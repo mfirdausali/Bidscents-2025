@@ -287,6 +287,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin-specific endpoints
+  app.get("/api/admin/users", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+      
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/admin/users/:id/ban", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const { isBanned } = z.object({ isBanned: z.boolean() }).parse(req.body);
+      
+      // Prevent admins from banning themselves or other admins
+      const userToBan = await storage.getUser(id);
+      if (!userToBan) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (userToBan.isAdmin) {
+        return res.status(403).json({ message: "Cannot ban administrator accounts" });
+      }
+      
+      const updatedUser = await storage.banUser(id, isBanned);
+      res.json(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/admin/orders", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+      
+      const orders = await storage.getAllOrders();
+      res.json(orders);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/admin/orders/:id/status", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const { status } = z.object({ 
+        status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"])
+      }).parse(req.body);
+      
+      const order = await storage.getOrderById(id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      const updatedOrder = await storage.updateOrderStatus(id, status);
+      res.json(updatedOrder);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

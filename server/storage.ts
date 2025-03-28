@@ -1,10 +1,11 @@
-import { users, products, categories, cartItems, reviews } from "@shared/schema";
+import { users, products, categories, cartItems, reviews, orders, orderItems } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
   CartItem, InsertCartItem, CartItemWithProduct,
-  Review, InsertReview
+  Review, InsertReview,
+  Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -34,6 +35,9 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, user: Partial<InsertUser>): Promise<User>;
+  getAllUsers(): Promise<User[]>;
+  banUser(id: number, isBanned: boolean): Promise<User>;
   
   // Category methods
   getAllCategories(): Promise<Category[]>;
@@ -56,11 +60,20 @@ export interface IStorage {
   addToCart(cartItem: InsertCartItem): Promise<CartItem>;
   updateCartItem(id: number, quantity: number): Promise<CartItem>;
   removeFromCart(id: number): Promise<void>;
+  clearCart(userId: number): Promise<void>;
   
   // Review methods
   getProductReviews(productId: number): Promise<Review[]>;
   getUserProductReview(userId: number, productId: number): Promise<Review | undefined>;
   createReview(review: InsertReview): Promise<Review>;
+  
+  // Order methods
+  createOrder(order: InsertOrder): Promise<Order>;
+  addOrderItem(orderItem: InsertOrderItem): Promise<OrderItem>;
+  getOrderById(id: number): Promise<OrderWithItems | undefined>;
+  getUserOrders(userId: number): Promise<OrderWithItems[]>;
+  getAllOrders(): Promise<OrderWithItems[]>;
+  updateOrderStatus(id: number, status: string): Promise<Order>;
   
   // Session storage
   sessionStore: any;
@@ -72,6 +85,8 @@ export class MemStorage implements IStorage {
   private products: Map<number, Product>;
   private cartItems: Map<number, CartItem>;
   private reviews: Map<number, Review>;
+  private orders: Map<number, Order>;
+  private orderItems: Map<number, OrderItem>;
   sessionStore: any;
   currentIds: {
     users: number;
@@ -79,6 +94,8 @@ export class MemStorage implements IStorage {
     products: number;
     cartItems: number;
     reviews: number;
+    orders: number;
+    orderItems: number;
   };
 
   constructor() {
@@ -87,12 +104,16 @@ export class MemStorage implements IStorage {
     this.products = new Map();
     this.cartItems = new Map();
     this.reviews = new Map();
+    this.orders = new Map();
+    this.orderItems = new Map();
     this.currentIds = {
       users: 1,
       categories: 1,
       products: 1,
       cartItems: 1,
       reviews: 1,
+      orders: 1,
+      orderItems: 1
     };
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // 1 day
@@ -136,9 +157,40 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentIds.users++;
-    const user: User = { ...insertUser, id };
+    const user: User = { 
+      ...insertUser, 
+      id,
+      isAdmin: insertUser.isAdmin || false,
+      isBanned: insertUser.isBanned || false
+    };
     this.users.set(id, user);
     return user;
+  }
+  
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
+    const user = this.users.get(id);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    const updatedUser = { ...user, ...userData };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+  
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+  
+  async banUser(id: number, isBanned: boolean): Promise<User> {
+    const user = this.users.get(id);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    const updatedUser = { ...user, isBanned };
+    this.users.set(id, updatedUser);
+    return updatedUser;
   }
 
   // Category methods
@@ -295,6 +347,15 @@ export class MemStorage implements IStorage {
   async removeFromCart(id: number): Promise<void> {
     this.cartItems.delete(id);
   }
+  
+  async clearCart(userId: number): Promise<void> {
+    // Find all cart items for this user and remove them
+    for (const [cartItemId, cartItem] of this.cartItems.entries()) {
+      if (cartItem.userId === userId) {
+        this.cartItems.delete(cartItemId);
+      }
+    }
+  }
 
   // Review methods
   async getProductReviews(productId: number): Promise<Review[]> {
@@ -315,6 +376,76 @@ export class MemStorage implements IStorage {
     const review: Review = { ...insertReview, id, createdAt };
     this.reviews.set(id, review);
     return review;
+  }
+  
+  // Order methods
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    const id = this.currentIds.orders++;
+    const createdAt = new Date();
+    const order: Order = { ...insertOrder, id, createdAt };
+    this.orders.set(id, order);
+    return order;
+  }
+  
+  async addOrderItem(insertOrderItem: InsertOrderItem): Promise<OrderItem> {
+    const id = this.currentIds.orderItems++;
+    const orderItem: OrderItem = { ...insertOrderItem, id };
+    this.orderItems.set(id, orderItem);
+    return orderItem;
+  }
+  
+  async getOrderById(id: number): Promise<OrderWithItems | undefined> {
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+    
+    const items = Array.from(this.orderItems.values())
+      .filter(item => item.orderId === id)
+      .map(item => {
+        const product = this.products.get(item.productId);
+        if (!product) {
+          throw new Error(`Product not found for order item: ${item.id}`);
+        }
+        return { ...item, product };
+      });
+    
+    const user = this.users.get(order.userId);
+    if (!user) {
+      throw new Error(`User not found for order: ${order.id}`);
+    }
+    
+    return {
+      ...order,
+      items,
+      user
+    };
+  }
+  
+  async getUserOrders(userId: number): Promise<OrderWithItems[]> {
+    const userOrders = Array.from(this.orders.values())
+      .filter(order => order.userId === userId);
+    
+    return Promise.all(
+      userOrders.map(order => this.getOrderById(order.id))
+    ) as Promise<OrderWithItems[]>;
+  }
+  
+  async getAllOrders(): Promise<OrderWithItems[]> {
+    const allOrders = Array.from(this.orders.values());
+    
+    return Promise.all(
+      allOrders.map(order => this.getOrderById(order.id))
+    ) as Promise<OrderWithItems[]>;
+  }
+  
+  async updateOrderStatus(id: number, status: string): Promise<Order> {
+    const order = this.orders.get(id);
+    if (!order) {
+      throw new Error("Order not found");
+    }
+    
+    const updatedOrder: Order = { ...order, status };
+    this.orders.set(id, updatedOrder);
+    return updatedOrder;
   }
 
   // Helper methods
@@ -390,6 +521,38 @@ export class DatabaseStorage implements IStorage {
   async createUser(user: InsertUser): Promise<User> {
     const [newUser] = await db.insert(users).values(user).returning();
     return newUser;
+  }
+  
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(userData)
+      .where(eq(users.id, id))
+      .returning();
+    
+    if (!updatedUser) {
+      throw new Error("User not found");
+    }
+    
+    return updatedUser;
+  }
+  
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+  
+  async banUser(id: number, isBanned: boolean): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({ isBanned })
+      .where(eq(users.id, id))
+      .returning();
+    
+    if (!updatedUser) {
+      throw new Error("User not found");
+    }
+    
+    return updatedUser;
   }
 
   // Category methods
@@ -552,6 +715,10 @@ export class DatabaseStorage implements IStorage {
   async removeFromCart(id: number): Promise<void> {
     await db.delete(cartItems).where(eq(cartItems.id, id));
   }
+  
+  async clearCart(userId: number): Promise<void> {
+    await db.delete(cartItems).where(eq(cartItems.userId, userId));
+  }
 
   // Review methods
   async getProductReviews(productId: number): Promise<Review[]> {
@@ -575,6 +742,83 @@ export class DatabaseStorage implements IStorage {
   async createReview(review: InsertReview): Promise<Review> {
     const [newReview] = await db.insert(reviews).values(review).returning();
     return newReview;
+  }
+  
+  // Order methods
+  async createOrder(order: InsertOrder): Promise<Order> {
+    const [newOrder] = await db.insert(orders).values(order).returning();
+    return newOrder;
+  }
+  
+  async addOrderItem(orderItem: InsertOrderItem): Promise<OrderItem> {
+    const [newItem] = await db.insert(orderItems).values(orderItem).returning();
+    return newItem;
+  }
+  
+  async getOrderById(id: number): Promise<OrderWithItems | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    if (!order) return undefined;
+    
+    // Get order items with products
+    const orderItemsResult = await db.select().from(orderItems).where(eq(orderItems.orderId, id));
+    
+    const items = await Promise.all(orderItemsResult.map(async (item) => {
+      const [product] = await db.select().from(products).where(eq(products.id, item.productId));
+      
+      if (!product) {
+        throw new Error(`Product not found for order item: ${item.id}`);
+      }
+      
+      return { ...item, product };
+    }));
+    
+    // Get user
+    const [user] = await db.select().from(users).where(eq(users.id, order.userId));
+    
+    if (!user) {
+      throw new Error(`User not found for order: ${order.id}`);
+    }
+    
+    return {
+      ...order,
+      items,
+      user
+    };
+  }
+  
+  async getUserOrders(userId: number): Promise<OrderWithItems[]> {
+    const userOrders = await db.select()
+      .from(orders)
+      .where(eq(orders.userId, userId))
+      .orderBy(desc(orders.createdAt));
+    
+    return Promise.all(
+      userOrders.map(order => this.getOrderById(order.id))
+    ) as Promise<OrderWithItems[]>;
+  }
+  
+  async getAllOrders(): Promise<OrderWithItems[]> {
+    const allOrders = await db.select()
+      .from(orders)
+      .orderBy(desc(orders.createdAt));
+    
+    return Promise.all(
+      allOrders.map(order => this.getOrderById(order.id))
+    ) as Promise<OrderWithItems[]>;
+  }
+  
+  async updateOrderStatus(id: number, status: string): Promise<Order> {
+    const [updatedOrder] = await db
+      .update(orders)
+      .set({ status })
+      .where(eq(orders.id, id))
+      .returning();
+    
+    if (!updatedOrder) {
+      throw new Error("Order not found");
+    }
+    
+    return updatedOrder;
   }
 
   // Helper methods
