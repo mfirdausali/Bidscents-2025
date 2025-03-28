@@ -71,6 +71,12 @@ const productSchema = z.object({
   categoryId: z.number().int().positive({ message: "Please select a category" }),
   isNew: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
+  // Secondhand perfume specific fields
+  remainingPercentage: z.number().int().min(1).max(100).default(100),
+  batchCode: z.string().optional(),
+  purchaseYear: z.number().int().min(1970).max(new Date().getFullYear()).optional(),
+  boxCondition: z.string().optional(),
+  listingType: z.enum(["fixed", "negotiable", "auction"]).default("fixed"),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -109,6 +115,12 @@ export default function SellerDashboard() {
       categoryId: 0,
       isNew: false,
       isFeatured: false,
+      // Secondhand perfume specific fields
+      remainingPercentage: 100,
+      batchCode: "",
+      purchaseYear: new Date().getFullYear(),
+      boxCondition: "",
+      listingType: "fixed",
     },
   });
 
@@ -187,10 +199,16 @@ export default function SellerDashboard() {
 
   // Handle form submission
   const onSubmitProduct = (data: ProductFormValues) => {
+    // Include sellerId from the logged-in user
+    const productWithSellerId = {
+      ...data,
+      sellerId: user?.id || 0,
+    };
+    
     if (isEditMode && currentProductId) {
-      updateProductMutation.mutate({ id: currentProductId, product: data });
+      updateProductMutation.mutate({ id: currentProductId, product: productWithSellerId });
     } else {
-      createProductMutation.mutate(data);
+      createProductMutation.mutate(productWithSellerId);
     }
   };
 
@@ -207,8 +225,14 @@ export default function SellerDashboard() {
       imageUrl: product.imageUrl,
       stockQuantity: product.stockQuantity,
       categoryId: product.categoryId || 1,
-      isNew: product.isNew,
-      isFeatured: product.isFeatured,
+      isNew: product.isNew === null ? false : product.isNew,
+      isFeatured: product.isFeatured === null ? false : product.isFeatured,
+      // Secondhand perfume specific fields
+      remainingPercentage: product.remainingPercentage || 100,
+      batchCode: product.batchCode || "",
+      purchaseYear: product.purchaseYear || new Date().getFullYear(),
+      boxCondition: product.boxCondition || "",
+      listingType: (product.listingType as "fixed" | "negotiable" | "auction") || "fixed",
     });
     
     setIsDialogOpen(true);
@@ -236,6 +260,12 @@ export default function SellerDashboard() {
       categoryId: 0,
       isNew: false,
       isFeatured: false,
+      // Secondhand perfume specific fields
+      remainingPercentage: 100,
+      batchCode: "",
+      purchaseYear: new Date().getFullYear(),
+      boxCondition: "",
+      listingType: "fixed",
     });
     setIsDialogOpen(true);
   };
@@ -837,6 +867,113 @@ export default function SellerDashboard() {
                         />
                       </FormControl>
                       <FormLabel className="m-0">Feature this product</FormLabel>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              {/* Secondhand perfume specific fields */}
+              <h3 className="text-lg font-medium mt-8 mb-4">Perfume Condition Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="remainingPercentage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bottle Fullness (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min={1} 
+                          max={100} 
+                          placeholder="100"
+                          {...field}
+                          onChange={e => field.onChange(parseInt(e.target.value) || 100)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="purchaseYear"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Year</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min={1970} 
+                          max={new Date().getFullYear()}
+                          placeholder={new Date().getFullYear().toString()}
+                          {...field}
+                          onChange={e => field.onChange(parseInt(e.target.value) || new Date().getFullYear())}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="boxCondition"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Box Condition</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g., Good, Damaged, No Box"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="batchCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Batch Code (Optional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g., 8K01"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="listingType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Listing Type</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select listing type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="fixed">Fixed Price</SelectItem>
+                          <SelectItem value="negotiable">Negotiable</SelectItem>
+                          <SelectItem value="auction">Auction</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />

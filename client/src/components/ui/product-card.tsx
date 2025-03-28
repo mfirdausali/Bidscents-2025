@@ -89,6 +89,19 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   };
 
+  // Format listing type for display
+  const formatListingType = (type: string | undefined | null) => {
+    if (!type) return "Fixed Price";
+    switch (type) {
+      case "auction":
+        return "Auction";
+      case "negotiable":
+        return "Negotiable";
+      default:
+        return "Fixed Price";
+    }
+  };
+
   return (
     <div className="product-card bg-white rounded-lg overflow-hidden shadow">
       <div className="relative">
@@ -102,19 +115,35 @@ export function ProductCard({ product }: ProductCardProps) {
         <button className="absolute top-4 right-4 text-dark-grey hover:text-gold">
           <Heart className="h-5 w-5" />
         </button>
-        {product.isNew && (
-          <div className="absolute top-4 left-4 bg-gold text-rich-black text-xs px-2 py-1 rounded">
-            New
-          </div>
-        )}
+        {/* Condition badge */}
+        <div className="absolute top-4 left-4 bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded flex items-center">
+          {product.isNew ? 'Like New' : `${product.remainingPercentage || 100}% Full`}
+        </div>
+        
+        {/* Listing type badge */}
+        <div className="absolute bottom-4 left-4 bg-gold text-rich-black text-xs px-2 py-1 rounded">
+          {formatListingType(product.listingType)}
+        </div>
       </div>
       <div className="p-4">
-        <div className="text-sm text-gray-500 mb-1">{product.brand}</div>
+        <div className="flex justify-between items-center mb-1">
+          <div className="text-sm text-gray-500">{product.brand}</div>
+          {product.purchaseYear && (
+            <div className="text-xs text-gray-400">Year: {product.purchaseYear}</div>
+          )}
+        </div>
         <Link href={`/products/${product.id}`}>
           <h3 className="font-playfair text-xl font-medium mb-2 hover:text-gold transition">
             {product.name}
           </h3>
         </Link>
+        
+        {/* Seller info */}
+        <div className="text-xs text-gray-500 mb-2">
+          Seller: {product.seller?.username || 'Unknown'}
+        </div>
+        
+        {/* Reviews */}
         <div className="flex items-center mb-3">
           <div className="flex">
             {renderStars(product.averageRating)}
@@ -123,20 +152,22 @@ export function ProductCard({ product }: ProductCardProps) {
             ({product.reviews?.length || 0})
           </span>
         </div>
+        
         <div className="flex justify-between items-center">
-          <span className="font-semibold text-lg">${product.price.toFixed(2)}</span>
+          <span className="font-semibold text-lg">RM {product.price.toFixed(2)}</span>
+          
           <Button
             onClick={handleAddToCart}
             disabled={isAddingToCart}
-            className="bg-gold text-rich-black hover:bg-metallic-gold"
+            className="bg-gray-800 text-white hover:bg-gray-700 text-sm"
           >
             {isAddingToCart ? (
               <span className="flex items-center">
-                <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
+                <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full"></span>
                 Adding...
               </span>
             ) : (
-              "Add to Cart"
+              product.listingType === "auction" ? "Bid Now" : "Buy Now"
             )}
           </Button>
         </div>
