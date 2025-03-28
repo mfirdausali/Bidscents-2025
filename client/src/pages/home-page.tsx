@@ -34,20 +34,20 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative h-[500px] bg-cover bg-center" 
         style={{ 
-          backgroundImage: "url('https://images.unsplash.com/photo-1600612253971-422e7f7faeb6?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80')" 
+          backgroundImage: "url('https://images.unsplash.com/photo-1594035910387-fea47794261f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8NHx8dG9tJTIwZm9yZCUyMHBlcmZ1bWV8ZW58MHx8MHx8&auto=format&fit=crop&w=800&q=60')" 
         }}
       >
         <div className="absolute inset-0 bg-rich-black opacity-50"></div>
         <div className="container mx-auto px-6 relative h-full flex flex-col justify-center text-white">
-          <h1 className="font-playfair text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-shadow-md">Find Luxury Fragrances at Bargain Prices</h1>
-          <p className="font-lato text-lg md:text-xl mb-8 max-w-xl text-shadow-sm">Buy, sell, and bid on pre-owned designer and niche perfumes from our trusted community of fragrance enthusiasts.</p>
+          <h1 className="font-playfair text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-shadow">Find Luxury Fragrances at Bargain Prices</h1>
+          <p className="font-lato text-lg md:text-xl mb-8 pt-5 max-w-xl text-shadow">Buy, sell, and bid on pre-owned designer and niche perfumes from our trusted community of fragrance enthusiasts.</p>
           <div>
             <Link href="/products">
-              <Button className="bg-gold text-rich-black px-8 py-6 rounded-full font-medium hover:bg-metallic-gold transition">
+              <Button className="bg-white bg-opacity-10 text-white px-8 py-6 rounded-full font-medium hover:bg-metallic-gold transition">
                 Shop Now
               </Button>
             </Link>
-            <Button variant="outline" className="ml-4 text-white border border-white px-8 py-6 rounded-full font-medium hover:bg-white hover:text-rich-black transition">
+            <Button variant="outline" className="ml-4 text-black border border-white px-8 py-6 rounded-full font-medium hover:bg-white hover:text-rich-black transition">
               Learn More
             </Button>
           </div>
