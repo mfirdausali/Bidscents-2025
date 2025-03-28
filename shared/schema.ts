@@ -42,7 +42,8 @@ export const products = pgTable("products", {
   batchCode: text("batch_code"), // Authenticity batch code
   purchaseYear: integer("purchase_year"), // When was it originally purchased
   boxCondition: text("box_condition"), // Condition of the box/packaging
-  listingType: text("listing_type").default("fixed") // fixed, negotiable, auction
+  listingType: text("listing_type").default("fixed"), // fixed, negotiable, auction
+  volume: text("volume") // Bottle size (e.g., "50ml", "100ml", "3.4oz")
 });
 
 // Cart items table
@@ -110,6 +111,7 @@ export const insertProductSchema = createInsertSchema(products).pick({
   purchaseYear: true,
   boxCondition: true,
   listingType: true,
+  volume: true,
 });
 
 export const insertCategorySchema = createInsertSchema(categories).pick({

@@ -256,7 +256,9 @@ export default function ProductDetailPage() {
                   </Badge>
                 </div>
                 
-                <div className="text-gray-500 mb-1">{product.brand}</div>
+                <div className="text-gray-500 mb-1">
+                  {product.brand} {product.volume && <span className="text-sm">({product.volume})</span>}
+                </div>
                 <h1 className="font-playfair text-2xl md:text-3xl font-bold mb-3">{product.name}</h1>
                 
                 <div className="flex items-center mb-3">
@@ -453,6 +455,10 @@ export default function ProductDetailPage() {
                       {product.listingType === "auction" ? "Auction" : 
                        product.listingType === "negotiable" ? "Negotiable Price" : "Fixed Price"}
                     </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-1">Volume:</h4>
+                    <p className="text-gray-600">{product.volume || "Not specified"}</p>
                   </div>
                   <div>
                     <h4 className="font-medium mb-1">Concentration:</h4>
