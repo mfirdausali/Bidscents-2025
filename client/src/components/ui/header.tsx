@@ -96,10 +96,10 @@ export function Header() {
               </DropdownMenu>
             ) : (
               <>
-                <Link href="/auth" className="text-sm hover:text-gold transition">
+                <Link href="/auth" className="text-sm hover:text-gold transition font-medium">
                   Sign In
                 </Link>
-                <Link href="/auth?tab=register" className="text-sm bg-gold text-rich-black px-3 py-1 rounded hover:bg-metallic-gold transition">
+                <Link href="/auth?tab=register" className="text-sm bg-gold text-black font-semibold px-3 py-1 rounded hover:bg-amber-500 transition">
                   Register
                 </Link>
               </>
@@ -142,7 +142,7 @@ export function Header() {
             >
               <ShoppingBag className="h-5 w-5" />
               {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-gold text-xs text-rich-black rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute -top-2 -right-2 bg-amber-500 text-xs text-black font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {cartCount}
                 </span>
               )}

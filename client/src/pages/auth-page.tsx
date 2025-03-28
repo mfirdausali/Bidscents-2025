@@ -24,8 +24,8 @@ const registerSchema = insertUserSchema.extend({
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
   confirmPassword: z.string(),
   email: z.string().email({ message: "Please enter a valid email address" }),
-  terms: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the terms and conditions" }),
+  terms: z.boolean().refine(val => val === true, {
+    message: "You must accept the terms and conditions"
   }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
@@ -40,6 +40,7 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   
   // Get tab from URL query parameter
   useEffect(() => {
@@ -156,7 +157,7 @@ export default function AuthPage() {
                   <CardFooter>
                     <Button 
                       type="submit" 
-                      className="w-full bg-gold text-rich-black hover:bg-metallic-gold"
+                      className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
                       disabled={loginMutation.isPending}
                     >
                       {loginMutation.isPending ? (
@@ -273,11 +274,17 @@ export default function AuthPage() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="terms"
+                        checked={termsAccepted}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
+                          setTermsAccepted(isChecked);
+                          registerForm.setValue("terms", isChecked, { shouldValidate: true });
+                        }}
                         {...registerForm.register("terms")}
                       />
                       <Label htmlFor="terms">
                         I agree to the{" "}
-                        <a href="#" className="text-gold hover:underline">
+                        <a href="#" className="text-amber-600 hover:underline">
                           terms and conditions
                         </a>
                       </Label>
@@ -291,7 +298,7 @@ export default function AuthPage() {
                   <CardFooter>
                     <Button 
                       type="submit" 
-                      className="w-full bg-gold text-rich-black hover:bg-metallic-gold"
+                      className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
                       disabled={registerMutation.isPending}
                     >
                       {registerMutation.isPending ? (
