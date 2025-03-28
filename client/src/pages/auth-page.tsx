@@ -20,14 +20,12 @@ const loginSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 });
 
-// Create a custom schema for registration that includes terms field
-const registerSchema = z.object({
-  ...insertUserSchema.shape,
+const registerSchema = insertUserSchema.extend({
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
   confirmPassword: z.string(),
   email: z.string().email({ message: "Please enter a valid email address" }),
   terms: z.boolean().refine(val => val === true, {
-    message: "You must accept the terms and conditions",
+    message: "You must accept the terms and conditions"
   }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
@@ -42,6 +40,7 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   
   // Get tab from URL query parameter
   useEffect(() => {
@@ -80,7 +79,6 @@ export default function AuthPage() {
       lastName: "",
       isSeller: false,
       isAdmin: false,
-      isBanned: false,
       terms: false,
     },
   });
@@ -159,7 +157,7 @@ export default function AuthPage() {
                   <CardFooter>
                     <Button 
                       type="submit" 
-                      className="w-full bg-gold text-rich-black hover:bg-metallic-gold"
+                      className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
                       disabled={loginMutation.isPending}
                     >
                       {loginMutation.isPending ? (
@@ -263,50 +261,37 @@ export default function AuthPage() {
                       <Checkbox
                         id="isSeller"
                         checked={registerForm.watch("isSeller")}
-                        onCheckedChange={(checked) => 
-                          registerForm.setValue("isSeller", checked === true)
-                        }
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
+                          registerForm.setValue("isSeller", isChecked);
+                        }}
                       />
-                      <Label htmlFor="isSeller" className="cursor-pointer" onClick={() => 
-                        registerForm.setValue("isSeller", !registerForm.watch("isSeller"))
-                      }>
-                        I want to sell perfumes
-                      </Label>
+                      <Label htmlFor="isSeller">I want to sell perfumes</Label>
                     </div>
-                    {/* Dev mode admin checkbox */}
-                    {import.meta.env.DEV && (
-                      <div className="flex items-center space-x-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
-                        <Checkbox
-                          id="isAdmin"
-                          checked={registerForm.watch("isAdmin")}
-                          onCheckedChange={(checked) => 
-                            registerForm.setValue("isAdmin", checked === true)
-                          }
-                        />
-                        <Label htmlFor="isAdmin" className="text-amber-800 cursor-pointer" onClick={() => 
-                          registerForm.setValue("isAdmin", !registerForm.watch("isAdmin"))
-                        }>
-                          <strong>DEV MODE:</strong> Register as admin
-                        </Label>
-                      </div>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="isAdmin"
+                        checked={registerForm.watch("isAdmin")}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
+                          registerForm.setValue("isAdmin", isChecked);
+                        }}
+                      />
+                      <Label htmlFor="isAdmin" className="text-amber-600 font-medium">Admin account (development only)</Label>
+                    </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="terms"
-                        checked={registerForm.watch("terms")}
-                        onCheckedChange={(checked) => 
-                          registerForm.setValue("terms", checked === true, { 
-                            shouldValidate: true 
-                          })
-                        }
+                        checked={termsAccepted}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
+                          setTermsAccepted(isChecked);
+                          registerForm.setValue("terms", isChecked, { shouldValidate: true });
+                        }}
                       />
-                      <Label htmlFor="terms" className="cursor-pointer" onClick={() => 
-                        registerForm.setValue("terms", !registerForm.watch("terms"), {
-                          shouldValidate: true
-                        })
-                      }>
+                      <Label htmlFor="terms">
                         I agree to the{" "}
-                        <a href="#" className="text-gold hover:underline">
+                        <a href="#" className="text-amber-600 hover:underline">
                           terms and conditions
                         </a>
                       </Label>
@@ -320,7 +305,7 @@ export default function AuthPage() {
                   <CardFooter>
                     <Button 
                       type="submit" 
-                      className="w-full bg-gold text-rich-black hover:bg-metallic-gold"
+                      className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
                       disabled={registerMutation.isPending}
                     >
                       {registerMutation.isPending ? (

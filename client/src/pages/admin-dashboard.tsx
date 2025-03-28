@@ -1,320 +1,378 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { User } from "@shared/schema";
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Header } from "@/components/ui/header";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { 
-  ShieldAlert, 
-  UserX, 
-  User as UserIcon, 
-  Store, 
-  Loader2 
+  Table, TableBody, TableCaption, TableCell, 
+  TableHead, TableHeader, TableRow 
+} from "@/components/ui/table";
+import { 
+  Dialog, DialogContent, DialogDescription, 
+  DialogHeader, DialogTitle 
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { User, Order } from "@shared/schema";
+import { 
+  Users, Package, Truck, AlertCircle, CheckCircle, 
+  UserX, UserCheck, ShoppingBag 
 } from "lucide-react";
 
 export default function AdminDashboard() {
-  const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-
-  // Check if user is admin
-  useEffect(() => {
-    if (user && !user.isAdmin) {
-      navigate("/");
-      toast({
-        title: "Access Denied",
-        description: "You don't have permission to access this page.",
-        variant: "destructive",
-      });
-    }
-  }, [user, navigate, toast]);
-
+  const [activeTab, setActiveTab] = useState("users");
+  const [userToAction, setUserToAction] = useState<User | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dialogAction, setDialogAction] = useState<"ban" | "unban" | null>(null);
+  
   // Fetch all users
-  const {
-    data: users = [],
-    isLoading,
-    error,
-  } = useQuery<User[]>({
+  const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/admin/users");
-      return res.json();
-    },
+    queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!user?.isAdmin,
   });
-
-  // Toggle user banned status
-  const toggleBanMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      isBanned,
-    }: {
-      userId: number;
-      isBanned: boolean;
-    }) => {
-      const res = await apiRequest(
-        "PATCH",
-        `/api/admin/users/${userId}/ban`,
-        { isBanned }
-      );
+  
+  // Fetch all orders
+  const { data: orders = [] } = useQuery<Order[]>({
+    queryKey: ["/api/admin/orders"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!user?.isAdmin && activeTab === "orders",
+  });
+  
+  // Ban/unban user mutation
+  const banUserMutation = useMutation({
+    mutationFn: async ({ userId, isBanned }: { userId: number, isBanned: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/ban`, { isBanned });
       return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setIsDialogOpen(false);
       toast({
         title: "Success",
-        description: "User status updated successfully",
+        description: dialogAction === "ban" ? "User has been banned" : "User has been unbanned",
       });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: `Failed to update user: ${error.message}`,
+        description: error.message,
         variant: "destructive",
       });
     },
   });
-
-  // Toggle user role (admin/seller)
-  const toggleRoleMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      role,
-      value,
-    }: {
-      userId: number;
-      role: "isAdmin" | "isSeller";
-      value: boolean;
-    }) => {
-      const res = await apiRequest(
-        "PATCH",
-        `/api/admin/users/${userId}/role`,
-        { [role]: value }
-      );
+  
+  // Update order status mutation
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: number, status: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/orders/${orderId}/status`, { status });
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       toast({
         title: "Success",
-        description: "User role updated successfully",
+        description: "Order status has been updated",
       });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: `Failed to update user role: ${error.message}`,
+        description: error.message,
         variant: "destructive",
       });
     },
   });
-
-  // Delete user
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: number) => {
-      await apiRequest("DELETE", `/api/admin/users/${userId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({
-        title: "Success",
-        description: "User deleted successfully",
-      });
-      setIsDeleteDialogOpen(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: `Failed to delete user: ${error.message}`,
-        variant: "destructive",
-      });
-      setIsDeleteDialogOpen(false);
-    },
-  });
-
-  const handleDeleteUser = (user: User) => {
-    setUserToDelete(user);
-    setIsDeleteDialogOpen(true);
+  
+  // Redirect if not admin
+  useEffect(() => {
+    if (user && !user.isAdmin) {
+      window.location.href = "/";
+    }
+  }, [user]);
+  
+  // Handlers
+  const handleBanUser = (user: User) => {
+    setUserToAction(user);
+    setDialogAction(user.isBanned ? "unban" : "ban");
+    setIsDialogOpen(true);
   };
-
-  const confirmDelete = () => {
-    if (userToDelete) {
-      deleteUserMutation.mutate(userToDelete.id);
+  
+  const confirmBanUser = () => {
+    if (userToAction && dialogAction) {
+      banUserMutation.mutate({ 
+        userId: userToAction.id, 
+        isBanned: dialogAction === "ban" 
+      });
     }
   };
-
-  if (!user?.isAdmin) {
-    return null;
-  }
-
+  
+  const handleUpdateOrderStatus = (orderId: number, status: string) => {
+    updateOrderStatusMutation.mutate({ orderId, status });
+  };
+  
+  // Calculate stats
+  const totalUsers = users.length;
+  const totalSellers = users.filter(u => u.isSeller).length;
+  const totalBannedUsers = users.filter(u => u.isBanned).length;
+  const totalOrders = orders.length;
+  const pendingOrders = orders.filter(o => o.status === "pending").length;
+  const completedOrders = orders.filter(o => o.status === "completed").length;
+  
   return (
-    <div className="container py-10">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center">
-            <ShieldAlert className="h-6 w-6 text-gold mr-2" />
-            Admin Dashboard
-          </CardTitle>
-          <CardDescription>
-            Manage users, roles, and permissions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gold" />
-            </div>
-          ) : error ? (
-            <div className="text-center text-red-500 p-8">
-              Error loading users. Please try again.
-            </div>
-          ) : (
-            <Table>
-              <TableCaption>List of all registered users</TableCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Admin</TableHead>
-                  <TableHead className="text-center">Seller</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users?.map((user: User) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.username}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      {user.firstName} {user.lastName}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center">
-                        <Checkbox
-                          checked={user.isAdmin}
-                          onCheckedChange={(checked) => 
-                            toggleRoleMutation.mutate({
-                              userId: user.id,
-                              role: "isAdmin",
-                              value: !!checked,
-                            })
-                          }
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center">
-                        <Checkbox
-                          checked={user.isSeller}
-                          onCheckedChange={(checked) =>
-                            toggleRoleMutation.mutate({
-                              userId: user.id,
-                              role: "isSeller",
-                              value: !!checked,
-                            })
-                          }
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <Switch
-                          checked={!user.isBanned}
-                          onCheckedChange={(checked) =>
-                            toggleBanMutation.mutate({
-                              userId: user.id,
-                              isBanned: !checked,
-                            })
-                          }
-                        />
-                        <Label className={user.isBanned ? "text-red-500" : "text-green-500"}>
-                          {user.isBanned ? "Banned" : "Active"}
-                        </Label>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user)}
-                      >
-                        <UserX className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Delete User Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the user account for{" "}
-              <strong>{userToDelete?.username}</strong> and remove all their data.
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-500 hover:bg-red-600"
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      
+      <main className="flex-grow bg-gray-50">
+        <div className="container mx-auto px-6 py-8">
+          <div className="mb-8">
+            <h1 className="font-playfair text-3xl font-bold mb-2">Admin Dashboard</h1>
+            <p className="text-gray-600">Manage users, products, and orders</p>
+          </div>
+          
+          {/* Dashboard summary */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center">
+                  <div className="bg-gold/20 p-3 rounded-full mr-4">
+                    <Users className="h-6 w-6 text-gold" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Total Users</p>
+                    <h3 className="text-2xl font-bold">{totalUsers}</h3>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center">
+                  <div className="bg-gold/20 p-3 rounded-full mr-4">
+                    <Package className="h-6 w-6 text-gold" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Sellers</p>
+                    <h3 className="text-2xl font-bold">{totalSellers}</h3>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center">
+                  <div className="bg-gold/20 p-3 rounded-full mr-4">
+                    <ShoppingBag className="h-6 w-6 text-gold" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Total Orders</p>
+                    <h3 className="text-2xl font-bold">{totalOrders}</h3>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="users">Users</TabsTrigger>
+              <TabsTrigger value="orders">Orders</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="users">
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableCaption>A list of all users.</TableCaption>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Username</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>{user.id}</TableCell>
+                          <TableCell>{user.username}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>{`${user.firstName || ''} ${user.lastName || ''}`}</TableCell>
+                          <TableCell>
+                            {user.isAdmin ? (
+                              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">Admin</span>
+                            ) : user.isSeller ? (
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">Seller</span>
+                            ) : (
+                              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">Customer</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {user.isBanned ? (
+                              <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">Banned</span>
+                            ) : (
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Active</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleBanUser(user)}
+                              className={user.isBanned ? "text-green-600" : "text-red-600"}
+                              disabled={user.isAdmin} // Can't ban admins
+                            >
+                              {user.isBanned ? (
+                                <>
+                                  <UserCheck className="h-4 w-4 mr-1" />
+                                  Unban
+                                </>
+                              ) : (
+                                <>
+                                  <UserX className="h-4 w-4 mr-1" />
+                                  Ban
+                                </>
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="orders">
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableCaption>A list of all orders.</TableCaption>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order ID</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {orders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell>#{order.id}</TableCell>
+                          <TableCell>{order.userId}</TableCell>
+                          <TableCell>${order.total.toFixed(2)}</TableCell>
+                          <TableCell>{new Date(order.createdAt!).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            {order.status === "pending" && (
+                              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">Pending</span>
+                            )}
+                            {order.status === "processing" && (
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">Processing</span>
+                            )}
+                            {order.status === "shipped" && (
+                              <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-xs">Shipped</span>
+                            )}
+                            {order.status === "delivered" && (
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Delivered</span>
+                            )}
+                            {order.status === "cancelled" && (
+                              <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">Cancelled</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="space-x-2">
+                            {order.status === "pending" && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleUpdateOrderStatus(order.id, "processing")}
+                              >
+                                <Truck className="h-4 w-4 mr-1" />
+                                Process
+                              </Button>
+                            )}
+                            {order.status === "processing" && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleUpdateOrderStatus(order.id, "shipped")}
+                              >
+                                <Truck className="h-4 w-4 mr-1" />
+                                Ship
+                              </Button>
+                            )}
+                            {order.status === "shipped" && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleUpdateOrderStatus(order.id, "delivered")}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Deliver
+                              </Button>
+                            )}
+                            {(order.status === "pending" || order.status === "processing") && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="text-red-600"
+                                onClick={() => handleUpdateOrderStatus(order.id, "cancelled")}
+                              >
+                                <AlertCircle className="h-4 w-4 mr-1" />
+                                Cancel
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </main>
+      
+      {/* Ban User Confirmation Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {dialogAction === "ban" ? "Ban User" : "Unban User"}
+            </DialogTitle>
+            <DialogDescription>
+              {dialogAction === "ban"
+                ? "Are you sure you want to ban this user? They will no longer be able to make purchases."
+                : "Are you sure you want to unban this user? They will be able to use the platform again."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={confirmBanUser}
+              className={dialogAction === "ban" ? "bg-red-600 hover:bg-red-700" : ""}
             >
-              {deleteUserMutation.isPending ? (
-                <span className="flex items-center">
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Deleting...
-                </span>
-              ) : (
-                "Delete User"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {dialogAction === "ban" ? "Ban User" : "Unban User"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

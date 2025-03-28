@@ -46,7 +46,7 @@ export function ProtectedRoute({
       <Route path={path}>
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
           <h1 className="font-playfair text-2xl mb-4">Admin Access Required</h1>
-          <p className="text-gray-600 mb-6">You don't have permission to access this page.</p>
+          <p className="text-gray-600 mb-6">You need administrator privileges to access this page.</p>
           <Redirect to="/" />
         </div>
       </Route>

@@ -57,6 +57,24 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Orders table
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  total: doublePrecision("total").notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Order items table
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  quantity: integer("quantity").notNull(),
+  price: doublePrecision("price").notNull(),
+});
+
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -101,6 +119,19 @@ export const insertReviewSchema = createInsertSchema(reviews).pick({
   comment: true,
 });
 
+export const insertOrderSchema = createInsertSchema(orders).pick({
+  userId: true,
+  total: true,
+  status: true,
+});
+
+export const insertOrderItemSchema = createInsertSchema(orderItems).pick({
+  orderId: true,
+  productId: true,
+  quantity: true,
+  price: true,
+});
+
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -117,6 +148,12 @@ export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
 export type Review = typeof reviews.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+
+export type OrderItem = typeof orderItems.$inferSelect;
+export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
+
 // Extended types
 export type ProductWithDetails = Product & {
   category?: Category;
@@ -127,6 +164,11 @@ export type ProductWithDetails = Product & {
 
 export type CartItemWithProduct = CartItem & {
   product: Product;
+};
+
+export type OrderWithItems = Order & {
+  items: (OrderItem & { product: Product })[];
+  user: User;
 };
 
 // Note: Relations are handled through joins in the DatabaseStorage implementation

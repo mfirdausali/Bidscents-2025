@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
-import { Search, Heart, ShoppingBag, User, LogOut, Package, ShieldAlert } from "lucide-react";
+import { Search, Heart, ShoppingBag, User, LogOut, Package, Shield } from "lucide-react";
 
 export function Header() {
   const [location] = useLocation();
@@ -64,7 +64,7 @@ export function Header() {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="link" className="text-sm text-white hover:text-gold transition p-0">
+                  <Button variant="link" className="text-sm text-black hover:text-gold transition p-0">
                     <User className="h-4 w-4 mr-1" />
                     {user.username}
                   </Button>
@@ -72,19 +72,19 @@ export function Header() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {user.isAdmin && (
-                    <Link href="/admin/dashboard">
-                      <DropdownMenuItem className="cursor-pointer">
-                        <ShieldAlert className="h-4 w-4 mr-2" />
-                        Admin Dashboard
-                      </DropdownMenuItem>
-                    </Link>
-                  )}
                   {user.isSeller && (
                     <Link href="/seller/dashboard">
                       <DropdownMenuItem className="cursor-pointer">
                         <Package className="h-4 w-4 mr-2" />
                         Seller Dashboard
+                      </DropdownMenuItem>
+                    </Link>
+                  )}
+                  {user.isAdmin && (
+                    <Link href="/admin/dashboard">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Shield className="h-4 w-4 mr-2" />
+                        Admin Dashboard
                       </DropdownMenuItem>
                     </Link>
                   )}
@@ -96,10 +96,10 @@ export function Header() {
               </DropdownMenu>
             ) : (
               <>
-                <Link href="/auth" className="text-sm hover:text-gold transition text-black">
+                <Link href="/auth" className="text-sm hover:text-gold transition font-medium text-black">
                   Sign In
                 </Link>
-                <Link href="/auth?tab=register" className="text-sm bg-gold text-black px-3 py-1 rounded hover:bg-metallic-gold transition">
+                <Link href="/auth?tab=register" className="text-sm bg-gold text-black font-semibold px-3 py-1 rounded hover:bg-amber-500 transition">
                   Register
                 </Link>
               </>
@@ -142,7 +142,7 @@ export function Header() {
             >
               <ShoppingBag className="h-5 w-5" />
               {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-gold text-xs text-rich-black rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute -top-2 -right-2 bg-amber-500 text-xs text-black font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
