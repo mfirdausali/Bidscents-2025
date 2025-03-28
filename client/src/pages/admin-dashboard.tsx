@@ -29,11 +29,41 @@ export default function AdminDashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogAction, setDialogAction] = useState<"ban" | "unban" | null>(null);
   
-  // Fetch all users
-  const { data: users = [] } = useQuery<User[]>({
+  // Debug logging
+  useEffect(() => {
+    console.log("Admin Dashboard - Current user:", user);
+    console.log("Is user admin?", user?.isAdmin);
+  }, [user]);
+  
+  // Fetch all users with improved error handling
+  const { 
+    data: users = [], 
+    isError, 
+    error: usersError,
+    refetch: refetchUsers 
+  } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
-    queryFn: getQueryFn({ on401: "throw" }),
-    enabled: !!user?.isAdmin,
+    queryFn: async ({ queryKey }) => {
+      console.log("Fetching admin users, auth status:", !!user);
+      console.log("isAdmin status:", user?.isAdmin);
+      
+      const res = await fetch(queryKey[0] as string, {
+        credentials: "include"
+      });
+      
+      console.log("Admin users API response status:", res.status);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Admin users API error:", errorText);
+        throw new Error(`${res.status}: ${errorText || res.statusText}`);
+      }
+      
+      const data = await res.json();
+      console.log("Admin users API data:", data);
+      return data;
+    },
+    enabled: !!user?.isAdmin
   });
   
   // Fetch all orders
@@ -129,6 +159,90 @@ export default function AdminDashboard() {
       
       <main className="flex-grow bg-gray-50">
         <div className="container mx-auto px-6 py-8">
+          {/* Debug panel - REMOVE IN PRODUCTION */}
+          <div className="mb-4 p-4 bg-gray-200 rounded-md">
+            <h2 className="text-sm font-bold mb-2">Debug Information</h2>
+            <p>User logged in: {user ? 'Yes' : 'No'}</p>
+            <p>Username: {user?.username}</p>
+            <p>Is Admin: {user?.isAdmin ? 'Yes' : 'No'}</p>
+            <p>User ID: {user?.id}</p>
+            <p>Users loaded: {users.length}</p>
+            
+            {isError && (
+              <div className="mt-2 p-2 bg-red-100 text-red-800 rounded">
+                <h3 className="font-bold">Error:</h3>
+                <p>{usersError?.message || "Unknown error"}</p>
+              </div>
+            )}
+            
+            <div className="flex space-x-2 mt-3">
+              <button 
+                className="px-3 py-1 bg-blue-500 text-white rounded text-xs"
+                onClick={() => {
+                  console.log("Current user:", user);
+                  console.log("Users array:", users);
+                  console.log("Manually fetching users...");
+                  fetch("/api/admin/users", { credentials: "include" })
+                    .then(res => {
+                      console.log("API Response Status:", res.status);
+                      return res.json().catch(e => {
+                        console.error("JSON parse error:", e);
+                        return { error: "Failed to parse JSON" };
+                      });
+                    })
+                    .then(data => console.log("API Response Data:", data))
+                    .catch(err => console.error("Fetch error:", err));
+                }}
+              >
+                Debug API Call
+              </button>
+              <button 
+                className="px-3 py-1 bg-green-500 text-white rounded text-xs"
+                onClick={() => {
+                  refetchUsers();
+                  console.log("Refetching users...");
+                }}
+              >
+                Refetch Users
+              </button>
+            </div>
+            
+            <div className="mt-3 pt-3 border-t border-gray-300">
+              <h3 className="text-sm font-bold mb-1">Force Login</h3>
+              <div className="flex space-x-2">
+                <button 
+                  className="px-3 py-1 bg-purple-500 text-white rounded text-xs"
+                  onClick={() => {
+                    console.log("Force login as admin");
+                    fetch("/api/login", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ username: "admin", password: "admin123" }),
+                      credentials: "include"
+                    })
+                    .then(res => {
+                      console.log("Login response status:", res.status);
+                      return res.json().catch(e => {
+                        console.error("JSON parse error:", e);
+                        return { error: "Failed to parse JSON" };
+                      });
+                    })
+                    .then(data => {
+                      console.log("Login response data:", data);
+                      // If login successful, refresh the page
+                      if (data && data.id) {
+                        window.location.reload();
+                      }
+                    })
+                    .catch(err => console.error("Login error:", err));
+                  }}
+                >
+                  Login as Admin
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="mb-8">
             <h1 className="font-playfair text-3xl font-bold mb-2">Admin Dashboard</h1>
             <p className="text-gray-600">Manage users, products, and orders</p>
