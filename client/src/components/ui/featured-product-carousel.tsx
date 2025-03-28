@@ -265,32 +265,54 @@ export function FeaturedProductCarousel() {
             <ArrowRight className="h-6 w-6" />
           </button>
           
-          {/* Carousel dots */}
-          <div className="mt-8 flex justify-center">
-            {featuredProducts.map((_, index) => (
-              <button
-                key={index}
-                className={`w-3 h-3 mx-1 rounded-full transition-colors duration-300 ${
-                  index === currentIndex ? 'bg-gold' : 'bg-gray-300'
-                }`}
-                onClick={() => {
-                  if (isTransitioning || index === currentIndex) return;
-                  
-                  // Start transition animation
-                  setIsTransitioning(true);
-                  
-                  // After a brief fade out, change the product
-                  setTimeout(() => {
-                    setCurrentIndex(index);
+          {/* Carousel dots and navigation buttons */}
+          <div className="mt-8 flex justify-center items-center">
+            {/* Left navigation button */}
+            <button 
+              className="bg-rich-black text-white h-8 w-8 rounded-full flex items-center justify-center mr-4 hover:bg-gold hover:text-rich-black transition"
+              onClick={handlePrev}
+              aria-label="Previous"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            
+            {/* Dots */}
+            <div className="flex">
+              {featuredProducts.map((_, index) => (
+                <button
+                  key={index}
+                  className={`w-3 h-3 mx-1 rounded-full transition-colors duration-300 ${
+                    index === currentIndex ? 'bg-gold' : 'bg-gray-300'
+                  }`}
+                  onClick={() => {
+                    if (isTransitioning || index === currentIndex) return;
                     
-                    // Allow time for the new product to render before fading back in
+                    // Start transition animation
+                    setIsTransitioning(true);
+                    
+                    // After a brief fade out, change the product
                     setTimeout(() => {
-                      setIsTransitioning(false);
-                    }, 50);
-                  }, 350);
-                }}
-              />
-            ))}
+                      setCurrentIndex(index);
+                      
+                      // Allow time for the new product to render before fading back in
+                      setTimeout(() => {
+                        setIsTransitioning(false);
+                      }, 50);
+                    }, 350);
+                  }}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+            
+            {/* Right navigation button */}
+            <button 
+              className="bg-rich-black text-white h-8 w-8 rounded-full flex items-center justify-center ml-4 hover:bg-gold hover:text-rich-black transition"
+              onClick={handleNext}
+              aria-label="Next"
+            >
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>
