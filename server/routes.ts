@@ -290,20 +290,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin-specific endpoints
   app.get("/api/admin/users", async (req, res, next) => {
     try {
-      console.log("Admin users API called - Session ID:", req.sessionID);
       console.log("Admin users API called - Auth status:", req.isAuthenticated());
-      console.log("Admin users API called - User data:", req.user);
-      console.log("Admin users API called - Cookies:", req.headers.cookie);
+      console.log("User data:", req.user);
       
-      // Treat the route as authenticated if the user has admin in their session
-      // This is a temporary fix for debugging - not for production
-      if (!req.isAuthenticated()) {
-        console.log("Admin access denied - Not authenticated");
-        return res.status(403).json({ message: "Unauthorized: Not authenticated" });
-      }
-      
-      if (!req.user.isAdmin) {
-        console.log("Admin access denied - Not admin. isAdmin:", req.user?.isAdmin);
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        console.log("Admin access denied - isAdmin:", req.user?.isAdmin);
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
       
