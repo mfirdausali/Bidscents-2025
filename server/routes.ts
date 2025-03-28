@@ -290,14 +290,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin-specific endpoints
   app.get("/api/admin/users", async (req, res, next) => {
     try {
+      console.log("=== ADMIN AUTH DEBUGGING ===");
       console.log("Admin users API called - Auth status:", req.isAuthenticated());
+      console.log("Session ID:", req.sessionID);
+      console.log("Session data:", req.session);
       console.log("User data:", req.user);
       
-      if (!req.isAuthenticated() || !req.user.isAdmin) {
+      if (!req.isAuthenticated()) {
+        console.log("Authentication failed - User not authenticated");
+        return res.status(403).json({ message: "Unauthorized: Not authenticated" });
+      }
+      
+      if (!req.user.isAdmin) {
         console.log("Admin access denied - isAdmin:", req.user?.isAdmin);
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
       
+      console.log("Authentication successful - Admin access granted");
       const users = await storage.getAllUsers();
       console.log("Retrieved users from DB:", users.length);
       res.json(users);

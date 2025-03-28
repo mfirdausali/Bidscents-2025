@@ -479,7 +479,12 @@ export class DatabaseStorage implements IStorage {
   constructor() {
     this.sessionStore = new PgSessionStore({
       pool,
-      createTableIfMissing: true
+      createTableIfMissing: true,
+      tableName: 'session', // explicitly set table name
+      schemaName: 'public',
+      ttl: 86400, // 1 day in seconds
+      errorLog: console.error,    // log errors to console
+      pruneSessionInterval: 60    // prune expired sessions every minute
     });
     this.initializeDefaultData();
   }

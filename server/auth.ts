@@ -31,9 +31,14 @@ async function comparePasswords(supplied: string, stored: string) {
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "luxury-perfume-marketplace-secret",
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     store: storage.sessionStore,
+    cookie: {
+      secure: false, // Set to true in production with HTTPS
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
   };
 
   app.set("trust proxy", 1);
@@ -85,7 +90,27 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+    console.log("=== LOGIN DEBUGGING ===");
+    console.log("Login successful for user:", req.user?.username);
+    console.log("Is Admin:", req.user?.isAdmin);
+    console.log("User ID:", req.user?.id);
+    console.log("Session ID:", req.sessionID);
+    console.log("req.isAuthenticated():", req.isAuthenticated());
+    
+    // Don't regenerate session; just save it to ensure it persists
+    req.session.touch();
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error:", err);
+        return res.status(500).json({ message: "Session error" });
+      }
+      
+      console.log("Session successfully saved");
+      console.log("After save - req.isAuthenticated():", req.isAuthenticated());
+      console.log("After save - Session ID:", req.sessionID);
+      
+      res.status(200).json(req.user);
+    });
   });
 
   app.post("/api/logout", (req, res, next) => {
