@@ -240,7 +240,7 @@ export function FeaturedProductCarousel() {
                     <Link href={`/products/${currentProduct.id}`}>
                       <Button 
                         variant="outline" 
-                        className="border border-rich-black text-rich-black hover:bg-rich-black hover:text-white px-6 py-6 rounded-full"
+                        className="border border-rich-black bg-purple-600 hover:bg-purple-700 text-white px-6 py-6 rounded-full"
                       >
                         View Details
                       </Button>
