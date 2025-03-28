@@ -215,6 +215,7 @@ export default function ProductsPage() {
                       step={10}
                       onValueChange={(value) => setPriceRange(value as [number, number])}
                       className="mb-6"
+                      
                     />
                     <div className="flex justify-between">
                       <span>${priceRange[0]}</span>
