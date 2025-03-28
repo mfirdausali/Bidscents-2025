@@ -77,6 +77,7 @@ const productSchema = z.object({
   purchaseYear: z.number().int().min(1970).max(new Date().getFullYear()).optional(),
   boxCondition: z.string().optional(),
   listingType: z.enum(["fixed", "negotiable", "auction"]).default("fixed"),
+  volume: z.string().min(2, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }).optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -121,6 +122,7 @@ export default function SellerDashboard() {
       purchaseYear: new Date().getFullYear(),
       boxCondition: "",
       listingType: "fixed",
+      volume: "",
     },
   });
 
@@ -233,6 +235,7 @@ export default function SellerDashboard() {
       purchaseYear: product.purchaseYear || new Date().getFullYear(),
       boxCondition: product.boxCondition || "",
       listingType: (product.listingType as "fixed" | "negotiable" | "auction") || "fixed",
+      volume: product.volume || "",
     });
     
     setIsDialogOpen(true);
@@ -266,6 +269,7 @@ export default function SellerDashboard() {
       purchaseYear: new Date().getFullYear(),
       boxCondition: "",
       listingType: "fixed",
+      volume: "",
     });
     setIsDialogOpen(true);
   };
@@ -973,6 +977,23 @@ export default function SellerDashboard() {
                           <SelectItem value="auction">Auction</SelectItem>
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="volume"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Volume</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g., 50ml, 100ml, 3.4oz"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

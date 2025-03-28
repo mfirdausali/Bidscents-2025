@@ -38,8 +38,8 @@ export default function HomePage() {
       >
         <div className="absolute inset-0 bg-rich-black opacity-50"></div>
         <div className="container mx-auto px-6 relative h-full flex flex-col justify-center text-white">
-          <h1 className="font-playfair text-4xl md:text-5xl lg:text-6xl font-bold mb-4">Discover Your Signature Scent</h1>
-          <p className="font-lato text-lg md:text-xl mb-8 max-w-xl">Explore our curated collection of premium fragrances from iconic brands and independent perfumers.</p>
+          <h1 className="font-playfair text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-shadow-md">Find Luxury Fragrances at Bargain Prices</h1>
+          <p className="font-lato text-lg md:text-xl mb-8 max-w-xl text-shadow-sm">Buy, sell, and bid on pre-owned designer and niche perfumes from our trusted community of fragrance enthusiasts.</p>
           <div>
             <Link href="/products">
               <Button className="bg-gold text-rich-black px-8 py-6 rounded-full font-medium hover:bg-metallic-gold transition">
@@ -55,7 +55,7 @@ export default function HomePage() {
 
       {/* Featured Categories */}
       <section className="container mx-auto px-6 py-12">
-        <h2 className="font-playfair text-3xl font-bold text-center mb-8">Explore Categories</h2>
+        <h2 className="font-playfair text-3xl font-bold text-center mb-8">Shop Pre-owned Fragrances</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Category 1 */}
@@ -170,8 +170,11 @@ export default function HomePage() {
               />
             </div>
             <div>
-              <div className="text-sm text-gold mb-2 uppercase tracking-wider">Featured Product</div>
-              <h2 className="font-playfair text-4xl font-bold mb-4">Dior J'adore</h2>
+              <div className="text-sm bg-gold text-rich-black px-3 py-1 rounded-full inline-block mb-2 uppercase tracking-wider">Featured Listing</div>
+              <h2 className="font-playfair text-4xl font-bold mb-3">Dior J'adore</h2>
+              <div className="text-xl text-gold">$89.00</div>
+              <div className="text-sm text-gray-500 mb-4">Retail Price: $150.00 - Save 41%</div>
+              
               <div className="flex items-center mb-4">
                 <div className="flex text-gold">
                   <Star className="fill-gold" />
@@ -180,30 +183,42 @@ export default function HomePage() {
                   <Star className="fill-gold" />
                   <StarHalf className="fill-gold" />
                 </div>
-                <span className="text-sm text-gray-500 ml-2">(189 reviews)</span>
+                <span className="text-sm text-gray-500 ml-2">(14 reviews)</span>
               </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+                <div className="bg-gray-100 p-3 rounded-md">
+                  <div className="text-xs text-gray-500">Volume</div>
+                  <div className="font-medium">100ml / 3.4oz</div>
+                </div>
+                <div className="bg-gray-100 p-3 rounded-md">
+                  <div className="text-xs text-gray-500">Fullness</div>
+                  <div className="font-medium">85% Remaining</div>
+                </div>
+                <div className="bg-gray-100 p-3 rounded-md">
+                  <div className="text-xs text-gray-500">Batch Code</div>
+                  <div className="font-medium">8A02 (2022)</div>
+                </div>
+                <div className="bg-gray-100 p-3 rounded-md">
+                  <div className="text-xs text-gray-500">Box Condition</div>
+                  <div className="font-medium">Good, Minor Wear</div>
+                </div>
+                <div className="bg-gray-100 p-3 rounded-md">
+                  <div className="text-xs text-gray-500">Listing Type</div>
+                  <div className="font-medium">Fixed Price</div>
+                </div>
+                <div className="bg-gray-100 p-3 rounded-md">
+                  <div className="text-xs text-gray-500">Seller Rating</div>
+                  <div className="font-medium flex items-center">
+                    4.9 <Star className="h-3 w-3 fill-gold ml-1" />
+                  </div>
+                </div>
+              </div>
+              
               <p className="text-gray-600 mb-6">
-                J'adore is an iconic fragrance that celebrates the renaissance of extreme femininity and the power of spontaneous emotion with a modern, neo-classical composition.
+                J'adore is an iconic fragrance with notes of ylang-ylang, Damascus rose, and jasmine. This bottle was purchased in 2022 and has been stored properly. Authentic product, sprayed only a few times.
               </p>
-              <div className="mb-6">
-                <div className="font-medium mb-2">Key Notes:</div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="bg-gray-100 px-3 py-1 rounded-full text-sm">Ylang-Ylang</span>
-                  <span className="bg-gray-100 px-3 py-1 rounded-full text-sm">Damascus Rose</span>
-                  <span className="bg-gray-100 px-3 py-1 rounded-full text-sm">Jasmine</span>
-                </div>
-              </div>
-              <div className="mb-6">
-                <div className="font-medium mb-2">Size:</div>
-                <div className="flex space-x-3">
-                  <Button variant="outline" className="border border-gold text-dark-grey hover:bg-gold hover:text-rich-black">30ml</Button>
-                  <Button className="bg-gold text-rich-black">50ml</Button>
-                  <Button variant="outline" className="border border-gold text-dark-grey hover:bg-gold hover:text-rich-black">100ml</Button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between mb-8">
-                <span className="text-2xl font-semibold">$150.00</span>
-              </div>
+                            
               <div className="flex space-x-4">
                 <Button className="bg-rich-black text-white hover:bg-metallic-gold hover:text-rich-black flex-grow py-6 rounded-full">
                   Add to Cart
@@ -233,7 +248,7 @@ export default function HomePage() {
                 <Star className="fill-gold" />
               </div>
               <p className="text-gray-600 italic mb-4">
-                "The selection of niche perfumes is outstanding. I found scents here that I couldn't find anywhere else. The detailed descriptions helped me make the perfect choice."
+                "I found a discontinued bottle of my favorite Guerlain perfume for half the original price. The seller was transparent about the condition, and it arrived exactly as described!"
               </p>
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden mr-4">
@@ -241,7 +256,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <div className="font-medium">Sarah Johnson</div>
-                  <div className="text-sm text-gray-500">Perfume Enthusiast</div>
+                  <div className="text-sm text-gray-500">Vintage Collector</div>
                 </div>
               </div>
             </div>
@@ -256,7 +271,7 @@ export default function HomePage() {
                 <Star className="fill-gold" />
               </div>
               <p className="text-gray-600 italic mb-4">
-                "As a seller, I've been able to reach a wider audience for my artisanal perfumes. The platform is intuitive and makes managing my product listings incredibly easy."
+                "BidLelong helped me sell my collection of niche perfumes I no longer use. The listing process was straightforward, and I earned much more than I would have through other platforms."
               </p>
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden mr-4">
@@ -264,7 +279,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <div className="font-medium">David Chen</div>
-                  <div className="text-sm text-gray-500">Independent Perfumer</div>
+                  <div className="text-sm text-gray-500">Trusted Seller</div>
                 </div>
               </div>
             </div>
@@ -279,7 +294,7 @@ export default function HomePage() {
                 <StarHalf className="fill-gold" />
               </div>
               <p className="text-gray-600 italic mb-4">
-                "The shopping experience is seamless from browsing to checkout. I appreciate the detailed information about each fragrance's notes and longevity. Will shop here again!"
+                "I won an auction for a rare discontinued Creed perfume at 30% below retail. The detailed condition info (85% full, original box) gave me confidence in what I was bidding on."
               </p>
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden mr-4">
@@ -287,7 +302,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <div className="font-medium">Emma Thompson</div>
-                  <div className="text-sm text-gray-500">Loyal Customer</div>
+                  <div className="text-sm text-gray-500">Bargain Hunter</div>
                 </div>
               </div>
             </div>
@@ -298,9 +313,9 @@ export default function HomePage() {
       {/* Email Signup */}
       <section className="py-16 bg-rich-black">
         <div className="container mx-auto px-6 text-center">
-          <h2 className="font-playfair text-3xl text-white font-bold mb-4">Join Our Fragrance Community</h2>
+          <h2 className="font-playfair text-3xl text-white font-bold mb-4">Join Our Fragrance Marketplace</h2>
           <p className="text-gray-300 mb-8 max-w-xl mx-auto">
-            Subscribe to receive exclusive offers, early access to new releases, and expert fragrance recommendations.
+            Subscribe to receive alerts on rare finds, auction endings, price drops on your wishlist items, and trusted seller listings.
           </p>
           <form onSubmit={handleSubscribe} className="max-w-md mx-auto flex flex-col sm:flex-row">
             <Input

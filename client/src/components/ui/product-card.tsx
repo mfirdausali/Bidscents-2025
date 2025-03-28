@@ -116,18 +116,20 @@ export function ProductCard({ product }: ProductCardProps) {
           <Heart className="h-5 w-5" />
         </button>
         {/* Condition badge */}
-        <div className="absolute top-4 left-4 bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded flex items-center">
+        <div className="absolute top-4 left-4 bg-gray-100 text-gray-800 bg-opacity-30 text-xs px-2 py-1 rounded flex items-center">
           {product.isNew ? 'Like New' : `${product.remainingPercentage || 100}% Full`}
         </div>
         
         {/* Listing type badge */}
-        <div className="absolute bottom-4 left-4 bg-gold text-rich-black text-xs px-2 py-1 rounded">
+        <div className="absolute bottom-4 left-4 bg-gray-100 bg-opacity-50 text-rich-black text-xs px-2 py-1 rounded">
           {formatListingType(product.listingType)}
         </div>
       </div>
       <div className="p-4">
         <div className="flex justify-between items-center mb-1">
-          <div className="text-sm text-gray-500">{product.brand}</div>
+          <div className="text-sm text-gray-500">
+            {product.brand} {product.volume && <span className="text-xs">({product.volume})</span>}
+          </div>
           {product.purchaseYear && (
             <div className="text-xs text-gray-400">Year: {product.purchaseYear}</div>
           )}

@@ -148,7 +148,8 @@ async function main() {
       batchCode: "3145891209853",
       purchaseYear: 2021,
       boxCondition: "Excellent, with all original packaging",
-      listingType: "fixed"
+      listingType: "fixed",
+      volume: "100ml"
     },
     {
       name: "Bleu de Chanel Parfum",
@@ -165,7 +166,8 @@ async function main() {
       batchCode: "8901",
       purchaseYear: 2022,
       boxCondition: "Mint condition with cellophane",
-      listingType: "negotiable"
+      listingType: "negotiable",
+      volume: "50ml"
     },
     {
       name: "Tom Ford Tobacco Vanille (Partial)",
@@ -182,7 +184,8 @@ async function main() {
       batchCode: "A23",
       purchaseYear: 2020,
       boxCondition: "No box, decant bottle",
-      listingType: "auction"
+      listingType: "auction",
+      volume: "30ml"
     },
 
     // Seller 1 (Sarah Johnson) listings
@@ -400,7 +403,22 @@ async function main() {
 
   console.log("Creating sample products...");
   
+  // Add volume data to products that don't have it
+  const volumes = ["30ml", "50ml", "100ml", "75ml", "15ml", "200ml"];
+  
   for (const product of sampleProducts) {
+    // Add volume if not already set
+    if (!product.volume) {
+      // For decants, use smaller volumes
+      if (product.name.toLowerCase().includes("decant")) {
+        product.volume = "10ml";
+      } else {
+        // Randomly assign a volume from the common options
+        const randomIndex = Math.floor(Math.random() * volumes.length);
+        product.volume = volumes[randomIndex];
+      }
+    }
+    
     await db.insert(products).values(product);
   }
 
