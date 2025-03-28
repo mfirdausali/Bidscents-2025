@@ -31,12 +31,18 @@ export const products = pgTable("products", {
   description: text("description"),
   price: doublePrecision("price").notNull(),
   imageUrl: text("image_url").notNull(),
-  stockQuantity: integer("stock_quantity").notNull().default(0),
+  stockQuantity: integer("stock_quantity").notNull().default(1), // Most secondhand items have quantity 1
   categoryId: integer("category_id").references(() => categories.id),
   sellerId: integer("seller_id").references(() => users.id).notNull(),
-  isNew: boolean("is_new").default(false),
+  isNew: boolean("is_new").default(false), // In secondhand context: like new condition
   isFeatured: boolean("is_featured").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  // Secondhand perfume specific fields
+  remainingPercentage: integer("remaining_percentage").default(100), // How full the bottle is (%)
+  batchCode: text("batch_code"), // Authenticity verification
+  purchaseYear: integer("purchase_year"), // When it was originally purchased
+  boxCondition: text("box_condition"), // Condition of the packaging
+  listingType: text("listing_type").default("fixed"), // fixed, negotiable, auction
 });
 
 // Cart items table
@@ -99,6 +105,11 @@ export const insertProductSchema = createInsertSchema(products).pick({
   sellerId: true,
   isNew: true,
   isFeatured: true,
+  remainingPercentage: true,
+  batchCode: true,
+  purchaseYear: true,
+  boxCondition: true,
+  listingType: true,
 });
 
 export const insertCategorySchema = createInsertSchema(categories).pick({

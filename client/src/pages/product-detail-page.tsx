@@ -241,13 +241,25 @@ export default function ProductDetailPage() {
             {/* Right: Product info */}
             <div>
               <div className="mb-4">
-                {product.isNew && (
-                  <Badge className="bg-gold text-rich-black mb-2">New</Badge>
-                )}
-                <div className="text-gray-500 mb-1">{product.brand}</div>
-                <h1 className="font-playfair text-3xl md:text-4xl font-bold mb-4">{product.name}</h1>
+                {/* Condition badge */}
+                <div className="mb-2">
+                  {product.isNew ? (
+                    <Badge className="bg-gray-800 text-white">Like New</Badge>
+                  ) : (
+                    <Badge className="bg-blue-100 text-blue-800">{product.remainingPercentage || 100}% Full</Badge>
+                  )}
+                  
+                  {/* Listing type badge */}
+                  <Badge className="bg-gold text-rich-black ml-2">
+                    {product.listingType === "auction" ? "Auction" : 
+                     product.listingType === "negotiable" ? "Negotiable" : "Fixed Price"}
+                  </Badge>
+                </div>
                 
-                <div className="flex items-center mb-4">
+                <div className="text-gray-500 mb-1">{product.brand}</div>
+                <h1 className="font-playfair text-2xl md:text-3xl font-bold mb-3">{product.name}</h1>
+                
+                <div className="flex items-center mb-3">
                   <div className="flex">
                     {renderStars(product.averageRating)}
                   </div>
@@ -256,39 +268,50 @@ export default function ProductDetailPage() {
                   </span>
                 </div>
                 
-                <div className="text-2xl font-semibold mb-6">${product.price.toFixed(2)}</div>
+                {/* Seller information */}
+                <div className="flex items-center mb-4 text-sm bg-gray-50 p-3 rounded-md">
+                  <div className="flex-1">
+                    <p className="font-medium">Seller: {product.seller?.username}</p>
+                    <p className="text-gray-500 text-xs">Trusted Seller</p>
+                  </div>
+                  <Button variant="outline" className="text-xs h-8" asChild>
+                    <a href={`/profile/${product.seller?.id}`}>View Profile</a>
+                  </Button>
+                </div>
+                
+                <div className="text-2xl font-semibold mb-4">RM {product.price.toFixed(2)}</div>
+                
+                <div className="bg-gray-50 p-4 rounded-md mb-6">
+                  <h3 className="font-medium mb-2 text-sm">Item Details:</h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex items-center">
+                      <span className="text-gray-600 mr-2">Bottle:</span>
+                      <span className="font-medium">{product.remainingPercentage || 100}% Full</span>
+                    </div>
+                    {product.purchaseYear && (
+                      <div className="flex items-center">
+                        <span className="text-gray-600 mr-2">Year:</span>
+                        <span className="font-medium">{product.purchaseYear}</span>
+                      </div>
+                    )}
+                    {product.boxCondition && (
+                      <div className="flex items-center">
+                        <span className="text-gray-600 mr-2">Box:</span>
+                        <span className="font-medium">{product.boxCondition}</span>
+                      </div>
+                    )}
+                    {product.batchCode && (
+                      <div className="flex items-center">
+                        <span className="text-gray-600 mr-2">Batch:</span>
+                        <span className="font-medium">{product.batchCode}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 
                 <p className="text-gray-600 mb-6">
                   {product.description}
                 </p>
-              </div>
-              
-              {/* Size selection */}
-              <div className="mb-6">
-                <h3 className="font-medium mb-2">Size:</h3>
-                <div className="flex space-x-3">
-                  <Button 
-                    variant={selectedSize === "30ml" ? "default" : "outline"} 
-                    className={selectedSize === "30ml" ? "bg-gold text-rich-black" : "border-gold text-dark-grey hover:bg-gold hover:text-rich-black"}
-                    onClick={() => setSelectedSize("30ml")}
-                  >
-                    30ml
-                  </Button>
-                  <Button 
-                    variant={selectedSize === "50ml" ? "default" : "outline"} 
-                    className={selectedSize === "50ml" ? "bg-gold text-rich-black" : "border-gold text-dark-grey hover:bg-gold hover:text-rich-black"}
-                    onClick={() => setSelectedSize("50ml")}
-                  >
-                    50ml
-                  </Button>
-                  <Button 
-                    variant={selectedSize === "100ml" ? "default" : "outline"} 
-                    className={selectedSize === "100ml" ? "bg-gold text-rich-black" : "border-gold text-dark-grey hover:bg-gold hover:text-rich-black"}
-                    onClick={() => setSelectedSize("100ml")}
-                  >
-                    100ml
-                  </Button>
-                </div>
               </div>
               
               {/* Quantity and add to cart */}
@@ -398,27 +421,42 @@ export default function ProductDetailPage() {
               </TabsContent>
               
               <TabsContent value="details" className="p-6 bg-white rounded-lg shadow mt-6">
-                <h3 className="font-playfair text-xl font-semibold mb-4">Product Details</h3>
+                <h3 className="font-playfair text-xl font-semibold mb-4">Pre-owned Details</h3>
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-medium mb-1">Fragrance Family:</h4>
-                    <p className="text-gray-600">Floral, Oriental</p>
+                    <h4 className="font-medium mb-1">Original Purchase:</h4>
+                    <p className="text-gray-600">{product.purchaseYear || "Unknown"}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-1">Bottle Condition:</h4>
+                    <p className="text-gray-600">{product.remainingPercentage || 100}% Full</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-1">Box Condition:</h4>
+                    <p className="text-gray-600">{product.boxCondition || "Not specified"}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-1">Authenticity:</h4>
+                    <p className="text-gray-600">
+                      {product.batchCode ? (
+                        <span className="flex items-center text-green-600">
+                          <Check className="h-4 w-4 mr-1" /> Verified (Batch Code: {product.batchCode})
+                        </span>
+                      ) : (
+                        "No batch code provided"
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-1">Listing Type:</h4>
+                    <p className="text-gray-600">
+                      {product.listingType === "auction" ? "Auction" : 
+                       product.listingType === "negotiable" ? "Negotiable Price" : "Fixed Price"}
+                    </p>
                   </div>
                   <div>
                     <h4 className="font-medium mb-1">Concentration:</h4>
                     <p className="text-gray-600">Eau de Parfum</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-1">Longevity:</h4>
-                    <p className="text-gray-600">6-8 hours</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-1">Sillage:</h4>
-                    <p className="text-gray-600">Moderate</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-1">Year Introduced:</h4>
-                    <p className="text-gray-600">2023</p>
                   </div>
                 </div>
               </TabsContent>
