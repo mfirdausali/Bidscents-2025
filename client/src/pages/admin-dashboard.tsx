@@ -70,6 +70,10 @@ export default function AdminDashboard() {
     error,
   } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/users");
+      return res.json();
+    },
     enabled: !!user?.isAdmin,
   });
 
