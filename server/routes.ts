@@ -169,7 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update quantity if the item already exists
         const updatedItem = await storage.updateCartItem(
           existingItem.id, 
-          existingItem.quantity + validatedData.quantity
+          existingItem.quantity + (validatedData.quantity || 1)
         );
         return res.json(updatedItem);
       }

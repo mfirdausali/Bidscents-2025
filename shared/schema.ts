@@ -124,3 +124,5 @@ export type ProductWithDetails = Product & {
 export type CartItemWithProduct = CartItem & {
   product: Product;
 };
+
+// Note: Relations are handled through joins in the DatabaseStorage implementation
