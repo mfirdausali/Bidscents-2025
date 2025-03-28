@@ -290,13 +290,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin-specific endpoints
   app.get("/api/admin/users", async (req, res, next) => {
     try {
+      console.log("Admin users API called - Auth status:", req.isAuthenticated());
+      console.log("User data:", req.user);
+      
       if (!req.isAuthenticated() || !req.user.isAdmin) {
+        console.log("Admin access denied - isAdmin:", req.user?.isAdmin);
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
       
       const users = await storage.getAllUsers();
+      console.log("Retrieved users from DB:", users.length);
       res.json(users);
     } catch (error) {
+      console.error("Error in admin/users endpoint:", error);
       next(error);
     }
   });

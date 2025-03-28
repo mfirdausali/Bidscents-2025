@@ -546,7 +546,16 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getAllUsers(): Promise<User[]> {
-    return db.select().from(users);
+    console.log("DatabaseStorage - getAllUsers called");
+    try {
+      const result = await db.select().from(users);
+      console.log("DatabaseStorage - getAllUsers result count:", result.length);
+      console.log("DatabaseStorage - getAllUsers sample data:", result.slice(0, 2));
+      return result;
+    } catch (error) {
+      console.error("DatabaseStorage - getAllUsers error:", error);
+      throw error;
+    }
   }
   
   async banUser(id: number, isBanned: boolean): Promise<User> {
