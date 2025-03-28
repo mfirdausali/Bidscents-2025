@@ -40,6 +40,7 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   
   // Get tab from URL query parameter
   useEffect(() => {
@@ -273,7 +274,11 @@ export default function AuthPage() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="terms"
-                        {...registerForm.register("terms")}
+                        checked={termsAccepted}
+                        onCheckedChange={(checked) => {
+                          setTermsAccepted(checked as boolean);
+                          registerForm.setValue("terms", checked as boolean);
+                        }}
                       />
                       <Label htmlFor="terms">
                         I agree to the{" "}
