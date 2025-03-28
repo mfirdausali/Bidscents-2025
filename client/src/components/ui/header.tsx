@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
-import { Search, Heart, ShoppingBag, User, LogOut, Package } from "lucide-react";
+import { Search, Heart, ShoppingBag, User, LogOut, Package, ShieldAlert } from "lucide-react";
 
 export function Header() {
   const [location] = useLocation();
@@ -72,6 +72,14 @@ export function Header() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  {user.isAdmin && (
+                    <Link href="/admin/dashboard">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <ShieldAlert className="h-4 w-4 mr-2" />
+                        Admin Dashboard
+                      </DropdownMenuItem>
+                    </Link>
+                  )}
                   {user.isSeller && (
                     <Link href="/seller/dashboard">
                       <DropdownMenuItem className="cursor-pointer">

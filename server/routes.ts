@@ -286,6 +286,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // Admin-specific endpoints
+  app.get("/api/admin/users", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      // Get all users from the database
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.patch("/api/admin/users/:id/ban", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      const userId = parseInt(req.params.id);
+      const { isBanned } = req.body;
+      
+      if (typeof isBanned !== 'boolean') {
+        return res.status(400).json({ message: "Invalid request: isBanned must be a boolean" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Prevent admins from banning themselves
+      if (userId === req.user.id) {
+        return res.status(400).json({ message: "You cannot ban yourself" });
+      }
+      
+      const updatedUser = await storage.updateUserStatus(userId, { isBanned });
+      res.json(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.patch("/api/admin/users/:id/role", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      const userId = parseInt(req.params.id);
+      const { isAdmin, isSeller } = req.body;
+      
+      // Validate at least one role is specified
+      if (typeof isAdmin !== 'boolean' && typeof isSeller !== 'boolean') {
+        return res.status(400).json({ 
+          message: "Invalid request: at least one of isAdmin or isSeller must be provided" 
+        });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Prevent admins from removing their own admin rights
+      if (userId === req.user.id && isAdmin === false) {
+        return res.status(400).json({ message: "You cannot remove your own admin rights" });
+      }
+      
+      const updates: { isAdmin?: boolean; isSeller?: boolean } = {};
+      if (typeof isAdmin === 'boolean') updates.isAdmin = isAdmin;
+      if (typeof isSeller === 'boolean') updates.isSeller = isSeller;
+      
+      const updatedUser = await storage.updateUserStatus(userId, updates);
+      res.json(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.delete("/api/admin/users/:id", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      const userId = parseInt(req.params.id);
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Prevent admins from deleting themselves
+      if (userId === req.user.id) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+      
+      await storage.deleteUser(userId);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
