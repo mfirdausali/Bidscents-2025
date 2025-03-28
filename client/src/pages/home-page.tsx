@@ -144,8 +144,46 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Recent Listings */}
+      {/* Auction Listings */}
       <section className="container mx-auto px-6 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Live Auctions</h2>
+          <Link href="/products?type=auction" className="text-purple-600 hover:text-purple-800 flex items-center">
+            View All <span className="ml-1">→</span>
+          </Link>
+        </div>
+        
+        {isLoading ? (
+          <div className="flex justify-center items-center h-48">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+          </div>
+        ) : allProducts && allProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {/* Display the 3 auction products */}
+            {[...allProducts]
+              .filter(product => product.listingType === 'auction')
+              .sort((a, b) => {
+                // If createdAt exists, use it for sorting; otherwise, use id
+                if (a.createdAt && b.createdAt) {
+                  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                }
+                return b.id - a.id; // Fallback to id sorting (assuming higher id = more recent)
+              })
+              .slice(0, 3)
+              .map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))
+            }
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p>No auction listings available at the moment.</p>
+          </div>
+        )}
+      </section>
+      
+      {/* Recent Listings */}
+      <section className="container mx-auto px-6 py-8 bg-gray-50">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Recent Listings</h2>
           <Link href="/products" className="text-purple-600 hover:text-purple-800 flex items-center">
@@ -159,8 +197,9 @@ export default function HomePage() {
           </div>
         ) : allProducts && allProducts.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {/* Display the 9 most recent products by sorting them by createdAt in descending order */}
+            {/* Display the 6 most recent non-auction products */}
             {[...allProducts]
+              .filter(product => product.listingType !== 'auction')
               .sort((a, b) => {
                 // If createdAt exists, use it for sorting; otherwise, use id
                 if (a.createdAt && b.createdAt) {
@@ -168,7 +207,7 @@ export default function HomePage() {
                 }
                 return b.id - a.id; // Fallback to id sorting (assuming higher id = more recent)
               })
-              .slice(0, 9)
+              .slice(0, 6)
               .map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))
@@ -176,7 +215,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="text-center py-8">
-            <p>No products available at the moment.</p>
+            <p>No regular listings available at the moment.</p>
           </div>
         )}
       </section>
