@@ -286,109 +286,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
-  
+
   // Admin-specific endpoints
   app.get("/api/admin/users", async (req, res, next) => {
     try {
       if (!req.isAuthenticated() || !req.user.isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
       
-      // Get all users from the database
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
       next(error);
     }
   });
-  
+
   app.patch("/api/admin/users/:id/ban", async (req, res, next) => {
     try {
       if (!req.isAuthenticated() || !req.user.isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
       
-      const userId = parseInt(req.params.id);
-      const { isBanned } = req.body;
+      const id = parseInt(req.params.id);
+      const { isBanned } = z.object({ isBanned: z.boolean() }).parse(req.body);
       
-      if (typeof isBanned !== 'boolean') {
-        return res.status(400).json({ message: "Invalid request: isBanned must be a boolean" });
-      }
-      
-      const user = await storage.getUser(userId);
-      if (!user) {
+      // Prevent admins from banning themselves or other admins
+      const userToBan = await storage.getUser(id);
+      if (!userToBan) {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // Prevent admins from banning themselves
-      if (userId === req.user.id) {
-        return res.status(400).json({ message: "You cannot ban yourself" });
+      if (userToBan.isAdmin) {
+        return res.status(403).json({ message: "Cannot ban administrator accounts" });
       }
       
-      const updatedUser = await storage.updateUserStatus(userId, { isBanned });
+      const updatedUser = await storage.banUser(id, isBanned);
       res.json(updatedUser);
     } catch (error) {
       next(error);
     }
   });
-  
-  app.patch("/api/admin/users/:id/role", async (req, res, next) => {
+
+  app.get("/api/admin/orders", async (req, res, next) => {
     try {
       if (!req.isAuthenticated() || !req.user.isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
       
-      const userId = parseInt(req.params.id);
-      const { isAdmin, isSeller } = req.body;
-      
-      // Validate at least one role is specified
-      if (typeof isAdmin !== 'boolean' && typeof isSeller !== 'boolean') {
-        return res.status(400).json({ 
-          message: "Invalid request: at least one of isAdmin or isSeller must be provided" 
-        });
-      }
-      
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Prevent admins from removing their own admin rights
-      if (userId === req.user.id && isAdmin === false) {
-        return res.status(400).json({ message: "You cannot remove your own admin rights" });
-      }
-      
-      const updates: { isAdmin?: boolean; isSeller?: boolean } = {};
-      if (typeof isAdmin === 'boolean') updates.isAdmin = isAdmin;
-      if (typeof isSeller === 'boolean') updates.isSeller = isSeller;
-      
-      const updatedUser = await storage.updateUserStatus(userId, updates);
-      res.json(updatedUser);
+      const orders = await storage.getAllOrders();
+      res.json(orders);
     } catch (error) {
       next(error);
     }
   });
-  
-  app.delete("/api/admin/users/:id", async (req, res, next) => {
+
+  app.patch("/api/admin/orders/:id/status", async (req, res, next) => {
     try {
       if (!req.isAuthenticated() || !req.user.isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
       
-      const userId = parseInt(req.params.id);
+      const id = parseInt(req.params.id);
+      const { status } = z.object({ 
+        status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"])
+      }).parse(req.body);
       
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+      const order = await storage.getOrderById(id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
       }
       
-      // Prevent admins from deleting themselves
-      if (userId === req.user.id) {
-        return res.status(400).json({ message: "You cannot delete your own account" });
-      }
-      
-      await storage.deleteUser(userId);
-      res.status(204).send();
+      const updatedOrder = await storage.updateOrderStatus(id, status);
+      res.json(updatedOrder);
     } catch (error) {
       next(error);
     }
