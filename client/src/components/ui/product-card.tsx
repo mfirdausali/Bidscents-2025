@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { ProductWithDetails } from "@shared/schema";
-import { Badge } from "./badge";
 import { Button } from "./button";
 import { Heart, Star, StarHalf } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -93,9 +92,13 @@ export function ProductCard({ product }: ProductCardProps) {
   // Get condition text based on product state
   const getConditionText = (product: ProductWithDetails) => {
     if (product.isNew) return 'Like New';
-    if (product.remainingPercentage && product.remainingPercentage > 90) return 'Very Good';
-    if (product.remainingPercentage && product.remainingPercentage > 70) return 'Good';
-    if (product.remainingPercentage && product.remainingPercentage > 50) return 'Fair';
+    
+    // Safe handling of remainingPercentage
+    const remainingPercentage = product.remainingPercentage ?? 0;
+    
+    if (remainingPercentage > 90) return 'Very Good';
+    if (remainingPercentage > 70) return 'Good';
+    if (remainingPercentage > 50) return 'Fair';
     return 'Good';
   };
 
@@ -115,7 +118,7 @@ export function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300">
+    <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 border">
       <div className="relative">
         <Link href={`/products/${product.id}`}>
           <img
@@ -152,21 +155,20 @@ export function ProductCard({ product }: ProductCardProps) {
               {product.name}
             </h3>
           </Link>
-          <span className="font-semibold text-purple-600 text-sm">
+        </div>
+        <span className="font-semibold text-purple-600 text-sm">
             RM {product.price.toFixed(0)}
           </span>
-        </div>
         
         {/* Brand and volume */}
         <div className="text-xs text-gray-600 mb-2">
-          {product.brand}
-          {product.volume && ` • ${product.volume}`}
+          {product.volume && ` ${product.volume}`}
           {product.batchCode && ` • Batch ${product.batchCode}`}
         </div>
         
         {/* Location and seller */}
         <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
-          <span>{product.seller?.username || 'US'} • Seller</span>
+          <span>{product.seller?.username || 'US'}</span>
         </div>
         
         {/* Auction info (if applicable) */}

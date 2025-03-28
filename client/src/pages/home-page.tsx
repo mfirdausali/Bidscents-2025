@@ -16,9 +16,9 @@ export default function HomePage() {
   const [email, setEmail] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch featured products
-  const { data: featuredProducts, isLoading } = useQuery<ProductWithDetails[]>({
-    queryKey: ["/api/products/featured"],
+  // Fetch all products to get the most recent ones
+  const { data: allProducts, isLoading } = useQuery<ProductWithDetails[]>({
+    queryKey: ["/api/products"],
   });
 
   const handleSubscribe = (e: React.FormEvent) => {
@@ -144,10 +144,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Listings */}
+      {/* Recent Listings */}
       <section className="container mx-auto px-6 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Featured Listings</h2>
+          <h2 className="text-2xl font-bold">Recent Listings</h2>
           <Link href="/products" className="text-purple-600 hover:text-purple-800 flex items-center">
             View All <span className="ml-1">→</span>
           </Link>
@@ -157,15 +157,26 @@ export default function HomePage() {
           <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
           </div>
-        ) : featuredProducts && featuredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {featuredProducts.slice(0, 4).map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+        ) : allProducts && allProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {/* Display the 9 most recent products by sorting them by createdAt in descending order */}
+            {[...allProducts]
+              .sort((a, b) => {
+                // If createdAt exists, use it for sorting; otherwise, use id
+                if (a.createdAt && b.createdAt) {
+                  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                }
+                return b.id - a.id; // Fallback to id sorting (assuming higher id = more recent)
+              })
+              .slice(0, 9)
+              .map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))
+            }
           </div>
         ) : (
           <div className="text-center py-8">
-            <p>No featured products available at the moment.</p>
+            <p>No products available at the moment.</p>
           </div>
         )}
       </section>
