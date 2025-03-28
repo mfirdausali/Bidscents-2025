@@ -20,7 +20,9 @@ const loginSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 });
 
-const registerSchema = insertUserSchema.extend({
+// Create a custom schema for registration that includes terms field
+const registerSchema = z.object({
+  ...insertUserSchema.shape,
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
   confirmPassword: z.string(),
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -260,18 +262,30 @@ export default function AuthPage() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="isSeller"
-                        {...registerForm.register("isSeller")}
+                        checked={registerForm.watch("isSeller")}
+                        onCheckedChange={(checked) => 
+                          registerForm.setValue("isSeller", checked === true)
+                        }
                       />
-                      <Label htmlFor="isSeller">I want to sell perfumes</Label>
+                      <Label htmlFor="isSeller" className="cursor-pointer" onClick={() => 
+                        registerForm.setValue("isSeller", !registerForm.watch("isSeller"))
+                      }>
+                        I want to sell perfumes
+                      </Label>
                     </div>
                     {/* Dev mode admin checkbox */}
                     {import.meta.env.DEV && (
                       <div className="flex items-center space-x-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
                         <Checkbox
                           id="isAdmin"
-                          {...registerForm.register("isAdmin")}
+                          checked={registerForm.watch("isAdmin")}
+                          onCheckedChange={(checked) => 
+                            registerForm.setValue("isAdmin", checked === true)
+                          }
                         />
-                        <Label htmlFor="isAdmin" className="text-amber-800">
+                        <Label htmlFor="isAdmin" className="text-amber-800 cursor-pointer" onClick={() => 
+                          registerForm.setValue("isAdmin", !registerForm.watch("isAdmin"))
+                        }>
                           <strong>DEV MODE:</strong> Register as admin
                         </Label>
                       </div>
@@ -279,9 +293,18 @@ export default function AuthPage() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="terms"
-                        {...registerForm.register("terms")}
+                        checked={registerForm.watch("terms")}
+                        onCheckedChange={(checked) => 
+                          registerForm.setValue("terms", checked === true, { 
+                            shouldValidate: true 
+                          })
+                        }
                       />
-                      <Label htmlFor="terms">
+                      <Label htmlFor="terms" className="cursor-pointer" onClick={() => 
+                        registerForm.setValue("terms", !registerForm.watch("terms"), {
+                          shouldValidate: true
+                        })
+                      }>
                         I agree to the{" "}
                         <a href="#" className="text-gold hover:underline">
                           terms and conditions
