@@ -38,11 +38,11 @@ export const products = pgTable("products", {
   isFeatured: boolean("is_featured").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   // Secondhand perfume specific fields
-  remainingPercentage: integer("remaining_percentage").default(100), // How full the bottle is (%)
-  batchCode: text("batch_code"), // Authenticity verification
-  purchaseYear: integer("purchase_year"), // When it was originally purchased
-  boxCondition: text("box_condition"), // Condition of the packaging
-  listingType: text("listing_type").default("fixed"), // fixed, negotiable, auction
+  remainingPercentage: integer("remaining_percentage").default(100), // How full is the bottle (1-100%)
+  batchCode: text("batch_code"), // Authenticity batch code
+  purchaseYear: integer("purchase_year"), // When was it originally purchased
+  boxCondition: text("box_condition"), // Condition of the box/packaging
+  listingType: text("listing_type").default("fixed") // fixed, negotiable, auction
 });
 
 // Cart items table
