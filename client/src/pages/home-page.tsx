@@ -14,6 +14,7 @@ import { FeaturedProductCarousel } from "@/components/ui/featured-product-carous
 export default function HomePage() {
   const [sortOption, setSortOption] = useState("featured");
   const [email, setEmail] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch featured products
   const { data: featuredProducts, isLoading } = useQuery<ProductWithDetails[]>({
@@ -26,6 +27,11 @@ export default function HomePage() {
     alert(`Thank you for subscribing with ${email}`);
     setEmail("");
   };
+  
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    window.location.href = `/products?search=${encodeURIComponent(searchQuery)}`;
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -37,124 +43,186 @@ export default function HomePage() {
           backgroundImage: "url('https://images.unsplash.com/photo-1594035910387-fea47794261f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8NHx8dG9tJTIwZm9yZCUyMHBlcmZ1bWV8ZW58MHx8MHx8&auto=format&fit=crop&w=800&q=60')" 
         }}
       >
-        <div className="absolute inset-0 bg-rich-black opacity-50"></div>
+        <div className="absolute inset-0 bg-black opacity-50"></div>
         <div className="container mx-auto px-6 relative h-full flex flex-col justify-center text-white">
-          <h1 className="font-playfair text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-shadow">Find Luxury Fragrances at Bargain Prices</h1>
-          <p className="font-lato text-lg md:text-xl mb-8 pt-5 max-w-xl text-shadow">Buy, sell, and bid on pre-owned designer and niche perfumes from our trusted community of fragrance enthusiasts.</p>
-          <div>
-            <Link href="/products">
-              <Button className="bg-white bg-opacity-10 text-white px-8 py-6 rounded-full font-medium hover:bg-metallic-gold transition">
-                Shop Now
-              </Button>
-            </Link>
-            <Button variant="outline" className="ml-4 text-black border border-white px-8 py-6 rounded-full font-medium hover:bg-white hover:text-rich-black transition">
-              Learn More
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">Discover Your Signature Scent</h1>
+          <p className="text-lg md:text-xl mb-8 max-w-xl">Explore authentic pre-owned luxury perfumes at incredible prices</p>
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 max-w-lg">
+            <div className="relative flex-grow">
+              <Input
+                type="text"
+                placeholder="Search for perfumes, brands..."
+                className="search-bar pl-4 pr-4 py-3 w-full bg-white border-0 rounded-full text-gray-800"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full">
+              Start Shopping
             </Button>
-          </div>
+          </form>
         </div>
       </section>
 
-      {/* Featured Categories */}
+      {/* Browse Categories */}
       <section className="container mx-auto px-6 py-12">
-        <h2 className="font-playfair text-3xl font-bold text-center mb-8">Shop Pre-owned Fragrances</h2>
+        <h2 className="text-2xl font-bold mb-8">Browse Categories</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Category 1 */}
-          <div className="relative h-64 rounded-lg overflow-hidden group cursor-pointer">
-            <Link href="/products?category=1">
-              <img 
-                src="https://images.unsplash.com/photo-1590736969997-f5d7c4fbdfac?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80" 
-                alt="Women's Fragrances" 
-                className="w-full h-full object-cover transition duration-500 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-rich-black/80 flex items-end p-6">
-                <div>
-                  <h3 className="text-white font-playfair text-2xl mb-2">Women's Fragrances</h3>
-                  <span className="text-gold group-hover:underline">Explore Collection →</span>
-                </div>
-              </div>
-            </Link>
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-4">
+          {/* Category icons */}
+          <div className="flex flex-col items-center">
+            <div className="category-icon mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <span className="text-xs text-center">Men's</span>
           </div>
           
-          {/* Category 2 */}
-          <div className="relative h-64 rounded-lg overflow-hidden group cursor-pointer">
-            <Link href="/products?category=2">
-              <img 
-                src="https://images.unsplash.com/photo-1547887538-6b3c3359f36a?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80" 
-                alt="Men's Fragrances" 
-                className="w-full h-full object-cover transition duration-500 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-rich-black/80 flex items-end p-6">
-                <div>
-                  <h3 className="text-white font-playfair text-2xl mb-2">Men's Fragrances</h3>
-                  <span className="text-gold group-hover:underline">Explore Collection →</span>
-                </div>
-              </div>
-            </Link>
+          <div className="flex flex-col items-center">
+            <div className="category-icon mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <span className="text-xs text-center">Women's</span>
           </div>
           
-          {/* Category 3 */}
-          <div className="relative h-64 rounded-lg overflow-hidden group cursor-pointer">
-            <Link href="/products?category=4">
-              <img 
-                src="https://images.unsplash.com/photo-1616949755610-8c9bbc08f138?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80" 
-                alt="Niche Fragrances" 
-                className="w-full h-full object-cover transition duration-500 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-rich-black/80 flex items-end p-6">
-                <div>
-                  <h3 className="text-white font-playfair text-2xl mb-2">Niche Fragrances</h3>
-                  <span className="text-gold group-hover:underline">Explore Collection →</span>
-                </div>
-              </div>
-            </Link>
+          <div className="flex flex-col items-center">
+            <div className="category-icon mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <span className="text-xs text-center">Unisex</span>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <div className="category-icon mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <span className="text-xs text-center">Niche</span>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <div className="category-icon mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <span className="text-xs text-center">Designer</span>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <div className="category-icon mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <span className="text-xs text-center">Vintage</span>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <div className="category-icon mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <span className="text-xs text-center">Rare Finds</span>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <div className="category-icon mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <span className="text-xs text-center">Limited Editions</span>
           </div>
         </div>
       </section>
 
-      {/* Featured Products */}
-      <section className="bg-gray-50 py-12">
+      {/* Featured Listings */}
+      <section className="container mx-auto px-6 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Featured Listings</h2>
+          <Link href="/products" className="text-purple-600 hover:text-purple-800 flex items-center">
+            View All <span className="ml-1">→</span>
+          </Link>
+        </div>
+        
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+          </div>
+        ) : featuredProducts && featuredProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {featuredProducts.slice(0, 4).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p>No featured products available at the moment.</p>
+          </div>
+        )}
+      </section>
+
+      {/* How It Works */}
+      <section className="bg-gray-50 py-16">
         <div className="container mx-auto px-6">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-            <h2 className="font-playfair text-3xl font-bold">Trending Now</h2>
-            <div className="mt-4 md:mt-0">
-              <Select value={sortOption} onValueChange={setSortOption}>
-                <SelectTrigger className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-1 focus:ring-gold">
-                  <SelectValue placeholder="Sort by: Featured" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="featured">Sort by: Featured</SelectItem>
-                  <SelectItem value="low">Price: Low to High</SelectItem>
-                  <SelectItem value="high">Price: High to Low</SelectItem>
-                  <SelectItem value="newest">Newest First</SelectItem>
-                  <SelectItem value="bestselling">Best Selling</SelectItem>
-                </SelectContent>
-              </Select>
+          <h2 className="text-3xl font-bold text-center mb-4">How BidLelongMY Works</h2>
+          <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
+            Our secure marketplace ensures authenticity and safety for all your perfume transactions.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Step 1 */}
+            <div className="bg-white p-6 rounded-lg shadow-sm text-center">
+              <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-3">Authentication</h3>
+              <p className="text-gray-600">
+                Every perfume is verified through batch code validation and expert review before it's listed on our platform.
+              </p>
+            </div>
+            
+            {/* Step 2 */}
+            <div className="bg-white p-6 rounded-lg shadow-sm text-center">
+              <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-3">Secure Payments</h3>
+              <p className="text-gray-600">
+                Our escrow payment system via Billplz protects both buyers and sellers throughout the transaction.
+              </p>
+            </div>
+            
+            {/* Step 3 */}
+            <div className="bg-white p-6 rounded-lg shadow-sm text-center">
+              <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-3">Safe Delivery</h3>
+              <p className="text-gray-600">
+                Track your package every step of the way with our integrated shipping partners across Malaysia.
+              </p>
             </div>
           </div>
           
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-gold" />
-            </div>
-          ) : featuredProducts && featuredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p>No featured products available at the moment.</p>
-            </div>
-          )}
-          
-          <div className="flex justify-center mt-10">
-            <Link href="/products">
-              <Button variant="outline" className="border border-gold text-gold px-8 py-6 rounded-full font-medium hover:bg-gold hover:text-rich-black transition">
-                View All Products
-              </Button>
-            </Link>
+          <div className="text-center mt-10">
+            <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-full px-6 py-3">
+              Learn More About Our Process
+            </Button>
           </div>
         </div>
       </section>
@@ -163,76 +231,76 @@ export default function HomePage() {
       <FeaturedProductCarousel />
 
       {/* Testimonials */}
-      <section className="bg-gray-50 py-16">
+      <section className="bg-white py-16">
         <div className="container mx-auto px-6">
-          <h2 className="font-playfair text-3xl font-bold text-center mb-12">What Our Customers Say</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">What Our Customers Say</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Testimonial 1 */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <div className="flex text-gold mb-4">
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
+            <div className="bg-gray-50 p-6 rounded-lg">
+              <div className="flex text-purple-600 mb-4">
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
               </div>
               <p className="text-gray-600 italic mb-4">
                 "I found a discontinued bottle of my favorite Guerlain perfume for half the original price. The seller was transparent about the condition, and it arrived exactly as described!"
               </p>
               <div className="flex items-center">
-                <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden mr-4">
+                <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden mr-3">
                   <img src="https://i.pravatar.cc/100?img=32" alt="Customer" className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <div className="font-medium">Sarah Johnson</div>
-                  <div className="text-sm text-gray-500">Vintage Collector</div>
+                  <div className="font-medium text-sm">Sarah Johnson</div>
+                  <div className="text-xs text-gray-500">Vintage Collector</div>
                 </div>
               </div>
             </div>
             
             {/* Testimonial 2 */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <div className="flex text-gold mb-4">
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
+            <div className="bg-gray-50 p-6 rounded-lg">
+              <div className="flex text-purple-600 mb-4">
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
               </div>
               <p className="text-gray-600 italic mb-4">
                 "BidLelong helped me sell my collection of niche perfumes I no longer use. The listing process was straightforward, and I earned much more than I would have through other platforms."
               </p>
               <div className="flex items-center">
-                <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden mr-4">
+                <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden mr-3">
                   <img src="https://i.pravatar.cc/100?img=58" alt="Customer" className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <div className="font-medium">David Chen</div>
-                  <div className="text-sm text-gray-500">Trusted Seller</div>
+                  <div className="font-medium text-sm">David Chen</div>
+                  <div className="text-xs text-gray-500">Trusted Seller</div>
                 </div>
               </div>
             </div>
             
             {/* Testimonial 3 */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <div className="flex text-gold mb-4">
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
-                <Star className="fill-gold" />
-                <StarHalf className="fill-gold" />
+            <div className="bg-gray-50 p-6 rounded-lg">
+              <div className="flex text-purple-600 mb-4">
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
+                <Star className="fill-current h-4 w-4" />
+                <StarHalf className="fill-current h-4 w-4" />
               </div>
               <p className="text-gray-600 italic mb-4">
                 "I won an auction for a rare discontinued Creed perfume at 30% below retail. The detailed condition info (85% full, original box) gave me confidence in what I was bidding on."
               </p>
               <div className="flex items-center">
-                <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden mr-4">
+                <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden mr-3">
                   <img src="https://i.pravatar.cc/100?img=26" alt="Customer" className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <div className="font-medium">Emma Thompson</div>
-                  <div className="text-sm text-gray-500">Bargain Hunter</div>
+                  <div className="font-medium text-sm">Emma Thompson</div>
+                  <div className="text-xs text-gray-500">Bargain Hunter</div>
                 </div>
               </div>
             </div>
@@ -241,26 +309,26 @@ export default function HomePage() {
       </section>
 
       {/* Email Signup */}
-      <section className="py-16 bg-rich-black">
+      <section className="py-16 bg-purple-100">
         <div className="container mx-auto px-6 text-center">
-          <h2 className="font-playfair text-3xl text-white font-bold mb-4">Join Our Fragrance Marketplace</h2>
-          <p className="text-gray-300 mb-8 max-w-xl mx-auto">
+          <h2 className="text-3xl font-bold mb-4 text-gray-900">Join Our Fragrance Community</h2>
+          <p className="text-gray-600 mb-8 max-w-xl mx-auto">
             Subscribe to receive alerts on rare finds, auction endings, price drops on your wishlist items, and trusted seller listings.
           </p>
           <form onSubmit={handleSubscribe} className="max-w-md mx-auto flex flex-col sm:flex-row">
             <Input
               type="email"
               placeholder="Your email address"
-              className="flex-grow px-4 py-3 rounded-full sm:rounded-r-none mb-3 sm:mb-0 text-black"
+              className="flex-grow px-4 py-3 rounded-full sm:rounded-r-none mb-3 sm:mb-0"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <Button type="submit" className="bg-gold text-rich-black px-6 py-3 rounded-full sm:rounded-l-none font-medium hover:bg-metallic-gold transition">
+            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-full sm:rounded-l-none">
               Subscribe
             </Button>
           </form>
-          <p className="text-gray-400 text-sm mt-4">
+          <p className="text-gray-500 text-sm mt-4">
             By subscribing, you agree to our Privacy Policy and consent to receive updates.
           </p>
         </div>

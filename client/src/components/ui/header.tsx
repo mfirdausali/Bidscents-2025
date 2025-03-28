@@ -52,26 +52,76 @@ export function Header() {
   };
 
   return (
-    <header className={`border-b border-gray-200 sticky top-0 z-30 bg-white ${isScrolled ? "shadow" : ""}`}>
-      {/* Top navigation bar */}
-      <div className="bg-rich-black text-white py-2 px-6">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <a href="#" className="text-sm hover:text-gold transition text-black">Help</a>
-            <a href="#" className="text-sm hover:text-gold transition text-black">Track Order</a>
-          </div>
-          <div className="flex items-center space-x-4">
+    <header className={`sticky top-0 z-30 bg-white ${isScrolled ? "shadow-sm" : ""}`}>
+      <div className="container mx-auto py-3 px-4 md:px-6">
+        <div className="flex justify-between items-center">
+          {/* Logo */}
+          <Link href="/" className="flex items-center">
+            <span className="text-xl font-bold text-purple-600">BidLelong<span className="text-yellow-500">MY</span></span>
+          </Link>
+          
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="relative hidden md:block max-w-md w-full mx-4">
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="Search for perfumes, brands, notes..."
+                className="search-bar pl-10 pr-4 py-2 w-full bg-gray-100 border-0 rounded-full"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+            </div>
+          </form>
+          
+          {/* Navigation */}
+          <nav className="flex items-center space-x-6">
+            <Link href="/explore" className="hidden md:block font-medium hover:text-purple-700 transition">
+              Explore
+            </Link>
+            <Link href="/seller/dashboard" className="hidden md:block font-medium hover:text-purple-700 transition">
+              Sell
+            </Link>
+            <Link href="/community" className="hidden md:block font-medium hover:text-purple-700 transition">
+              Community
+            </Link>
+            
+            {/* Mobile search icon */}
+            <button className="md:hidden text-gray-700">
+              <Search className="h-5 w-5" />
+            </button>
+            
+            {/* Cart */}
+            <button 
+              onClick={() => setIsCartOpen(true)}
+              className="text-gray-700 relative"
+              aria-label="Cart"
+            >
+              <ShoppingBag className="h-5 w-5" />
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+            
+            {/* User menu */}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="link" className="text-sm text-black hover:text-gold transition p-0">
-                    <User className="h-4 w-4 mr-1" />
-                    {user.username}
+                  <Button variant="ghost" size="icon" className="rounded-full p-0">
+                    <User className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <Link href="/profile">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <User className="h-4 w-4 mr-2" />
+                      Profile
+                    </DropdownMenuItem>
+                  </Link>
                   {user.isSeller && (
                     <Link href="/seller/dashboard">
                       <DropdownMenuItem className="cursor-pointer">
@@ -88,6 +138,7 @@ export function Header() {
                       </DropdownMenuItem>
                     </Link>
                   )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
@@ -95,126 +146,14 @@ export function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <>
-                <Link href="/auth" className="text-sm hover:text-gold transition font-medium text-black">
+              <Link href="/auth">
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-full">
                   Sign In
-                </Link>
-                <Link href="/auth?tab=register" className="text-sm bg-gold text-black font-semibold px-3 py-1 rounded hover:bg-amber-500 transition">
-                  Register
-                </Link>
-              </>
+                </Button>
+              </Link>
             )}
-          </div>
+          </nav>
         </div>
-      </div>
-      
-      {/* Main header with logo and search */}
-      <div className="container mx-auto py-4 px-6">
-        <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-          <Link href="/" className="text-3xl font-playfair font-bold text-rich-black">
-            <span className="text-gold">E</span>ssence
-          </Link>
-          
-          <form onSubmit={handleSearch} className="relative w-full md:w-2/5">
-            <Input
-              type="text"
-              placeholder="Search for perfumes, brands..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <Button
-              type="submit"
-              variant="ghost"
-              className="absolute right-0 top-0 h-full px-4 text-gold"
-            >
-              <Search className="h-5 w-5" />
-            </Button>
-          </form>
-          
-          <div className="flex items-center space-x-6">
-            <a href="#" className="text-dark-grey hover:text-gold transition">
-              <Heart className="h-5 w-5" />
-            </a>
-            <button 
-              onClick={() => setIsCartOpen(true)} 
-              className="text-dark-grey hover:text-gold transition relative"
-            >
-              <ShoppingBag className="h-5 w-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-amber-500 text-xs text-black font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-        
-        {/* Categories navigation */}
-        <nav className="mt-4 hidden md:block overflow-x-auto">
-          <ul className="flex space-x-8 font-lato text-dark-grey whitespace-nowrap">
-            <li>
-              <Link 
-                href="/products" 
-                className={`hover:text-gold transition pb-2 ${
-                  location === "/products" ? "border-b-2 border-gold font-medium" : ""
-                }`}
-              >
-                All Perfumes
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/products?category=1" 
-                className={`hover:text-gold transition pb-2 ${
-                  location.includes("category=1") ? "border-b-2 border-gold font-medium" : ""
-                }`}
-              >
-                Women
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/products?category=2" 
-                className={`hover:text-gold transition pb-2 ${
-                  location.includes("category=2") ? "border-b-2 border-gold font-medium" : ""
-                }`}
-              >
-                Men
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/products?category=3" 
-                className={`hover:text-gold transition pb-2 ${
-                  location.includes("category=3") ? "border-b-2 border-gold font-medium" : ""
-                }`}
-              >
-                Unisex
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/products?category=4" 
-                className={`hover:text-gold transition pb-2 ${
-                  location.includes("category=4") ? "border-b-2 border-gold font-medium" : ""
-                }`}
-              >
-                Niche
-              </Link>
-            </li>
-            <li>
-              <Link 
-                href="/products?category=5" 
-                className={`hover:text-gold transition pb-2 ${
-                  location.includes("category=5") ? "border-b-2 border-gold font-medium" : ""
-                }`}
-              >
-                New Arrivals
-              </Link>
-            </li>
-          </ul>
-        </nav>
       </div>
 
       {/* Cart Drawer */}
