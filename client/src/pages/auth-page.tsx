@@ -77,6 +77,7 @@ export default function AuthPage() {
       firstName: "",
       lastName: "",
       isSeller: false,
+      isAdmin: false,
       terms: false,
     },
   });
@@ -261,6 +262,13 @@ export default function AuthPage() {
                         {...registerForm.register("isSeller")}
                       />
                       <Label htmlFor="isSeller">I want to sell perfumes</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="isAdmin"
+                        {...registerForm.register("isAdmin")}
+                      />
+                      <Label htmlFor="isAdmin" className="text-amber-600 font-medium">Admin account (development only)</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
