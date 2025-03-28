@@ -57,8 +57,8 @@ export function Header() {
       <div className="bg-rich-black text-white py-2 px-6">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-4">
-            <a href="#" className="text-sm hover:text-gold transition">Help</a>
-            <a href="#" className="text-sm hover:text-gold transition">Track Order</a>
+            <a href="#" className="text-sm hover:text-gold transition text-black">Help</a>
+            <a href="#" className="text-sm hover:text-gold transition text-black">Track Order</a>
           </div>
           <div className="flex items-center space-x-4">
             {user ? (
@@ -96,10 +96,10 @@ export function Header() {
               </DropdownMenu>
             ) : (
               <>
-                <Link href="/auth" className="text-sm hover:text-gold transition">
+                <Link href="/auth" className="text-sm hover:text-gold transition text-black">
                   Sign In
                 </Link>
-                <Link href="/auth?tab=register" className="text-sm bg-gold text-rich-black px-3 py-1 rounded hover:bg-metallic-gold transition">
+                <Link href="/auth?tab=register" className="text-sm bg-gold text-black px-3 py-1 rounded hover:bg-metallic-gold transition">
                   Register
                 </Link>
               </>
