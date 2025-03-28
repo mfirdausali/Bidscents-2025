@@ -77,6 +77,8 @@ export default function AuthPage() {
       firstName: "",
       lastName: "",
       isSeller: false,
+      isAdmin: false,
+      isBanned: false,
       terms: false,
     },
   });
@@ -262,6 +264,18 @@ export default function AuthPage() {
                       />
                       <Label htmlFor="isSeller">I want to sell perfumes</Label>
                     </div>
+                    {/* Dev mode admin checkbox */}
+                    {import.meta.env.DEV && (
+                      <div className="flex items-center space-x-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
+                        <Checkbox
+                          id="isAdmin"
+                          {...registerForm.register("isAdmin")}
+                        />
+                        <Label htmlFor="isAdmin" className="text-amber-800">
+                          <strong>DEV MODE:</strong> Register as admin
+                        </Label>
+                      </div>
+                    )}
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="terms"

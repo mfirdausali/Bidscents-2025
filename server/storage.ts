@@ -35,6 +35,11 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
+  // Admin methods
+  getAllUsers(): Promise<User[]>;
+  updateUserStatus(id: number, updates: Partial<User>): Promise<User>;
+  deleteUser(id: number): Promise<void>;
+  
   // Category methods
   getAllCategories(): Promise<Category[]>;
   getCategoryById(id: number): Promise<Category | undefined>;
@@ -315,6 +320,56 @@ export class MemStorage implements IStorage {
     const review: Review = { ...insertReview, id, createdAt };
     this.reviews.set(id, review);
     return review;
+  }
+  
+  // Admin methods
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values()).sort((a, b) => 
+      a.username.localeCompare(b.username)
+    );
+  }
+  
+  async updateUserStatus(id: number, updates: Partial<User>): Promise<User> {
+    const user = this.users.get(id);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    const updatedUser = { ...user, ...updates };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+  
+  async deleteUser(id: number): Promise<void> {
+    // First delete associated products and their related data
+    const userProducts = Array.from(this.products.values()).filter(
+      product => product.sellerId === id
+    );
+    
+    for (const product of userProducts) {
+      await this.deleteProduct(product.id);
+    }
+    
+    // Delete user's cart items
+    const cartItemIds: number[] = [];
+    for (const [itemId, item] of this.cartItems.entries()) {
+      if (item.userId === id) {
+        cartItemIds.push(itemId);
+      }
+    }
+    cartItemIds.forEach(itemId => this.cartItems.delete(itemId));
+    
+    // Delete user's reviews
+    const reviewIds: number[] = [];
+    for (const [reviewId, review] of this.reviews.entries()) {
+      if (review.userId === id) {
+        reviewIds.push(reviewId);
+      }
+    }
+    reviewIds.forEach(reviewId => this.reviews.delete(reviewId));
+    
+    // Finally delete the user
+    this.users.delete(id);
   }
 
   // Helper methods
@@ -614,6 +669,44 @@ export class DatabaseStorage implements IStorage {
         averageRating,
       };
     }));
+  }
+  
+  // Admin methods
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users).orderBy(asc(users.username));
+  }
+  
+  async updateUserStatus(id: number, updates: Partial<User>): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    
+    if (!updatedUser) {
+      throw new Error("User not found");
+    }
+    
+    return updatedUser;
+  }
+  
+  async deleteUser(id: number): Promise<void> {
+    // First delete associated cart items, products, and reviews
+    const userProducts = await db.select().from(products).where(eq(products.sellerId, id));
+    
+    // Delete all user's products and their associated items
+    for (const product of userProducts) {
+      await this.deleteProduct(product.id);
+    }
+    
+    // Delete user's cart items
+    await db.delete(cartItems).where(eq(cartItems.userId, id));
+    
+    // Delete user's reviews
+    await db.delete(reviews).where(eq(reviews.userId, id));
+    
+    // Finally delete the user
+    await db.delete(users).where(eq(users.id, id));
   }
 }
 

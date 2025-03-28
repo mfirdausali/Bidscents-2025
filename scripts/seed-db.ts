@@ -34,7 +34,9 @@ async function main() {
       firstName: "Chanel",
       lastName: "Official",
       address: "Paris, France",
-      isSeller: true
+      isSeller: true,
+      isAdmin: false,
+      isBanned: false
     },
     {
       username: "ysl_boutique",
@@ -43,7 +45,9 @@ async function main() {
       firstName: "Yves Saint",
       lastName: "Laurent",
       address: "Paris, France",
-      isSeller: true
+      isSeller: true,
+      isAdmin: false,
+      isBanned: false
     },
     {
       username: "dior_fragrance",
@@ -52,7 +56,9 @@ async function main() {
       firstName: "Christian",
       lastName: "Dior",
       address: "Paris, France",
-      isSeller: true
+      isSeller: true,
+      isAdmin: false,
+      isBanned: false
     },
     {
       username: "tom_ford_beauty",
@@ -61,7 +67,9 @@ async function main() {
       firstName: "Tom",
       lastName: "Ford",
       address: "New York, USA",
-      isSeller: true
+      isSeller: true,
+      isAdmin: false,
+      isBanned: false
     }
   ];
 
@@ -73,6 +81,22 @@ async function main() {
     sellerIds.push(inserted.id);
     console.log(`Created seller: ${seller.username} with ID: ${inserted.id}`);
   }
+  
+  // Create admin account
+  const adminAccount = {
+    username: "admin",
+    password: await hashPassword("Admin123!"),
+    email: "admin@essence.com",
+    firstName: "System",
+    lastName: "Admin",
+    address: "Admin Office",
+    isSeller: false,
+    isAdmin: true,
+    isBanned: false
+  };
+  
+  const [adminUser] = await db.insert(users).values(adminAccount).returning({ id: users.id });
+  console.log(`Created admin user with ID: ${adminUser.id}`);
 
   // 2. Get all categories
   const allCategories = await db.select().from(categories);
