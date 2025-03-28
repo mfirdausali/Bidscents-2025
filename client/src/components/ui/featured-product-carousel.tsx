@@ -269,7 +269,7 @@ export function FeaturedProductCarousel() {
           <div className="mt-8 flex justify-center items-center">
             {/* Left navigation button */}
             <button 
-              className="bg-rich-black text-white h-8 w-8 rounded-full flex items-center justify-center mr-4 hover:bg-gold hover:text-rich-black transition"
+              className="bg-rich-black text-gray-700 h-8 w-8 rounded-full flex items-center justify-center mr-4 hover:bg-gold hover:text-rich-black transition"
               onClick={handlePrev}
               aria-label="Previous"
             >
@@ -307,7 +307,7 @@ export function FeaturedProductCarousel() {
             
             {/* Right navigation button */}
             <button 
-              className="bg-rich-black text-white h-8 w-8 rounded-full flex items-center justify-center ml-4 hover:bg-gold hover:text-rich-black transition"
+              className="bg-rich-black text-gray-700 h-8 w-8 rounded-full flex items-center justify-center ml-4 hover:bg-gold hover:text-rich-black transition"
               onClick={handleNext}
               aria-label="Next"
             >
