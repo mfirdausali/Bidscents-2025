@@ -128,12 +128,17 @@ export function ProductCard({ product }: ProductCardProps) {
       <div className="p-4">
         <div className="flex justify-between items-center mb-1">
           <div className="text-sm text-gray-500">
-            {product.brand} {product.volume && <span className="text-xs">({product.volume})</span>}
+            {product.brand}
           </div>
           {product.purchaseYear && (
             <div className="text-xs text-gray-400">Year: {product.purchaseYear}</div>
           )}
         </div>
+        {product.volume && (
+          <div className="mb-1 -mt-1">
+            <span className="bg-gray-100 px-2 py-0.5 rounded-full text-xs inline-block">{product.volume}</span>
+          </div>
+        )}
         <Link href={`/products/${product.id}`}>
           <h3 className="font-playfair text-xl font-medium mb-2 hover:text-gold transition">
             {product.name}

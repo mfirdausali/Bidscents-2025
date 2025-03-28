@@ -257,7 +257,14 @@ export default function ProductDetailPage() {
                 </div>
                 
                 <div className="text-gray-500 mb-1">
-                  {product.brand} {product.volume && <span className="text-sm">({product.volume})</span>}
+                  {product.brand}
+                </div>
+                <div className="flex items-center mb-2">
+                  {product.volume && (
+                    <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium mr-2">
+                      {product.volume}
+                    </span>
+                  )}
                 </div>
                 <h1 className="font-playfair text-2xl md:text-3xl font-bold mb-3">{product.name}</h1>
                 
@@ -286,6 +293,12 @@ export default function ProductDetailPage() {
                 <div className="bg-gray-50 p-4 rounded-md mb-6">
                   <h3 className="font-medium mb-2 text-sm">Item Details:</h3>
                   <div className="grid grid-cols-2 gap-3 text-sm">
+                    {product.volume && (
+                      <div className="flex items-center col-span-2 bg-gray-100 p-2 rounded mb-2">
+                        <span className="text-gray-700 mr-2 font-medium">Size:</span>
+                        <span className="text-black font-bold">{product.volume}</span>
+                      </div>
+                    )}
                     <div className="flex items-center">
                       <span className="text-gray-600 mr-2">Bottle:</span>
                       <span className="font-medium">{product.remainingPercentage || 100}% Full</span>
