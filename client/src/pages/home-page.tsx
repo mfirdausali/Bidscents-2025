@@ -144,61 +144,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Active Auctions */}
-      <section className="container mx-auto px-6 py-10 bg-amber-50 rounded-lg my-8">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-amber-800">Active Auctions</h2>
-            <p className="text-amber-700 text-sm mt-1">Bid on exclusive luxury fragrances</p>
-          </div>
-          <Link href="/products?type=auction" className="text-amber-600 hover:text-amber-800 flex items-center">
-            View All Auctions <span className="ml-1">→</span>
-          </Link>
-        </div>
-        
-        {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
-          </div>
-        ) : allProducts && allProducts.length > 0 ? (
-          <div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {/* Display the 3 most recent auction products */}
-              {[...allProducts]
-                .filter(product => product.listingType === 'auction')
-                .sort((a, b) => {
-                  // If createdAt exists, use it for sorting; otherwise, use id
-                  if (a.createdAt && b.createdAt) {
-                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                  }
-                  return b.id - a.id; // Fallback to id sorting (assuming higher id = more recent)
-                })
-                .slice(0, 3)
-                .map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))
-              }
-            </div>
-            {[...allProducts].filter(product => product.listingType === 'auction').length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-amber-700">No auctions available at the moment.</p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-amber-700">No auctions available at the moment.</p>
-          </div>
-        )}
-      </section>
-
       {/* Recent Listings */}
-      <section className="container mx-auto px-6 py-10 bg-white rounded-lg shadow-sm my-8">
+      <section className="container mx-auto px-6 py-8">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Recent Listings</h2>
-            <p className="text-gray-600 text-sm mt-1">Latest perfumes added to our marketplace</p>
-          </div>
+          <h2 className="text-2xl font-bold">Recent Listings</h2>
           <Link href="/products" className="text-purple-600 hover:text-purple-800 flex items-center">
             View All <span className="ml-1">→</span>
           </Link>
@@ -209,33 +158,25 @@ export default function HomePage() {
             <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
           </div>
         ) : allProducts && allProducts.length > 0 ? (
-          <div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {/* Display the 6 most recent non-auction products */}
-              {[...allProducts]
-                .filter(product => product.listingType !== 'auction')
-                .sort((a, b) => {
-                  // If createdAt exists, use it for sorting; otherwise, use id
-                  if (a.createdAt && b.createdAt) {
-                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                  }
-                  return b.id - a.id; // Fallback to id sorting (assuming higher id = more recent)
-                })
-                .slice(0, 6)
-                .map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))
-              }
-            </div>
-            {[...allProducts].filter(product => product.listingType !== 'auction').length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-gray-600">No products available at the moment.</p>
-              </div>
-            )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {/* Display the 9 most recent products by sorting them by createdAt in descending order */}
+            {[...allProducts]
+              .sort((a, b) => {
+                // If createdAt exists, use it for sorting; otherwise, use id
+                if (a.createdAt && b.createdAt) {
+                  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                }
+                return b.id - a.id; // Fallback to id sorting (assuming higher id = more recent)
+              })
+              .slice(0, 9)
+              .map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))
+            }
           </div>
         ) : (
           <div className="text-center py-8">
-            <p className="text-gray-600">No products available at the moment.</p>
+            <p>No products available at the moment.</p>
           </div>
         )}
       </section>
