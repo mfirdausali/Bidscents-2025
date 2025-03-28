@@ -157,7 +157,7 @@ export default function AuthPage() {
                   <CardFooter>
                     <Button 
                       type="submit" 
-                      className="w-full bg-gold text-rich-black hover:bg-metallic-gold"
+                      className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
                       disabled={loginMutation.isPending}
                     >
                       {loginMutation.isPending ? (
@@ -276,13 +276,15 @@ export default function AuthPage() {
                         id="terms"
                         checked={termsAccepted}
                         onCheckedChange={(checked) => {
-                          setTermsAccepted(checked as boolean);
-                          registerForm.setValue("terms", checked as boolean);
+                          const isChecked = checked === true;
+                          setTermsAccepted(isChecked);
+                          registerForm.setValue("terms", isChecked, { shouldValidate: true });
                         }}
+                        {...registerForm.register("terms")}
                       />
                       <Label htmlFor="terms">
                         I agree to the{" "}
-                        <a href="#" className="text-gold hover:underline">
+                        <a href="#" className="text-amber-600 hover:underline">
                           terms and conditions
                         </a>
                       </Label>
@@ -296,7 +298,7 @@ export default function AuthPage() {
                   <CardFooter>
                     <Button 
                       type="submit" 
-                      className="w-full bg-gold text-rich-black hover:bg-metallic-gold"
+                      className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
                       disabled={registerMutation.isPending}
                     >
                       {registerMutation.isPending ? (
