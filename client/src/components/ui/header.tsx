@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
-import { Search, Heart, ShoppingBag, User, LogOut, Package, Shield } from "lucide-react";
+import { Search, Heart, ShoppingBag, User, LogOut, Package } from "lucide-react";
 
 export function Header() {
   const [location] = useLocation();
@@ -57,14 +57,14 @@ export function Header() {
       <div className="bg-rich-black text-white py-2 px-6">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-4">
-            <a href="#" className="text-sm hover:text-gold transition text-black">Help</a>
-            <a href="#" className="text-sm hover:text-gold transition text-black">Track Order</a>
+            <a href="#" className="text-sm hover:text-gold transition">Help</a>
+            <a href="#" className="text-sm hover:text-gold transition">Track Order</a>
           </div>
           <div className="flex items-center space-x-4">
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="link" className="text-sm text-black hover:text-gold transition p-0">
+                  <Button variant="link" className="text-sm text-white hover:text-gold transition p-0">
                     <User className="h-4 w-4 mr-1" />
                     {user.username}
                   </Button>
@@ -80,14 +80,6 @@ export function Header() {
                       </DropdownMenuItem>
                     </Link>
                   )}
-                  {user.isAdmin && (
-                    <Link href="/admin/dashboard">
-                      <DropdownMenuItem className="cursor-pointer">
-                        <Shield className="h-4 w-4 mr-2" />
-                        Admin Dashboard
-                      </DropdownMenuItem>
-                    </Link>
-                  )}
                   <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
@@ -96,10 +88,10 @@ export function Header() {
               </DropdownMenu>
             ) : (
               <>
-                <Link href="/auth" className="text-sm hover:text-gold transition font-medium text-black">
+                <Link href="/auth" className="text-sm hover:text-gold transition">
                   Sign In
                 </Link>
-                <Link href="/auth?tab=register" className="text-sm bg-gold text-black font-semibold px-3 py-1 rounded hover:bg-amber-500 transition">
+                <Link href="/auth?tab=register" className="text-sm bg-gold text-rich-black px-3 py-1 rounded hover:bg-metallic-gold transition">
                   Register
                 </Link>
               </>
@@ -142,7 +134,7 @@ export function Header() {
             >
               <ShoppingBag className="h-5 w-5" />
               {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-amber-500 text-xs text-black font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute -top-2 -right-2 bg-gold text-xs text-rich-black rounded-full w-5 h-5 flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
