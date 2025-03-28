@@ -1,75 +1,85 @@
 import { Link } from "wouter";
+import { Facebook, Instagram, Twitter, Linkedin, Phone, Mail, MapPin } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="bg-white border-t border-gray-200 pt-12 pb-8">
+    <footer className="bg-white border-t border-gray-100 pt-12 pb-8">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <Link href="/" className="text-2xl font-playfair font-bold text-rich-black mb-4 inline-block">
-              <span className="text-gold">E</span>ssence
+            <Link href="/" className="text-xl font-bold text-gray-900 mb-4 inline-block">
+              <span className="text-purple-600">BidLelong</span><span className="text-amber-500">MY</span>
             </Link>
-            <p className="text-gray-600 mb-4">
-              The premier marketplace for luxury fragrances, connecting perfume enthusiasts with exceptional scents.
+            <p className="text-gray-600 mb-4 text-sm">
+              The premier marketplace for secondhand perfumes, connecting fragrance enthusiasts in Malaysia since 2023.
             </p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-gold transition">
-                <i className="fab fa-facebook-f"></i>
+            <div className="flex space-x-4 mt-6">
+              <a href="#" className="bg-gray-100 p-2 rounded-full text-gray-600 hover:bg-purple-100 hover:text-purple-600 transition-colors">
+                <Facebook size={18} />
               </a>
-              <a href="#" className="text-gray-400 hover:text-gold transition">
-                <i className="fab fa-instagram"></i>
+              <a href="#" className="bg-gray-100 p-2 rounded-full text-gray-600 hover:bg-purple-100 hover:text-purple-600 transition-colors">
+                <Instagram size={18} />
               </a>
-              <a href="#" className="text-gray-400 hover:text-gold transition">
-                <i className="fab fa-twitter"></i>
+              <a href="#" className="bg-gray-100 p-2 rounded-full text-gray-600 hover:bg-purple-100 hover:text-purple-600 transition-colors">
+                <Twitter size={18} />
               </a>
-              <a href="#" className="text-gray-400 hover:text-gold transition">
-                <i className="fab fa-pinterest"></i>
+              <a href="#" className="bg-gray-100 p-2 rounded-full text-gray-600 hover:bg-purple-100 hover:text-purple-600 transition-colors">
+                <Linkedin size={18} />
               </a>
             </div>
           </div>
           
           <div>
-            <h3 className="font-playfair font-semibold text-lg mb-4">Customer Service</h3>
-            <ul className="space-y-2">
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Contact Us</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">FAQ</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Shipping & Returns</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Track Order</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Gift Cards</a></li>
+            <h3 className="font-medium text-base mb-4 text-gray-900">Quick Links</h3>
+            <ul className="space-y-2 text-sm">
+              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">About Us</a></li>
+              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">Blog</a></li>
+              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">FAQs</a></li>
+              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">Contact Us</a></li>
+              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">Help Center</a></li>
             </ul>
           </div>
           
           <div>
-            <h3 className="font-playfair font-semibold text-lg mb-4">Information</h3>
-            <ul className="space-y-2">
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">About Us</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Fragrance Guide</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Sustainability</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Careers</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Press</a></li>
+            <h3 className="font-medium text-base mb-4 text-gray-900">For Buyers & Sellers</h3>
+            <ul className="space-y-2 text-sm">
+              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">Buying Guide</a></li>
+              <li><Link href="/seller/dashboard" className="text-gray-600 hover:text-purple-600 transition-colors">Seller Dashboard</Link></li>
+              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">Authentication Process</a></li>
+              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">Shipping Guidelines</a></li>
+              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">Return Policy</a></li>
             </ul>
           </div>
           
           <div>
-            <h3 className="font-playfair font-semibold text-lg mb-4">Selling on Essence</h3>
-            <ul className="space-y-2">
-              <li><Link href="/seller/dashboard" className="text-gray-600 hover:text-gold transition">Seller Dashboard</Link></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Seller Guidelines</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Success Stories</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-gold transition">Seller Support</a></li>
+            <h3 className="font-medium text-base mb-4 text-gray-900">Contact Us</h3>
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-start">
+                <Phone size={16} className="text-purple-600 mr-2 mt-0.5" />
+                <span className="text-gray-600">+60 3-2141 6050</span>
+              </li>
+              <li className="flex items-start">
+                <Mail size={16} className="text-purple-600 mr-2 mt-0.5" />
+                <span className="text-gray-600">support@bidlelongmy.com</span>
+              </li>
+              <li className="flex items-start">
+                <MapPin size={16} className="text-purple-600 mr-2 mt-0.5" />
+                <span className="text-gray-600">Level 8, Menara CIMB, Jalan Stesen Sentral 2, Kuala Lumpur, Malaysia</span>
+              </li>
             </ul>
           </div>
         </div>
         
-        <div className="border-t border-gray-200 mt-10 pt-6">
+        <div className="border-t border-gray-100 mt-10 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="text-gray-500 text-sm mb-4 md:mb-0">
-              &copy; 2023 Essence. All rights reserved.
+            <div className="text-gray-500 text-xs mb-4 md:mb-0">
+              &copy; 2025 BidLelongMY. All rights reserved.
             </div>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-500 text-sm hover:text-gold transition">Privacy Policy</a>
-              <a href="#" className="text-gray-500 text-sm hover:text-gold transition">Terms of Service</a>
-              <a href="#" className="text-gray-500 text-sm hover:text-gold transition">Cookies</a>
+            <div className="flex flex-wrap justify-center space-x-4">
+              <a href="#" className="text-gray-500 text-xs hover:text-purple-600 transition-colors">Privacy Policy</a>
+              <a href="#" className="text-gray-500 text-xs hover:text-purple-600 transition-colors">Terms of Service</a>
+              <a href="#" className="text-gray-500 text-xs hover:text-purple-600 transition-colors">Shipping Policy</a>
+              <a href="#" className="text-gray-500 text-xs hover:text-purple-600 transition-colors">Refund Policy</a>
             </div>
           </div>
         </div>
