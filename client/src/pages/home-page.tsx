@@ -8,7 +8,8 @@ import { ProductCard } from "@/components/ui/product-card";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Input } from "@/components/ui/input";
-import { Loader2, Star, StarHalf, Heart } from "lucide-react";
+import { Loader2, Star, StarHalf } from "lucide-react";
+import { FeaturedProductCarousel } from "@/components/ui/featured-product-carousel";
 
 export default function HomePage() {
   const [sortOption, setSortOption] = useState("featured");
@@ -158,79 +159,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Product */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <img 
-                src="https://images.unsplash.com/photo-1588405748880-12d1d2a59f75?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" 
-                alt="Dior J'adore" 
-                className="rounded-lg shadow-xl w-full"
-              />
-            </div>
-            <div>
-              <div className="text-sm bg-gold text-rich-black px-3 py-1 rounded-full inline-block mb-2 uppercase tracking-wider">Featured Listing</div>
-              <h2 className="font-playfair text-4xl font-bold mb-3">Dior J'adore</h2>
-              <div className="text-xl text-gold">$89.00</div>
-              <div className="text-sm text-gray-500 mb-4">Retail Price: $150.00 - Save 41%</div>
-              
-              <div className="flex items-center mb-4">
-                <div className="flex text-gold">
-                  <Star className="fill-gold" />
-                  <Star className="fill-gold" />
-                  <Star className="fill-gold" />
-                  <Star className="fill-gold" />
-                  <StarHalf className="fill-gold" />
-                </div>
-                <span className="text-sm text-gray-500 ml-2">(14 reviews)</span>
-              </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-                <div className="bg-gray-100 p-3 rounded-md">
-                  <div className="text-xs text-gray-500">Volume</div>
-                  <div className="font-medium">100ml / 3.4oz</div>
-                </div>
-                <div className="bg-gray-100 p-3 rounded-md">
-                  <div className="text-xs text-gray-500">Fullness</div>
-                  <div className="font-medium">85% Remaining</div>
-                </div>
-                <div className="bg-gray-100 p-3 rounded-md">
-                  <div className="text-xs text-gray-500">Batch Code</div>
-                  <div className="font-medium">8A02 (2022)</div>
-                </div>
-                <div className="bg-gray-100 p-3 rounded-md">
-                  <div className="text-xs text-gray-500">Box Condition</div>
-                  <div className="font-medium">Good, Minor Wear</div>
-                </div>
-                <div className="bg-gray-100 p-3 rounded-md">
-                  <div className="text-xs text-gray-500">Listing Type</div>
-                  <div className="font-medium">Fixed Price</div>
-                </div>
-                <div className="bg-gray-100 p-3 rounded-md">
-                  <div className="text-xs text-gray-500">Seller Rating</div>
-                  <div className="font-medium flex items-center">
-                    4.9 <Star className="h-3 w-3 fill-gold ml-1" />
-                  </div>
-                </div>
-              </div>
-              
-              <p className="text-gray-600 mb-6">
-                J'adore is an iconic fragrance with notes of ylang-ylang, Damascus rose, and jasmine. This bottle was purchased in 2022 and has been stored properly. Authentic product, sprayed only a few times.
-              </p>
-                            
-              <div className="flex space-x-4">
-                <Button className="bg-rich-black text-white hover:bg-metallic-gold hover:text-rich-black flex-grow py-6 rounded-full">
-                  Add to Cart
-                </Button>
-                <Button variant="outline" className="border border-rich-black text-rich-black hover:bg-rich-black hover:text-white px-4 py-6 rounded-full">
-                  <Heart className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Featured Product Carousel */}
+      <FeaturedProductCarousel />
 
       {/* Testimonials */}
       <section className="bg-gray-50 py-16">

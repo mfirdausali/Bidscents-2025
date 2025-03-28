@@ -250,7 +250,7 @@ export default function ProductDetailPage() {
                   )}
                   
                   {/* Listing type badge */}
-                  <Badge className="bg-gold text-rich-black ml-2">
+                  <Badge className="bg-gold bg-gray-100 text-rich-black ml-2">
                     {product.listingType === "auction" ? "Auction" : 
                      product.listingType === "negotiable" ? "Negotiable" : "Fixed Price"}
                   </Badge>
@@ -293,12 +293,6 @@ export default function ProductDetailPage() {
                 <div className="bg-gray-50 p-4 rounded-md mb-6">
                   <h3 className="font-medium mb-2 text-sm">Item Details:</h3>
                   <div className="grid grid-cols-2 gap-3 text-sm">
-                    {product.volume && (
-                      <div className="flex items-center col-span-2 bg-gray-100 p-2 rounded mb-2">
-                        <span className="text-gray-700 mr-2 font-medium">Size:</span>
-                        <span className="text-black font-bold">{product.volume}</span>
-                      </div>
-                    )}
                     <div className="flex items-center">
                       <span className="text-gray-600 mr-2">Bottle:</span>
                       <span className="font-medium">{product.remainingPercentage || 100}% Full</span>
@@ -356,13 +350,13 @@ export default function ProductDetailPage() {
                 </div>
                 
                 <Button 
-                  className="bg-rich-black text-white hover:bg-metallic-gold hover:text-rich-black h-12 flex-grow"
+                  className="bg-black text-white hover:bg-metallic-gold hover:text-rich-black h-12 flex-grow"
                   onClick={handleAddToCart}
                   disabled={isAddingToCart}
                 >
                   {isAddingToCart ? (
                     <span className="flex items-center">
-                      <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full"></span>
+                      <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-black rounded-full"></span>
                       Adding...
                     </span>
                   ) : (
