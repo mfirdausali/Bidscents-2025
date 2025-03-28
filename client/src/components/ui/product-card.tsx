@@ -138,8 +138,8 @@ export function ProductCard({ product }: ProductCardProps) {
         </button>
         
         {/* Condition badge (bottom left) */}
-        <Badge className={`absolute bottom-2 left-2 text-xs font-medium py-1 px-2 ${product.remainingPercentage > 90 ? 'bg-green-100 text-green-800' : product.remainingPercentage > 70 ? 'bg-yellow-100 text-yellow-800' : product.remainingPercentage > 50 ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800'}`}>
-          {product.remainingPercentage !== null && `${product.remainingPercentage}%`}
+        <Badge className={`absolute bottom-2 left-2 text-xs font-medium py-1 px-2 ${product.remainingPercentage && product.remainingPercentage > 90 ? 'bg-green-100 text-green-800' : product.remainingPercentage && product.remainingPercentage > 70 ? 'bg-yellow-100 text-yellow-800' : product.remainingPercentage && product.remainingPercentage > 50 ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800'}`}>
+          {product.remainingPercentage !== null && product.remainingPercentage !== undefined && `${product.remainingPercentage}%`}
         </Badge>
         
         {/* Listing type badge (bottom right) */}
