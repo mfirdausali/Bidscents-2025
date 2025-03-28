@@ -27,12 +27,12 @@ export function ProductCard({ product }: ProductCardProps) {
 
     // Add full stars
     for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={`star-${i}`} className="fill-current text-purple-600 h-3 w-3" />);
+      stars.push(<Star key={`star-${i}`} className="fill-purple-600 text-purple-600 h-3 w-3" />);
     }
 
     // Add half star if needed
     if (hasHalfStar) {
-      stars.push(<StarHalf key="half-star" className="fill-current text-purple-600 h-3 w-3" />);
+      stars.push(<StarHalf key="half-star" className="fill-purple-600 text-purple-600 h-3 w-3" />);
     }
 
     // Add empty stars to make total of 5
@@ -90,112 +90,108 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   };
 
-  // Format condition text
+  // Get condition text based on product state
   const getConditionText = (product: ProductWithDetails) => {
     if (product.isNew) return 'Like New';
-    if (product.remainingPercentage) return `${product.remainingPercentage}% Full`;
+    if (product.remainingPercentage && product.remainingPercentage > 90) return 'Very Good';
+    if (product.remainingPercentage && product.remainingPercentage > 70) return 'Good';
+    if (product.remainingPercentage && product.remainingPercentage > 50) return 'Fair';
     return 'Good';
-  }
+  };
 
-  // Get condition class
-  const getConditionClass = (product: ProductWithDetails) => {
-    if (product.isNew) return 'bg-gray-100 text-gray-800';
-    if (product.remainingPercentage && product.remainingPercentage > 90) return 'bg-green-100 text-green-800';
-    if (product.remainingPercentage && product.remainingPercentage > 70) return 'bg-blue-100 text-blue-800';
-    return 'bg-orange-100 text-orange-800';
-  }
-
-  // Get listing type class
-  const getListingTypeClass = (type: string | undefined | null) => {
-    if (!type || type === 'fixed') return 'badge-fixed';
-    if (type === 'negotiable') return 'badge-negotiable';
-    if (type === 'auction') return 'badge-auction';
-    return 'badge-fixed';
-  }
+  // Get listing type badge text
+  const getListingTypeText = (type: string | undefined | null) => {
+    if (!type || type === 'fixed') return 'FIXED PRICE';
+    if (type === 'negotiable') return 'NEGOTIABLE';
+    if (type === 'auction') return 'AUCTION';
+    return 'FIXED PRICE';
+  };
+  
+  // Get listing type badge color
+  const getListingTypeBadgeColor = (type: string | undefined | null) => {
+    if (type === 'auction') return 'bg-amber-100 text-amber-800';
+    if (type === 'negotiable') return 'bg-white text-purple-800';
+    return 'bg-white text-gray-800';
+  };
 
   return (
-    <div className="card group hover:shadow-md transition-shadow duration-300">
+    <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300">
       <div className="relative">
         <Link href={`/products/${product.id}`}>
           <img
             src={product.imageUrl}
             alt={product.name}
-            className="w-full h-56 object-cover"
+            className="w-full h-48 object-cover"
           />
         </Link>
+        
+        {/* Heart button */}
         <button 
-          className="absolute top-3 right-3 text-white bg-white bg-opacity-50 hover:bg-opacity-100 p-1.5 rounded-full transition-colors duration-300"
+          className="absolute top-2 left-2 text-white bg-white rounded-full p-1 shadow-sm"
           onClick={() => setIsLiked(!isLiked)}
         >
-          <Heart className={`h-4 w-4 ${isLiked ? 'fill-purple-600 text-purple-600' : 'text-gray-600'}`} />
+          <Heart className={`h-5 w-5 ${isLiked ? 'fill-purple-600 text-purple-600' : 'text-gray-400'}`} />
         </button>
         
-        {/* Condition badge */}
-        <div className={`absolute top-3 left-3 condition-badge ${getConditionClass(product)}`}>
+        {/* Condition badge (bottom left) */}
+        <div className="absolute bottom-2 left-2 text-xs font-medium py-1 px-2 rounded-sm bg-white">
           {getConditionText(product)}
         </div>
         
-        {/* Listing type badge */}
-        <div className={`absolute bottom-3 left-3 listing-badge ${getListingTypeClass(product.listingType)}`}>
-          {product.listingType === 'auction' ? 'AUCTION' : 
-            product.listingType === 'negotiable' ? 'NEGOTIABLE' : 'FIXED PRICE'}
+        {/* Listing type badge (bottom right) */}
+        <div className={`absolute bottom-2 right-2 text-xs font-medium py-1 px-2 rounded-sm ${getListingTypeBadgeColor(product.listingType)}`}>
+          {getListingTypeText(product.listingType)}
         </div>
       </div>
       
-      <div className="p-4">
-        <div className="flex justify-between items-baseline mb-1">
-          <span className="text-sm text-gray-600 font-medium">{product.brand}</span>
-          
-          {/* Volume badge */}
-          {product.volume && (
-            <span className="bg-gray-100 px-2 py-0.5 rounded-full text-xs text-gray-700">
-              {product.volume}
-            </span>
-          )}
+      <div className="p-3">
+        {/* Product name and price */}
+        <div className="flex justify-between items-start mb-1">
+          <Link href={`/products/${product.id}`}>
+            <h3 className="text-sm font-semibold text-gray-900 hover:text-purple-600 transition-colors">
+              {product.name}
+            </h3>
+          </Link>
+          <span className="font-semibold text-purple-600 text-sm">
+            RM {product.price.toFixed(0)}
+          </span>
         </div>
         
-        <Link href={`/products/${product.id}`}>
-          <h3 className="text-base font-medium mb-1 text-gray-900 hover:text-purple-600 transition-colors">
-            {product.name}
-          </h3>
-        </Link>
+        {/* Brand and volume */}
+        <div className="text-xs text-gray-600 mb-2">
+          {product.brand}
+          {product.volume && ` • ${product.volume}`}
+          {product.batchCode && ` • Batch ${product.batchCode}`}
+        </div>
         
-        {/* Batch info and seller */}
+        {/* Location and seller */}
         <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
-          <span>{product.batchCode ? `Batch ${product.batchCode}` : '•'} {product.purchaseYear ? `• ${product.purchaseYear}` : ''}</span>
-          <span>US • Seller</span>
+          <span>{product.seller?.username || 'US'} • Seller</span>
         </div>
         
-        {/* Price and bid status */}
-        {product.listingType === 'auction' ? (
-          <div className="mt-3">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm text-gray-600">Current Bid:</span>
-              <span className="font-semibold text-purple-600">RM {product.price.toFixed(2)}</span>
+        {/* Auction info (if applicable) */}
+        {product.listingType === 'auction' && (
+          <div className="text-xs text-gray-500 mb-3">
+            <div className="flex justify-between">
+              <span>Current Bid: RM {product.price.toFixed(0)}</span>
+              <span>0 bids • in 5 days</span>
             </div>
-            <div className="text-xs text-gray-500 mb-3">
-              0 bids • in 5 days
-            </div>
-          </div>
-        ) : (
-          <div className="font-semibold text-lg text-purple-600 mt-2 mb-3">
-            RM {product.price.toFixed(2)}
           </div>
         )}
         
-        {/* Action button */}
+        {/* Action buttons */}
         {product.listingType === 'negotiable' ? (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 mt-3">
             <Button
               onClick={handleAddToCart}
               disabled={isAddingToCart}
-              className="btn-primary text-sm py-1.5"
+              className="bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md py-1.5"
             >
-              {isAddingToCart ? 'Adding...' : 'Buy Now'}
+              Buy Now
             </Button>
             <Button
               variant="outline"
-              className="btn-outline text-sm py-1.5"
+              className="border-purple-600 text-purple-600 hover:bg-purple-50 text-xs rounded-md py-1.5"
             >
               Make Offer
             </Button>
@@ -204,7 +200,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <Button
             onClick={handleAddToCart}
             disabled={isAddingToCart}
-            className="btn-primary w-full text-sm py-1.5"
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md py-1.5 w-full mt-3"
           >
             {isAddingToCart ? 'Processing...' : 'Bid Now'}
           </Button>
@@ -212,7 +208,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <Button
             onClick={handleAddToCart}
             disabled={isAddingToCart}
-            className="btn-primary w-full text-sm py-1.5"
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md py-1.5 w-full mt-3"
           >
             {isAddingToCart ? (
               <span className="flex items-center justify-center">
