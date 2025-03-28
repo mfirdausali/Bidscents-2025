@@ -350,7 +350,7 @@ export default function ProductDetailPage() {
                 </div>
                 
                 <Button 
-                  className="bg-black text-white hover:bg-metallic-gold hover:text-rich-black h-12 flex-grow"
+                  className="bg-purple-600 text-white hover:bg-purple-700 h-12 flex-grow shadow-sm"
                   onClick={handleAddToCart}
                   disabled={isAddingToCart}
                 >
@@ -369,7 +369,7 @@ export default function ProductDetailPage() {
                 
                 <Button 
                   variant="outline" 
-                  className="border-rich-black text-rich-black hover:bg-rich-black hover:text-white h-12 px-4"
+                  className="border-purple-600 text-purple-600 hover:bg-purple-100 h-12 px-4"
                 >
                   <Heart className="h-5 w-5" />
                 </Button>
@@ -539,7 +539,7 @@ export default function ProductDetailPage() {
                                         className="p-1"
                                       >
                                         <Star 
-                                          className={`h-6 w-6 ${selectedRating >= rating ? 'fill-gold text-gold' : 'text-gray-300'}`} 
+                                          className={`h-6 w-6 ${selectedRating >= rating ? 'fill-purple-600 text-purple-600' : 'text-gray-300'}`} 
                                         />
                                       </button>
                                     ))}
@@ -570,12 +570,12 @@ export default function ProductDetailPage() {
                           
                           <Button 
                             type="submit" 
-                            className="bg-gold text-rich-black hover:bg-metallic-gold"
+                            className="bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
                             disabled={addReviewMutation.isPending}
                           >
                             {addReviewMutation.isPending ? (
                               <span className="flex items-center">
-                                <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
+                                <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full"></span>
                                 Submitting...
                               </span>
                             ) : (
@@ -589,7 +589,7 @@ export default function ProductDetailPage() {
                 ) : (
                   <div className="bg-gray-50 p-6 rounded-lg text-center">
                     <p className="text-gray-600 mb-4">Please sign in to leave a review</p>
-                    <Button asChild className="bg-gold text-rich-black hover:bg-metallic-gold">
+                    <Button asChild className="bg-purple-600 text-white hover:bg-purple-700 shadow-sm">
                       <a href="/auth">Sign In</a>
                     </Button>
                   </div>

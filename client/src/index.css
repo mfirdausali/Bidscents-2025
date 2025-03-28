@@ -6,11 +6,15 @@
 
 @layer base {
   :root {
-    --primary: 263 100% 66%; /* BidLelongMY purple */
-    --primary-light: 263 100% 90%;
-    --primary-dark: 263 100% 50%;
+    /* Theme variables (original gold theme) */
+    /* These are the default Shadcn variables for the theme */
+    
+    /* Custom BidLelong variables (not part of theme but explicit for components) */
+    --bidlelong-purple: 263 100% 66%;
+    --bidlelong-purple-light: 263 100% 90%;
+    --bidlelong-purple-dark: 263 100% 50%;
+    --bidlelong-amber: 35 100% 50%;
     --secondary: 0 0% 96%; /* Light gray for backgrounds */
-    --accent: 35 100% 50%; /* Gold accent for auction badges */
     --success: 142 72% 29%; /* Green */
     --warning: 38 92% 50%; /* Amber */
     --danger: 0 84% 60%; /* Red */

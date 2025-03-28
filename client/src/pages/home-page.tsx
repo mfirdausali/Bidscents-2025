@@ -57,7 +57,7 @@ export default function HomePage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full">
+            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full shadow-sm">
               Start Shopping
             </Button>
           </form>
@@ -220,7 +220,7 @@ export default function HomePage() {
           </div>
           
           <div className="text-center mt-10">
-            <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-full px-6 py-3">
+            <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-full px-8 py-3 shadow-sm">
               Learn More About Our Process
             </Button>
           </div>
@@ -324,7 +324,7 @@ export default function HomePage() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-full sm:rounded-l-none">
+            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-full sm:rounded-l-none shadow-sm">
               Subscribe
             </Button>
           </form>
