@@ -260,14 +260,22 @@ export default function AuthPage() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="isSeller"
-                        {...registerForm.register("isSeller")}
+                        checked={registerForm.watch("isSeller")}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
+                          registerForm.setValue("isSeller", isChecked);
+                        }}
                       />
                       <Label htmlFor="isSeller">I want to sell perfumes</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="isAdmin"
-                        {...registerForm.register("isAdmin")}
+                        checked={registerForm.watch("isAdmin")}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
+                          registerForm.setValue("isAdmin", isChecked);
+                        }}
                       />
                       <Label htmlFor="isAdmin" className="text-amber-600 font-medium">Admin account (development only)</Label>
                     </div>
@@ -280,7 +288,6 @@ export default function AuthPage() {
                           setTermsAccepted(isChecked);
                           registerForm.setValue("terms", isChecked, { shouldValidate: true });
                         }}
-                        {...registerForm.register("terms")}
                       />
                       <Label htmlFor="terms">
                         I agree to the{" "}
