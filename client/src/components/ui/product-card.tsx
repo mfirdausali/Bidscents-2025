@@ -136,7 +136,7 @@ export function ProductCard({ product }: ProductCardProps) {
         </div>
         {product.volume && (
           <div className="mb-1 -mt-1">
-            <span className="bg-gray-100 px-2 py-0.5 rounded-full text-xs inline-block">{product.volume}</span>
+            <span className="bg-black px-2 py-0.5 rounded-full text-xs inline-block">{product.volume}</span>
           </div>
         )}
         <Link href={`/products/${product.id}`}>
