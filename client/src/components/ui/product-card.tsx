@@ -119,7 +119,7 @@ export function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 border">
+    <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 border flex flex-col h-full">
       <div className="relative">
         <Link href={`/products/${product.id}`}>
           <img
@@ -148,7 +148,7 @@ export function ProductCard({ product }: ProductCardProps) {
         </Badge>
       </div>
       
-      <div className="p-3">
+      <div className="p-3 flex flex-col flex-grow">
         {/* Product name and price */}
         <div className="flex justify-between items-start mb-1">
           <Link href={`/products/${product.id}`}>
@@ -181,6 +181,9 @@ export function ProductCard({ product }: ProductCardProps) {
             </div>
           </div>
         )}
+        
+        {/* Spacer to push buttons to bottom */}
+        <div className="flex-grow"></div>
         
         {/* Action buttons */}
         {product.listingType === 'negotiable' ? (
