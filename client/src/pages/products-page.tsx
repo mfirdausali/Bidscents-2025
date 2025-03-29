@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, useRoute } from "wouter";
+import { useLocation } from "wouter";
 import { ProductWithDetails, Category } from "@shared/schema";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
@@ -15,7 +15,7 @@ import { Loader2, FilterX } from "lucide-react";
 
 export default function ProductsPage() {
   // Parse query params
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const searchParams = new URLSearchParams(location.split("?")[1] || "");
   
   // State for filters
@@ -29,22 +29,6 @@ export default function ProductsPage() {
   const [brands, setBrands] = useState<string[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState("featured");
-  
-  // Function to update URL params
-  const updateUrlParams = (params: Record<string, string | undefined>) => {
-    const urlParams = new URLSearchParams(location.split("?")[1] || "");
-    
-    Object.entries(params).forEach(([key, value]) => {
-      if (value === undefined || value === "") {
-        urlParams.delete(key);
-      } else {
-        urlParams.set(key, value);
-      }
-    });
-    
-    const newUrl = urlParams.toString() ? `/products?${urlParams.toString()}` : "/products";
-    setLocation(newUrl, { replace: true });
-  };
 
   // Fetch categories
   const { data: categories, isLoading: isLoadingCategories } = useQuery<Category[]>({
@@ -91,23 +75,6 @@ export default function ProductsPage() {
   const applyFilters = () => {
     setMinPrice(priceRange[0]);
     setMaxPrice(priceRange[1]);
-    
-    // Update URL with all current filter parameters
-    const urlParams: Record<string, string | undefined> = {
-      category: categoryId !== undefined ? categoryId.toString() : undefined,
-      search: searchQuery || undefined,
-      minPrice: priceRange[0] > 0 ? priceRange[0].toString() : undefined,
-      maxPrice: priceRange[1] < 500 ? priceRange[1].toString() : undefined
-    };
-    
-    // Add brands if any selected
-    if (selectedBrands.length > 0) {
-      selectedBrands.forEach((brand, index) => {
-        urlParams[`brand${index}`] = brand;
-      });
-    }
-    
-    updateUrlParams(urlParams);
     refetch();
   };
 
@@ -121,7 +88,7 @@ export default function ProductsPage() {
     setSelectedBrands([]);
     
     // Update URL
-    setLocation("/products", { replace: true });
+    window.history.pushState({}, "", "/products");
     
     refetch();
   };
@@ -216,10 +183,7 @@ export default function ProductsPage() {
                           name="category"
                           className="mr-2"
                           checked={categoryId === undefined}
-                          onChange={() => {
-                            setCategoryId(undefined);
-                            updateUrlParams({ category: undefined });
-                          }}
+                          onChange={() => setCategoryId(undefined)}
                         />
                         <Label htmlFor="all-categories">All Categories</Label>
                       </div>
@@ -231,10 +195,7 @@ export default function ProductsPage() {
                             name="category"
                             className="mr-2"
                             checked={categoryId === category.id}
-                            onChange={() => {
-                              setCategoryId(category.id);
-                              updateUrlParams({ category: category.id.toString() });
-                            }}
+                            onChange={() => setCategoryId(category.id)}
                           />
                           <Label htmlFor={`category-${category.id}`}>{category.name}</Label>
                         </div>
@@ -306,14 +267,7 @@ export default function ProductsPage() {
                       type="text"
                       placeholder="Search products..."
                       value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        if (e.target.value) {
-                          updateUrlParams({ search: e.target.value });
-                        } else {
-                          updateUrlParams({ search: undefined });
-                        }
-                      }}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                       className="mr-2 w-full md:w-48"
                     />
                     <Select value={sortOption} onValueChange={setSortOption}>
