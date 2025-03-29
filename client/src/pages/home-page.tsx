@@ -8,7 +8,7 @@ import { ProductCard } from "@/components/ui/product-card";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Input } from "@/components/ui/input";
-import { Loader2, Star, StarHalf } from "lucide-react";
+import { Loader2, Star, StarHalf, Crown, Home, Droplets, Sparkles } from "lucide-react";
 import { FeaturedProductCarousel } from "@/components/ui/featured-product-carousel";
 
 export default function HomePage() {
@@ -65,82 +65,41 @@ export default function HomePage() {
       </section>
 
       {/* Browse Categories */}
-      <section className="container mx-auto px-6 py-12">
+      <section className="container mx-auto px-6 py-10">
         <h2 className="text-2xl font-bold mb-8">Browse Categories</h2>
         
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-4">
-          {/* Category icons */}
-          <div className="flex flex-col items-center">
-            <div className="category-icon mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
+        <div className="grid grid-cols-4 md:grid-cols-4 gap-4">
+          {/* Designer category (ID: 1) */}
+          <Link href="/products?category=1" className="flex flex-col items-center hover:text-purple-600 transition-colors">
+            <div className="category-icon mb-2 bg-purple-100 rounded-full p-4">
+              <Crown className="h-7 w-7 text-purple-600" />
             </div>
-            <span className="text-xs text-center">Men's</span>
-          </div>
+            <span className="text-sm text-center font-medium">Designer</span>
+          </Link>
           
-          <div className="flex flex-col items-center">
-            <div className="category-icon mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
+          {/* Local category (ID: 2) */}
+          <Link href="/products?category=2" className="flex flex-col items-center hover:text-purple-600 transition-colors">
+            <div className="category-icon mb-2 bg-purple-100 rounded-full p-4">
+              <Home className="h-7 w-7 text-purple-600" />
             </div>
-            <span className="text-xs text-center">Women's</span>
-          </div>
+            <span className="text-sm text-center font-medium">Local</span>
+          </Link>
           
-          <div className="flex flex-col items-center">
-            <div className="category-icon mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
+          {/* Arabian House category (ID: 3) */}
+          <Link href="/products?category=3" className="flex flex-col items-center hover:text-purple-600 transition-colors">
+            <div className="category-icon mb-2 bg-purple-100 rounded-full p-4">
+              <Droplets className="h-7 w-7 text-purple-600" />
             </div>
-            <span className="text-xs text-center">Unisex</span>
-          </div>
+            <span className="text-sm text-center font-medium">Arabian House</span>
+          </Link>
           
-          <div className="flex flex-col items-center">
-            <div className="category-icon mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
+          {/* Niche category (ID: 4) */}
+          <Link href="/products?category=4" className="flex flex-col items-center hover:text-purple-600 transition-colors">
+            <div className="category-icon mb-2 bg-purple-100 rounded-full p-4">
+              <Sparkles className="h-7 w-7 text-purple-600" />
             </div>
-            <span className="text-xs text-center">Niche</span>
-          </div>
-          
-          <div className="flex flex-col items-center">
-            <div className="category-icon mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </div>
-            <span className="text-xs text-center">Designer</span>
-          </div>
-          
-          <div className="flex flex-col items-center">
-            <div className="category-icon mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </div>
-            <span className="text-xs text-center">Vintage</span>
-          </div>
-          
-          <div className="flex flex-col items-center">
-            <div className="category-icon mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </div>
-            <span className="text-xs text-center">Rare Finds</span>
-          </div>
-          
-          <div className="flex flex-col items-center">
-            <div className="category-icon mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </div>
-            <span className="text-xs text-center">Limited Editions</span>
-          </div>
+            <span className="text-sm text-center font-medium">Niche</span>
+          </Link>
         </div>
       </section>
 
