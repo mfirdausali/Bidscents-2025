@@ -76,9 +76,6 @@ export function Header() {
           
           {/* Navigation */}
           <nav className="flex items-center space-x-6">
-            <Link href="/explore" className="hidden md:block font-medium hover:text-purple-700 transition">
-              Explore
-            </Link>
             <Link href="/seller/dashboard" className="hidden md:block font-medium hover:text-purple-700 transition">
               Sell
             </Link>
