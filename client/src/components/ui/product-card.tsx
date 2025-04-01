@@ -164,7 +164,12 @@ export function ProductCard({ product }: ProductCardProps) {
         
         {/* Product subtitle */}
         <div className="text-sm font-medium text-gray-600 mb-1 line-clamp-1">
-          {product.brand} {product.volume && `(${product.volume})`}
+          {product.brand} {product.volume && 
+            (product.isNew 
+              ? `(${product.volume})` 
+              : `(${Math.round((product.remainingPercentage || 100) * parseInt(product.volume) / 100)}ml/${product.volume})`
+            )
+          }
         </div>
         
         {/* Batch code and year */}

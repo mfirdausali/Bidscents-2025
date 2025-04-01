@@ -8,7 +8,7 @@ import { ProductCard } from "@/components/ui/product-card";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Input } from "@/components/ui/input";
-import { Loader2, Star, StarHalf, Crown, Home, Droplets, Sparkles } from "lucide-react";
+import { Loader2, Star, StarHalf, Diamond, MapPin, Flame } from "lucide-react";
 import { FeaturedProductCarousel } from "@/components/ui/featured-product-carousel";
 
 export default function HomePage() {
@@ -65,40 +65,40 @@ export default function HomePage() {
       </section>
 
       {/* Browse Categories */}
-      <section className="container mx-auto px-6 py-10">
-        <h2 className="text-2xl font-bold mb-8">Browse Categories</h2>
+      <section className="container mx-auto px-6 py-6">
+        <h2 className="text-xl font-bold mb-4">Browse Categories</h2>
         
-        <div className="grid grid-cols-4 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 md:grid-cols-4 gap-3">
           {/* Designer category (ID: 1) */}
           <Link href="/products?category=1" className="flex flex-col items-center hover:text-purple-600 transition-colors">
-            <div className="category-icon mb-2 bg-purple-100 rounded-full p-4">
-              <Crown className="h-7 w-7 text-purple-600" />
+            <div className="category-icon mb-2 bg-purple-50 rounded-full p-3 shadow-sm border border-purple-100">
+              <Diamond className="h-5 w-5 text-purple-600" />
             </div>
-            <span className="text-sm text-center font-medium">Designer</span>
+            <span className="text-xs text-center font-medium">Designer</span>
           </Link>
           
           {/* Local category (ID: 2) */}
           <Link href="/products?category=2" className="flex flex-col items-center hover:text-purple-600 transition-colors">
-            <div className="category-icon mb-2 bg-purple-100 rounded-full p-4">
-              <Home className="h-7 w-7 text-purple-600" />
+            <div className="category-icon mb-2 bg-purple-50 rounded-full p-3 shadow-sm border border-purple-100">
+              <MapPin className="h-5 w-5 text-purple-600" />
             </div>
-            <span className="text-sm text-center font-medium">Local</span>
+            <span className="text-xs text-center font-medium">Local</span>
           </Link>
           
           {/* Arabian House category (ID: 3) */}
           <Link href="/products?category=3" className="flex flex-col items-center hover:text-purple-600 transition-colors">
-            <div className="category-icon mb-2 bg-purple-100 rounded-full p-4">
-              <Droplets className="h-7 w-7 text-purple-600" />
+            <div className="category-icon mb-2 bg-purple-50 rounded-full p-3 shadow-sm border border-purple-100">
+              <Flame className="h-5 w-5 text-purple-600" />
             </div>
-            <span className="text-sm text-center font-medium">Arabian House</span>
+            <span className="text-xs text-center font-medium">Arabian House</span>
           </Link>
           
           {/* Niche category (ID: 4) */}
           <Link href="/products?category=4" className="flex flex-col items-center hover:text-purple-600 transition-colors">
-            <div className="category-icon mb-2 bg-purple-100 rounded-full p-4">
-              <Sparkles className="h-7 w-7 text-purple-600" />
+            <div className="category-icon mb-2 bg-purple-50 rounded-full p-3 shadow-sm border border-purple-100">
+              <Star className="h-5 w-5 text-purple-600" />
             </div>
-            <span className="text-sm text-center font-medium">Niche</span>
+            <span className="text-xs text-center font-medium">Niche</span>
           </Link>
         </div>
       </section>
