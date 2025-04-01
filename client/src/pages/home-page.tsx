@@ -38,26 +38,26 @@ export default function HomePage() {
       <Header />
       
       {/* Hero Section */}
-      <section className="relative h-[500px] bg-cover bg-center" 
+      <section className="relative h-[300px] bg-cover bg-center" 
         style={{ 
           backgroundImage: "url('https://images.unsplash.com/photo-1594035910387-fea47794261f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8NHx8dG9tJTIwZm9yZCUyMHBlcmZ1bWV8ZW58MHx8MHx8&auto=format&fit=crop&w=800&q=60')" 
         }}
       >
         <div className="absolute inset-0 bg-black opacity-50"></div>
         <div className="container mx-auto px-6 relative h-full flex flex-col justify-center text-white">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">Discover Your Signature Scent</h1>
-          <p className="text-lg md:text-xl mb-8 max-w-xl">Explore authentic pre-owned luxury perfumes at incredible prices</p>
-          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 max-w-lg">
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">Discover Your Signature Scent</h1>
+          <p className="text-base md:text-lg mb-4 max-w-xl">Explore authentic pre-owned luxury perfumes at incredible prices</p>
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 max-w-lg">
             <div className="relative flex-grow">
               <Input
                 type="text"
                 placeholder="Search for perfumes, brands..."
-                className="search-bar pl-4 pr-4 py-3 w-full bg-white border-0 rounded-full text-gray-800"
+                className="search-bar pl-4 pr-4 py-2 w-full bg-white border-0 rounded-full text-gray-800"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full shadow-sm">
+            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-full shadow-sm">
               Start Shopping
             </Button>
           </form>
