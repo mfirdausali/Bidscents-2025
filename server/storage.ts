@@ -1,13 +1,11 @@
-import { users, products, categories, cartItems, reviews, orders, orderItems, bookmarks, bids } from "@shared/schema";
+import { users, products, categories, cartItems, reviews, orders, orderItems } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
   CartItem, InsertCartItem, CartItemWithProduct,
   Review, InsertReview,
-  Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
-  Bookmark, InsertBookmark,
-  Bid, InsertBid
+  Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -77,19 +75,6 @@ export interface IStorage {
   getAllOrders(): Promise<OrderWithItems[]>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
   
-  // Bookmark methods
-  getUserBookmarks(userId: number): Promise<ProductWithDetails[]>;
-  getBookmarkByProductId(userId: number, productId: number): Promise<Bookmark | undefined>;
-  addBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
-  removeBookmark(id: number): Promise<void>;
-  
-  // Bid methods
-  getProductBids(productId: number): Promise<Bid[]>;
-  getUserBids(userId: number): Promise<Bid[]>;
-  getHighestBid(productId: number): Promise<Bid | undefined>;
-  placeBid(bid: InsertBid): Promise<Bid>;
-  setWinningBid(id: number): Promise<Bid>;
-  
   // Session storage
   sessionStore: any;
 }
@@ -102,8 +87,6 @@ export class MemStorage implements IStorage {
   private reviews: Map<number, Review>;
   private orders: Map<number, Order>;
   private orderItems: Map<number, OrderItem>;
-  private bookmarks: Map<number, Bookmark>;
-  private bids: Map<number, Bid>;
   sessionStore: any;
   currentIds: {
     users: number;
@@ -113,8 +96,6 @@ export class MemStorage implements IStorage {
     reviews: number;
     orders: number;
     orderItems: number;
-    bookmarks: number;
-    bids: number;
   };
 
   constructor() {
@@ -125,8 +106,6 @@ export class MemStorage implements IStorage {
     this.reviews = new Map();
     this.orders = new Map();
     this.orderItems = new Map();
-    this.bookmarks = new Map();
-    this.bids = new Map();
     this.currentIds = {
       users: 1,
       categories: 1,
@@ -134,9 +113,7 @@ export class MemStorage implements IStorage {
       cartItems: 1,
       reviews: 1,
       orders: 1,
-      orderItems: 1,
-      bookmarks: 1,
-      bids: 1
+      orderItems: 1
     };
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // 1 day
@@ -471,93 +448,12 @@ export class MemStorage implements IStorage {
     return updatedOrder;
   }
 
-  // Bookmark methods
-  async getUserBookmarks(userId: number): Promise<ProductWithDetails[]> {
-    const bookmarkedItems = Array.from(this.bookmarks.values()).filter(
-      bookmark => bookmark.userId === userId
-    );
-    
-    const bookmarkedProducts = bookmarkedItems.map(bookmark => {
-      const product = this.products.get(bookmark.productId);
-      if (!product) {
-        throw new Error(`Product not found for bookmark: ${bookmark.id}`);
-      }
-      return product;
-    });
-    
-    return this.addProductDetails(bookmarkedProducts);
-  }
-  
-  async getBookmarkByProductId(userId: number, productId: number): Promise<Bookmark | undefined> {
-    return Array.from(this.bookmarks.values()).find(
-      bookmark => bookmark.userId === userId && bookmark.productId === productId
-    );
-  }
-  
-  async addBookmark(bookmarkData: InsertBookmark): Promise<Bookmark> {
-    const id = this.currentIds.bookmarks++;
-    const createdAt = new Date();
-    const bookmark: Bookmark = { ...bookmarkData, id, createdAt };
-    this.bookmarks.set(id, bookmark);
-    return bookmark;
-  }
-  
-  async removeBookmark(id: number): Promise<void> {
-    this.bookmarks.delete(id);
-  }
-  
-  // Bid methods
-  async getProductBids(productId: number): Promise<Bid[]> {
-    return Array.from(this.bids.values())
-      .filter(bid => bid.productId === productId)
-      .sort((a, b) => b.amount - a.amount); // Sort by highest amount first
-  }
-  
-  async getUserBids(userId: number): Promise<Bid[]> {
-    return Array.from(this.bids.values())
-      .filter(bid => bid.userId === userId);
-  }
-  
-  async getHighestBid(productId: number): Promise<Bid | undefined> {
-    const bids = await this.getProductBids(productId);
-    return bids.length > 0 ? bids[0] : undefined;
-  }
-  
-  async placeBid(bidData: InsertBid): Promise<Bid> {
-    const id = this.currentIds.bids++;
-    const createdAt = new Date();
-    const bid: Bid = { ...bidData, id, createdAt };
-    this.bids.set(id, bid);
-    return bid;
-  }
-  
-  async setWinningBid(id: number): Promise<Bid> {
-    const bid = this.bids.get(id);
-    if (!bid) {
-      throw new Error("Bid not found");
-    }
-    
-    // Reset all winning bids for this product
-    for (const [bidId, existingBid] of this.bids.entries()) {
-      if (existingBid.productId === bid.productId && existingBid.isWinning) {
-        this.bids.set(bidId, { ...existingBid, isWinning: false });
-      }
-    }
-    
-    // Set this bid as winning
-    const updatedBid: Bid = { ...bid, isWinning: true };
-    this.bids.set(id, updatedBid);
-    return updatedBid;
-  }
-  
   // Helper methods
   private async addProductDetails(products: Product[]): Promise<ProductWithDetails[]> {
     return Promise.all(products.map(async product => {
       const category = product.categoryId ? await this.getCategoryById(product.categoryId) : undefined;
       const seller = await this.getUser(product.sellerId);
       const reviews = await this.getProductReviews(product.id);
-      const bids = await this.getProductBids(product.id);
-      const highestBid = await this.getHighestBid(product.id);
       
       // Calculate average rating
       let averageRating: number | undefined = undefined;
@@ -572,9 +468,6 @@ export class MemStorage implements IStorage {
         seller,
         reviews,
         averageRating,
-        bids,
-        highestBid,
-        bidCount: bids.length,
       };
     }));
   }
@@ -936,103 +829,6 @@ export class DatabaseStorage implements IStorage {
     return updatedOrder;
   }
 
-  // Bookmark methods
-  async getUserBookmarks(userId: number): Promise<ProductWithDetails[]> {
-    const bookmarkedItems = await db.select()
-      .from(bookmarks)
-      .where(eq(bookmarks.userId, userId))
-      .orderBy(desc(bookmarks.createdAt));
-    
-    const bookmarkedProducts = await Promise.all(
-      bookmarkedItems.map(async (bookmark) => {
-        const [product] = await db.select()
-          .from(products)
-          .where(eq(products.id, bookmark.productId));
-        
-        if (!product) {
-          throw new Error(`Product not found for bookmark: ${bookmark.id}`);
-        }
-        return product;
-      })
-    );
-    
-    return this.addProductDetails(bookmarkedProducts);
-  }
-  
-  async getBookmarkByProductId(userId: number, productId: number): Promise<Bookmark | undefined> {
-    const [bookmark] = await db.select()
-      .from(bookmarks)
-      .where(and(
-        eq(bookmarks.userId, userId),
-        eq(bookmarks.productId, productId)
-      ));
-    
-    return bookmark;
-  }
-  
-  async addBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
-    const [newBookmark] = await db.insert(bookmarks).values(bookmark).returning();
-    return newBookmark;
-  }
-  
-  async removeBookmark(id: number): Promise<void> {
-    await db.delete(bookmarks).where(eq(bookmarks.id, id));
-  }
-  
-  // Bid methods
-  async getProductBids(productId: number): Promise<Bid[]> {
-    return db.select()
-      .from(bids)
-      .where(eq(bids.productId, productId))
-      .orderBy(desc(bids.amount));
-  }
-  
-  async getUserBids(userId: number): Promise<Bid[]> {
-    return db.select()
-      .from(bids)
-      .where(eq(bids.userId, userId))
-      .orderBy(desc(bids.createdAt));
-  }
-  
-  async getHighestBid(productId: number): Promise<Bid | undefined> {
-    const [highestBid] = await db.select()
-      .from(bids)
-      .where(eq(bids.productId, productId))
-      .orderBy(desc(bids.amount))
-      .limit(1);
-    
-    return highestBid;
-  }
-  
-  async placeBid(bid: InsertBid): Promise<Bid> {
-    const [newBid] = await db.insert(bids).values(bid).returning();
-    return newBid;
-  }
-  
-  async setWinningBid(id: number): Promise<Bid> {
-    const [bid] = await db.select().from(bids).where(eq(bids.id, id));
-    
-    if (!bid) {
-      throw new Error("Bid not found");
-    }
-    
-    // Reset all winning bids for this product
-    await db.update(bids)
-      .set({ isWinning: false })
-      .where(and(
-        eq(bids.productId, bid.productId),
-        eq(bids.isWinning, true)
-      ));
-    
-    // Set this bid as winning
-    const [updatedBid] = await db.update(bids)
-      .set({ isWinning: true })
-      .where(eq(bids.id, id))
-      .returning();
-    
-    return updatedBid;
-  }
-  
   // Helper methods
   private async addProductDetails(products: Product[]): Promise<ProductWithDetails[]> {
     return Promise.all(products.map(async (product) => {
@@ -1055,10 +851,6 @@ export class DatabaseStorage implements IStorage {
         .from(reviews)
         .where(eq(reviews.productId, product.id));
       
-      // Get bids
-      const bidsResult = await this.getProductBids(product.id);
-      const highestBid = await this.getHighestBid(product.id);
-      
       // Calculate average rating
       let averageRating: number | undefined = undefined;
       if (reviewsResult.length > 0) {
@@ -1072,9 +864,6 @@ export class DatabaseStorage implements IStorage {
         seller,
         reviews: reviewsResult,
         averageRating,
-        bids: bidsResult,
-        highestBid,
-        bidCount: bidsResult.length,
       };
     }));
   }
