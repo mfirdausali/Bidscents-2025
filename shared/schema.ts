@@ -11,6 +11,15 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   address: text("address"),
+  
+  // Additional profile fields
+  name: text("name"), // Full name
+  bio: text("bio"), // Short bio or description
+  location: text("location"), // User's location/city
+  avatarUrl: text("avatar_url"), // Profile image URL
+  phone: text("phone"), // Phone number
+  
+  // Account status
   isSeller: boolean("is_seller").default(false).notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   isBanned: boolean("is_banned").default(false).notNull(),
@@ -82,6 +91,24 @@ export const orderItems = pgTable("order_items", {
   price: doublePrecision("price").notNull(),
 });
 
+// Bookmarks table
+export const bookmarks = pgTable("bookmarks", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Bids table for auction
+export const bids = pgTable("bids", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  amount: doublePrecision("amount").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  isWinning: boolean("is_winning").default(false),
+});
+
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -90,6 +117,11 @@ export const insertUserSchema = createInsertSchema(users).pick({
   firstName: true,
   lastName: true,
   address: true,
+  name: true,
+  bio: true,
+  location: true,
+  avatarUrl: true,
+  phone: true,
   isSeller: true,
   isAdmin: true,
   isBanned: true,
@@ -145,6 +177,18 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).pick({
   price: true,
 });
 
+export const insertBookmarkSchema = createInsertSchema(bookmarks).pick({
+  userId: true,
+  productId: true,
+});
+
+export const insertBidSchema = createInsertSchema(bids).pick({
+  userId: true,
+  productId: true,
+  amount: true,
+  isWinning: true,
+});
+
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -167,12 +211,27 @@ export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 
+export type Bookmark = typeof bookmarks.$inferSelect;
+export type InsertBookmark = z.infer<typeof insertBookmarkSchema>;
+
+export type Bid = typeof bids.$inferSelect;
+export type InsertBid = z.infer<typeof insertBidSchema>;
+
 // Extended types
 export type ProductWithDetails = Product & {
   category?: Category;
   seller?: User;
   reviews?: Review[];
   averageRating?: number;
+  
+  // Additional fields for auctions
+  bids?: Bid[];
+  highestBid?: Bid;
+  bidCount?: number;
+  auctionEndsAt?: Date;
+  
+  // Additional fields for product listings
+  status?: string; // For sellers' product listings: 'active', 'sold', 'expired', 'draft'
 };
 
 export type CartItemWithProduct = CartItem & {
