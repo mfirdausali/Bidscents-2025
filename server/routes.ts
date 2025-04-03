@@ -4,14 +4,10 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertProductSchema, insertCartItemSchema, insertReviewSchema } from "@shared/schema";
 import { z } from "zod";
-import profileRoutes from "./routes/index";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
-  
-  // Set up profile-related routes (bookmarks, bids, messages, notifications)
-  app.use(profileRoutes);
 
   // Categories endpoints
   app.get("/api/categories", async (_req, res, next) => {

@@ -1,24 +1,17 @@
-import { 
-  users, products, categories, cartItems, reviews, orders, orderItems,
-  bookmarks, bids, messages, notifications 
-} from "@shared/schema";
+import { users, products, categories, cartItems, reviews, orders, orderItems } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
   CartItem, InsertCartItem, CartItemWithProduct,
   Review, InsertReview,
-  Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
-  Bookmark, InsertBookmark, BookmarkWithProduct,
-  Bid, InsertBid, BidWithProduct,
-  Message, InsertMessage, MessageWithDetails,
-  Notification, InsertNotification
+  Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import connectPg from "connect-pg-simple";
 import { db } from "./db";
-import { eq, and, or, desc, asc, gte, lte, ilike, like, sql, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, like, ilike, asc, desc, sql, or, isNull } from "drizzle-orm";
 import pkg from "pg";
 const { Pool } = pkg;
 
@@ -82,32 +75,6 @@ export interface IStorage {
   getAllOrders(): Promise<OrderWithItems[]>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
   
-  // Bookmark methods
-  getUserBookmarks(userId: number): Promise<BookmarkWithProduct[]>;
-  getBookmarkById(id: number): Promise<Bookmark | undefined>;
-  getBookmarkByProductId(userId: number, productId: number): Promise<Bookmark | undefined>;
-  addBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
-  removeBookmark(id: number): Promise<void>;
-  
-  // Bid methods
-  getUserBids(userId: number, status?: string): Promise<BidWithProduct[]>;
-  getBidById(id: number): Promise<Bid | undefined>;
-  createBid(bid: InsertBid): Promise<Bid>;
-  updateBidStatus(id: number, status: string): Promise<Bid>;
-  getProductBids(productId: number): Promise<BidWithProduct[]>;
-  
-  // Message methods
-  getUserMessages(userId: number): Promise<MessageWithDetails[]>;
-  getMessagesByConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]>;
-  createMessage(message: InsertMessage): Promise<Message>;
-  markMessageAsRead(id: number): Promise<Message>;
-  
-  // Notification methods
-  getUserNotifications(userId: number): Promise<Notification[]>;
-  createNotification(notification: InsertNotification): Promise<Notification>;
-  markNotificationAsRead(id: number): Promise<Notification>;
-  markAllNotificationsAsRead(userId: number): Promise<void>;
-  
   // Session storage
   sessionStore: any;
 }
@@ -120,10 +87,6 @@ export class MemStorage implements IStorage {
   private reviews: Map<number, Review>;
   private orders: Map<number, Order>;
   private orderItems: Map<number, OrderItem>;
-  private bookmarks: Map<number, Bookmark>;
-  private bids: Map<number, Bid>;
-  private messages: Map<number, Message>;
-  private notifications: Map<number, Notification>;
   sessionStore: any;
   currentIds: {
     users: number;
@@ -133,10 +96,6 @@ export class MemStorage implements IStorage {
     reviews: number;
     orders: number;
     orderItems: number;
-    bookmarks: number;
-    bids: number;
-    messages: number;
-    notifications: number;
   };
 
   constructor() {
@@ -147,10 +106,6 @@ export class MemStorage implements IStorage {
     this.reviews = new Map();
     this.orders = new Map();
     this.orderItems = new Map();
-    this.bookmarks = new Map();
-    this.bids = new Map();
-    this.messages = new Map();
-    this.notifications = new Map();
     this.currentIds = {
       users: 1,
       categories: 1,
@@ -158,11 +113,7 @@ export class MemStorage implements IStorage {
       cartItems: 1,
       reviews: 1,
       orders: 1,
-      orderItems: 1,
-      bookmarks: 1,
-      bids: 1,
-      messages: 1,
-      notifications: 1
+      orderItems: 1
     };
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // 1 day
@@ -497,221 +448,6 @@ export class MemStorage implements IStorage {
     return updatedOrder;
   }
 
-  // Bookmark methods
-  async getUserBookmarks(userId: number): Promise<BookmarkWithProduct[]> {
-    const bookmarks = Array.from(this.bookmarks.values()).filter(
-      bookmark => bookmark.userId === userId
-    );
-    
-    return Promise.all(bookmarks.map(async bookmark => {
-      const product = await this.getProductById(bookmark.productId);
-      if (!product) {
-        throw new Error(`Product not found for bookmark: ${bookmark.id}`);
-      }
-      
-      return {
-        ...bookmark,
-        product,
-      };
-    }));
-  }
-  
-  async getBookmarkById(id: number): Promise<Bookmark | undefined> {
-    return this.bookmarks.get(id);
-  }
-  
-  async getBookmarkByProductId(userId: number, productId: number): Promise<Bookmark | undefined> {
-    return Array.from(this.bookmarks.values()).find(
-      bookmark => bookmark.userId === userId && bookmark.productId === productId
-    );
-  }
-  
-  async addBookmark(insertBookmark: InsertBookmark): Promise<Bookmark> {
-    const id = this.currentIds.bookmarks++;
-    const bookmark: Bookmark = { ...insertBookmark, id };
-    this.bookmarks.set(id, bookmark);
-    return bookmark;
-  }
-  
-  async removeBookmark(id: number): Promise<void> {
-    this.bookmarks.delete(id);
-  }
-  
-  // Bid methods
-  async getUserBids(userId: number, status?: string): Promise<BidWithProduct[]> {
-    let bids = Array.from(this.bids.values()).filter(
-      bid => bid.userId === userId
-    );
-    
-    if (status) {
-      bids = bids.filter(bid => bid.status === status);
-    }
-    
-    return Promise.all(bids.map(async bid => {
-      const product = await this.getProductById(bid.productId);
-      if (!product) {
-        throw new Error(`Product not found for bid: ${bid.id}`);
-      }
-      
-      return {
-        ...bid,
-        product,
-      };
-    }));
-  }
-  
-  async getBidById(id: number): Promise<Bid | undefined> {
-    return this.bids.get(id);
-  }
-  
-  async createBid(insertBid: InsertBid): Promise<Bid> {
-    const id = this.currentIds.bids++;
-    const createdAt = new Date();
-    const bid: Bid = { ...insertBid, id, createdAt };
-    this.bids.set(id, bid);
-    return bid;
-  }
-  
-  async updateBidStatus(id: number, status: string): Promise<Bid> {
-    const bid = this.bids.get(id);
-    if (!bid) {
-      throw new Error("Bid not found");
-    }
-    
-    const updatedBid: Bid = { ...bid, status };
-    this.bids.set(id, updatedBid);
-    return updatedBid;
-  }
-  
-  async getProductBids(productId: number): Promise<BidWithProduct[]> {
-    const bids = Array.from(this.bids.values()).filter(
-      bid => bid.productId === productId
-    );
-    
-    return Promise.all(bids.map(async bid => {
-      const product = await this.getProductById(bid.productId);
-      if (!product) {
-        throw new Error(`Product not found for bid: ${bid.id}`);
-      }
-      
-      return {
-        ...bid,
-        product,
-      };
-    }));
-  }
-  
-  // Message methods
-  async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
-    const messages = Array.from(this.messages.values()).filter(
-      message => message.senderId === userId || message.receiverId === userId
-    );
-    
-    return Promise.all(messages.map(async message => {
-      const sender = await this.getUser(message.senderId);
-      const receiver = await this.getUser(message.receiverId);
-      
-      if (!sender || !receiver) {
-        throw new Error(`Sender or receiver not found for message: ${message.id}`);
-      }
-      
-      let product: ProductWithDetails | undefined = undefined;
-      if (message.productId) {
-        product = await this.getProductById(message.productId);
-      }
-      
-      return {
-        ...message,
-        sender,
-        receiver,
-        product,
-      };
-    }));
-  }
-  
-  async getMessagesByConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
-    const messages = Array.from(this.messages.values()).filter(
-      message => 
-        (message.senderId === userId1 && message.receiverId === userId2) ||
-        (message.senderId === userId2 && message.receiverId === userId1)
-    );
-    
-    return Promise.all(messages.map(async message => {
-      const sender = await this.getUser(message.senderId);
-      const receiver = await this.getUser(message.receiverId);
-      
-      if (!sender || !receiver) {
-        throw new Error(`Sender or receiver not found for message: ${message.id}`);
-      }
-      
-      let product: ProductWithDetails | undefined = undefined;
-      if (message.productId) {
-        product = await this.getProductById(message.productId);
-      }
-      
-      return {
-        ...message,
-        sender,
-        receiver,
-        product,
-      };
-    }));
-  }
-  
-  async createMessage(insertMessage: InsertMessage): Promise<Message> {
-    const id = this.currentIds.messages++;
-    const createdAt = new Date();
-    const message: Message = { ...insertMessage, id, createdAt };
-    this.messages.set(id, message);
-    return message;
-  }
-  
-  async markMessageAsRead(id: number): Promise<Message> {
-    const message = this.messages.get(id);
-    if (!message) {
-      throw new Error("Message not found");
-    }
-    
-    const updatedMessage: Message = { ...message, isRead: true };
-    this.messages.set(id, updatedMessage);
-    return updatedMessage;
-  }
-  
-  // Notification methods
-  async getUserNotifications(userId: number): Promise<Notification[]> {
-    return Array.from(this.notifications.values()).filter(
-      notification => notification.userId === userId
-    );
-  }
-  
-  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
-    const id = this.currentIds.notifications++;
-    const createdAt = new Date();
-    const notification: Notification = { ...insertNotification, id, createdAt };
-    this.notifications.set(id, notification);
-    return notification;
-  }
-  
-  async markNotificationAsRead(id: number): Promise<Notification> {
-    const notification = this.notifications.get(id);
-    if (!notification) {
-      throw new Error("Notification not found");
-    }
-    
-    const updatedNotification: Notification = { ...notification, isRead: true };
-    this.notifications.set(id, updatedNotification);
-    return updatedNotification;
-  }
-  
-  async markAllNotificationsAsRead(userId: number): Promise<void> {
-    const userNotifications = Array.from(this.notifications.entries())
-      .filter(([_, notification]) => notification.userId === userId);
-    
-    for (const [id, notification] of userNotifications) {
-      this.notifications.set(id, { ...notification, isRead: true });
-    }
-  }
-  
   // Helper methods
   private async addProductDetails(products: Product[]): Promise<ProductWithDetails[]> {
     return Promise.all(products.map(async product => {
@@ -746,252 +482,6 @@ export class DatabaseStorage implements IStorage {
       createTableIfMissing: true
     });
     this.initializeDefaultData();
-  }
-  
-  // Bookmark methods
-  async getUserBookmarks(userId: number): Promise<BookmarkWithProduct[]> {
-    const result = await db.query.bookmarks.findMany({
-      where: eq(bookmarks.userId, userId),
-      with: {
-        product: true
-      }
-    });
-    
-    // Add additional product details like seller and category
-    const bookmarksWithDetails: BookmarkWithProduct[] = [];
-    for (const bookmark of result) {
-      const productWithDetails = await this.getProductById(bookmark.product.id);
-      if (productWithDetails) {
-        bookmarksWithDetails.push({
-          ...bookmark,
-          product: productWithDetails
-        });
-      }
-    }
-    
-    return bookmarksWithDetails;
-  }
-  
-  async getBookmarkById(id: number): Promise<Bookmark | undefined> {
-    return db.query.bookmarks.findFirst({
-      where: eq(bookmarks.id, id)
-    });
-  }
-  
-  async getBookmarkByProductId(userId: number, productId: number): Promise<Bookmark | undefined> {
-    return db.query.bookmarks.findFirst({
-      where: and(
-        eq(bookmarks.userId, userId),
-        eq(bookmarks.productId, productId)
-      )
-    });
-  }
-  
-  async addBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
-    const [result] = await db.insert(bookmarks).values(bookmark).returning();
-    return result;
-  }
-  
-  async removeBookmark(id: number): Promise<void> {
-    await db.delete(bookmarks).where(eq(bookmarks.id, id));
-  }
-  
-  // Bid methods
-  async getUserBids(userId: number, status?: string): Promise<BidWithProduct[]> {
-    let query = db.query.bids.findMany({
-      where: eq(bids.userId, userId),
-      with: {
-        product: true
-      }
-    });
-    
-    if (status) {
-      query = db.query.bids.findMany({
-        where: and(
-          eq(bids.userId, userId),
-          eq(bids.status, status)
-        ),
-        with: {
-          product: true
-        }
-      });
-    }
-    
-    const result = await query;
-    
-    // Add additional product details like seller and category
-    const bidsWithDetails: BidWithProduct[] = [];
-    for (const bid of result) {
-      const productWithDetails = await this.getProductById(bid.product.id);
-      if (productWithDetails) {
-        bidsWithDetails.push({
-          ...bid,
-          product: productWithDetails
-        });
-      }
-    }
-    
-    return bidsWithDetails;
-  }
-  
-  async getBidById(id: number): Promise<Bid | undefined> {
-    return db.query.bids.findFirst({
-      where: eq(bids.id, id)
-    });
-  }
-  
-  async createBid(bid: InsertBid): Promise<Bid> {
-    const [result] = await db.insert(bids).values({
-      ...bid,
-      status: bid.status || "pending", // Ensure status has a default
-      createdAt: new Date()
-    }).returning();
-    return result;
-  }
-  
-  async updateBidStatus(id: number, status: string): Promise<Bid> {
-    const [result] = await db.update(bids)
-      .set({ status })
-      .where(eq(bids.id, id))
-      .returning();
-    return result;
-  }
-  
-  async getProductBids(productId: number): Promise<BidWithProduct[]> {
-    const product = await this.getProductById(productId);
-    if (!product) return [];
-    
-    const result = await db.query.bids.findMany({
-      where: eq(bids.productId, productId),
-      with: {
-        product: true
-      }
-    });
-    
-    return result.map(bid => ({
-      ...bid,
-      product
-    }));
-  }
-  
-  // Message methods
-  async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
-    const result = await db.query.messages.findMany({
-      where: or(
-        eq(messages.senderId, userId),
-        eq(messages.receiverId, userId)
-      ),
-      orderBy: desc(messages.createdAt)
-    });
-    
-    const messagesWithDetails: MessageWithDetails[] = [];
-    for (const message of result) {
-      const sender = await this.getUser(message.senderId);
-      const receiver = await this.getUser(message.receiverId);
-      let product = undefined;
-      
-      if (message.productId) {
-        product = await this.getProductById(message.productId);
-      }
-      
-      if (sender && receiver) {
-        messagesWithDetails.push({
-          ...message,
-          sender,
-          receiver,
-          product
-        });
-      }
-    }
-    
-    return messagesWithDetails;
-  }
-  
-  async getMessagesByConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
-    const result = await db.query.messages.findMany({
-      where: or(
-        and(
-          eq(messages.senderId, userId1),
-          eq(messages.receiverId, userId2)
-        ),
-        and(
-          eq(messages.senderId, userId2),
-          eq(messages.receiverId, userId1)
-        )
-      ),
-      orderBy: asc(messages.createdAt)
-    });
-    
-    const messagesWithDetails: MessageWithDetails[] = [];
-    for (const message of result) {
-      const sender = await this.getUser(message.senderId);
-      const receiver = await this.getUser(message.receiverId);
-      let product = undefined;
-      
-      if (message.productId) {
-        product = await this.getProductById(message.productId);
-      }
-      
-      if (sender && receiver) {
-        messagesWithDetails.push({
-          ...message,
-          sender,
-          receiver,
-          product
-        });
-      }
-    }
-    
-    return messagesWithDetails;
-  }
-  
-  async createMessage(message: InsertMessage): Promise<Message> {
-    const [result] = await db.insert(messages).values({
-      ...message,
-      isRead: false,
-      createdAt: new Date()
-    }).returning();
-    return result;
-  }
-  
-  async markMessageAsRead(id: number): Promise<Message> {
-    const [result] = await db.update(messages)
-      .set({ isRead: true })
-      .where(eq(messages.id, id))
-      .returning();
-    return result;
-  }
-  
-  // Notification methods
-  async getUserNotifications(userId: number): Promise<Notification[]> {
-    const result = await db.query.notifications.findMany({
-      where: eq(notifications.userId, userId),
-      orderBy: desc(notifications.createdAt)
-    });
-    return result;
-  }
-  
-  async createNotification(notification: InsertNotification): Promise<Notification> {
-    const [result] = await db.insert(notifications).values({
-      ...notification,
-      isRead: false,
-      createdAt: new Date()
-    }).returning();
-    return result;
-  }
-  
-  async markNotificationAsRead(id: number): Promise<Notification> {
-    const [result] = await db.update(notifications)
-      .set({ isRead: true })
-      .where(eq(notifications.id, id))
-      .returning();
-    return result;
-  }
-  
-  async markAllNotificationsAsRead(userId: number): Promise<void> {
-    await db.update(notifications)
-      .set({ isRead: true })
-      .where(eq(notifications.userId, userId));
   }
 
   private async initializeDefaultData() {
