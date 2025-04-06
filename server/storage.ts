@@ -206,7 +206,9 @@ export class MemStorage implements IStorage {
       ...insertUser, 
       id,
       isAdmin: insertUser.isAdmin || false,
-      isBanned: insertUser.isBanned || false
+      isBanned: insertUser.isBanned || false,
+      resetToken: null,
+      resetTokenExpiry: null
     };
     this.users.set(id, user);
     return user;
@@ -628,12 +630,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    // Ensure boolean values are correctly set
+    // Ensure boolean values are correctly set and include reset token fields
     const userData = {
       ...user,
       isAdmin: user.isAdmin === true,
       isSeller: user.isSeller === true,
-      isBanned: user.isBanned === true || false
+      isBanned: user.isBanned === true || false,
+      resetToken: null,
+      resetTokenExpiry: null
     };
     
     const [newUser] = await db.insert(users).values(userData).returning();

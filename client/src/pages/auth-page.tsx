@@ -141,7 +141,7 @@ export default function AuthPage() {
   const forgotPasswordMutation = useMutation({
     mutationKey: ["forgotPassword"],
     mutationFn: async (data: { email: string }) => {
-      return apiRequest({
+      return apiRequest<{ success: boolean }>({
         url: "/api/forgot-password",
         method: "POST",
         data,
@@ -168,7 +168,7 @@ export default function AuthPage() {
   const verifyCodeMutation = useMutation({
     mutationKey: ["verifyResetCode"],
     mutationFn: async (data: { email: string; code: string }) => {
-      return apiRequest({
+      return apiRequest<{ success: boolean }>({
         url: "/api/verify-reset-code",
         method: "POST",
         data,
@@ -194,7 +194,7 @@ export default function AuthPage() {
   const resetPasswordMutation = useMutation({
     mutationKey: ["resetPassword"],
     mutationFn: async (data: { email: string; code: string; newPassword: string }) => {
-      return apiRequest({
+      return apiRequest<{ success: boolean }>({
         url: "/api/reset-password",
         method: "POST",
         data,
