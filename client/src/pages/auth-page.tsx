@@ -12,10 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { ArrowRight, ArrowLeft, Loader } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { ArrowRight } from "lucide-react";
 
 // Extended schemas with validation
 const loginSchema = z.object({
@@ -35,30 +32,8 @@ const registerSchema = insertUserSchema.extend({
   path: ["confirmPassword"],
 });
 
-// Forgot password schema
-const forgotPasswordSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
-});
-
-// Verify code schema
-const verifyCodeSchema = z.object({
-  code: z.string().length(6, { message: "Please enter a valid 6-digit code" }),
-});
-
-// Reset password schema
-const resetPasswordSchema = z.object({
-  newPassword: z.string().min(8, { message: "Password must be at least 8 characters" }),
-  confirmNewPassword: z.string().min(8, { message: "Password must be at least 8 characters" }),
-}).refine((data) => data.newPassword === data.confirmNewPassword, {
-  message: "Passwords do not match",
-  path: ["confirmNewPassword"],
-});
-
 type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
-type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
-type VerifyCodeFormValues = z.infer<typeof verifyCodeSchema>;
-type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function AuthPage() {
   const [location, navigate] = useLocation();
@@ -66,8 +41,6 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
-  const [resetStep, setResetStep] = useState<"email" | "code" | "password">("email");
   
   // Get tab from URL query parameter
   useEffect(() => {
@@ -75,8 +48,6 @@ export default function AuthPage() {
     const tab = params.get("tab");
     if (tab === "register") {
       setActiveTab("register");
-    } else if (tab === "forgot") {
-      setActiveTab("forgot");
     }
   }, [location]);
 
@@ -111,110 +82,6 @@ export default function AuthPage() {
       terms: false,
     },
   });
-  
-  // Forgot password form
-  const forgotPasswordForm = useForm<ForgotPasswordFormValues>({
-    resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: {
-      email: "",
-    },
-  });
-  
-  // Verify code form
-  const verifyCodeForm = useForm<VerifyCodeFormValues>({
-    resolver: zodResolver(verifyCodeSchema),
-    defaultValues: {
-      code: "",
-    },
-  });
-  
-  // Reset password form
-  const resetPasswordForm = useForm<ResetPasswordFormValues>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: {
-      newPassword: "",
-      confirmNewPassword: "",
-    },
-  });
-  
-  // Forgot password mutation
-  const forgotPasswordMutation = useMutation({
-    mutationKey: ["forgotPassword"],
-    mutationFn: async (data: { email: string }) => {
-      return apiRequest<{ success: boolean }>({
-        url: "/api/forgot-password",
-        method: "POST",
-        data,
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Verification code sent",
-        description: "Please check your email for the 6-digit code",
-      });
-      setResetEmail(forgotPasswordForm.getValues().email);
-      setResetStep("code");
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send verification code",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Verify code mutation
-  const verifyCodeMutation = useMutation({
-    mutationKey: ["verifyResetCode"],
-    mutationFn: async (data: { email: string; code: string }) => {
-      return apiRequest<{ success: boolean }>({
-        url: "/api/verify-reset-code",
-        method: "POST",
-        data,
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Code verified",
-        description: "Please create a new password",
-      });
-      setResetStep("password");
-    },
-    onError: (error) => {
-      toast({
-        title: "Invalid code",
-        description: error.message || "The code is invalid or has expired",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Reset password mutation
-  const resetPasswordMutation = useMutation({
-    mutationKey: ["resetPassword"],
-    mutationFn: async (data: { email: string; code: string; newPassword: string }) => {
-      return apiRequest<{ success: boolean }>({
-        url: "/api/reset-password",
-        method: "POST",
-        data,
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Password reset successful",
-        description: "You can now login with your new password",
-      });
-      setActiveTab("login");
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to reset password",
-        variant: "destructive",
-      });
-    },
-  });
 
   const onLoginSubmit = (data: LoginFormValues) => {
     loginMutation.mutate(data);
@@ -224,25 +91,6 @@ export default function AuthPage() {
     // Remove confirmPassword and terms from data before sending to API
     const { confirmPassword, terms, ...registerData } = data;
     registerMutation.mutate(registerData);
-  };
-  
-  const onForgotPasswordSubmit = (data: ForgotPasswordFormValues) => {
-    forgotPasswordMutation.mutate(data);
-  };
-  
-  const onVerifyCodeSubmit = (data: VerifyCodeFormValues) => {
-    verifyCodeMutation.mutate({
-      email: resetEmail,
-      code: data.code,
-    });
-  };
-  
-  const onResetPasswordSubmit = (data: ResetPasswordFormValues) => {
-    resetPasswordMutation.mutate({
-      email: resetEmail,
-      code: verifyCodeForm.getValues().code,
-      newPassword: data.newPassword,
-    });
   };
 
   return (
@@ -258,10 +106,9 @@ export default function AuthPage() {
           </div>
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="login">Sign In</TabsTrigger>
               <TabsTrigger value="register">Register</TabsTrigger>
-              <TabsTrigger value="forgot">Forgot Password</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login">
@@ -290,13 +137,9 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <Label htmlFor="login-password">Password</Label>
-                        <button 
-                          type="button" 
-                          onClick={() => setActiveTab("forgot")}
-                          className="text-sm text-gold hover:underline"
-                        >
+                        <a href="#" className="text-sm text-gold hover:underline">
                           Forgot password?
-                        </button>
+                        </a>
                       </div>
                       <Input
                         id="login-password"
@@ -476,186 +319,6 @@ export default function AuthPage() {
                     </Button>
                   </CardFooter>
                 </form>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="forgot">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Reset your password</CardTitle>
-                  <CardDescription>
-                    We'll send you a verification code to reset your password
-                  </CardDescription>
-                </CardHeader>
-                
-                {resetStep === "email" && (
-                  <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)}>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reset-email">Email</Label>
-                        <Input
-                          id="reset-email"
-                          type="email"
-                          {...forgotPasswordForm.register("email")}
-                          placeholder="Enter your email address"
-                        />
-                        {forgotPasswordForm.formState.errors.email && (
-                          <p className="text-sm text-red-500">
-                            {forgotPasswordForm.formState.errors.email.message}
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-4">
-                      <Button 
-                        type="submit" 
-                        className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
-                        disabled={forgotPasswordMutation.isPending}
-                      >
-                        {forgotPasswordMutation.isPending ? (
-                          <span className="flex items-center">
-                            <Loader className="mr-2 h-4 w-4 animate-spin" />
-                            Sending verification code...
-                          </span>
-                        ) : (
-                          "Send verification code"
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => setActiveTab("login")}
-                      >
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to login
-                      </Button>
-                    </CardFooter>
-                  </form>
-                )}
-                
-                {resetStep === "code" && (
-                  <form onSubmit={verifyCodeForm.handleSubmit(onVerifyCodeSubmit)}>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="verification-code">Verification Code</Label>
-                        <p className="text-sm text-gray-500 mb-4">
-                          Enter the 6-digit code sent to {resetEmail}
-                        </p>
-                        <div className="flex justify-center py-4">
-                          <InputOTP
-                            maxLength={6}
-                            containerClassName="gap-2"
-                            value={verifyCodeForm.watch("code")}
-                            onChange={(value) => verifyCodeForm.setValue("code", value, { shouldValidate: true })}
-                            render={({ slots }) => (
-                              <InputOTPGroup>
-                                {slots.map((slot, index) => (
-                                  <InputOTPSlot 
-                                    key={index} 
-                                    {...slot}
-                                    className="w-10 h-12 text-center text-lg border-amber-300 focus:border-amber-500 focus:ring-amber-500"
-                                    index={index}
-                                  />
-                                ))}
-                              </InputOTPGroup>
-                            )}
-                          />
-                        </div>
-                        {verifyCodeForm.formState.errors.code && (
-                          <p className="text-sm text-red-500 text-center">
-                            {verifyCodeForm.formState.errors.code.message}
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-4">
-                      <Button 
-                        type="submit" 
-                        className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
-                        disabled={verifyCodeMutation.isPending}
-                      >
-                        {verifyCodeMutation.isPending ? (
-                          <span className="flex items-center">
-                            <Loader className="mr-2 h-4 w-4 animate-spin" />
-                            Verifying code...
-                          </span>
-                        ) : (
-                          "Verify code"
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => setResetStep("email")}
-                      >
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back
-                      </Button>
-                    </CardFooter>
-                  </form>
-                )}
-                
-                {resetStep === "password" && (
-                  <form onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)}>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="new-password">New Password</Label>
-                        <Input
-                          id="new-password"
-                          type="password"
-                          {...resetPasswordForm.register("newPassword")}
-                          placeholder="Enter your new password"
-                        />
-                        {resetPasswordForm.formState.errors.newPassword && (
-                          <p className="text-sm text-red-500">
-                            {resetPasswordForm.formState.errors.newPassword.message}
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="confirm-new-password">Confirm New Password</Label>
-                        <Input
-                          id="confirm-new-password"
-                          type="password"
-                          {...resetPasswordForm.register("confirmNewPassword")}
-                          placeholder="Confirm your new password"
-                        />
-                        {resetPasswordForm.formState.errors.confirmNewPassword && (
-                          <p className="text-sm text-red-500">
-                            {resetPasswordForm.formState.errors.confirmNewPassword.message}
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-4">
-                      <Button 
-                        type="submit" 
-                        className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
-                        disabled={resetPasswordMutation.isPending}
-                      >
-                        {resetPasswordMutation.isPending ? (
-                          <span className="flex items-center">
-                            <Loader className="mr-2 h-4 w-4 animate-spin" />
-                            Resetting password...
-                          </span>
-                        ) : (
-                          "Reset password"
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => setResetStep("code")}
-                      >
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back
-                      </Button>
-                    </CardFooter>
-                  </form>
-                )}
               </Card>
             </TabsContent>
           </Tabs>
