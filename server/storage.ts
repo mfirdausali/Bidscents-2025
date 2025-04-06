@@ -34,8 +34,11 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User>;
+  setPasswordResetToken(email: string, token: string, expiryHours: number): Promise<User>;
+  resetPassword(token: string, newPassword: string): Promise<User>;
   getAllUsers(): Promise<User[]>;
   banUser(id: number, isBanned: boolean): Promise<User>;
   
@@ -153,6 +156,48 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values()).find(
       (user) => user.email.toLowerCase() === email.toLowerCase(),
     );
+  }
+  
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.resetToken === token && user.resetTokenExpiry && new Date(user.resetTokenExpiry) > new Date()
+    );
+  }
+  
+  async setPasswordResetToken(email: string, token: string, expiryHours: number): Promise<User> {
+    const user = await this.getUserByEmail(email);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    const expiryDate = new Date();
+    expiryDate.setHours(expiryDate.getHours() + expiryHours);
+    
+    const updatedUser = { 
+      ...user, 
+      resetToken: token,
+      resetTokenExpiry: expiryDate
+    };
+    
+    this.users.set(user.id, updatedUser);
+    return updatedUser;
+  }
+  
+  async resetPassword(token: string, newPassword: string): Promise<User> {
+    const user = await this.getUserByResetToken(token);
+    if (!user) {
+      throw new Error("Invalid or expired reset token");
+    }
+    
+    const updatedUser = { 
+      ...user, 
+      password: newPassword,
+      resetToken: null,
+      resetTokenExpiry: null
+    };
+    
+    this.users.set(user.id, updatedUser);
+    return updatedUser;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -516,6 +561,70 @@ export class DatabaseStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
+  }
+  
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    // Find user with matching token where expiry is in the future
+    const [user] = await db.select()
+      .from(users)
+      .where(
+        and(
+          eq(users.resetToken, token),
+          sql`${users.resetTokenExpiry} > NOW()`
+        )
+      );
+    return user;
+  }
+  
+  async setPasswordResetToken(email: string, token: string, expiryHours: number): Promise<User> {
+    const user = await this.getUserByEmail(email);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    // Calculate expiry time
+    const expiryDate = new Date();
+    expiryDate.setHours(expiryDate.getHours() + expiryHours);
+    
+    // Update user with token and expiry
+    const [updatedUser] = await db
+      .update(users)
+      .set({ 
+        resetToken: token,
+        resetTokenExpiry: expiryDate
+      })
+      .where(eq(users.id, user.id))
+      .returning();
+    
+    if (!updatedUser) {
+      throw new Error("Failed to update user with reset token");
+    }
+    
+    return updatedUser;
+  }
+  
+  async resetPassword(token: string, newPassword: string): Promise<User> {
+    const user = await this.getUserByResetToken(token);
+    if (!user) {
+      throw new Error("Invalid or expired reset token");
+    }
+    
+    // Update user's password and clear token data
+    const [updatedUser] = await db
+      .update(users)
+      .set({ 
+        password: newPassword,
+        resetToken: null,
+        resetTokenExpiry: null
+      })
+      .where(eq(users.id, user.id))
+      .returning();
+    
+    if (!updatedUser) {
+      throw new Error("Failed to reset password");
+    }
+    
+    return updatedUser;
   }
 
   async createUser(user: InsertUser): Promise<User> {

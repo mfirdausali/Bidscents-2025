@@ -16,6 +16,8 @@ export const users = pgTable("users", {
   isSeller: boolean("is_seller").default(false).notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   isBanned: boolean("is_banned").default(false).notNull(),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
 });
 
 // Categories table
