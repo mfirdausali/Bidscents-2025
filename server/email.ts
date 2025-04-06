@@ -1,15 +1,49 @@
-import nodemailer from "nodemailer";
+import nodemailer, { Transporter } from "nodemailer";
 
-// Create a transporter for sending emails
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || "smtp.ethereal.email", // Default to Ethereal for testing
-  port: parseInt(process.env.EMAIL_PORT || "587"),
-  secure: process.env.EMAIL_SECURE === "true", // true for 465, false for other ports
-  auth: {
-    user: process.env.EMAIL_USER || "",
-    pass: process.env.EMAIL_PASSWORD || "",
-  },
-});
+// We'll initialize the transporter when needed
+let transporter: Transporter | null = null;
+
+/**
+ * Get an email transporter - creating a test account if needed
+ */
+async function getTransporter(): Promise<Transporter> {
+  // If we already have a transporter, return it
+  if (transporter) {
+    return transporter;
+  }
+  
+  // If we have email credentials, create a real transporter
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+    transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || "smtp.gmail.com",
+      port: parseInt(process.env.EMAIL_PORT || "587"),
+      secure: process.env.EMAIL_SECURE === "true",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+    
+    return transporter;
+  }
+  
+  // Otherwise create a test account with Ethereal
+  console.log("No email credentials provided, using Ethereal test account...");
+  const testAccount = await nodemailer.createTestAccount();
+  
+  transporter = nodemailer.createTransport({
+    host: "smtp.ethereal.email",
+    port: 587,
+    secure: false,
+    auth: {
+      user: testAccount.user,
+      pass: testAccount.pass,
+    },
+  });
+  
+  console.log(`Using test account: ${testAccount.user}`);
+  return transporter;
+}
 
 interface EmailOptions {
   to: string;
@@ -23,18 +57,8 @@ interface EmailOptions {
  */
 export async function sendEmail({ to, subject, text, html }: EmailOptions): Promise<boolean> {
   try {
-    // If no email credentials are set, create a test account
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-      console.log("No email credentials provided, using Ethereal test account...");
-      const testAccount = await nodemailer.createTestAccount();
-      
-      transporter.options.auth = {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      };
-      
-      console.log(`Using test account: ${testAccount.user}`);
-    }
+    // Get or create a transporter
+    const emailTransporter = await getTransporter();
     
     const mailOptions = {
       from: process.env.EMAIL_FROM || `"Essence Perfumes" <noreply@essenceperfumes.com>`,
@@ -44,12 +68,14 @@ export async function sendEmail({ to, subject, text, html }: EmailOptions): Prom
       html,
     };
     
-    const info = await transporter.sendMail(mailOptions);
+    const info = await emailTransporter.sendMail(mailOptions);
     
     // If using Ethereal (test account), log the URL to view the email
     if (info.messageId && !process.env.EMAIL_USER) {
       console.log(`Email sent: ${info.messageId}`);
       console.log(`Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
+    } else if (info.messageId) {
+      console.log(`Email sent to ${to}: ${info.messageId}`);
     }
     
     return true;
