@@ -570,7 +570,7 @@ export default function SellerDashboard() {
                               <TableCell>
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100">
                                   <img 
-                                    src={product.imageUrl} 
+                                    src={`/api/images/${product.imageUrl}`} 
                                     alt={product.name}
                                     className="w-full h-full object-cover"
                                   />
@@ -670,7 +670,7 @@ export default function SellerDashboard() {
                               <div key={product.id} className="flex items-center">
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 mr-3">
                                   <img 
-                                    src={product.imageUrl} 
+                                    src={`/api/images/${product.imageUrl}`} 
                                     alt={product.name}
                                     className="w-full h-full object-cover"
                                   />

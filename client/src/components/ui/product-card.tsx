@@ -114,8 +114,8 @@ export function ProductCard({ product }: ProductCardProps) {
         <Link href={`/products/${product.id}`}>
           <img
             src={product.images && product.images.length > 0 
-              ? product.images[0].imageUrl 
-              : product.imageUrl}
+              ? `/api/images/${product.images[0].imageUrl}` 
+              : `/api/images/${product.imageUrl}`}
             alt={product.name}
             className="w-full h-48 object-cover"
           />
