@@ -1,11 +1,12 @@
-import { users, products, categories, cartItems, reviews, orders, orderItems } from "@shared/schema";
+import { users, products, categories, cartItems, reviews, orders, orderItems, productImages } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
   CartItem, InsertCartItem, CartItemWithProduct,
   Review, InsertReview,
-  Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems
+  Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
+  ProductImage, InsertProductImage
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -75,6 +76,11 @@ export interface IStorage {
   getAllOrders(): Promise<OrderWithItems[]>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
   
+  // Product Image methods
+  getProductImages(productId: number): Promise<ProductImage[]>;
+  createProductImage(productImage: InsertProductImage): Promise<ProductImage>;
+  deleteProductImage(id: number): Promise<void>;
+  
   // Session storage
   sessionStore: any;
 }
@@ -87,6 +93,7 @@ export class MemStorage implements IStorage {
   private reviews: Map<number, Review>;
   private orders: Map<number, Order>;
   private orderItems: Map<number, OrderItem>;
+  private productImages: Map<number, ProductImage>;
   sessionStore: any;
   currentIds: {
     users: number;
@@ -96,6 +103,7 @@ export class MemStorage implements IStorage {
     reviews: number;
     orders: number;
     orderItems: number;
+    productImages: number;
   };
 
   constructor() {
@@ -106,6 +114,7 @@ export class MemStorage implements IStorage {
     this.reviews = new Map();
     this.orders = new Map();
     this.orderItems = new Map();
+    this.productImages = new Map();
     this.currentIds = {
       users: 1,
       categories: 1,
@@ -113,7 +122,8 @@ export class MemStorage implements IStorage {
       cartItems: 1,
       reviews: 1,
       orders: 1,
-      orderItems: 1
+      orderItems: 1,
+      productImages: 1
     };
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // 1 day
@@ -283,9 +293,7 @@ export class MemStorage implements IStorage {
   }
 
   async deleteProduct(id: number): Promise<void> {
-    this.products.delete(id);
-    
-    // Delete associated cart items and reviews
+    // Delete associated cart items, reviews, and images
     for (const [cartItemId, cartItem] of this.cartItems.entries()) {
       if (cartItem.productId === id) {
         this.cartItems.delete(cartItemId);
@@ -297,6 +305,15 @@ export class MemStorage implements IStorage {
         this.reviews.delete(reviewId);
       }
     }
+    
+    for (const [imageId, image] of this.productImages.entries()) {
+      if (image.productId === id) {
+        this.productImages.delete(imageId);
+      }
+    }
+    
+    // Finally delete the product
+    this.products.delete(id);
   }
 
   // Cart methods
@@ -448,12 +465,36 @@ export class MemStorage implements IStorage {
     return updatedOrder;
   }
 
+  // Product Image methods
+  async getProductImages(productId: number): Promise<ProductImage[]> {
+    return Array.from(this.productImages.values())
+      .filter(image => image.productId === productId)
+      .sort((a, b) => a.imageOrder - b.imageOrder);
+  }
+
+  async createProductImage(productImage: InsertProductImage): Promise<ProductImage> {
+    const id = this.currentIds.productImages++;
+    const createdAt = new Date();
+    const newImage: ProductImage = { 
+      ...productImage, 
+      id, 
+      createdAt 
+    };
+    this.productImages.set(id, newImage);
+    return newImage;
+  }
+
+  async deleteProductImage(id: number): Promise<void> {
+    this.productImages.delete(id);
+  }
+
   // Helper methods
   private async addProductDetails(products: Product[]): Promise<ProductWithDetails[]> {
     return Promise.all(products.map(async product => {
       const category = product.categoryId ? await this.getCategoryById(product.categoryId) : undefined;
       const seller = await this.getUser(product.sellerId);
       const reviews = await this.getProductReviews(product.id);
+      const images = await this.getProductImages(product.id);
       
       // Calculate average rating
       let averageRating: number | undefined = undefined;
@@ -468,6 +509,7 @@ export class MemStorage implements IStorage {
         seller,
         reviews,
         averageRating,
+        images,
       };
     }));
   }
@@ -659,9 +701,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProduct(id: number): Promise<void> {
-    // First delete associated cart items and reviews
+    // First delete associated cart items, reviews, and images
     await db.delete(cartItems).where(eq(cartItems.productId, id));
     await db.delete(reviews).where(eq(reviews.productId, id));
+    await db.delete(productImages).where(eq(productImages.productId, id));
     
     // Then delete the product
     await db.delete(products).where(eq(products.id, id));
@@ -829,6 +872,23 @@ export class DatabaseStorage implements IStorage {
     return updatedOrder;
   }
 
+  // Product Image methods
+  async getProductImages(productId: number): Promise<ProductImage[]> {
+    return db.select()
+      .from(productImages)
+      .where(eq(productImages.productId, productId))
+      .orderBy(productImages.imageOrder);
+  }
+
+  async createProductImage(productImage: InsertProductImage): Promise<ProductImage> {
+    const [newImage] = await db.insert(productImages).values(productImage).returning();
+    return newImage;
+  }
+
+  async deleteProductImage(id: number): Promise<void> {
+    await db.delete(productImages).where(eq(productImages.id, id));
+  }
+
   // Helper methods
   private async addProductDetails(products: Product[]): Promise<ProductWithDetails[]> {
     return Promise.all(products.map(async (product) => {
@@ -851,6 +911,9 @@ export class DatabaseStorage implements IStorage {
         .from(reviews)
         .where(eq(reviews.productId, product.id));
       
+      // Get product images
+      const images = await this.getProductImages(product.id);
+      
       // Calculate average rating
       let averageRating: number | undefined = undefined;
       if (reviewsResult.length > 0) {
@@ -864,6 +927,7 @@ export class DatabaseStorage implements IStorage {
         seller,
         reviews: reviewsResult,
         averageRating,
+        images,
       };
     }));
   }
