@@ -57,7 +57,7 @@ export function Header() {
         <div className="flex justify-between items-center">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <span className="text-xl font-bold text-purple-600">BidLelong<span className="text-amber-500">MY</span></span>
+            <span className="text-xl font-bold text-purple-600">Bid<span className="text-amber-500">Scents</span></span>
           </Link>
           
           {/* Search Bar */}
