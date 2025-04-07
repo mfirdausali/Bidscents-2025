@@ -1,9 +1,12 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertProductSchema, insertCartItemSchema, insertReviewSchema } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
+import * as path from "path";
+import { storeFile } from "./storage-utils";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
