@@ -32,7 +32,7 @@ export const products = pgTable("products", {
   brand: text("brand").notNull(),
   description: text("description"),
   price: doublePrecision("price").notNull(),
-  // imageUrl column has been completely removed
+  imageUrl: text("image_url").notNull(),
   stockQuantity: integer("stock_quantity").notNull().default(1), // Most secondhand items have quantity 1
   categoryId: integer("category_id").references(() => categories.id),
   sellerId: integer("seller_id").references(() => users.id).notNull(),
@@ -52,7 +52,7 @@ export const products = pgTable("products", {
 export const productImages = pgTable("product_images", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").references(() => products.id).notNull(),
-  image_url: text("image_url").notNull(),  // Using snake_case to match database column name
+  imageUrl: text("image_url").notNull(),
   imageOrder: integer("image_order").default(0).notNull(), // The order/position of the image
   imageName: text("image_name"), // Original file name or generated name
   createdAt: timestamp("created_at").defaultNow(),
@@ -114,6 +114,7 @@ export const insertProductSchema = createInsertSchema(products).pick({
   brand: true,
   description: true,
   price: true,
+  imageUrl: true,
   stockQuantity: true,
   categoryId: true,
   sellerId: true,
@@ -160,7 +161,7 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).pick({
 
 export const insertProductImageSchema = createInsertSchema(productImages).pick({
   productId: true,
-  image_url: true,
+  imageUrl: true,
   imageOrder: true,
   imageName: true,
 });

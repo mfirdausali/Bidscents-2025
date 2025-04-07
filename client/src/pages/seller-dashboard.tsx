@@ -69,6 +69,7 @@ const productSchema = z.object({
   brand: z.string().min(2, { message: "Brand must be at least 2 characters" }),
   description: z.string().min(10, { message: "Description must be at least 10 characters" }),
   price: z.number().min(0.01, { message: "Price must be greater than 0" }),
+  imageUrl: z.string().url({ message: "Please enter a valid image URL" }), // Keep for compatibility, will be updated in backend
   imageFiles: z.any().optional(), // Will hold the actual file objects for upload
   stockQuantity: z.number().int().min(0, { message: "Stock quantity must be 0 or greater" }),
   categoryId: z.number().int().positive({ message: "Please select a category" }),
@@ -116,6 +117,7 @@ export default function SellerDashboard() {
       brand: "",
       description: "",
       price: 0,
+      imageUrl: "",
       stockQuantity: 0,
       categoryId: 0,
       isNew: false,
@@ -219,7 +221,7 @@ export default function SellerDashboard() {
           },
           body: JSON.stringify({
             productId,
-            image_url: `image-id-${imageId}`, // Temporary URL with UUID
+            imageUrl: `image-id-${imageId}`, // Temporary URL with UUID
             imageOrder: index,
             imageName: file.name || `Image ${index + 1}`
           }),
@@ -327,9 +329,14 @@ export default function SellerDashboard() {
     imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
     setImagePreviewUrls([]);
     
+    // If we have an image URL from the product, add it to the previews
+    if (product.imageUrl) {
+      setImagePreviewUrls([product.imageUrl]);
+    }
+    
     // If the product has images in the product.images array, show them in the preview
     if (product.images && product.images.length > 0) {
-      const existingImageUrls = product.images.map(img => img.image_url);
+      const existingImageUrls = product.images.map(img => img.imageUrl);
       setImagePreviewUrls(existingImageUrls);
     }
     
@@ -338,6 +345,7 @@ export default function SellerDashboard() {
       brand: product.brand,
       description: product.description || "",
       price: product.price,
+      imageUrl: product.imageUrl,
       stockQuantity: product.stockQuantity,
       categoryId: product.categoryId || 1,
       isNew: product.isNew === null ? false : product.isNew,
@@ -377,8 +385,11 @@ export default function SellerDashboard() {
     setUploadedImages(newFiles);
     setImagePreviewUrls(newPreviewUrls);
     
-    // Images are now handled via the product_images table
-    // No need to set form values for images
+    // Update form with first image URL as a placeholder
+    // In a real implementation, we would properly handle multiple images
+    if (newFiles.length > 0) {
+      form.setValue('imageUrl', newPreviewUrls[0]);
+    }
   };
   
   // Remove image from preview
@@ -395,7 +406,8 @@ export default function SellerDashboard() {
     setUploadedImages(newImages);
     setImagePreviewUrls(newPreviewUrls);
     
-    // No need to update form values as images are handled by the product_images table
+    // Update form with first remaining image or empty string
+    form.setValue('imageUrl', newPreviewUrls[0] || '');
   };
 
   // Open dialog for new product
@@ -410,6 +422,7 @@ export default function SellerDashboard() {
       brand: "",
       description: "",
       price: 0,
+      imageUrl: "",
       stockQuantity: 0,
       categoryId: 0,
       isNew: false,
@@ -556,17 +569,11 @@ export default function SellerDashboard() {
                             <TableRow key={product.id}>
                               <TableCell>
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100">
-                                  {product.images && product.images.length > 0 ? (
-                                    <img 
-                                      src={`/api/images/${product.images.find(img => img.imageOrder === 0)?.image_url || product.images[0].image_url}`} 
-                                      alt={product.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">
-                                      <Package size={16} />
-                                    </div>
-                                  )}
+                                  <img 
+                                    src={`/api/images/${product.imageUrl}`} 
+                                    alt={product.name}
+                                    className="w-full h-full object-cover"
+                                  />
                                 </div>
                               </TableCell>
                               <TableCell className="font-medium">{product.name}</TableCell>
@@ -662,17 +669,11 @@ export default function SellerDashboard() {
                             .map(product => (
                               <div key={product.id} className="flex items-center">
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 mr-3">
-                                  {product.images && product.images.length > 0 ? (
-                                    <img 
-                                      src={`/api/images/${product.images.find(img => img.imageOrder === 0)?.image_url || product.images[0].image_url}`} 
-                                      alt={product.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">
-                                      <Package size={16} />
-                                    </div>
-                                  )}
+                                  <img 
+                                    src={`/api/images/${product.imageUrl}`} 
+                                    alt={product.name}
+                                    className="w-full h-full object-cover"
+                                  />
                                 </div>
                                 <div className="flex-grow">
                                   <div className="font-medium">{product.name}</div>
@@ -990,7 +991,7 @@ export default function SellerDashboard() {
               
               <FormField
                 control={form.control}
-                name="imageFiles"
+                name="imageUrl"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Product Images (up to 5)</FormLabel>

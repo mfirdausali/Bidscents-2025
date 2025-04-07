@@ -301,14 +301,14 @@ export class MemStorage implements IStorage {
       for (const [imageId, image] of this.productImages.entries()) {
         if (image.productId === id) {
           try {
-            const deleted = await objectStorage.deleteProductImage(image.image_url);
+            const deleted = await objectStorage.deleteProductImage(image.imageUrl);
             if (deleted) {
-              console.log(`Image ${image.image_url} removed from object storage`);
+              console.log(`Image ${image.imageUrl} removed from object storage`);
             } else {
-              console.log(`Failed to delete image ${image.image_url} from object storage`);
+              console.log(`Failed to delete image ${image.imageUrl} from object storage`);
             }
           } catch (error: any) {
-            console.error(`Error trying to delete image ${image.image_url} from object storage:`, error);
+            console.error(`Error trying to delete image ${image.imageUrl} from object storage:`, error);
           }
         }
       }
@@ -710,15 +710,15 @@ export class DatabaseStorage implements IStorage {
       // Delete each image from object storage
       for (const image of images) {
         try {
-          // The image_url field contains the ID used in object storage
-          const deleted = await objectStorage.deleteProductImage(image.image_url);
+          // The imageUrl field contains the ID used in object storage
+          const deleted = await objectStorage.deleteProductImage(image.imageUrl);
           if (deleted) {
-            console.log(`Image ${image.image_url} removed from object storage`);
+            console.log(`Image ${image.imageUrl} removed from object storage`);
           } else {
-            console.log(`Failed to delete image ${image.image_url} from object storage`);
+            console.log(`Failed to delete image ${image.imageUrl} from object storage`);
           }
         } catch (error: any) {
-          console.error(`Error trying to delete image ${image.image_url} from object storage:`, error);
+          console.error(`Error trying to delete image ${image.imageUrl} from object storage:`, error);
           // Continue with other deletions even if one fails
         }
       }
