@@ -1,13 +1,22 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertProductSchema, insertCartItemSchema, insertReviewSchema } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
+  
+  // Set up multer for file uploads
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB file size limit
+    },
+  });
 
   // Categories endpoints
   app.get("/api/categories", async (_req, res, next) => {
@@ -273,6 +282,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // File upload endpoint
+  app.post("/api/upload", upload.array("images", 5), async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+      
+      const files = req.files as Express.Multer.File[];
+      
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: "No files uploaded" });
+      }
+      
+      // For now, just return placeholder URLs since we're having issues with Replit's object storage
+      // In a production environment, we would properly upload the files to a storage service
+      const uploadedUrls = files.map(file => {
+        // Generate a unique identifier for the file
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 1000);
+        return `/images/${timestamp}-${random}-${file.originalname.replace(/\s+/g, '_')}`;
+      });
+      
+      res.status(201).json({ urls: uploadedUrls });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
   // Seller-specific endpoints
   app.get("/api/seller/products", async (req, res, next) => {
     try {

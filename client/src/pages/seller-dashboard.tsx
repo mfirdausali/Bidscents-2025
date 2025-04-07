@@ -204,12 +204,73 @@ export default function SellerDashboard() {
       setIsDeleting(null);
     },
   });
+  
+  // Upload images mutation
+  const uploadImagesMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      if (!files.length) return { urls: [] };
+      
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append("images", file);
+      });
+      
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to upload images");
+      }
+      
+      return await res.json();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error uploading images",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Handle form submission
-  const onSubmitProduct = (data: ProductFormValues) => {
-    // Include sellerId from the logged-in user
+  const onSubmitProduct = async (data: ProductFormValues) => {
+    // First, upload any images if they exist
+    let imageUrl = data.imageUrl;
+    
+    if (uploadedImages.length > 0) {
+      try {
+        // Show loading toast for image upload
+        toast({
+          title: "Uploading images...",
+          description: "Please wait while we upload your product images",
+        });
+        
+        // Upload the images
+        const result = await uploadImagesMutation.mutateAsync(uploadedImages);
+        
+        // If we got URLs back, use the first one as the main image
+        // The server response should give us an array of URLs
+        if (result.urls && result.urls.length > 0) {
+          imageUrl = result.urls[0];
+          
+          // Store additional URLs in a comma-separated string or another field if needed
+          // For now, we'll just use the first image
+        }
+      } catch (error) {
+        console.error("Failed to upload images:", error);
+        // Continue with submission using preview URL if available
+      }
+    }
+    
+    // Include sellerId from the logged-in user and the imageUrl
     const productWithSellerId = {
       ...data,
+      imageUrl, // Use the uploaded image URL
       sellerId: user?.id || 0,
     };
     
