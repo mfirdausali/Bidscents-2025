@@ -205,18 +205,82 @@ export default function SellerDashboard() {
     },
   });
 
+  // Image upload mutation
+  const uploadImagesMutation = useMutation({
+    mutationFn: async ({ productId, images }: { productId: number; images: File[] }) => {
+      if (!images || images.length === 0) return;
+      
+      const formData = new FormData();
+      images.forEach(image => {
+        formData.append('images', image);
+      });
+      
+      const res = await fetch(`/api/products/${productId}/images`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to upload images');
+      }
+      
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Images uploaded",
+        description: "Product images have been uploaded successfully",
+      });
+      
+      // Clear image previews
+      setUploadedImages([]);
+      imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+      setImagePreviewUrls([]);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error uploading images",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Handle form submission
-  const onSubmitProduct = (data: ProductFormValues) => {
+  const onSubmitProduct = async (data: ProductFormValues) => {
     // Include sellerId from the logged-in user
     const productWithSellerId = {
       ...data,
       sellerId: user?.id || 0,
     };
     
-    if (isEditMode && currentProductId) {
-      updateProductMutation.mutate({ id: currentProductId, product: productWithSellerId });
-    } else {
-      createProductMutation.mutate(productWithSellerId);
+    try {
+      if (isEditMode && currentProductId) {
+        // Update the product first
+        await updateProductMutation.mutateAsync({ id: currentProductId, product: productWithSellerId });
+        
+        // Then upload images if any
+        if (uploadedImages.length > 0) {
+          await uploadImagesMutation.mutateAsync({ 
+            productId: currentProductId, 
+            images: uploadedImages 
+          });
+        }
+      } else {
+        // Create the product first
+        const newProduct = await createProductMutation.mutateAsync(productWithSellerId);
+        
+        // Then upload images if any
+        if (uploadedImages.length > 0 && newProduct && newProduct.id) {
+          await uploadImagesMutation.mutateAsync({ 
+            productId: newProduct.id, 
+            images: uploadedImages 
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error in product submission:", error);
     }
   };
 
@@ -896,7 +960,7 @@ export default function SellerDashboard() {
                             <div className="flex flex-col items-center justify-center py-4 border-2 border-dashed rounded-md border-gray-300 hover:border-gold transition-colors">
                               <Upload className="h-8 w-8 text-gray-400 mb-2" />
                               <p className="text-sm text-gray-500">Click to upload images</p>
-                              <p className="text-xs text-gray-400 mt-1">JPG, PNG, or GIF up to 5MB</p>
+                              <p className="text-xs text-gray-400 mt-1">JPG, PNG, or GIF up to 5MB (max 5 images)</p>
                             </div>
                             <input 
                               id="product-images" 
@@ -911,26 +975,34 @@ export default function SellerDashboard() {
                       </div>
                       
                       {/* Preview area for uploaded images */}
-                      {imagePreviewUrls.length > 0 && (
-                        <div className="grid grid-cols-5 gap-2 mt-3">
-                          {imagePreviewUrls.map((url, index) => (
-                            <div key={index} className="relative group">
-                              <img 
-                                src={url} 
-                                alt={`Preview ${index + 1}`}
-                                className="w-full h-16 object-cover rounded-md border border-gray-200"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeImage(index)}
-                                className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <X className="h-3 w-3 text-gray-600" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      {imagePreviewUrls.length > 0 ? (
+                        <>
+                          <div className="flex justify-between items-center mt-2">
+                            <p className="text-sm text-gray-600">{imagePreviewUrls.length} image(s) selected</p>
+                            {imagePreviewUrls.length < 5 && (
+                              <p className="text-xs text-gray-500">You can add {5 - imagePreviewUrls.length} more</p>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mt-2">
+                            {imagePreviewUrls.map((url, index) => (
+                              <div key={index} className="relative group">
+                                <img 
+                                  src={url} 
+                                  alt={`Preview ${index + 1}`}
+                                  className="w-full h-20 object-cover rounded-md border border-gray-200"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(index)}
+                                  className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X className="h-3 w-3 text-gray-600" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                     <FormMessage />
                   </FormItem>
