@@ -84,15 +84,6 @@ export const orderItems = pgTable("order_items", {
   price: doublePrecision("price").notNull(),
 });
 
-// Product images table
-export const productImages = pgTable("product_images", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.id).notNull(),
-  imageUrl: text("image_url").notNull(),
-  displayOrder: integer("display_order").default(0), // Order in which images are displayed
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -158,12 +149,6 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).pick({
   price: true,
 });
 
-export const insertProductImageSchema = createInsertSchema(productImages).pick({
-  productId: true,
-  imageUrl: true,
-  displayOrder: true,
-});
-
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -186,15 +171,11 @@ export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 
-export type ProductImage = typeof productImages.$inferSelect;
-export type InsertProductImage = z.infer<typeof insertProductImageSchema>;
-
 // Extended types
 export type ProductWithDetails = Product & {
   category?: Category;
   seller?: User;
   reviews?: Review[];
-  images?: ProductImage[];
   averageRating?: number;
 };
 
