@@ -205,41 +205,41 @@ export default function SellerDashboard() {
     },
   });
 
-  // Mutation for uploading product images
-  const uploadImagesMutation = useMutation({
-    mutationFn: async ({ productId, imageUrl, imageOrder, imageName }: { 
-      productId: number, 
-      imageUrl: string, 
-      imageOrder: number, 
-      imageName: string 
-    }) => {
-      const response = await fetch('/api/product-images', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          productId,
-          imageUrl,
-          imageOrder,
-          imageName
-        }),
+  // Mutation for registering image IDs
+  const registerImagesMutation = useMutation({
+    mutationFn: async ({ productId, numImages }: { productId: number, numImages: number }) => {
+      // Create placeholder entries for each image
+      const imagePromises = Array.from({ length: numImages }).map((_, index) => {
+        // Generate a random UUID-like string for the image URL
+        const imageId = crypto.randomUUID();
+        
+        return fetch('/api/product-images', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            productId,
+            imageUrl: `image-id-${imageId}`,
+            imageOrder: index,
+            imageName: `Image ${index + 1}`
+          }),
+        }).then(res => {
+          if (!res.ok) {
+            throw new Error(`Failed to register image ${index}`);
+          }
+          return res.json();
+        });
       });
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to upload image');
-      }
-      
-      return await response.json();
+      return Promise.all(imagePromises);
     },
     onSuccess: () => {
-      // Success can be handled if needed
-      console.log('Image uploaded successfully');
+      console.log('Image IDs registered successfully');
     },
     onError: (error: Error) => {
       toast({
-        title: "Error uploading image",
+        title: "Error registering image IDs",
         description: error.message,
         variant: "destructive",
       });
@@ -268,35 +268,35 @@ export default function SellerDashboard() {
         productId = newProduct.id;
       }
       
-      // After product is created/updated, upload all images
+      // After product is created/updated, register image IDs
       if (uploadedImages.length > 0) {
-        // Convert files to base64 strings
-        const uploadPromises = uploadedImages.map(async (file, index) => {
-          const base64String = await fileToBase64(file);
-          return uploadImagesMutation.mutateAsync({
-            productId,
-            imageUrl: base64String,
-            imageOrder: index,
-            imageName: file.name
-          });
+        await registerImagesMutation.mutateAsync({
+          productId,
+          numImages: uploadedImages.length
         });
-        
-        await Promise.all(uploadPromises);
       }
+      
+      // Close dialog after successful submission
+      setIsDialogOpen(false);
     } catch (error) {
       console.error('Error in product submission:', error);
     }
   };
-  
-  // Helper function to convert File to base64 string
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
-  };
+
+  // Query to fetch product images
+  const { data: productImages } = useQuery({
+    queryKey: ['product-images', currentProductId],
+    queryFn: async () => {
+      if (!currentProductId) return [];
+      
+      const response = await fetch(`/api/product-images/${currentProductId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch product images');
+      }
+      return response.json();
+    },
+    enabled: !!currentProductId && isEditMode,
+  });
 
   // Edit product
   const handleEditProduct = (product: ProductWithDetails) => {
@@ -308,9 +308,15 @@ export default function SellerDashboard() {
     imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
     setImagePreviewUrls([]);
     
-    // If we have an image URL from the product, we could add it to the previews
+    // If we have an image URL from the product, add it to the previews
     if (product.imageUrl) {
       setImagePreviewUrls([product.imageUrl]);
+    }
+    
+    // If the product has images in the product.images array, show them in the preview
+    if (product.images && product.images.length > 0) {
+      const existingImageUrls = product.images.map(img => img.imageUrl);
+      setImagePreviewUrls(existingImageUrls);
     }
     
     form.reset({
@@ -339,6 +345,7 @@ export default function SellerDashboard() {
   const handleDeleteProduct = (id: number) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       setIsDeleting(id);
+      // When deleting a product, backend should cascade delete all related images
       deleteProductMutation.mutate(id);
     }
   };
