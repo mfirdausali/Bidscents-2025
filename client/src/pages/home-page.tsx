@@ -65,7 +65,7 @@ export default function HomePage() {
       </section>
 
       {/* Browse Categories */}
-      <section className="container mx-auto px-6 py-6">
+      <section className="container mx-auto px-6 py-6 ">
         <h2 className="text-xl font-bold mb-4">Browse Categories</h2>
         
         <div className="grid grid-cols-4 md:grid-cols-4 gap-3">
@@ -103,8 +103,11 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Featured Product Carousel */}
+      <FeaturedProductCarousel />
+
       {/* Auction Listings */}
-      <section className="container mx-auto px-6 py-8">
+      <section className="container mx-auto px-6 py-8 bg-gray-50">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Live Auctions</h2>
           <Link href="/products?type=auction" className="text-purple-600 hover:text-purple-800 flex items-center">
@@ -116,7 +119,7 @@ export default function HomePage() {
           <div className="flex justify-center items-center h-48">
             <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
           </div>
-        ) : allProducts && allProducts.length > 0 ? (
+        ) : allProducts && allProducts.length > 0 && allProducts.some(product => product.listingType === 'auction') ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {/* Display the 3 auction products */}
             {[...allProducts]
@@ -142,7 +145,7 @@ export default function HomePage() {
       </section>
       
       {/* Recent Listings */}
-      <section className="container mx-auto px-6 py-8 bg-gray-50">
+      <section className="container mx-auto px-6 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Recent Listings</h2>
           <Link href="/products" className="text-purple-600 hover:text-purple-800 flex items-center">
@@ -235,9 +238,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* Featured Product Carousel */}
-      <FeaturedProductCarousel />
 
       {/* Testimonials */}
       <section className="bg-white py-16">
