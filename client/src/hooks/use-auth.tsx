@@ -15,8 +15,6 @@ type AuthContextType = {
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
-  cartCount: number;
-  setCartCount: (count: number) => void;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -25,7 +23,6 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const [cartCount, setCartCount] = useState(0);
   
   const {
     data: user,
@@ -47,9 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Login successful",
         description: `Welcome back, ${user.username}!`,
       });
-      
-      // Fetch cart count after login
-      fetchCartCount(user.id);
     },
     onError: (error: Error) => {
       toast({
@@ -87,7 +81,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
-      setCartCount(0);
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",
@@ -102,27 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Helper function to fetch cart count
-  const fetchCartCount = async (userId: number) => {
-    try {
-      const res = await fetch("/api/cart", {
-        credentials: "include",
-      });
-      
-      if (res.ok) {
-        const cartItems = await res.json();
-        setCartCount(cartItems.length);
-      }
-    } catch (error) {
-      console.error("Error fetching cart count:", error);
-    }
-  };
-
-  // Fetch cart count if user is logged in
-  if (user && user.id && cartCount === 0) {
-    fetchCartCount(user.id);
-  }
-
   return (
     <AuthContext.Provider
       value={{
@@ -132,8 +104,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
-        cartCount,
-        setCartCount,
       }}
     >
       {children}

@@ -2,9 +2,8 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { ProductWithDetails } from "@shared/schema";
 import { Button } from "./button";
-import { Heart, Star, StarHalf } from "lucide-react";
+import { Heart, Star, StarHalf, MessageSquare } from "lucide-react";
 import { Badge } from "./badge";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,9 +12,9 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { user, setCartCount } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isContacting, setIsContacting] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
 
   // Function to render star ratings
@@ -44,49 +43,40 @@ export function ProductCard({ product }: ProductCardProps) {
     return stars;
   };
 
-  // Handle add to cart
-  const handleAddToCart = async () => {
+  // Handle contact seller
+  const handleContactSeller = () => {
     if (!user) {
       toast({
         title: "Please sign in",
-        description: "You need to be signed in to add items to your cart",
+        description: "You need to be signed in to contact sellers",
         variant: "destructive",
       });
       return;
     }
 
-    setIsAddingToCart(true);
+    setIsContacting(true);
     try {
-      await apiRequest("POST", "/api/cart", {
-        productId: product.id,
-        quantity: 1,
-      });
-      
+      // In a real app, this would navigate to a messaging page or open a modal
       toast({
-        title: "Added to cart",
-        description: `${product.name} has been added to your cart`,
+        title: "Contacting seller",
+        description: `We're connecting you with the seller of ${product.name}`,
       });
       
-      // Refetch cart items to update count
-      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
-      
-      // Get updated cart count
-      const response = await fetch("/api/cart", {
-        credentials: "include",
-      });
-      
-      if (response.ok) {
-        const cartItems = await response.json();
-        setCartCount(cartItems.length);
-      }
+      // Simulate a delay before showing success message
+      setTimeout(() => {
+        toast({
+          title: "Seller contacted",
+          description: `Your interest in ${product.name} has been sent to the seller`,
+        });
+        setIsContacting(false);
+      }, 1000);
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add item to cart",
+        description: "Failed to contact seller",
         variant: "destructive",
       });
-    } finally {
-      setIsAddingToCart(false);
+      setIsContacting(false);
     }
   };
 
@@ -207,11 +197,11 @@ export function ProductCard({ product }: ProductCardProps) {
         {product.listingType === 'negotiable' ? (
           <div className="grid grid-cols-2 gap-2">
             <Button
-              onClick={handleAddToCart}
-              disabled={isAddingToCart}
+              onClick={handleContactSeller}
+              disabled={isContacting}
               className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded-md"
             >
-              Buy Now
+              <MessageSquare className="mr-1 h-3 w-3" /> Contact
             </Button>
             <Button
               variant="outline"
@@ -226,25 +216,29 @@ export function ProductCard({ product }: ProductCardProps) {
               <span>Current Bid: RM {product.price.toFixed(0)}</span>
             </div>
             <Button
-              onClick={handleAddToCart}
-              disabled={isAddingToCart}
+              onClick={handleContactSeller}
+              disabled={isContacting}
               className="bg-amber-500 hover:bg-amber-600 text-white text-xs py-2 w-full rounded-md"
             >
-              {isAddingToCart ? 'Processing...' : 'Bid Now'}
+              {isContacting ? 'Processing...' : 'Bid Now'}
             </Button>
           </div>
         ) : (
           <Button
-            onClick={handleAddToCart}
-            disabled={isAddingToCart}
+            onClick={handleContactSeller}
+            disabled={isContacting}
             className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 w-full rounded-md"
           >
-            {isAddingToCart ? (
+            {isContacting ? (
               <span className="flex items-center justify-center">
                 <span className="animate-spin mr-2 h-3 w-3 border-b-2 border-white rounded-full"></span>
-                Adding...
+                Contacting...
               </span>
-            ) : 'Buy Now'}
+            ) : (
+              <span className="flex items-center justify-center">
+                <MessageSquare className="mr-1 h-3 w-3" /> Contact Seller
+              </span>
+            )}
           </Button>
         )}
       </div>
