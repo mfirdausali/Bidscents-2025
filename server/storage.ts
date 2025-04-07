@@ -701,13 +701,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProduct(id: number): Promise<void> {
-    // First delete associated cart items, reviews, and images
-    await db.delete(cartItems).where(eq(cartItems.productId, id));
-    await db.delete(reviews).where(eq(reviews.productId, id));
-    await db.delete(productImages).where(eq(productImages.productId, id));
-    
-    // Then delete the product
-    await db.delete(products).where(eq(products.id, id));
+    try {
+      // First retrieve all product images to delete them from object storage
+      const images = await db.select()
+        .from(productImages)
+        .where(eq(productImages.productId, id));
+      
+      // Import the object storage module for image deletion
+      const objectStorage = await import('./object-storage');
+      
+      // Delete each image from object storage
+      for (const image of images) {
+        try {
+          // The imageUrl field contains the ID used in object storage
+          await objectStorage.deleteProductImage(image.imageUrl);
+          console.log(`Deleted image ${image.imageUrl} from object storage`);
+        } catch (error) {
+          console.error(`Failed to delete image ${image.imageUrl} from object storage:`, error);
+          // Continue with other deletions even if one fails
+        }
+      }
+      
+      // Delete associated database records
+      await db.delete(cartItems).where(eq(cartItems.productId, id));
+      await db.delete(reviews).where(eq(reviews.productId, id));
+      await db.delete(productImages).where(eq(productImages.productId, id));
+      
+      // Finally delete the product
+      await db.delete(products).where(eq(products.id, id));
+      
+      console.log(`Successfully deleted product ${id} and all associated images`);
+    } catch (error) {
+      console.error(`Error deleting product ${id}:`, error);
+      throw error;
+    }
   }
 
   // Cart methods
