@@ -225,7 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uuid = imageUrlParts[imageUrlParts.length - 1];
       
       // Upload to object storage
-      const uploadResult = await uploadProductImage(
+      const uploadResult = await objectStorage.uploadProductImage(
         req.file.buffer,
         uuid,
         req.file.mimetype
