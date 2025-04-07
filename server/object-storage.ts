@@ -52,6 +52,13 @@ export async function deleteProductImage(imageId: string): Promise<boolean> {
     const result = await storageClient.delete(imageId);
     
     if (!result.ok) {
+      // Check if the error is because the object doesn't exist (404)
+      if (result.error && result.error.statusCode === 404) {
+        console.error(`Image ${imageId} not found in Object Storage`);
+        // Return true since there's nothing to delete anyway
+        return true;
+      }
+      
       console.error('Error deleting from Replit Object Storage:', result.error);
       return false;
     }
