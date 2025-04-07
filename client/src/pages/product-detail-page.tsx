@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, StarHalf, Heart, Minus, Plus, ShoppingBag, Info, Check } from "lucide-react";
+import { Star, StarHalf, Heart, Minus, Plus, MessageSquare, Info, Check } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -29,12 +29,12 @@ type ReviewFormValues = z.infer<typeof reviewSchema>;
 export default function ProductDetailPage() {
   const [, params] = useRoute("/products/:id");
   const productId = params?.id ? parseInt(params.id) : 0;
-  const { user, setCartCount } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState("50ml");
-  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isContacting, setIsContacting] = useState(false);
   const [activeTab, setActiveTab] = useState("description");
   const [selectedRating, setSelectedRating] = useState(0);
 
@@ -117,12 +117,12 @@ export default function ProductDetailPage() {
     return stars;
   };
 
-  // Handle add to cart
-  const handleAddToCart = async () => {
+  // Handle contact seller
+  const handleContactSeller = () => {
     if (!user) {
       toast({
         title: "Please sign in",
-        description: "You need to be signed in to add items to your cart",
+        description: "You need to be signed in to contact sellers",
         variant: "destructive",
       });
       return;
@@ -130,38 +130,29 @@ export default function ProductDetailPage() {
 
     if (!product) return;
 
-    setIsAddingToCart(true);
+    setIsContacting(true);
     try {
-      await apiRequest("POST", "/api/cart", {
-        productId: product.id,
-        quantity: quantity,
-      });
-      
+      // In a real app, this would navigate to a messaging page or open a modal
       toast({
-        title: "Added to cart",
-        description: `${product.name} has been added to your cart`,
+        title: "Contacting seller",
+        description: `We're connecting you with the seller of ${product.name}`,
       });
       
-      // Refetch cart items to update count
-      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
-      
-      // Get updated cart count
-      const response = await fetch("/api/cart", {
-        credentials: "include",
-      });
-      
-      if (response.ok) {
-        const cartItems = await response.json();
-        setCartCount(cartItems.length);
-      }
+      // Simulate a delay before showing success message
+      setTimeout(() => {
+        toast({
+          title: "Seller contacted",
+          description: `Your interest in ${product.name} has been sent to the seller`,
+        });
+        setIsContacting(false);
+      }, 1000);
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add item to cart",
+        description: "Failed to contact seller",
         variant: "destructive",
       });
-    } finally {
-      setIsAddingToCart(false);
+      setIsContacting(false);
     }
   };
 
@@ -351,18 +342,18 @@ export default function ProductDetailPage() {
                 
                 <Button 
                   className="bg-purple-600 text-white hover:bg-purple-700 h-12 flex-grow shadow-sm"
-                  onClick={handleAddToCart}
-                  disabled={isAddingToCart}
+                  onClick={handleContactSeller}
+                  disabled={isContacting}
                 >
-                  {isAddingToCart ? (
+                  {isContacting ? (
                     <span className="flex items-center">
                       <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-black rounded-full"></span>
-                      Adding...
+                      Contacting...
                     </span>
                   ) : (
                     <span className="flex items-center">
-                      <ShoppingBag className="mr-2 h-5 w-5" />
-                      Add to Cart
+                      <MessageSquare className="mr-2 h-5 w-5" />
+                      Contact Seller
                     </span>
                   )}
                 </Button>

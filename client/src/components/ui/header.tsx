@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { CartDrawer } from "./cart-drawer";
 import { Input } from "./input";
 import { Button } from "./button";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,14 +12,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
-import { Search, Heart, ShoppingBag, User, LogOut, Package, Shield } from "lucide-react";
+import { Search, Heart, MessageCircle, User, LogOut, Package, Shield } from "lucide-react";
 
 export function Header() {
   const [location] = useLocation();
-  const { user, logoutMutation, cartCount } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle scroll event to add shadow to header
@@ -88,19 +86,15 @@ export function Header() {
               <Search className="h-5 w-5" />
             </button>
             
-            {/* Cart */}
-            <button 
-              onClick={() => setIsCartOpen(true)}
-              className="text-gray-700 relative"
-              aria-label="Cart"
-            >
-              <ShoppingBag className="h-5 w-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </button>
+            {/* Messages */}
+            <Link href="/messages">
+              <button 
+                className="text-gray-700 relative"
+                aria-label="Messages"
+              >
+                <MessageCircle className="h-5 w-5" />
+              </button>
+            </Link>
             
             {/* User menu */}
             {user ? (
@@ -152,9 +146,6 @@ export function Header() {
           </nav>
         </div>
       </div>
-
-      {/* Cart Drawer */}
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </header>
   );
 }
