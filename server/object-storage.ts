@@ -30,10 +30,9 @@ export async function uploadProductImage(
       throw new Error('Failed to upload image');
     }
     
-    // Create a public URL for the image since getPublicUrl is not available
-    const url = `/api/images/${imageId}`;
+    // Return just the image ID, not the full path
     console.log(`Successfully uploaded image ${imageId} to Replit Object Storage`);
-    return { url, success: true };
+    return { url: imageId, success: true };
   } catch (error) {
     console.error('Error in uploadProductImage:', error);
     return {
