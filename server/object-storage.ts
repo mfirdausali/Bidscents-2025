@@ -1,27 +1,15 @@
 import { Client } from '@replit/object-storage';
 import { randomUUID } from 'crypto';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 
-// Create a temporary directory for image storage while we work on the object storage implementation
-export const TEMP_DIR = path.join(os.tmpdir(), 'product-images');
+// Initialize the Replit Object Storage client with the ProductImageBucket
+export const storageClient = new Client({
+  bucketId: "ProductImageBucket"
+});
 
-// Create the temp directory if it doesn't exist
-if (!fs.existsSync(TEMP_DIR)) {
-  fs.mkdirSync(TEMP_DIR, { recursive: true });
-}
-
-// Initialize the storage client (lazy load to prevent application from crashing if credentials not set)
-export let storageClient: any = null;
-
-// We'll only use local file system for now
-// We are not initializing the client since it requires additional configuration
-// which would need to be done through environment variables
-console.log('Using local filesystem for image storage');
+console.log('Initialized Replit Object Storage client with ProductImageBucket');
 
 /**
- * Upload an image to storage (uses local filesystem as fallback)
+ * Upload an image to the Replit Object Storage bucket
  * @param imageBuffer The image buffer to upload
  * @param imageId The UUID to use as the filename
  * @param contentType The content type of the image
@@ -33,24 +21,17 @@ export async function uploadProductImage(
   contentType: string
 ): Promise<{ url: string, success: boolean }> {
   try {
-    // If object storage client is available, try to use it
-    if (storageClient) {
-      try {
-        await storageClient.uploadFromBuffer(imageId, imageBuffer);
-        const url = `/api/images/${imageId}`;
-        return { url, success: true };
-      } catch (error) {
-        console.warn('Object storage upload failed, falling back to filesystem:', error);
-      }
+    // Upload directly to the bucket using the client
+    const result = await storageClient.uploadFromBytes(imageId, imageBuffer);
+    
+    if (!result.ok) {
+      console.error('Error uploading to Replit Object Storage:', result.error);
+      throw new Error('Failed to upload image');
     }
     
-    // Fallback to local filesystem
-    const imagePath = path.join(TEMP_DIR, imageId);
-    await fs.promises.writeFile(imagePath, imageBuffer);
-    
-    // Return a temporary URL for local development
-    // In production, this would be a proper URL
+    // Create a public URL for the image since getPublicUrl is not available
     const url = `/api/images/${imageId}`;
+    console.log(`Successfully uploaded image ${imageId} to Replit Object Storage`);
     return { url, success: true };
   } catch (error) {
     console.error('Error in uploadProductImage:', error);
@@ -62,28 +43,20 @@ export async function uploadProductImage(
 }
 
 /**
- * Delete an image from storage
+ * Delete an image from Replit Object Storage
  * @param imageId The ID of the image to delete
  * @returns Promise with the result of the deletion
  */
 export async function deleteProductImage(imageId: string): Promise<boolean> {
   try {
-    // If object storage client is available, try to use it
-    if (storageClient) {
-      try {
-        await storageClient.delete(imageId);
-        return true;
-      } catch (error) {
-        console.warn('Object storage deletion failed, falling back to filesystem:', error);
-      }
+    const result = await storageClient.delete(imageId);
+    
+    if (!result.ok) {
+      console.error('Error deleting from Replit Object Storage:', result.error);
+      return false;
     }
     
-    // Fallback to local filesystem
-    const imagePath = path.join(TEMP_DIR, imageId);
-    if (fs.existsSync(imagePath)) {
-      await fs.promises.unlink(imagePath);
-    }
-    
+    console.log(`Successfully deleted image ${imageId} from Replit Object Storage`);
     return true;
   } catch (error) {
     console.error('Error in deleteProductImage:', error);
@@ -97,8 +70,7 @@ export async function deleteProductImage(imageId: string): Promise<boolean> {
  * @returns The public URL to access the image
  */
 export function getImagePublicUrl(imageId: string): string {
-  // We'll always use our own API endpoint for image serving
-  // This way we can handle both local file storage and object storage
+  // Since getPublicUrl is not available in the SDK, we use our API endpoint
   return `/api/images/${imageId}`;
 }
 
@@ -109,3 +81,26 @@ export function getImagePublicUrl(imageId: string): string {
 export function generateImageId(): string {
   return randomUUID();
 }
+
+/**
+ * Get an image from Replit Object Storage
+ * @param imageId The ID of the image to retrieve
+ * @returns Promise with the image buffer or null if not found
+ */
+export async function getImageFromStorage(imageId: string): Promise<Buffer | null> {
+  try {
+    const result = await storageClient.downloadAsBytes(imageId);
+    
+    if (!result.ok || !result.value) {
+      console.error('Error retrieving image from Replit Object Storage:', result.error);
+      return null;
+    }
+    
+    // The result value should be a buffer
+    return result.value[0]; // downloadAsBytes returns an array with one Buffer
+  } catch (error) {
+    console.error('Error in getImageFromStorage:', error);
+    return null;
+  }
+}
+
