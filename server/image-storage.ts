@@ -4,11 +4,13 @@ import { db } from './db';
 import { productImages, InsertProductImage } from '../shared/schema';
 import { eq } from 'drizzle-orm';
 
-// Create a client instance for Replit Object Storage
-const client = new Client();
+// Create a client instance for Replit Object Storage with configuration
+const client = new Client({
+  bucketId: 'ProductImageBucket'
+});
 
 // The bucket name where product images will be stored
-const BUCKET_NAME = 'product-images';
+const BUCKET_NAME = 'ProductImageBucket';
 
 export class ImageStorageService {
   /**
@@ -106,23 +108,31 @@ export class ImageStorageService {
     try {
       const objectKey = `${BUCKET_NAME}/${imageId}`;
       
-      // Download the image from object storage as text (base64)
-      const { ok, value, error } = await client.downloadAsText(objectKey);
-      
-      if (!ok) {
-        console.error(`Failed to download image ${imageId}:`, error);
+      // Try to download the image from object storage
+      try {
+        // Download the image from object storage as text (base64)
+        const { ok, value, error } = await client.downloadAsText(objectKey);
+        
+        if (!ok) {
+          console.error(`Failed to download image ${imageId}:`, error);
+          // Fall back to placeholder image (return null and let the API handler deal with it)
+          return { data: null, contentType: null };
+        }
+        
+        // Convert base64 string back to Buffer
+        const buffer = Buffer.from(value, 'base64');
+        
+        return { 
+          data: buffer,
+          contentType: 'image/jpeg' // Default to JPEG; in a real implementation we'd store this with the image
+        };
+      } catch (error) {
+        console.error(`Error downloading image ${imageId} from object storage:`, error);
+        // Fall back to placeholder image or no image
         return { data: null, contentType: null };
       }
-      
-      // Convert base64 string back to Buffer
-      const buffer = Buffer.from(value, 'base64');
-      
-      return { 
-        data: buffer,
-        contentType: 'image/jpeg' // Default to JPEG; in a real implementation we'd store this with the image
-      };
     } catch (error) {
-      console.error(`Error downloading image ${imageId}:`, error);
+      console.error(`General error handling image ${imageId}:`, error);
       return { data: null, contentType: null };
     }
   }
@@ -164,6 +174,18 @@ export class ImageStorageService {
     isPrimary: boolean = false
   ): Promise<InsertProductImage> {
     try {
+      // If this is primary, first clear any existing primary images
+      if (isPrimary) {
+        try {
+          await db.update(productImages)
+            .set({ isPrimary: false })
+            .where(eq(productImages.productId, productId));
+        } catch (e) {
+          console.warn(`Warning: Could not reset primary status for images of product ${productId}:`, e);
+          // Continue anyway - this is not a critical error
+        }
+      }
+      
       // Create a product image record
       const productImage: InsertProductImage = {
         productId,
@@ -174,6 +196,7 @@ export class ImageStorageService {
       // Insert into the database
       await db.insert(productImages).values(productImage);
       
+      console.log(`Successfully associated image ${imageId} with product ${productId}`);
       return productImage;
     } catch (error) {
       console.error(`Error associating image ${imageId} with product ${productId}:`, error);
