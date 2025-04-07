@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
@@ -7,10 +7,31 @@ import { productImages } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import multer from "multer";
+import { uploadProductImage, deleteProductImage, getImagePublicUrl } from "./object-storage";
+import * as objectStorage from "./object-storage"; // Import the entire module to access other properties
+import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
+  
+  // Configure multer for file uploads
+  const upload = multer({
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB max file size
+    },
+    fileFilter: (_req, file, cb) => {
+      // Accept only image files
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    }
+  });
 
   // Categories endpoints
   app.get("/api/categories", async (_req, res, next) => {
@@ -145,6 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint to register product images (metadata only)
   app.post("/api/product-images", async (req, res, next) => {
     try {
       if (!req.isAuthenticated() || !req.user.isSeller) {
@@ -166,6 +188,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const image = await storage.createProductImage(validatedData);
       res.status(201).json(image);
     } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Endpoint to upload the actual image file to object storage
+  app.post("/api/product-images/:id/upload", upload.single('image'), async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+      
+      const imageId = parseInt(req.params.id);
+      
+      // Verify the image exists in database
+      const result = await db.select().from(productImages).where(eq(productImages.id, imageId));
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+      
+      const image = result[0];
+      
+      // Check if the product belongs to the seller
+      const product = await storage.getProductById(image.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      if (product.sellerId !== req.user.id) {
+        return res.status(403).json({ message: "Unauthorized: You can only upload images to your own products" });
+      }
+      
+      // Make sure we have a file
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+      
+      // Get the UUID from the image URL
+      const imageUrlParts = image.imageUrl.split('-');
+      const uuid = imageUrlParts[imageUrlParts.length - 1];
+      
+      // Upload to object storage
+      const uploadResult = await uploadProductImage(
+        req.file.buffer,
+        uuid,
+        req.file.mimetype
+      );
+      
+      if (!uploadResult.success) {
+        return res.status(500).json({ message: "Failed to upload image to storage" });
+      }
+      
+      // Update the image URL in the database to the actual one from object storage
+      await db.update(productImages)
+        .set({ imageUrl: uploadResult.url })
+        .where(eq(productImages.id, imageId));
+      
+      res.status(200).json({ 
+        message: "Image uploaded successfully",
+        url: uploadResult.url
+      });
+    } catch (error) {
+      console.error("Error uploading image:", error);
       next(error);
     }
   });
@@ -430,6 +514,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedOrder = await storage.updateOrderStatus(id, status);
       res.json(updatedOrder);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Endpoint to serve images
+  app.get('/api/images/:imageId', async (req, res, next) => {
+    try {
+      const { imageId } = req.params;
+      
+      // Use the TEMP_DIR from object-storage module
+      const { TEMP_DIR } = objectStorage;
+      const imagePath = path.join(TEMP_DIR, imageId);
+      
+      // Check if the file exists in local filesystem
+      if (fs.existsSync(imagePath)) {
+        // Determine content type based on file extension or default to jpeg
+        let contentType = 'image/jpeg';
+        if (imageId.endsWith('.png')) contentType = 'image/png';
+        if (imageId.endsWith('.gif')) contentType = 'image/gif';
+        if (imageId.endsWith('.webp')) contentType = 'image/webp';
+        
+        res.setHeader('Content-Type', contentType);
+        return fs.createReadStream(imagePath).pipe(res);
+      }
+      
+      // If file doesn't exist locally, check if object storage client is available
+      if (objectStorage.storageClient) {
+        try {
+          // TODO: Get the image from object storage
+          // This would involve checking if the object exists in storage
+          // and then streaming it back to the client
+          return res.status(404).json({ message: 'Image not found' });
+        } catch (error) {
+          console.error('Error retrieving from object storage:', error);
+        }
+      }
+      
+      // If we get here, the image was not found
+      res.status(404).json({ message: 'Image not found' });
     } catch (error) {
       next(error);
     }

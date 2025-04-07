@@ -205,41 +205,62 @@ export default function SellerDashboard() {
     },
   });
 
-  // Mutation for registering image IDs
+  // Mutation for registering image IDs and uploading images
   const registerImagesMutation = useMutation({
-    mutationFn: async ({ productId, numImages }: { productId: number, numImages: number }) => {
-      // Create placeholder entries for each image
-      const imagePromises = Array.from({ length: numImages }).map((_, index) => {
-        // Generate a random UUID-like string for the image URL
+    mutationFn: async ({ productId, images }: { productId: number, images: File[] }) => {
+      // Step 1: Create placeholder entries for each image in the database
+      const registerPromises = images.map(async (file, index) => {
+        // Generate a random UUID for the image
         const imageId = crypto.randomUUID();
         
-        return fetch('/api/product-images', {
+        // Register the image metadata in the database
+        const registerResponse = await fetch('/api/product-images', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             productId,
-            imageUrl: `image-id-${imageId}`,
+            imageUrl: `image-id-${imageId}`, // Temporary URL with UUID
             imageOrder: index,
-            imageName: `Image ${index + 1}`
+            imageName: file.name || `Image ${index + 1}`
           }),
-        }).then(res => {
-          if (!res.ok) {
-            throw new Error(`Failed to register image ${index}`);
-          }
-          return res.json();
         });
+        
+        if (!registerResponse.ok) {
+          throw new Error(`Failed to register image ${index}`);
+        }
+        
+        // Get the registered image record with its ID
+        const registeredImage = await registerResponse.json();
+        
+        // Step 2: Upload the actual image file to object storage
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        const uploadResponse = await fetch(`/api/product-images/${registeredImage.id}/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload image ${index}`);
+        }
+        
+        return await uploadResponse.json();
       });
       
-      return Promise.all(imagePromises);
+      return Promise.all(registerPromises);
     },
     onSuccess: () => {
-      console.log('Image IDs registered successfully');
+      console.log('Images registered and uploaded successfully');
+      // Clear the image upload state after successful upload
+      setUploadedImages([]);
+      setImagePreviewUrls([]);
     },
     onError: (error: Error) => {
       toast({
-        title: "Error registering image IDs",
+        title: "Error with images",
         description: error.message,
         variant: "destructive",
       });
@@ -268,11 +289,11 @@ export default function SellerDashboard() {
         productId = newProduct.id;
       }
       
-      // After product is created/updated, register image IDs
+      // After product is created/updated, register and upload images
       if (uploadedImages.length > 0) {
         await registerImagesMutation.mutateAsync({
           productId,
-          numImages: uploadedImages.length
+          images: uploadedImages
         });
       }
       
