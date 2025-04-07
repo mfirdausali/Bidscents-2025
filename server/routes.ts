@@ -8,11 +8,7 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";
-import { uploadProductImage, deleteProductImage, getImagePublicUrl } from "./object-storage";
-import * as objectStorage from "./object-storage"; // Import the entire module to access other properties
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
+import * as objectStorage from "./object-storage"; // Import the entire module to access all properties
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -524,37 +520,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { imageId } = req.params;
       
-      // Use the TEMP_DIR from object-storage module
-      const { TEMP_DIR } = objectStorage;
-      const imagePath = path.join(TEMP_DIR, imageId);
+      // Determine content type based on file extension or default to jpeg
+      let contentType = 'image/jpeg';
+      if (imageId.endsWith('.png')) contentType = 'image/png';
+      if (imageId.endsWith('.gif')) contentType = 'image/gif';
+      if (imageId.endsWith('.webp')) contentType = 'image/webp';
       
-      // Check if the file exists in local filesystem
-      if (fs.existsSync(imagePath)) {
-        // Determine content type based on file extension or default to jpeg
-        let contentType = 'image/jpeg';
-        if (imageId.endsWith('.png')) contentType = 'image/png';
-        if (imageId.endsWith('.gif')) contentType = 'image/gif';
-        if (imageId.endsWith('.webp')) contentType = 'image/webp';
-        
+      // Get the image from Replit Object Storage
+      const imageBuffer = await objectStorage.getImageFromStorage(imageId);
+      
+      if (imageBuffer) {
+        // If we have the image, send it back with the appropriate content type
         res.setHeader('Content-Type', contentType);
-        return fs.createReadStream(imagePath).pipe(res);
-      }
-      
-      // If file doesn't exist locally, check if object storage client is available
-      if (objectStorage.storageClient) {
-        try {
-          // TODO: Get the image from object storage
-          // This would involve checking if the object exists in storage
-          // and then streaming it back to the client
-          return res.status(404).json({ message: 'Image not found' });
-        } catch (error) {
-          console.error('Error retrieving from object storage:', error);
-        }
+        return res.send(imageBuffer);
       }
       
       // If we get here, the image was not found
       res.status(404).json({ message: 'Image not found' });
     } catch (error) {
+      console.error('Error serving image:', error);
       next(error);
     }
   });
