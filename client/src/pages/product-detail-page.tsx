@@ -38,6 +38,9 @@ export default function ProductDetailPage() {
   const [activeTab, setActiveTab] = useState("description");
   const [selectedRating, setSelectedRating] = useState(0);
 
+  // State for current displayed image
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   // Fetch product details
   const { data: product, isLoading } = useQuery<ProductWithDetails>({
     queryKey: [`/api/products/${productId}`],
@@ -220,13 +223,36 @@ export default function ProductDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Left: Product image */}
             <div>
-              <div className="rounded-lg overflow-hidden bg-gray-50">
+              <div className="rounded-lg overflow-hidden bg-gray-50 mb-4">
                 <img 
-                  src={product.imageUrl} 
+                  src={product.images && product.images.length > 0 
+                    ? product.images[currentImageIndex]?.imageUrl 
+                    : product.imageUrl} 
                   alt={product.name} 
-                  className="w-full h-auto object-cover"
+                  className="w-full h-auto object-cover max-h-[500px]"
                 />
               </div>
+              
+              {/* Image thumbnails */}
+              {product.images && product.images.length > 0 && (
+                <div className="flex space-x-2 mt-4 overflow-x-auto">
+                  {product.images.map((image, index) => (
+                    <div 
+                      key={image.id} 
+                      className={`w-16 h-16 rounded-md overflow-hidden cursor-pointer border-2 ${
+                        currentImageIndex === index ? 'border-gold' : 'border-transparent'
+                      }`}
+                      onClick={() => setCurrentImageIndex(index)}
+                    >
+                      <img 
+                        src={image.imageUrl} 
+                        alt={`${product.name} - Image ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             
             {/* Right: Product info */}
