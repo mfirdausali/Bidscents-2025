@@ -937,7 +937,7 @@ export default function SellerDashboard() {
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Price ($)</FormLabel>
+                      <FormLabel>Price (MYR)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
