@@ -113,9 +113,16 @@ export function ProductCard({ product }: ProductCardProps) {
       <div className="relative">
         <Link href={`/products/${product.id}`}>
           <img
-            src={product.images && product.images.length > 0 
-              ? `/api/images/${product.images[0].imageUrl}` 
-              : `/api/images/${product.imageUrl}`}
+            src={
+              // First, try to find an image with imageOrder=0
+              product.images && product.images.find(img => img.imageOrder === 0)
+                ? `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`
+                // Then try any available image
+                : product.images && product.images.length > 0
+                  ? `/api/images/${product.images[0].imageUrl}`
+                  // Fallback to the old imageUrl field if no images in the table
+                  : `/api/images/${product.imageUrl}`
+            }
             alt={product.name}
             className="w-full h-48 object-cover"
           />

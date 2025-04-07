@@ -329,15 +329,14 @@ export default function SellerDashboard() {
     imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
     setImagePreviewUrls([]);
     
-    // If we have an image URL from the product, add it to the previews
-    if (product.imageUrl) {
-      setImagePreviewUrls([product.imageUrl]);
-    }
-    
     // If the product has images in the product.images array, show them in the preview
     if (product.images && product.images.length > 0) {
-      const existingImageUrls = product.images.map(img => img.imageUrl);
+      const existingImageUrls = product.images.map(img => `/api/images/${img.imageUrl}`);
       setImagePreviewUrls(existingImageUrls);
+    }
+    // Fallback to the old imageUrl field if no images in the table
+    else if (product.imageUrl) {
+      setImagePreviewUrls([`/api/images/${product.imageUrl}`]);
     }
     
     form.reset({
@@ -570,7 +569,16 @@ export default function SellerDashboard() {
                               <TableCell>
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100">
                                   <img 
-                                    src={`/api/images/${product.imageUrl}`} 
+                                    src={
+                                      // First, try to find an image with imageOrder=0
+                                      product.images && product.images.find(img => img.imageOrder === 0)
+                                        ? `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`
+                                        // Then try any available image
+                                        : product.images && product.images.length > 0
+                                          ? `/api/images/${product.images[0].imageUrl}`
+                                          // Fallback to the old imageUrl field if no images in the table
+                                          : `/api/images/${product.imageUrl}`
+                                    } 
                                     alt={product.name}
                                     className="w-full h-full object-cover"
                                   />
@@ -670,7 +678,16 @@ export default function SellerDashboard() {
                               <div key={product.id} className="flex items-center">
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 mr-3">
                                   <img 
-                                    src={`/api/images/${product.imageUrl}`} 
+                                    src={
+                                      // First, try to find an image with imageOrder=0
+                                      product.images && product.images.find(img => img.imageOrder === 0)
+                                        ? `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`
+                                        // Then try any available image
+                                        : product.images && product.images.length > 0
+                                          ? `/api/images/${product.images[0].imageUrl}`
+                                          // Fallback to the old imageUrl field if no images in the table
+                                          : `/api/images/${product.imageUrl}`
+                                    }
                                     alt={product.name}
                                     className="w-full h-full object-cover"
                                   />

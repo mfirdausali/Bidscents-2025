@@ -165,7 +165,16 @@ export function FeaturedProductCarousel() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center min-h-[600px]">
                 <div className="h-96">
                   <img 
-                    src={currentProduct.imageUrl} 
+                    src={
+                      // First, try to find an image with imageOrder=0
+                      currentProduct.images && currentProduct.images.find(img => img.imageOrder === 0)
+                        ? `/api/images/${currentProduct.images.find(img => img.imageOrder === 0)?.imageUrl}`
+                        // Then try any available image
+                        : currentProduct.images && currentProduct.images.length > 0
+                          ? `/api/images/${currentProduct.images[0].imageUrl}`
+                          // Fallback to the old imageUrl field if no images in the table
+                          : `/api/images/${currentProduct.imageUrl}`
+                    }
                     alt={currentProduct.name} 
                     className="rounded-lg shadow-xl w-full h-full object-cover transition-opacity duration-700 ease-in-out"
                   />
