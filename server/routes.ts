@@ -2,7 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertProductSchema, insertCartItemSchema, insertReviewSchema } from "@shared/schema";
+import { insertProductSchema, insertCartItemSchema, insertReviewSchema, insertProductImageSchema } from "@shared/schema";
+import { productImages } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -125,6 +128,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.deleteProduct(id);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Product Images endpoints
+  app.get("/api/products/:id/images", async (req, res, next) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const images = await storage.getProductImages(productId);
+      res.json(images);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/product-images", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+      
+      const validatedData = insertProductImageSchema.parse(req.body);
+      
+      // Check if the product exists and belongs to the seller
+      const product = await storage.getProductById(validatedData.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      if (product.sellerId !== req.user.id) {
+        return res.status(403).json({ message: "Unauthorized: You can only add images to your own products" });
+      }
+      
+      const image = await storage.createProductImage(validatedData);
+      res.status(201).json(image);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.delete("/api/product-images/:id", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+      
+      const id = parseInt(req.params.id);
+      
+      // Query the database for the specific image by ID
+      const result = await db.select().from(productImages).where(eq(productImages.id, id));
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+      
+      const image = result[0];
+      
+      // Check if the product belongs to the seller
+      const product = await storage.getProductById(image.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      if (product.sellerId !== req.user.id) {
+        return res.status(403).json({ message: "Unauthorized: You can only delete images from your own products" });
+      }
+      
+      await storage.deleteProductImage(id);
       res.status(204).send();
     } catch (error) {
       next(error);

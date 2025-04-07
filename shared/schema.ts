@@ -48,6 +48,16 @@ export const products = pgTable("products", {
   volume: text("volume") // Bottle size (e.g., "50ml", "100ml", "3.4oz")
 });
 
+// Product Images table
+export const productImages = pgTable("product_images", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  imageUrl: text("image_url").notNull(),
+  imageOrder: integer("image_order").default(0).notNull(), // The order/position of the image
+  imageName: text("image_name"), // Original file name or generated name
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Cart items table
 export const cartItems = pgTable("cart_items", {
   id: serial("id").primaryKey(),
@@ -149,6 +159,13 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).pick({
   price: true,
 });
 
+export const insertProductImageSchema = createInsertSchema(productImages).pick({
+  productId: true,
+  imageUrl: true,
+  imageOrder: true,
+  imageName: true,
+});
+
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -171,12 +188,16 @@ export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 
+export type ProductImage = typeof productImages.$inferSelect;
+export type InsertProductImage = z.infer<typeof insertProductImageSchema>;
+
 // Extended types
 export type ProductWithDetails = Product & {
   category?: Category;
   seller?: User;
   reviews?: Review[];
   averageRating?: number;
+  images?: ProductImage[]; // Added images array
 };
 
 export type CartItemWithProduct = CartItem & {
