@@ -293,85 +293,78 @@ export class MemStorage implements IStorage {
   }
 
   async deleteProduct(id: number): Promise<void> {
-    // Delete associated cart items, reviews, and images
-    for (const [cartItemId, cartItem] of this.cartItems.entries()) {
-      if (cartItem.productId === id) {
-        this.cartItems.delete(cartItemId);
-      }
-    }
-    
-    for (const [reviewId, review] of this.reviews.entries()) {
-      if (review.productId === id) {
-        this.reviews.delete(reviewId);
-      }
-    }
-    
-    for (const [imageId, image] of this.productImages.entries()) {
-      if (image.productId === id) {
-        this.productImages.delete(imageId);
-      }
-    }
-    
-    // Finally delete the product
-    this.products.delete(id);
-  }
-
-  // Cart methods
-  async getCartItems(userId: number): Promise<CartItemWithProduct[]> {
-    const items = Array.from(this.cartItems.values()).filter(item => item.userId === userId);
-    
-    return Promise.all(items.map(async item => {
-      const product = this.products.get(item.productId);
-      if (!product) {
-        throw new Error(`Product not found for cart item: ${item.id}`);
+    try {
+      // Import the object storage module for image deletion
+      const objectStorage = await import('./object-storage');
+      
+      // Delete associated images from object storage first
+      for (const [imageId, image] of this.productImages.entries()) {
+        if (image.productId === id) {
+          try {
+            await objectStorage.deleteProductImage(image.imageUrl);
+            console.log(`Deleted image ${image.imageUrl} from object storage`);
+          } catch (error: any) {
+            console.error(`Failed to delete image ${image.imageUrl} from object storage:`, error);
+          }
+        }
       }
       
-      return {
-        ...item,
-        product,
-      };
-    }));
+      // Delete associated reviews
+      for (const [reviewId, review] of this.reviews.entries()) {
+        if (review.productId === id) {
+          this.reviews.delete(reviewId);
+        }
+      }
+      
+      // Delete associated images from database
+      for (const [imageId, image] of this.productImages.entries()) {
+        if (image.productId === id) {
+          this.productImages.delete(imageId);
+        }
+      }
+      
+      // Finally delete the product
+      this.products.delete(id);
+      
+      console.log(`Successfully deleted product ${id} and all associated images`);
+    } catch (error: any) {
+      console.error(`Error deleting product ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // Cart methods - These methods are kept for interface compatibility but will throw errors if called
+  async getCartItems(userId: number): Promise<CartItemWithProduct[]> {
+    console.warn("Cart functionality has been removed");
+    return [];
   }
 
   async getCartItemById(id: number): Promise<CartItem | undefined> {
-    return this.cartItems.get(id);
+    console.warn("Cart functionality has been removed");
+    return undefined;
   }
 
   async getCartItemByProductId(userId: number, productId: number): Promise<CartItem | undefined> {
-    return Array.from(this.cartItems.values()).find(
-      item => item.userId === userId && item.productId === productId
-    );
+    console.warn("Cart functionality has been removed");
+    return undefined;
   }
 
   async addToCart(insertCartItem: InsertCartItem): Promise<CartItem> {
-    const id = this.currentIds.cartItems++;
-    const cartItem: CartItem = { ...insertCartItem, id };
-    this.cartItems.set(id, cartItem);
-    return cartItem;
+    console.warn("Cart functionality has been removed");
+    throw new Error("Cart functionality has been removed");
   }
 
   async updateCartItem(id: number, quantity: number): Promise<CartItem> {
-    const cartItem = this.cartItems.get(id);
-    if (!cartItem) {
-      throw new Error("Cart item not found");
-    }
-    
-    const updatedItem: CartItem = { ...cartItem, quantity };
-    this.cartItems.set(id, updatedItem);
-    return updatedItem;
+    console.warn("Cart functionality has been removed");
+    throw new Error("Cart functionality has been removed");
   }
 
   async removeFromCart(id: number): Promise<void> {
-    this.cartItems.delete(id);
+    console.warn("Cart functionality has been removed");
   }
   
   async clearCart(userId: number): Promise<void> {
-    // Find all cart items for this user and remove them
-    for (const [cartItemId, cartItem] of this.cartItems.entries()) {
-      if (cartItem.userId === userId) {
-        this.cartItems.delete(cartItemId);
-      }
-    }
+    console.warn("Cart functionality has been removed");
   }
 
   // Review methods
@@ -716,103 +709,71 @@ export class DatabaseStorage implements IStorage {
           // The imageUrl field contains the ID used in object storage
           await objectStorage.deleteProductImage(image.imageUrl);
           console.log(`Deleted image ${image.imageUrl} from object storage`);
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Failed to delete image ${image.imageUrl} from object storage:`, error);
           // Continue with other deletions even if one fails
         }
       }
       
       // Delete associated records using try-catch for each operation
-      try {
-        await db.delete(cartItems).where(eq(cartItems.productId, id));
-        console.log(`Deleted cart items for product ${id}`);
-      } catch (error) {
-        console.log(`Skipping cart_items deletion: ${error.message}`);
-      }
+      // Note: cart_items table has been removed, so we don't need to delete from it
       
       try {
         await db.delete(reviews).where(eq(reviews.productId, id));
         console.log(`Deleted reviews for product ${id}`);
-      } catch (error) {
-        console.log(`Skipping reviews deletion: ${error.message}`);
+      } catch (error: any) {
+        console.log(`Skipping reviews deletion: ${error.message || 'Unknown error'}`);
       }
       
       try {
         await db.delete(productImages).where(eq(productImages.productId, id));
         console.log(`Deleted product images from database for product ${id}`);
-      } catch (error) {
-        console.log(`Skipping product_images deletion: ${error.message}`);
+      } catch (error: any) {
+        console.log(`Skipping product_images deletion: ${error.message || 'Unknown error'}`);
       }
       
       // Finally delete the product
       await db.delete(products).where(eq(products.id, id));
       
       console.log(`Successfully deleted product ${id} and all associated images`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error deleting product ${id}:`, error);
       throw error;
     }
   }
 
-  // Cart methods
+  // Cart methods - These methods are kept for interface compatibility but will throw errors if called
   async getCartItems(userId: number): Promise<CartItemWithProduct[]> {
-    const items = await db.select().from(cartItems).where(eq(cartItems.userId, userId));
-    
-    return Promise.all(items.map(async (item) => {
-      const [product] = await db.select().from(products).where(eq(products.id, item.productId));
-      
-      if (!product) {
-        throw new Error(`Product not found for cart item: ${item.id}`);
-      }
-      
-      return {
-        ...item,
-        product,
-      };
-    }));
+    console.warn("Cart functionality has been removed");
+    return [];
   }
 
   async getCartItemById(id: number): Promise<CartItem | undefined> {
-    const [item] = await db.select().from(cartItems).where(eq(cartItems.id, id));
-    return item;
+    console.warn("Cart functionality has been removed");
+    return undefined;
   }
 
   async getCartItemByProductId(userId: number, productId: number): Promise<CartItem | undefined> {
-    const [item] = await db.select()
-      .from(cartItems)
-      .where(and(
-        eq(cartItems.userId, userId),
-        eq(cartItems.productId, productId)
-      ));
-    
-    return item;
+    console.warn("Cart functionality has been removed");
+    return undefined;
   }
 
   async addToCart(cartItem: InsertCartItem): Promise<CartItem> {
-    const [newItem] = await db.insert(cartItems).values(cartItem).returning();
-    return newItem;
+    console.warn("Cart functionality has been removed");
+    throw new Error("Cart functionality has been removed");
   }
 
   async updateCartItem(id: number, quantity: number): Promise<CartItem> {
-    const [updatedItem] = await db
-      .update(cartItems)
-      .set({ quantity })
-      .where(eq(cartItems.id, id))
-      .returning();
-    
-    if (!updatedItem) {
-      throw new Error("Cart item not found");
-    }
-    
-    return updatedItem;
+    console.warn("Cart functionality has been removed");
+    throw new Error("Cart functionality has been removed");
   }
 
   async removeFromCart(id: number): Promise<void> {
-    await db.delete(cartItems).where(eq(cartItems.id, id));
+    console.warn("Cart functionality has been removed");
   }
   
   async clearCart(userId: number): Promise<void> {
-    await db.delete(cartItems).where(eq(cartItems.userId, userId));
+    console.warn("Cart functionality has been removed");
   }
 
   // Review methods
