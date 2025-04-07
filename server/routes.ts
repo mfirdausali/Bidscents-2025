@@ -221,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the UUID from the image URL
-      const imageUrlParts = image.image_url.split('-');
+      const imageUrlParts = image.imageUrl.split('-');
       const uuid = imageUrlParts[imageUrlParts.length - 1];
       
       // Upload to object storage
@@ -237,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Update the image URL in the database to the actual one from object storage
       await db.update(productImages)
-        .set({ image_url: uploadResult.url })
+        .set({ imageUrl: uploadResult.url })
         .where(eq(productImages.id, imageId));
       
       res.status(200).json({ 

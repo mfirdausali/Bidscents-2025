@@ -226,8 +226,8 @@ export default function ProductDetailPage() {
               <div className="rounded-lg overflow-hidden bg-gray-50 mb-4">
                 <img 
                   src={product.images && product.images.length > 0 
-                    ? `/api/images/${product.images[currentImageIndex]?.image_url}` 
-                    : `/api/images/default-perfume.jpg`} 
+                    ? `/api/images/${product.images[currentImageIndex]?.imageUrl}` 
+                    : `/api/images/${product.imageUrl}`} 
                   alt={product.name} 
                   className="w-full h-auto object-cover max-h-[500px]"
                 />
@@ -245,7 +245,7 @@ export default function ProductDetailPage() {
                       onClick={() => setCurrentImageIndex(index)}
                     >
                       <img 
-                        src={`/api/images/${image.image_url}`} 
+                        src={`/api/images/${image.imageUrl}`} 
                         alt={`${product.name} - Image ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
