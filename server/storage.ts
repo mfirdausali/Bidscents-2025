@@ -722,10 +722,27 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // Delete associated database records
-      await db.delete(cartItems).where(eq(cartItems.productId, id));
-      await db.delete(reviews).where(eq(reviews.productId, id));
-      await db.delete(productImages).where(eq(productImages.productId, id));
+      // Delete associated records using try-catch for each operation
+      try {
+        await db.delete(cartItems).where(eq(cartItems.productId, id));
+        console.log(`Deleted cart items for product ${id}`);
+      } catch (error) {
+        console.log(`Skipping cart_items deletion: ${error.message}`);
+      }
+      
+      try {
+        await db.delete(reviews).where(eq(reviews.productId, id));
+        console.log(`Deleted reviews for product ${id}`);
+      } catch (error) {
+        console.log(`Skipping reviews deletion: ${error.message}`);
+      }
+      
+      try {
+        await db.delete(productImages).where(eq(productImages.productId, id));
+        console.log(`Deleted product images from database for product ${id}`);
+      } catch (error) {
+        console.log(`Skipping product_images deletion: ${error.message}`);
+      }
       
       // Finally delete the product
       await db.delete(products).where(eq(products.id, id));
