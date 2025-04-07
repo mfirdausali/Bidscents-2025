@@ -32,7 +32,7 @@ export const products = pgTable("products", {
   brand: text("brand").notNull(),
   description: text("description"),
   price: doublePrecision("price").notNull(),
-  imageUrl: text("image_url").notNull(),
+  imageUrl: text("image_url"), // Legacy field - use productImages table instead
   stockQuantity: integer("stock_quantity").notNull().default(1), // Most secondhand items have quantity 1
   categoryId: integer("category_id").references(() => categories.id),
   sellerId: integer("seller_id").references(() => users.id).notNull(),
