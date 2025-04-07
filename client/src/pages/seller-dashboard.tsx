@@ -569,11 +569,17 @@ export default function SellerDashboard() {
                             <TableRow key={product.id}>
                               <TableCell>
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100">
-                                  <img 
-                                    src={`/api/images/${product.imageUrl}`} 
-                                    alt={product.name}
-                                    className="w-full h-full object-cover"
-                                  />
+                                  {product.images && product.images.length > 0 ? (
+                                    <img 
+                                      src={`/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl || product.images[0].imageUrl}`} 
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">
+                                      <Package size={16} />
+                                    </div>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell className="font-medium">{product.name}</TableCell>
@@ -669,11 +675,17 @@ export default function SellerDashboard() {
                             .map(product => (
                               <div key={product.id} className="flex items-center">
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 mr-3">
-                                  <img 
-                                    src={`/api/images/${product.imageUrl}`} 
-                                    alt={product.name}
-                                    className="w-full h-full object-cover"
-                                  />
+                                  {product.images && product.images.length > 0 ? (
+                                    <img 
+                                      src={`/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl || product.images[0].imageUrl}`} 
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">
+                                      <Package size={16} />
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="flex-grow">
                                   <div className="font-medium">{product.name}</div>
