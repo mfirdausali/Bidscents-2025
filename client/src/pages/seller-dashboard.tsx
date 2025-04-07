@@ -205,19 +205,97 @@ export default function SellerDashboard() {
     },
   });
 
+  // Mutation for uploading product images
+  const uploadImagesMutation = useMutation({
+    mutationFn: async ({ productId, imageUrl, imageOrder, imageName }: { 
+      productId: number, 
+      imageUrl: string, 
+      imageOrder: number, 
+      imageName: string 
+    }) => {
+      const response = await fetch('/api/product-images', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          productId,
+          imageUrl,
+          imageOrder,
+          imageName
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to upload image');
+      }
+      
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Success can be handled if needed
+      console.log('Image uploaded successfully');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error uploading image",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Handle form submission
-  const onSubmitProduct = (data: ProductFormValues) => {
+  const onSubmitProduct = async (data: ProductFormValues) => {
     // Include sellerId from the logged-in user
     const productWithSellerId = {
       ...data,
       sellerId: user?.id || 0,
     };
     
-    if (isEditMode && currentProductId) {
-      updateProductMutation.mutate({ id: currentProductId, product: productWithSellerId });
-    } else {
-      createProductMutation.mutate(productWithSellerId);
+    try {
+      let productId: number;
+      
+      if (isEditMode && currentProductId) {
+        const updatedProduct = await updateProductMutation.mutateAsync({ 
+          id: currentProductId, 
+          product: productWithSellerId 
+        });
+        productId = updatedProduct.id;
+      } else {
+        const newProduct = await createProductMutation.mutateAsync(productWithSellerId);
+        productId = newProduct.id;
+      }
+      
+      // After product is created/updated, upload all images
+      if (uploadedImages.length > 0) {
+        // Convert files to base64 strings
+        const uploadPromises = uploadedImages.map(async (file, index) => {
+          const base64String = await fileToBase64(file);
+          return uploadImagesMutation.mutateAsync({
+            productId,
+            imageUrl: base64String,
+            imageOrder: index,
+            imageName: file.name
+          });
+        });
+        
+        await Promise.all(uploadPromises);
+      }
+    } catch (error) {
+      console.error('Error in product submission:', error);
     }
+  };
+  
+  // Helper function to convert File to base64 string
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
   };
 
   // Edit product
