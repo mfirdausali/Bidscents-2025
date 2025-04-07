@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ProductWithDetails, InsertProduct, Category } from "@shared/schema";
 import { Header } from "@/components/ui/header";
@@ -50,7 +50,9 @@ import {
   Loader2,
   ShoppingBag,
   DollarSign,
-  Star
+  Star,
+  Upload,
+  X
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -59,6 +61,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Define product form schema
 const productSchema = z.object({
@@ -66,7 +69,8 @@ const productSchema = z.object({
   brand: z.string().min(2, { message: "Brand must be at least 2 characters" }),
   description: z.string().min(10, { message: "Description must be at least 10 characters" }),
   price: z.number().min(0.01, { message: "Price must be greater than 0" }),
-  imageUrl: z.string().url({ message: "Please enter a valid image URL" }),
+  imageUrl: z.string().url({ message: "Please enter a valid image URL" }), // Keep for compatibility, will be updated in backend
+  imageFiles: z.any().optional(), // Will hold the actual file objects for upload
   stockQuantity: z.number().int().min(0, { message: "Stock quantity must be 0 or greater" }),
   categoryId: z.number().int().positive({ message: "Please select a category" }),
   isNew: z.boolean().default(false),
@@ -75,7 +79,7 @@ const productSchema = z.object({
   remainingPercentage: z.number().int().min(1).max(100).default(100),
   batchCode: z.string().optional(),
   purchaseYear: z.number().int().min(1970).max(new Date().getFullYear()).optional(),
-  boxCondition: z.string().optional(),
+  boxCondition: z.enum(["Good", "Damaged", "No Box"]).default("Good"),
   listingType: z.enum(["fixed", "negotiable", "auction"]).default("fixed"),
   volume: z.string().min(2, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }).optional(),
 });
@@ -92,6 +96,8 @@ export default function SellerDashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
 
   // Fetch seller's products
   const { data: products, isLoading: isLoadingProducts } = useQuery<ProductWithDetails[]>({
@@ -120,7 +126,7 @@ export default function SellerDashboard() {
       remainingPercentage: 100,
       batchCode: "",
       purchaseYear: new Date().getFullYear(),
-      boxCondition: "",
+      boxCondition: "Good",
       listingType: "fixed",
       volume: "",
     },
@@ -219,6 +225,16 @@ export default function SellerDashboard() {
     setIsEditMode(true);
     setCurrentProductId(product.id);
     
+    // Clear existing image previews
+    setUploadedImages([]);
+    imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    setImagePreviewUrls([]);
+    
+    // If we have an image URL from the product, we could add it to the previews
+    if (product.imageUrl) {
+      setImagePreviewUrls([product.imageUrl]);
+    }
+    
     form.reset({
       name: product.name,
       brand: product.brand,
@@ -233,7 +249,7 @@ export default function SellerDashboard() {
       remainingPercentage: product.remainingPercentage || 100,
       batchCode: product.batchCode || "",
       purchaseYear: product.purchaseYear || new Date().getFullYear(),
-      boxCondition: product.boxCondition || "",
+      boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
       listingType: (product.listingType as "fixed" | "negotiable" | "auction") || "fixed",
       volume: product.volume || "",
     });
@@ -249,10 +265,52 @@ export default function SellerDashboard() {
     }
   };
 
+  // Handle image uploads
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    // Limit to 5 images
+    const newFiles: File[] = Array.from(files).slice(0, 5);
+    
+    // Create preview URLs
+    const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
+    
+    setUploadedImages(newFiles);
+    setImagePreviewUrls(newPreviewUrls);
+    
+    // Update form with first image URL as a placeholder
+    // In a real implementation, we would properly handle multiple images
+    if (newFiles.length > 0) {
+      form.setValue('imageUrl', newPreviewUrls[0]);
+    }
+  };
+  
+  // Remove image from preview
+  const removeImage = (index: number) => {
+    const newImages = [...uploadedImages];
+    const newPreviewUrls = [...imagePreviewUrls];
+    
+    // Revoke object URL to prevent memory leaks
+    URL.revokeObjectURL(newPreviewUrls[index]);
+    
+    newImages.splice(index, 1);
+    newPreviewUrls.splice(index, 1);
+    
+    setUploadedImages(newImages);
+    setImagePreviewUrls(newPreviewUrls);
+    
+    // Update form with first remaining image or empty string
+    form.setValue('imageUrl', newPreviewUrls[0] || '');
+  };
+
   // Open dialog for new product
   const handleAddNewProduct = () => {
     setIsEditMode(false);
     setCurrentProductId(null);
+    // Clear image states
+    setUploadedImages([]);
+    setImagePreviewUrls([]);
     form.reset({
       name: "",
       brand: "",
@@ -267,7 +325,7 @@ export default function SellerDashboard() {
       remainingPercentage: 100,
       batchCode: "",
       purchaseYear: new Date().getFullYear(),
-      boxCondition: "",
+      boxCondition: "Good",
       listingType: "fixed",
       volume: "",
     });
@@ -690,7 +748,7 @@ export default function SellerDashboard() {
       
       {/* Product Form Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditMode ? "Edit Product" : "Add New Product"}</DialogTitle>
             <DialogDescription>
@@ -830,13 +888,50 @@ export default function SellerDashboard() {
                 name="imageUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Image URL</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="https://example.com/image.jpg" 
-                        {...field} 
-                      />
-                    </FormControl>
+                    <FormLabel>Product Images (up to 5)</FormLabel>
+                    <div className="flex flex-col gap-2">
+                      <div className="border rounded-md p-4 bg-gray-50">
+                        <div className="flex items-center justify-center w-full">
+                          <label htmlFor="product-images" className="cursor-pointer w-full">
+                            <div className="flex flex-col items-center justify-center py-4 border-2 border-dashed rounded-md border-gray-300 hover:border-gold transition-colors">
+                              <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                              <p className="text-sm text-gray-500">Click to upload images</p>
+                              <p className="text-xs text-gray-400 mt-1">JPG, PNG, or GIF up to 5MB</p>
+                            </div>
+                            <input 
+                              id="product-images" 
+                              type="file" 
+                              multiple 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => handleImageUpload(e)}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      
+                      {/* Preview area for uploaded images */}
+                      {imagePreviewUrls.length > 0 && (
+                        <div className="grid grid-cols-5 gap-2 mt-3">
+                          {imagePreviewUrls.map((url, index) => (
+                            <div key={index} className="relative group">
+                              <img 
+                                src={url} 
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-16 object-cover rounded-md border border-gray-200"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeImage(index)}
+                                className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="h-3 w-3 text-gray-600" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -927,12 +1022,22 @@ export default function SellerDashboard() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Box Condition</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="e.g., Good, Damaged, No Box"
-                          {...field}
-                        />
-                      </FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select box condition" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Good">Good</SelectItem>
+                          <SelectItem value="Damaged">Damaged</SelectItem>
+                          <SelectItem value="No Box">No Box</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
