@@ -1,13 +1,13 @@
 import { Client } from '@replit/object-storage';
 import { randomUUID } from 'crypto';
 
-// Initialize the Replit Object Storage client with a specific bucket name
-// We're using 'perfume-images' as our bucket name
+// Initialize the Replit Object Storage client with a hardcoded bucket ID
+// This is the default bucket ID format used by Replit
 export const storageClient = new Client({
-  bucketId: 'perfume-images'
+  bucketId: "replit-objstore-0eba980b-4a8f-47b6-90af-f554bb8688e2" // Using the ID from the current project
 });
 
-console.log('Initialized Replit Object Storage client with perfume-images bucket');
+console.log("Initialized Replit Object Storage client with project bucket");
 
 /**
  * Upload an image to the Replit Object Storage bucket
