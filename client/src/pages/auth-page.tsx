@@ -268,7 +268,7 @@ export default function AuthPage() {
                       />
                       <Label htmlFor="isSeller">I want to sell perfumes</Label>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    {/* <div className="flex items-center space-x-2">
                       <Checkbox
                         id="isAdmin"
                         checked={registerForm.watch("isAdmin")}
@@ -278,7 +278,7 @@ export default function AuthPage() {
                         }}
                       />
                       <Label htmlFor="isAdmin" className="text-amber-600 font-medium">Admin account (development only)</Label>
-                    </div>
+                    </div> */}
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="terms"
