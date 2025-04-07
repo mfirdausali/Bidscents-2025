@@ -80,6 +80,19 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   };
 
+  // Get condition text based on product state
+  const getConditionText = (product: ProductWithDetails) => {
+    if (product.isNew) return 'Like New';
+    
+    // Safe handling of remainingPercentage
+    const remainingPercentage = product.remainingPercentage ?? 0;
+    
+    if (remainingPercentage > 90) return 'Very Good';
+    if (remainingPercentage > 70) return 'Good';
+    if (remainingPercentage > 50) return 'Fair';
+    return 'Good';
+  };
+
   // Get listing type badge text
   const getListingTypeText = (type: string | undefined | null) => {
     if (!type || type === 'fixed') return 'FIXED PRICE';
@@ -115,14 +128,8 @@ export function ProductCard({ product }: ProductCardProps) {
         </button>
         
         {/* Condition badge (top left) */}
-        <Badge className={`absolute top-2 left-2 text-xs font-medium py-1 px-2 ${
-          product.remainingPercentage && product.remainingPercentage >= 70 
-            ? 'bg-green-100 text-green-800' 
-            : product.remainingPercentage && product.remainingPercentage >= 50 
-              ? 'bg-yellow-100 text-yellow-800' 
-              : 'bg-red-100 text-red-800'
-        }`}>
-          {product.remainingPercentage ? `${product.remainingPercentage}%` : 'New'}
+        <Badge className="absolute top-2 left-2 text-xs font-medium py-1 px-2 bg-white/90 text-gray-800">
+          {getConditionText(product)}
         </Badge>
         
         {/* Listing type badge (bottom right) */}
