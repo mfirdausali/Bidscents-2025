@@ -1,8 +1,13 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertProductSchema, insertCartItemSchema, insertReviewSchema } from "@shared/schema";
+import { imageStorage } from "./image-storage";
+import { insertProductSchema, insertCartItemSchema, insertReviewSchema, insertProductImageSchema, productImages } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import multer from "multer";
+import path from "path";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -358,6 +363,207 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedOrder = await storage.updateOrderStatus(id, status);
       res.json(updatedOrder);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Configure file upload middleware with multer
+  const upload = multer({
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB max file size
+    },
+    fileFilter: (_req, file, cb) => {
+      // Accept only image files
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    }
+  });
+
+  // Product image endpoints
+  app.post("/api/products/:id/images", upload.array('images', 5), async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProductById(productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      if (product.sellerId !== req.user.id) {
+        return res.status(403).json({ message: "Unauthorized: You can only add images to your own products" });
+      }
+
+      // Get the uploaded files
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: "No image files were uploaded" });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const results = [];
+      
+      // Process each uploaded file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Generate a unique ID for the image
+        const imageId = imageStorage.generateImageId(product.name, user.username);
+        
+        // Upload the image to object storage
+        const uploaded = await imageStorage.uploadImage(
+          imageId,
+          file.buffer,
+          file.mimetype
+        );
+        
+        if (uploaded) {
+          // Set as primary image if it's the first one or if explicitly requested
+          const isPrimary = i === 0 || req.body.isPrimary === 'true';
+          
+          // Associate the image with the product in the database
+          const productImage = await imageStorage.associateImageWithProduct(
+            productId,
+            imageId,
+            isPrimary
+          );
+          
+          results.push({
+            imageId,
+            productId,
+            isPrimary,
+            success: true
+          });
+        } else {
+          results.push({
+            file: file.originalname,
+            success: false,
+            error: "Failed to upload image"
+          });
+        }
+      }
+      
+      res.status(201).json(results);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get all images for a product
+  app.get("/api/products/:id/images", async (req, res, next) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProductById(productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      const images = await imageStorage.getProductImages(productId);
+      res.json(images);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get a specific image by its ID
+  app.get("/api/images/:imageId", async (req, res, next) => {
+    try {
+      const imageId = req.params.imageId;
+      
+      // Get the image from object storage
+      const { data, contentType } = await imageStorage.getImage(imageId);
+      
+      if (!data) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+      
+      // Set the content type and send the image data
+      res.set('Content-Type', contentType || 'application/octet-stream');
+      res.send(data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Set an image as the primary image for a product
+  app.patch("/api/products/:id/images/:imageId/primary", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+
+      const productId = parseInt(req.params.id);
+      const imageId = req.params.imageId;
+      
+      const product = await storage.getProductById(productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      if (product.sellerId !== req.user.id) {
+        return res.status(403).json({ message: "Unauthorized: You can only modify your own products" });
+      }
+      
+      const success = await imageStorage.setPrimaryImage(imageId, productId);
+      
+      if (success) {
+        res.json({ success: true, message: "Primary image set successfully" });
+      } else {
+        res.status(500).json({ success: false, message: "Failed to set primary image" });
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Delete an image
+  app.delete("/api/products/:id/images/:imageId", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+
+      const productId = parseInt(req.params.id);
+      const imageId = req.params.imageId;
+      
+      const product = await storage.getProductById(productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      if (product.sellerId !== req.user.id) {
+        return res.status(403).json({ message: "Unauthorized: You can only delete images from your own products" });
+      }
+      
+      // Delete the image from storage
+      const deleted = await imageStorage.deleteImage(imageId);
+      
+      if (deleted) {
+        // Delete the database record
+        await db.delete(productImages)
+          .where(
+            eq(productImages.imageId, imageId) && 
+            eq(productImages.productId, productId)
+          );
+        
+        res.status(204).send();
+      } else {
+        res.status(500).json({ message: "Failed to delete image" });
+      }
     } catch (error) {
       next(error);
     }
