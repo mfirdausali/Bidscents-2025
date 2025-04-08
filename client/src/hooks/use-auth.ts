@@ -21,7 +21,8 @@ export function useAuth() {
   const fetchUser = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      const user = await apiRequest<User>("/api/auth/me");
+      const response = await apiRequest("GET", "/api/auth/me");
+      const user = await response.json();
       setState({
         user,
         isAuthenticated: true,
@@ -45,10 +46,7 @@ export function useAuth() {
   const login = async (username: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      await apiRequest("/api/auth/login", {
-        method: "POST",
-        body: { username, password },
-      });
+      await apiRequest("POST", "/api/auth/login", { username, password });
       
       await fetchUser();
       queryClient.invalidateQueries();
@@ -67,7 +65,7 @@ export function useAuth() {
   const logout = async () => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      await apiRequest("/api/auth/logout", { method: "POST" });
+      await apiRequest("POST", "/api/auth/logout");
       setState({
         user: null,
         isAuthenticated: false,
@@ -89,10 +87,7 @@ export function useAuth() {
   const register = async (userData: any) => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      await apiRequest("/api/auth/register", {
-        method: "POST",
-        body: userData,
-      });
+      await apiRequest("POST", "/api/auth/register", userData);
       
       await fetchUser();
       queryClient.invalidateQueries();

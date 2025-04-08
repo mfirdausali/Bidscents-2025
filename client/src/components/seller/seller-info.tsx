@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 interface SellerInfoProps {
   seller: {
     joinDate?: string;
+    createdAt?: string | Date;
     responseRate?: number;
     responseTime?: string;
     rating?: number;
@@ -22,12 +23,32 @@ interface SellerInfoProps {
     specialties?: string[];
     fragrance_families?: string[];
     experience?: string;
+    stats?: {
+      productCount?: number;
+      averageRating?: number;
+      totalSales?: number;
+      joinDate?: string;
+    };
   };
 }
 
-export function SellerInfo({ seller }: SellerInfoProps) {
+export default function SellerInfo({ seller }: SellerInfoProps) {
   const specialties = seller.specialties || [];
   const fragranceFamilies = seller.fragrance_families || [];
+  const stats = seller.stats || {};
+  
+  // Format join date from either source
+  const formatJoinDate = (date?: string | Date) => {
+    if (!date) return "N/A";
+    return new Date(date).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long' 
+    });
+  };
+  
+  const joinDate = seller.joinDate || stats.joinDate || (seller.createdAt ? formatJoinDate(seller.createdAt) : "N/A");
+  const rating = seller.rating || stats.averageRating;
+  const totalSales = seller.totalSales || stats.totalSales;
   
   return (
     <Card className="h-full">
@@ -40,9 +61,33 @@ export function SellerInfo({ seller }: SellerInfoProps) {
             <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Member since:</span>
             <span className="ml-auto">
-              {seller.joinDate || "N/A"}
+              {joinDate}
             </span>
           </div>
+          
+          {/* Products Listed */}
+          {stats.productCount !== undefined && (
+            <div className="flex items-center text-sm">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className="mr-2 h-4 w-4 text-muted-foreground"
+              >
+                <path d="M10 22v-8H3a10 10 0 0 1 7-9.9" />
+                <path d="M14 22v-8h7a10 10 0 0 0-7-9.9" />
+                <rect x="9" y="2" width="6" height="5" rx="2.5" />
+              </svg>
+              <span className="text-muted-foreground">Perfumes Listed:</span>
+              <span className="ml-auto">
+                {stats.productCount}
+              </span>
+            </div>
+          )}
           
           {/* Experience */}
           {seller.experience && (
@@ -56,20 +101,20 @@ export function SellerInfo({ seller }: SellerInfoProps) {
           )}
           
           {/* Rating */}
-          {seller.rating && (
+          {rating !== undefined && (
             <div className="flex items-center text-sm">
               <Star className="mr-2 h-4 w-4 text-amber-400" />
               <span className="text-muted-foreground">Rating:</span>
               <span className="ml-auto flex items-center">
-                <span className="mr-1 font-medium">{seller.rating.toFixed(1)}</span>
+                <span className="mr-1 font-medium">{Number(rating).toFixed(1)}</span>
                 <div className="flex">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Star 
                       key={i} 
                       className={`h-3.5 w-3.5 ${
-                        i < Math.floor(seller.rating) 
+                        i < Math.floor(Number(rating)) 
                           ? "fill-amber-400 text-amber-400" 
-                          : i < seller.rating 
+                          : i < Number(rating)
                             ? "fill-amber-400/50 text-amber-400/50" 
                             : "fill-muted text-muted"
                       }`} 
@@ -103,12 +148,12 @@ export function SellerInfo({ seller }: SellerInfoProps) {
           )}
           
           {/* Total Sales */}
-          {seller.totalSales !== undefined && (
+          {totalSales !== undefined && (
             <div className="flex items-center text-sm">
               <Award className="mr-2 h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Total Sales:</span>
               <span className="ml-auto">
-                {seller.totalSales}
+                {totalSales}
               </span>
             </div>
           )}

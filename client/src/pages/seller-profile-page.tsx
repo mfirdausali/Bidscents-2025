@@ -57,6 +57,19 @@ export default function SellerProfilePage() {
     queryKey: ["/api/categories"],
   });
   
+  // Fetch follow status
+  const { data: followStatus } = useQuery<{ following: boolean }>({
+    queryKey: [`/api/sellers/${sellerId}/following`],
+    enabled: !!sellerId
+  });
+
+  // Update isFollowing when followStatus changes
+  useEffect(() => {
+    if (followStatus) {
+      setIsFollowing(followStatus.following);
+    }
+  }, [followStatus]);
+  
   // Fetch seller's products with filtering, sorting, and pagination
   const { data: productsData, isLoading: isLoadingProducts } = useQuery<SellerProductsResponse>({
     queryKey: [`/api/sellers/${sellerId}/products`, { 
@@ -90,8 +103,9 @@ export default function SellerProfilePage() {
       }
       
       setIsFollowing(!isFollowing);
-      // Invalidate seller data to refresh
+      // Invalidate seller data and following status to refresh
       queryClient.invalidateQueries({ queryKey: [`/api/sellers/${sellerId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/sellers/${sellerId}/following`] });
     } catch (error) {
       console.error("Failed to toggle follow status:", error);
       toast({
