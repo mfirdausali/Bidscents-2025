@@ -438,6 +438,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // Public seller profile endpoints
+  app.get("/api/sellers/:id", async (req, res, next) => {
+    try {
+      const sellerId = parseInt(req.params.id);
+      const seller = await storage.getUser(sellerId);
+      
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      
+      if (!seller.isSeller) {
+        return res.status(404).json({ message: "User is not a seller" });
+      }
+      
+      // Don't expose sensitive information
+      const { password, ...sellerProfile } = seller;
+      
+      res.json(sellerProfile);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/sellers/:id/products", async (req, res, next) => {
+    try {
+      const sellerId = parseInt(req.params.id);
+      const page = req.query.page ? parseInt(req.query.page as string) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 12;
+      const category = req.query.category as string | undefined;
+      const sort = req.query.sort as string | undefined;
+      
+      // Verify the seller exists
+      const seller = await storage.getUser(sellerId);
+      if (!seller || !seller.isSeller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      
+      // Get all products for this seller
+      const products = await storage.getSellerProducts(sellerId);
+      
+      // Filter by category if provided
+      let filteredProducts = products;
+      if (category && category !== "all") {
+        filteredProducts = products.filter(p => {
+          return p.category?.name.toLowerCase() === category.toLowerCase();
+        });
+      }
+      
+      // Sort products based on sort option
+      if (sort) {
+        filteredProducts = [...filteredProducts].sort((a, b) => {
+          if (sort === "price-low") return a.price - b.price;
+          if (sort === "price-high") return b.price - a.price;
+          if (sort === "rating") {
+            const aRating = a.averageRating || 0;
+            const bRating = b.averageRating || 0;
+            return bRating - aRating;
+          }
+          // Default: newest first (by ID as a proxy for creation time)
+          return b.id - a.id;
+        });
+      }
+      
+      // Calculate pagination
+      const totalProducts = filteredProducts.length;
+      const totalPages = Math.ceil(totalProducts / limit);
+      const offset = (page - 1) * limit;
+      const paginatedProducts = filteredProducts.slice(offset, offset + limit);
+      
+      res.json({
+        products: paginatedProducts,
+        pagination: {
+          page,
+          limit,
+          totalProducts,
+          totalPages
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   // Admin-specific endpoints
   app.get("/api/admin/users", async (req, res, next) => {

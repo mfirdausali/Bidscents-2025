@@ -301,7 +301,7 @@ export default function ProductDetailPage() {
                     <p className="text-gray-500 text-xs">Trusted Seller</p>
                   </div>
                   <Button variant="outline" className="text-xs h-8" asChild>
-                    <a href={`/profile/${product.seller?.id}`}>View Profile</a>
+                    <Link href={`/sellers/${product.seller?.id}`}>View Seller</Link>
                   </Button>
                 </div>
                 
