@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "wouter";
 import { ProductWithDetails } from "@shared/schema";
@@ -80,34 +81,6 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   };
 
-  // Get condition text based on product state
-  const getConditionText = (product: ProductWithDetails) => {
-    if (product.isNew) return 'Like New';
-    
-    // Safe handling of remainingPercentage
-    const remainingPercentage = product.remainingPercentage ?? 0;
-    
-    if (remainingPercentage > 90) return 'Very Good';
-    if (remainingPercentage > 70) return 'Good';
-    if (remainingPercentage > 50) return 'Fair';
-    return 'Good';
-  };
-
-  // Get listing type badge text
-  const getListingTypeText = (type: string | undefined | null) => {
-    if (!type || type === 'fixed') return 'FIXED PRICE';
-    if (type === 'negotiable') return 'NEGOTIABLE';
-    if (type === 'auction') return 'AUCTION';
-    return 'FIXED PRICE';
-  };
-  
-  // Get listing type badge color
-  const getListingTypeBadgeColor = (type: string | undefined | null) => {
-    if (type === 'auction') return 'bg-amber-100 text-amber-800';
-    if (type === 'negotiable') return 'bg-white text-purple-800';
-    return 'bg-white text-gray-800';
-  };
-
   return (
     <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 border flex flex-col h-full">
       <div className="relative">
@@ -157,7 +130,8 @@ export function ProductCard({ product }: ProductCardProps) {
               ? 'bg-purple-300/90 text-purple-900' 
               : 'bg-white/90 text-gray-800'
         }`}>
-          {getListingTypeText(product.listingType)}
+          {product.listingType === "auction" ? "AUCTION" : 
+           product.listingType === "negotiable" ? "NEGOTIABLE" : "FIXED PRICE"}
         </Badge>
       </div>
       

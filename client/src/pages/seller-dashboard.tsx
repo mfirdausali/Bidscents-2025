@@ -1102,11 +1102,14 @@ export default function SellerDashboard() {
                   name="volume"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Volume</FormLabel>
+                      <FormLabel>Bottle Size (ml)</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="e.g., 50ml, 100ml, 3.4oz"
+                          type="number" 
+                          min={1} 
+                          placeholder="100"
                           {...field}
+                          onChange={e => field.onChange(parseInt(e.target.value) || 100)}
                         />
                       </FormControl>
                       <FormMessage />
