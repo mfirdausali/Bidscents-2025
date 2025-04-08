@@ -193,40 +193,44 @@ export function FeaturedProductCarousel() {
                     </span>
                   </div>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+                  {/* Product details that hide on smaller screens to prevent wrapping */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6 max-h-[170px] overflow-hidden">
+                    {/* Main details - always visible */}
                     {currentProduct.volume && (
                       <div className="bg-gray-100 p-3 rounded-md">
                         <div className="text-xs text-gray-500">Volume</div>
-                        <div className="font-medium">{currentProduct.volume}</div>
+                        <div className="font-medium truncate">{currentProduct.volume}</div>
                       </div>
                     )}
                     <div className="bg-gray-100 p-3 rounded-md">
                       <div className="text-xs text-gray-500">Fullness</div>
-                      <div className="font-medium">{currentProduct.remainingPercentage || 100}% Remaining</div>
+                      <div className="font-medium truncate">{currentProduct.remainingPercentage || 100}% Remaining</div>
                     </div>
+                    
+                    {/* Only show on md screens and up */}
                     {currentProduct.batchCode && (
-                      <div className="bg-gray-100 p-3 rounded-md">
+                      <div className="bg-gray-100 p-3 rounded-md hidden md:block">
                         <div className="text-xs text-gray-500">Batch Code</div>
-                        <div className="font-medium">{currentProduct.batchCode}</div>
+                        <div className="font-medium truncate">{currentProduct.batchCode}</div>
                       </div>
                     )}
                     {currentProduct.boxCondition && (
-                      <div className="bg-gray-100 p-3 rounded-md">
+                      <div className="bg-gray-100 p-3 rounded-md hidden md:block">
                         <div className="text-xs text-gray-500">Box Condition</div>
-                        <div className="font-medium">{currentProduct.boxCondition}</div>
+                        <div className="font-medium truncate">{currentProduct.boxCondition}</div>
                       </div>
                     )}
                     {currentProduct.listingType && (
                       <div className="bg-gray-100 p-3 rounded-md">
                         <div className="text-xs text-gray-500">Listing Type</div>
-                        <div className="font-medium">
+                        <div className="font-medium truncate">
                           {currentProduct.listingType.charAt(0).toUpperCase() + currentProduct.listingType.slice(1)}
                         </div>
                       </div>
                     )}
-                    <div className="bg-gray-100 p-3 rounded-md">
+                    <div className="bg-gray-100 p-3 rounded-md hidden md:block">
                       <div className="text-xs text-gray-500">Seller</div>
-                      <div className="font-medium flex items-center">
+                      <div className="font-medium truncate flex items-center">
                         {currentProduct.seller?.username || "Unknown"}
                       </div>
                     </div>

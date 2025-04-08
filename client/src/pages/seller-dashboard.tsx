@@ -945,7 +945,7 @@ export default function SellerDashboard() {
                           step="0.01"
                           placeholder="99.99" 
                           {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
                         />
                       </FormControl>
                       <FormMessage />
@@ -964,9 +964,9 @@ export default function SellerDashboard() {
                           type="number" 
                           min="0" 
                           step="1" 
-                          placeholder="50"
+                          placeholder="1"
                           {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          onChange={(e) => field.onChange(parseInt(e.target.value))}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1109,7 +1109,7 @@ export default function SellerDashboard() {
                           min={1} 
                           placeholder="100"
                           {...field}
-                          onChange={e => field.onChange(parseInt(e.target.value) || 100)}
+                          onChange={e => field.onChange(parseInt(e.target.value))}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1129,7 +1129,7 @@ export default function SellerDashboard() {
                           max={100} 
                           placeholder="100"
                           {...field}
-                          onChange={e => field.onChange(parseInt(e.target.value) || 100)}
+                          onChange={e => field.onChange(parseInt(e.target.value))}
                         />
                       </FormControl>
                       <FormMessage />
