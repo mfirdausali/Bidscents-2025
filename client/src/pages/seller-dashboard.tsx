@@ -1099,6 +1099,22 @@ export default function SellerDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
+                  name="volume"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Volume</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g., 50ml, 100ml, 3.4oz"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="remainingPercentage"
                   render={({ field }) => (
                     <FormItem>
@@ -1205,23 +1221,6 @@ export default function SellerDashboard() {
                           <SelectItem value="auction">Auction</SelectItem>
                         </SelectContent>
                       </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="volume"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Volume</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="e.g., 50ml, 100ml, 3.4oz"
-                          {...field}
-                        />
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
