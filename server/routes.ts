@@ -9,6 +9,57 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";
 import * as objectStorage from "./object-storage"; // Import the entire module to access all properties
+import { ProductWithDetails } from "@shared/schema";
+
+// Helper function to calculate average rating from product reviews
+function calculateAverageRating(products: ProductWithDetails[]): number {
+  let totalRating = 0;
+  let totalProductsWithRatings = 0;
+  
+  for (const product of products) {
+    if (product.averageRating) {
+      totalRating += product.averageRating;
+      totalProductsWithRatings++;
+    }
+  }
+  
+  if (totalProductsWithRatings === 0) return 0;
+  return parseFloat((totalRating / totalProductsWithRatings).toFixed(1));
+}
+
+// Helper function to sort products by different criteria
+function sortProducts(products: ProductWithDetails[], sortOption: string): void {
+  switch (sortOption) {
+    case 'newest':
+      products.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      break;
+    case 'price-low':
+      products.sort((a, b) => a.price - b.price);
+      break;
+    case 'price-high':
+      products.sort((a, b) => b.price - a.price);
+      break;
+    case 'rating':
+      products.sort((a, b) => {
+        const ratingA = a.averageRating || 0;
+        const ratingB = b.averageRating || 0;
+        return ratingB - ratingA;
+      });
+      break;
+    case 'popular':
+    default:
+      products.sort((a, b) => {
+        const reviewsA = a.reviews?.length || 0;
+        const reviewsB = b.reviews?.length || 0;
+        return reviewsB - reviewsA;
+      });
+      break;
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -434,6 +485,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const products = await storage.getSellerProducts(req.user.id);
       res.json(products);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get seller profile by ID
+  app.get("/api/sellers/:id", async (req, res, next) => {
+    try {
+      const sellerId = parseInt(req.params.id);
+      const seller = await storage.getUser(sellerId);
+      
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      
+      if (!seller.isSeller) {
+        return res.status(404).json({ message: "User is not a seller" });
+      }
+      
+      // Remove sensitive information
+      const { password, ...sellerInfo } = seller;
+      
+      // Get seller's stats
+      const products = await storage.getSellerProducts(sellerId);
+      const productCount = products.length;
+      
+      // TODO: In a full implementation, we would calculate these from actual data
+      const stats = {
+        productCount,
+        averageRating: calculateAverageRating(products),
+        totalSales: 0, // This would typically come from order data
+        joinDate: seller.createdAt ? new Date(seller.createdAt).toLocaleDateString() : 'N/A',
+      };
+      
+      res.json({
+        ...sellerInfo,
+        stats
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Get seller's products with filtering, sorting, and pagination
+  app.get("/api/sellers/:id/products", async (req, res, next) => {
+    try {
+      const sellerId = parseInt(req.params.id);
+      const seller = await storage.getUser(sellerId);
+      
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      
+      if (!seller.isSeller) {
+        return res.status(404).json({ message: "User is not a seller" });
+      }
+      
+      // Get query parameters for filtering, sorting, and pagination
+      const { 
+        category, 
+        brand, 
+        minPrice, 
+        maxPrice, 
+        search,
+        sort = 'newest', // default sort
+        page = '1',
+        limit = '12'
+      } = req.query;
+      
+      // Get seller's products
+      const products = await storage.getSellerProducts(sellerId);
+      
+      // Filter products
+      let filteredProducts = [...products];
+      
+      if (category) {
+        filteredProducts = filteredProducts.filter(p => p.categoryId === parseInt(category as string));
+      }
+      
+      if (brand) {
+        filteredProducts = filteredProducts.filter(p => p.brand.toLowerCase() === (brand as string).toLowerCase());
+      }
+      
+      if (minPrice) {
+        filteredProducts = filteredProducts.filter(p => p.price >= parseFloat(minPrice as string));
+      }
+      
+      if (maxPrice) {
+        filteredProducts = filteredProducts.filter(p => p.price <= parseFloat(maxPrice as string));
+      }
+      
+      if (search) {
+        const searchLower = (search as string).toLowerCase();
+        filteredProducts = filteredProducts.filter(p => 
+          p.name.toLowerCase().includes(searchLower) || 
+          p.description?.toLowerCase().includes(searchLower) ||
+          p.brand.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Sort products
+      sortProducts(filteredProducts, sort as string);
+      
+      // Pagination
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const startIndex = (pageNum - 1) * limitNum;
+      const endIndex = pageNum * limitNum;
+      
+      const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+      
+      res.json({
+        total: filteredProducts.length,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(filteredProducts.length / limitNum),
+        products: paginatedProducts
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Follow a seller
+  app.post("/api/sellers/:id/follow", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const sellerId = parseInt(req.params.id);
+      const seller = await storage.getUser(sellerId);
+      
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      
+      if (!seller.isSeller) {
+        return res.status(404).json({ message: "User is not a seller" });
+      }
+      
+      // Here we would implement the follow functionality
+      // For now, we'll just return a success message
+      res.json({ message: "Seller followed successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Unfollow a seller
+  app.delete("/api/sellers/:id/follow", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const sellerId = parseInt(req.params.id);
+      const seller = await storage.getUser(sellerId);
+      
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      
+      if (!seller.isSeller) {
+        return res.status(404).json({ message: "User is not a seller" });
+      }
+      
+      // Here we would implement the unfollow functionality
+      // For now, we'll just return a success message
+      res.json({ message: "Seller unfollowed successfully" });
     } catch (error) {
       next(error);
     }
