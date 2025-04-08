@@ -12,10 +12,20 @@ export const users = pgTable("users", {
   lastName: text("last_name"),
   address: text("address"),
   profileImage: text("profile_image"),
+  coverImage: text("cover_image"),
   walletBalance: doublePrecision("wallet_balance").default(0).notNull(),
   isSeller: boolean("is_seller").default(false).notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   isBanned: boolean("is_banned").default(false).notNull(),
+  bio: text("bio"),
+  location: text("location"),
+  website: text("website"),
+  specialties: text("specialties").array(),
+  fragranceFamilies: text("fragrance_families").array(),
+  experience: text("experience"),
+  responseTime: text("response_time"),
+  followerCount: integer("follower_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Categories table
@@ -94,6 +104,14 @@ export const orderItems = pgTable("order_items", {
   price: doublePrecision("price").notNull(),
 });
 
+// Followers table for tracking who follows which sellers
+export const followers = pgTable("followers", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  sellerId: integer("seller_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -103,10 +121,19 @@ export const insertUserSchema = createInsertSchema(users).pick({
   lastName: true,
   address: true,
   profileImage: true,
+  coverImage: true,
   walletBalance: true,
   isSeller: true,
   isAdmin: true,
   isBanned: true,
+  bio: true,
+  location: true,
+  website: true,
+  specialties: true,
+  fragranceFamilies: true,
+  experience: true,
+  responseTime: true,
+  followerCount: true,
 });
 
 export const insertProductSchema = createInsertSchema(products).pick({
@@ -166,6 +193,11 @@ export const insertProductImageSchema = createInsertSchema(productImages).pick({
   imageName: true,
 });
 
+export const insertFollowerSchema = createInsertSchema(followers).pick({
+  userId: true,
+  sellerId: true,
+});
+
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -190,6 +222,9 @@ export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 
 export type ProductImage = typeof productImages.$inferSelect;
 export type InsertProductImage = z.infer<typeof insertProductImageSchema>;
+
+export type Follower = typeof followers.$inferSelect;
+export type InsertFollower = z.infer<typeof insertFollowerSchema>;
 
 // Extended types
 export type ProductWithDetails = Product & {

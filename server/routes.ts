@@ -615,6 +615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
+      const userId = req.user.id;
       const sellerId = parseInt(req.params.id);
       const seller = await storage.getUser(sellerId);
       
@@ -626,9 +627,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User is not a seller" });
       }
       
-      // Here we would implement the follow functionality
-      // For now, we'll just return a success message
-      res.json({ message: "Seller followed successfully" });
+      // Check if already following
+      const existingFollow = await storage.getFollower(userId, sellerId);
+      if (existingFollow) {
+        return res.status(400).json({ message: "Already following this seller" });
+      }
+      
+      // Create follow relationship
+      await storage.followSeller({
+        userId,
+        sellerId
+      });
+      
+      // Increment follower count on seller
+      const updatedSeller = await storage.updateUser(sellerId, {
+        followerCount: (seller.followerCount || 0) + 1
+      });
+      
+      res.json({ 
+        message: "Seller followed successfully",
+        followerCount: updatedSeller.followerCount || 0
+      });
     } catch (error) {
       next(error);
     }
@@ -641,6 +660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
+      const userId = req.user.id;
       const sellerId = parseInt(req.params.id);
       const seller = await storage.getUser(sellerId);
       
@@ -652,9 +672,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User is not a seller" });
       }
       
-      // Here we would implement the unfollow functionality
-      // For now, we'll just return a success message
-      res.json({ message: "Seller unfollowed successfully" });
+      // Check if actually following
+      const existingFollow = await storage.getFollower(userId, sellerId);
+      if (!existingFollow) {
+        return res.status(400).json({ message: "Not following this seller" });
+      }
+      
+      // Remove follow relationship
+      await storage.unfollowSeller(userId, sellerId);
+      
+      // Decrement follower count on seller
+      const updatedSeller = await storage.updateUser(sellerId, {
+        followerCount: Math.max(0, (seller.followerCount || 0) - 1)
+      });
+      
+      res.json({ 
+        message: "Seller unfollowed successfully",
+        followerCount: updatedSeller.followerCount || 0
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Check if the current user follows a seller
+  app.get("/api/sellers/:id/following", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const userId = req.user.id;
+      const sellerId = parseInt(req.params.id);
+      
+      const existingFollow = await storage.getFollower(userId, sellerId);
+      
+      res.json({ 
+        following: !!existingFollow 
+      });
     } catch (error) {
       next(error);
     }

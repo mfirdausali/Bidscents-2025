@@ -31,7 +31,7 @@ interface SellerHeaderProps {
   onFollowToggle?: () => void;
 }
 
-export function SellerHeader({ 
+export default function SellerHeader({ 
   seller, 
   isFollowing = false, 
   onFollowToggle 
