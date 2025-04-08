@@ -333,7 +333,7 @@ export default function SellerProfilePage() {
 
                 <TabsContent value="all" className="mt-0">
                   {isProductsLoading ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                       {Array(6).fill(0).map((_, index) => (
                         <Card key={index} className="overflow-hidden">
                           <Skeleton className="h-48 w-full" />
@@ -364,7 +364,7 @@ export default function SellerProfilePage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                       {productsData?.products.map((product) => (
                         <ProductCard 
                           key={product.id} 
