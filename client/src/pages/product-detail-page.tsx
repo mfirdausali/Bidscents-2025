@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useRoute } from "wouter";
+import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ProductWithDetails, Review, InsertReview } from "@shared/schema";
 import { Header } from "@/components/ui/header";
