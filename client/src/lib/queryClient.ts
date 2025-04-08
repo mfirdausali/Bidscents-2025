@@ -1,127 +1,57 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Type for options to getQueryFn
-interface QueryFnOptions {
-  on401?: "throw" | "returnNull";
-  throwAllErrors?: boolean;
+async function throwIfResNotOk(res: Response) {
+  if (!res.ok) {
+    const text = (await res.text()) || res.statusText;
+    throw new Error(`${res.status}: ${text}`);
+  }
 }
 
-async function apiRequest<T = any>(
-  method: string = "GET", 
-  url: string, 
-  body?: any, 
-  options?: RequestInit
+export async function apiRequest(
+  method: string,
+  url: string,
+  data?: unknown | undefined,
 ): Promise<Response> {
-  const response = await fetch(url, {
+  const res = await fetch(url, {
     method,
-    body: body ? JSON.stringify(body) : undefined,
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
+    headers: data ? { "Content-Type": "application/json" } : {},
+    body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
   });
 
-  if (!response.ok) {
-    const error = new Error(`HTTP error! status: ${response.status}`);
-    throw error;
-  }
-
-  return response;
+  await throwIfResNotOk(res);
+  return res;
 }
 
-// Create a client
-const queryClient = new QueryClient({
+type UnauthorizedBehavior = "returnNull" | "throw";
+export const getQueryFn: <T>(options: {
+  on401: UnauthorizedBehavior;
+}) => QueryFunction<T> =
+  ({ on401: unauthorizedBehavior }) =>
+  async ({ queryKey }) => {
+    const res = await fetch(queryKey[0] as string, {
+      credentials: "include",
+    });
+
+    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      return null;
+    }
+
+    await throwIfResNotOk(res);
+    return await res.json();
+  };
+
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      queryFn: getQueryFn({ on401: "throw" }),
+      refetchInterval: false,
       refetchOnWindowFocus: false,
-      retry: 1,
-      queryFn: async ({ queryKey }) => {
-        const [url, params] = Array.isArray(queryKey) ? queryKey : [queryKey];
-        
-        if (typeof url !== "string") {
-          throw new Error(`Invalid query key: ${String(url)}`);
-        }
-        
-        // If params is an object, transform it to a query string
-        let finalUrl = url;
-        if (params && typeof params === "object") {
-          const searchParams = new URLSearchParams();
-          
-          Object.entries(params).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-              searchParams.append(key, String(value));
-            }
-          });
-          
-          const queryString = searchParams.toString();
-          if (queryString) {
-            finalUrl = `${url}${url.includes("?") ? "&" : "?"}${queryString}`;
-          }
-        }
-        
-        const response = await fetch(finalUrl);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        // For empty responses (like 204 No Content)
-        if (response.status === 204) {
-          return {};
-        }
-        
-        return response.json();
-      },
+      staleTime: Infinity,
+      retry: false,
+    },
+    mutations: {
+      retry: false,
     },
   },
 });
-
-// Function to get a custom query function with options
-function getQueryFn(options: QueryFnOptions = {}) {
-  return async ({ queryKey }: { queryKey: any }) => {
-    const [url, params] = Array.isArray(queryKey) ? queryKey : [queryKey];
-    
-    if (typeof url !== "string") {
-      throw new Error(`Invalid query key: ${String(url)}`);
-    }
-    
-    // If params is an object, transform it to a query string
-    let finalUrl = url;
-    if (params && typeof params === "object") {
-      const searchParams = new URLSearchParams();
-      
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          searchParams.append(key, String(value));
-        }
-      });
-      
-      const queryString = searchParams.toString();
-      if (queryString) {
-        finalUrl = `${url}${url.includes("?") ? "&" : "?"}${queryString}`;
-      }
-    }
-    
-    const response = await fetch(finalUrl);
-    
-    // Handle 401 according to options
-    if (response.status === 401 && options.on401 === "returnNull") {
-      return null;
-    }
-    
-    // If we should throw all errors or the response isn't ok and we haven't already handled it
-    if (!response.ok && (options.throwAllErrors || response.status !== 401)) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    // For empty responses (like 204 No Content)
-    if (response.status === 204) {
-      return {};
-    }
-    
-    return response.json();
-  };
-}
-
-export { queryClient, apiRequest, getQueryFn };
