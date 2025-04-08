@@ -153,17 +153,17 @@ export function FeaturedProductCarousel() {
   const currentProduct = featuredProducts[currentIndex];
 
   return (
-    <section className="py-16 bg-white">
-      <div className="container mx-auto px-6">
-        <h2 className="font-playfair text-3xl font-bold mb-8 text-center">Featured Products</h2>
+    <section className="py-8 lg:py-16 bg-white">
+      <div className="container mx-auto px-4 lg:px-6">
+        <h2 className="font-playfair text-2xl lg:text-3xl font-bold mb-4 lg:mb-8 text-center">Featured Products</h2>
         
         <div className="relative max-w-6xl mx-auto">
           {/* Fixed width container to prevent resizing */}
           <div className="overflow-hidden">
             {/* Apply smooth transition */}
             <div className={`transition-all duration-700 ease-in-out ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center min-h-[600px]">
-                <div className="h-96">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 items-center min-h-[400px] lg:min-h-[600px]">
+                <div className="h-72 lg:h-96">
                   <img 
                     src={
                       // First, try to find an image with imageOrder=0
@@ -179,12 +179,12 @@ export function FeaturedProductCarousel() {
                     className="rounded-lg shadow-xl w-full h-full object-cover transition-opacity duration-700 ease-in-out"
                   />
                 </div>
-                <div className="min-h-[400px] flex flex-col">
-                  <div className="text-sm bg-gold text-rich-black px-3 py-1 rounded-full inline-block mb-2 uppercase tracking-wider">Featured Listing</div>
-                  <h2 className="font-playfair text-4xl font-bold mb-3 line-clamp-2 h-[80px]">{currentProduct.name}</h2>
-                  <div className="text-xl text-gold mb-3">RM {currentProduct.price.toFixed(2)}</div>
+                <div className="lg:min-h-[400px] min-h-[250px] flex flex-col">
+                  <div className="text-sm bg-gold text-rich-black px-3 py-1 rounded-full inline-block mb-1 lg:mb-2 uppercase tracking-wider">Featured</div>
+                  <h2 className="font-playfair text-3xl lg:text-4xl font-bold mb-2 lg:mb-3 line-clamp-2 h-[60px] lg:h-[80px]">{currentProduct.name}</h2>
+                  <div className="text-xl text-gold mb-2 lg:mb-3">RM {currentProduct.price.toFixed(2)}</div>
                   
-                  <div className="flex items-center mb-6">
+                  <div className="flex items-center mb-3 lg:mb-6">
                     <div className="flex text-gold">
                       {renderStars(currentProduct.averageRating)}
                     </div>
@@ -242,7 +242,7 @@ export function FeaturedProductCarousel() {
                   <div className="mt-auto flex space-x-4">
                     <Link href={`/products/${currentProduct.id}`} className="w-full">
                       <Button 
-                        className="w-full bg-purple-600 text-white hover:bg-purple-700 py-6 rounded-full"
+                        className="w-full bg-purple-600 text-white hover:bg-purple-700 py-4 lg:py-6 rounded-full text-sm lg:text-base"
                       >
                         View Details
                       </Button>
