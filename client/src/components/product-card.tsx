@@ -62,7 +62,7 @@ export function ProductCard({ product }: ProductProps) {
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden h-full">
       <div className="relative">
         <Link href={`/products/${product.id}`}>
           <div className="aspect-square overflow-hidden bg-gray-100">
@@ -81,60 +81,60 @@ export function ProductCard({ product }: ProductProps) {
         </Link>
         {!product.inStock && (
           <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-            <Badge variant="outline" className="text-base font-semibold">
+            <Badge variant="outline" className="text-sm font-semibold">
               Out of Stock
             </Badge>
           </div>
         )}
         {product.inStock && (
-          <Badge className="absolute top-2 right-2 bg-purple-600">
+          <Badge className="absolute top-2 right-2 bg-purple-600 text-xs px-2 py-0.5">
             Available
           </Badge>
         )}
       </div>
-      <CardContent className="p-4">
+      <CardContent className="p-2 p-3">
         <div className="space-y-1">
-          <div className="flex justify-between items-center">
-            <Link href={`/products/${product.id}`} className="font-medium hover:underline">
+          <div className="flex justify-between items-start">
+            <Link href={`/products/${product.id}`} className="font-medium hover:underline text-sm line-clamp-1">
               {product.name}
             </Link>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-purple-600">
-              <Heart className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-purple-600 -mt-1 -mr-1 p-0.5">
+              <Heart className="h-4 w-4" />
             </Button>
           </div>
-          <p className="font-bold text-lg text-purple-600">RM {product.price.toFixed(2)}</p>
+          <p className="font-bold text-purple-600 text-sm md:text-base">RM {product.price.toFixed(2)}</p>
           <div className="flex items-center gap-1">
-            <Star className="h-4 w-4 fill-purple-600 text-purple-600" />
-            <span className="text-sm">{product.rating}</span>
+            <Star className="h-3 w-3 fill-purple-600 text-purple-600" />
+            <span className="text-xs">{product.rating}</span>
             <span className="text-xs text-muted-foreground">({product.reviewCount})</span>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground line-clamp-1">
             {product.category}
           </p>
         </div>
       </CardContent>
-      <CardFooter className="p-4 pt-0">
-        <div className="grid grid-cols-2 gap-2 w-full">
+      <CardFooter className="p-2 px-3 pt-0">
+        <div className="grid grid-cols-2 gap-1 w-full">
           <Button 
-            className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm text-xs h-9"
+            className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm text-xs h-7 md:h-8"
             disabled={!product.inStock || isContacting}
             onClick={handleContactSeller}
           >
             {isContacting ? (
               <span className="flex items-center">
-                <span className="animate-spin mr-2 h-3 w-3 border-b-2 border-white rounded-full"></span>
+                <span className="animate-spin mr-1 h-2 w-2 border-b-2 border-white rounded-full"></span>
                 Contacting...
               </span>
             ) : (
               <span className="flex items-center">
-                <MessageSquare className="mr-1 h-4 w-4" />
+                <MessageSquare className="mr-1 h-3 w-3" />
                 Contact
               </span>
             )}
           </Button>
           <Button 
             variant="outline"
-            className="border-purple-600 text-purple-600 hover:bg-purple-50 text-xs h-9"
+            className="border-purple-600 text-purple-600 hover:bg-purple-50 text-xs h-7 md:h-8"
           >
             Make Offer
           </Button>

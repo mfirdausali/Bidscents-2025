@@ -120,7 +120,7 @@ export default function HomePage() {
             <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
           </div>
         ) : allProducts && allProducts.length > 0 && allProducts.some(product => product.listingType === 'auction') ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
             {/* Display the 3 auction products */}
             {[...allProducts]
               .filter(product => product.listingType === 'auction')
@@ -158,7 +158,7 @@ export default function HomePage() {
             <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
           </div>
         ) : allProducts && allProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
             {/* Display the 6 most recent non-auction products */}
             {[...allProducts]
               .filter(product => product.listingType !== 'auction')
