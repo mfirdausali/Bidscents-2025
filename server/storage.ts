@@ -1,4 +1,4 @@
-import { users, products, categories, cartItems, reviews, orders, orderItems, productImages, followers } from "@shared/schema";
+import { users, products, categories, cartItems, reviews, orders, orderItems, productImages } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
@@ -6,8 +6,7 @@ import type {
   CartItem, InsertCartItem, CartItemWithProduct,
   Review, InsertReview,
   Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
-  ProductImage, InsertProductImage,
-  Follower, InsertFollower
+  ProductImage, InsertProductImage
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -82,13 +81,6 @@ export interface IStorage {
   createProductImage(productImage: InsertProductImage): Promise<ProductImage>;
   deleteProductImage(id: number): Promise<void>;
   
-  // Follower methods
-  getFollower(userId: number, sellerId: number): Promise<Follower | undefined>;
-  getSellerFollowers(sellerId: number): Promise<Follower[]>;
-  getUserFollowing(userId: number): Promise<Follower[]>;
-  followSeller(follower: InsertFollower): Promise<Follower>;
-  unfollowSeller(userId: number, sellerId: number): Promise<void>;
-  
   // Session storage
   sessionStore: any;
 }
@@ -102,7 +94,6 @@ export class MemStorage implements IStorage {
   private orders: Map<number, Order>;
   private orderItems: Map<number, OrderItem>;
   private productImages: Map<number, ProductImage>;
-  private followers: Map<number, Follower>;
   sessionStore: any;
   currentIds: {
     users: number;
@@ -113,7 +104,6 @@ export class MemStorage implements IStorage {
     orders: number;
     orderItems: number;
     productImages: number;
-    followers: number;
   };
 
   constructor() {
@@ -125,7 +115,6 @@ export class MemStorage implements IStorage {
     this.orders = new Map();
     this.orderItems = new Map();
     this.productImages = new Map();
-    this.followers = new Map();
     this.currentIds = {
       users: 1,
       categories: 1,
@@ -134,8 +123,7 @@ export class MemStorage implements IStorage {
       reviews: 1,
       orders: 1,
       orderItems: 1,
-      productImages: 1,
-      followers: 1
+      productImages: 1
     };
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // 1 day
@@ -495,40 +483,6 @@ export class MemStorage implements IStorage {
 
   async deleteProductImage(id: number): Promise<void> {
     this.productImages.delete(id);
-  }
-  
-  // Follower methods
-  async getFollower(userId: number, sellerId: number): Promise<Follower | undefined> {
-    return Array.from(this.followers.values()).find(
-      follower => follower.userId === userId && follower.sellerId === sellerId
-    );
-  }
-  
-  async getSellerFollowers(sellerId: number): Promise<Follower[]> {
-    return Array.from(this.followers.values()).filter(
-      follower => follower.sellerId === sellerId
-    );
-  }
-  
-  async getUserFollowing(userId: number): Promise<Follower[]> {
-    return Array.from(this.followers.values()).filter(
-      follower => follower.userId === userId
-    );
-  }
-  
-  async followSeller(insertFollower: InsertFollower): Promise<Follower> {
-    const id = this.currentIds.followers++;
-    const createdAt = new Date();
-    const follower: Follower = { ...insertFollower, id, createdAt };
-    this.followers.set(id, follower);
-    return follower;
-  }
-  
-  async unfollowSeller(userId: number, sellerId: number): Promise<void> {
-    const follower = await this.getFollower(userId, sellerId);
-    if (follower) {
-      this.followers.delete(follower.id);
-    }
   }
 
   // Helper methods
@@ -946,48 +900,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProductImage(id: number): Promise<void> {
     await db.delete(productImages).where(eq(productImages.id, id));
-  }
-  
-  // Follower methods
-  async getFollower(userId: number, sellerId: number): Promise<Follower | undefined> {
-    const [follower] = await db.select()
-      .from(followers)
-      .where(
-        and(
-          eq(followers.userId, userId),
-          eq(followers.sellerId, sellerId)
-        )
-      );
-    return follower;
-  }
-  
-  async getSellerFollowers(sellerId: number): Promise<Follower[]> {
-    return db.select()
-      .from(followers)
-      .where(eq(followers.sellerId, sellerId));
-  }
-  
-  async getUserFollowing(userId: number): Promise<Follower[]> {
-    return db.select()
-      .from(followers)
-      .where(eq(followers.userId, userId));
-  }
-  
-  async followSeller(follower: InsertFollower): Promise<Follower> {
-    const [newFollower] = await db.insert(followers)
-      .values(follower)
-      .returning();
-    return newFollower;
-  }
-  
-  async unfollowSeller(userId: number, sellerId: number): Promise<void> {
-    await db.delete(followers)
-      .where(
-        and(
-          eq(followers.userId, userId),
-          eq(followers.sellerId, sellerId)
-        )
-      );
   }
 
   // Helper methods
