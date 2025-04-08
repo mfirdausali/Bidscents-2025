@@ -179,12 +179,12 @@ export function FeaturedProductCarousel() {
                     className="rounded-lg shadow-xl w-full h-full object-cover transition-opacity duration-700 ease-in-out"
                   />
                 </div>
-                <div className="min-h-[500px] flex flex-col">
+                <div className="min-h-[400px] flex flex-col">
                   <div className="text-sm bg-gold text-rich-black px-3 py-1 rounded-full inline-block mb-2 uppercase tracking-wider">Featured Listing</div>
                   <h2 className="font-playfair text-4xl font-bold mb-3 line-clamp-2 h-[80px]">{currentProduct.name}</h2>
-                  <div className="text-xl text-gold">RM {currentProduct.price.toFixed(2)}</div>
+                  <div className="text-xl text-gold mb-3">RM {currentProduct.price.toFixed(2)}</div>
                   
-                  <div className="flex items-center mb-4">
+                  <div className="flex items-center mb-6">
                     <div className="flex text-gold">
                       {renderStars(currentProduct.averageRating)}
                     </div>
@@ -193,67 +193,56 @@ export function FeaturedProductCarousel() {
                     </span>
                   </div>
                   
-                  {/* Product details that hide on smaller screens to prevent wrapping */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6 max-h-[170px] overflow-hidden">
-                    {/* Main details - always visible */}
-                    {currentProduct.volume && (
+                  {/* All detailed product info removed - only showing on desktop */}
+                  <div className="hidden lg:block mb-6">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                      {currentProduct.volume && (
+                        <div className="bg-gray-100 p-3 rounded-md">
+                          <div className="text-xs text-gray-500">Volume</div>
+                          <div className="font-medium truncate">{currentProduct.volume}</div>
+                        </div>
+                      )}
                       <div className="bg-gray-100 p-3 rounded-md">
-                        <div className="text-xs text-gray-500">Volume</div>
-                        <div className="font-medium truncate">{currentProduct.volume}</div>
+                        <div className="text-xs text-gray-500">Fullness</div>
+                        <div className="font-medium truncate">{currentProduct.remainingPercentage || 100}% Remaining</div>
                       </div>
-                    )}
-                    <div className="bg-gray-100 p-3 rounded-md">
-                      <div className="text-xs text-gray-500">Fullness</div>
-                      <div className="font-medium truncate">{currentProduct.remainingPercentage || 100}% Remaining</div>
-                    </div>
-                    
-                    {/* Only show on md screens and up */}
-                    {currentProduct.batchCode && (
-                      <div className="bg-gray-100 p-3 rounded-md hidden md:block">
-                        <div className="text-xs text-gray-500">Batch Code</div>
-                        <div className="font-medium truncate">{currentProduct.batchCode}</div>
-                      </div>
-                    )}
-                    {currentProduct.boxCondition && (
-                      <div className="bg-gray-100 p-3 rounded-md hidden md:block">
-                        <div className="text-xs text-gray-500">Box Condition</div>
-                        <div className="font-medium truncate">{currentProduct.boxCondition}</div>
-                      </div>
-                    )}
-                    {currentProduct.listingType && (
+                      {currentProduct.batchCode && (
+                        <div className="bg-gray-100 p-3 rounded-md">
+                          <div className="text-xs text-gray-500">Batch Code</div>
+                          <div className="font-medium truncate">{currentProduct.batchCode}</div>
+                        </div>
+                      )}
+                      {currentProduct.boxCondition && (
+                        <div className="bg-gray-100 p-3 rounded-md">
+                          <div className="text-xs text-gray-500">Box Condition</div>
+                          <div className="font-medium truncate">{currentProduct.boxCondition}</div>
+                        </div>
+                      )}
+                      {currentProduct.listingType && (
+                        <div className="bg-gray-100 p-3 rounded-md">
+                          <div className="text-xs text-gray-500">Listing Type</div>
+                          <div className="font-medium truncate">
+                            {currentProduct.listingType.charAt(0).toUpperCase() + currentProduct.listingType.slice(1)}
+                          </div>
+                        </div>
+                      )}
                       <div className="bg-gray-100 p-3 rounded-md">
-                        <div className="text-xs text-gray-500">Listing Type</div>
-                        <div className="font-medium truncate">
-                          {currentProduct.listingType.charAt(0).toUpperCase() + currentProduct.listingType.slice(1)}
+                        <div className="text-xs text-gray-500">Seller</div>
+                        <div className="font-medium truncate flex items-center">
+                          {currentProduct.seller?.username || "Unknown"}
                         </div>
                       </div>
-                    )}
-                    <div className="bg-gray-100 p-3 rounded-md hidden md:block">
-                      <div className="text-xs text-gray-500">Seller</div>
-                      <div className="font-medium truncate flex items-center">
-                        {currentProduct.seller?.username || "Unknown"}
-                      </div>
                     </div>
+                    
+                    <p className="text-gray-600 mt-4 h-[80px] overflow-y-auto line-clamp-4">
+                      {currentProduct.description || "No description available."}
+                    </p>
                   </div>
                   
-                  <p className="text-gray-600 mb-6 h-[80px] overflow-y-auto line-clamp-4">
-                    {currentProduct.description || "No description available."}
-                  </p>
-                  
                   <div className="mt-auto flex space-x-4">
-                    <Button 
-                      className="bg-rich-black text-white hover:bg-metallic-gold hover:text-rich-black flex-grow py-6 rounded-full"
-                      onClick={() => handleAddToCart(currentProduct)}
-                      disabled={isAddingToCart}
-                    >
-                      {isAddingToCart ? "Adding..." : (
-                        currentProduct.listingType === "auction" ? "Bid Now" : "Add to Cart"
-                      )}
-                    </Button>
-                    <Link href={`/products/${currentProduct.id}`}>
+                    <Link href={`/products/${currentProduct.id}`} className="w-full">
                       <Button 
-                        variant="outline" 
-                        className="border border-rich-black bg-purple-600 hover:bg-purple-700 text-white px-6 py-6 rounded-full"
+                        className="w-full bg-purple-600 text-white hover:bg-purple-700 py-6 rounded-full"
                       >
                         View Details
                       </Button>
