@@ -8,7 +8,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <Link href="/" className="text-xl font-bold text-gray-900 mb-4 inline-block">
-              <span className="text-purple-600">BidLelong</span><span className="text-amber-500">MY</span>
+              <span className="text-purple-600">Bid</span><span className="text-amber-500">Scents</span>
             </Link>
             <p className="text-gray-600 mb-4 text-sm">
               The premier marketplace for secondhand perfumes, connecting fragrance enthusiasts in Malaysia since 2023.

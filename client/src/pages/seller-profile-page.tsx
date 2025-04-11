@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { ProductCard } from "../components/product-card";
+import { ProductCard } from "../components/ui/product-card";
 import { ProductFilters } from "../components/product-filters";
 import { User, ProductWithDetails } from "@shared/schema";
 
@@ -320,7 +320,7 @@ export default function SellerProfilePage() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                   <TabsList>
                     <TabsTrigger value="all">All Perfumes</TabsTrigger>
-                    <TabsTrigger value="Women's Fragrances">Women's</TabsTrigger>
+                    <TabsTrigger value="Niche">Niche</TabsTrigger>
                     <TabsTrigger value="Men's Fragrances">Men's</TabsTrigger>
                     <TabsTrigger value="Unisex">Unisex</TabsTrigger>
                   </TabsList>
@@ -367,17 +367,7 @@ export default function SellerProfilePage() {
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                       {productsData?.products.map((product) => (
                         <ProductCard 
-                          key={product.id} 
-                          product={{
-                            id: product.id.toString(),
-                            name: product.name,
-                            price: product.price,
-                            image: product.imageUrl,
-                            rating: product.averageRating?.toString() || "0",
-                            reviewCount: product.reviews?.length || 0,
-                            category: product.category?.name || "",
-                            inStock: product.stockQuantity > 0
-                          }} 
+                          key={product.id} product={product}
                         />
                       ))}
                     </div>
@@ -385,7 +375,7 @@ export default function SellerProfilePage() {
                 </TabsContent>
 
                 {/* Other tab content will be identical to the "all" tab */}
-                <TabsContent value="Women's Fragrances" className="mt-0">
+                <TabsContent value="Niche" className="mt-0">
                   {/* Same content as "all" tab but filtered */}
                   {/* This is handled by the backend query parameters */}
                 </TabsContent>
