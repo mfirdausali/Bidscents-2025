@@ -13,6 +13,7 @@ import ProfilePage from "@/pages/profile-page";
 import SellerProfilePage from "@/pages/seller-profile-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
+import TermsOfServicePage from "./pages/terms-of-service"; // Import the new component
 
 function Router() {
   return (
@@ -25,6 +26,7 @@ function Router() {
       <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute path="/seller/dashboard" component={SellerDashboard} />
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} />
+      <Route path="/terms-of-service" component={TermsOfServicePage} /> {/* Added route for Terms of Service */}
       <Route component={NotFound} />
     </Switch>
   );

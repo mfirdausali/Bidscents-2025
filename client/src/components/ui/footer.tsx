@@ -24,7 +24,7 @@ export function Footer() {
             </Link>
             <p className="text-gray-600 mb-4 text-sm">
               The premier marketplace for secondhand perfumes, connecting
-              fragrance enthusiasts in Malaysia since 2023.
+              fragrance enthusiasts in Malaysia since 2025.
             </p>
             <div className="flex space-x-4 mt-6">
               <a
@@ -83,14 +83,7 @@ export function Footer() {
                   FAQs
                 </a>
               </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-600 hover:text-purple-600 transition-colors"
-                >
-                  Contact Us
-                </a>
-              </li>
+              <li></li>
               <li>
                 <a
                   href="#"
@@ -173,12 +166,12 @@ export function Footer() {
               &copy; 2025 BidScents. All rights reserved.
             </div>
             <div className="flex flex-wrap justify-center space-x-4">
-              <a
-                href="#"
+              <Link
+                href="/terms-of-service"
                 className="text-gray-500 text-xs hover:text-purple-600 transition-colors"
               >
                 Terms of Service
-              </a>
+              </Link>
             </div>
           </div>
         </div>
