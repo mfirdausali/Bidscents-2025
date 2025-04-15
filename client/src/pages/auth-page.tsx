@@ -12,12 +12,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Mail, Lock, User, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Extended schemas with validation
 const loginSchema = z.object({
   username: z.string().min(3, { message: "Username must be at least 3 characters" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+});
+
+const emailLoginSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+});
+
+const resetPasswordSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
 });
 
 const registerSchema = insertUserSchema.extend({
@@ -33,23 +43,55 @@ const registerSchema = insertUserSchema.extend({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+type EmailLoginFormValues = z.infer<typeof emailLoginSchema>;
+type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
   const [location, navigate] = useLocation();
-  const { user, loginMutation, registerMutation } = useAuth();
+  const { 
+    user, 
+    loginMutation, 
+    loginWithEmailMutation,
+    registerMutation, 
+    registerWithVerificationMutation,
+    resetPasswordMutation,
+    isEmailVerified,
+    setIsEmailVerified
+  } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [useEmailLogin, setUseEmailLogin] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [resetRequested, setResetRequested] = useState(false);
   
-  // Get tab from URL query parameter
+  // Get tab from URL query parameter and other URL parameters
   useEffect(() => {
     const params = new URLSearchParams(location.split("?")[1]);
+    
+    // Tab selection
     const tab = params.get("tab");
     if (tab === "register") {
       setActiveTab("register");
     }
-  }, [location]);
+    
+    // Check if coming from successful registration
+    if (params.get("registration") === "success") {
+      setRegistrationSuccess(true);
+    }
+    
+    // Check if coming from reset password request
+    if (params.get("reset") === "requested") {
+      setResetRequested(true);
+    }
+    
+    // Check if email is verified
+    if (params.get("verified") === "true") {
+      setIsEmailVerified(true);
+    }
+  }, [location, setIsEmailVerified]);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -58,12 +100,29 @@ export default function AuthPage() {
     }
   }, [user, navigate]);
 
-  // Login form
+  // Login form (username)
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "",
       password: "",
+    },
+  });
+
+  // Login form (email)
+  const emailLoginForm = useForm<EmailLoginFormValues>({
+    resolver: zodResolver(emailLoginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+  
+  // Reset password form
+  const resetPasswordForm = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      email: "",
     },
   });
 
@@ -86,11 +145,27 @@ export default function AuthPage() {
   const onLoginSubmit = (data: LoginFormValues) => {
     loginMutation.mutate(data);
   };
+  
+  const onEmailLoginSubmit = (data: EmailLoginFormValues) => {
+    loginWithEmailMutation.mutate(data);
+  };
+  
+  const onResetPasswordSubmit = (data: ResetPasswordFormValues) => {
+    resetPasswordMutation.mutate(data);
+  };
 
   const onRegisterSubmit = (data: RegisterFormValues) => {
-    // Remove confirmPassword and terms from data before sending to API
+    // If using email verification
     const { confirmPassword, terms, ...registerData } = data;
-    registerMutation.mutate(registerData);
+    
+    // Use the new verification-based registration
+    registerWithVerificationMutation.mutate({
+      username: registerData.username,
+      email: registerData.email,
+      password: registerData.password,
+      firstName: registerData.firstName,
+      lastName: registerData.lastName
+    });
   };
 
   return (

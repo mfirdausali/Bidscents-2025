@@ -1,11 +1,19 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import {
+  registerUserWithEmailVerification, 
+  signInWithEmail, 
+  signOut as supabaseSignOut,
+  getCurrentUser,
+  verifyEmail,
+  resetPassword
+} from './supabase';
 
 declare global {
   namespace Express {
@@ -41,33 +49,168 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Keep legacy local strategy for backward compatibility
   passport.use(
     new LocalStrategy(async (username, password, done) => {
-      const user = await storage.getUserByUsername(username);
-      if (!user || !(await comparePasswords(password, user.password))) {
-        return done(null, false);
-      } else {
-        return done(null, user);
+      try {
+        const user = await storage.getUserByUsername(username);
+        if (!user || !(await comparePasswords(password, user.password))) {
+          return done(null, false);
+        } else {
+          return done(null, user);
+        }
+      } catch (error) {
+        return done(error);
       }
     }),
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
-    const user = await storage.getUser(id);
-    done(null, user);
+    try {
+      const user = await storage.getUser(id);
+      done(null, user);
+    } catch (error) {
+      done(error, null);
+    }
   });
+
+  // New authentication endpoints using Supabase Auth
+
+  // Register with email verification
+  app.post("/api/register-with-verification", async (req, res, next) => {
+    try {
+      const { email, password, username, firstName, lastName } = req.body;
+
+      // Check if username is already taken
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Check if email is already registered
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      // Register the user with Supabase Auth (sends verification email)
+      const authData = await registerUserWithEmailVerification(
+        email,
+        password,
+        { username, firstName, lastName }
+      );
+
+      // Create user in our database too (for backward compatibility)
+      // Only creating basic info, the rest will be completed after email verification
+      const hashedPassword = await hashPassword(password);
+      const user = await storage.createUser({
+        username,
+        email,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        address: null,
+        profileImage: null,
+        walletBalance: 0,
+        isSeller: false, 
+        isAdmin: false,
+        isBanned: false
+      });
+
+      res.status(201).json({ 
+        message: "Registration successful! Please check your email to verify your account.",
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email
+        }
+      });
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      res.status(500).json({ message: error.message || "Registration failed" });
+    }
+  });
+
+  // Email verification endpoint
+  app.get("/api/verify-email", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ message: "Invalid verification token" });
+      }
+      
+      await verifyEmail(token);
+      
+      // Redirect to login page after successful verification
+      res.redirect('/login?verified=true');
+    } catch (error: any) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ message: error.message || "Email verification failed" });
+    }
+  });
+
+  // Login with Supabase Auth
+  app.post("/api/login-with-email", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      // Authenticate with Supabase
+      const authData = await signInWithEmail(email, password);
+      
+      if (!authData.user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Find the corresponding user in our database
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        // Handle edge case where user exists in Supabase but not in our DB
+        return res.status(404).json({ message: "User account not found" });
+      }
+
+      // Log in with Passport session for backward compatibility
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Session creation failed" });
+        }
+        res.status(200).json({ user });
+      });
+    } catch (error: any) {
+      console.error("Login error:", error);
+      res.status(401).json({ message: error.message || "Authentication failed" });
+    }
+  });
+
+  // Password reset request
+  app.post("/api/reset-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      // Send password reset email
+      await resetPassword(email);
+      
+      res.status(200).json({ message: "Password reset email sent" });
+    } catch (error: any) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ message: error.message || "Password reset failed" });
+    }
+  });
+
+  // Keep legacy endpoints for backward compatibility
 
   app.post("/api/register", async (req, res, next) => {
     try {
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
-        return res.status(400).send("Username already exists");
+        return res.status(400).json({ message: "Username already exists" });
       }
 
       const existingEmail = await storage.getUserByEmail(req.body.email);
       if (existingEmail) {
-        return res.status(400).send("Email already exists");
+        return res.status(400).json({ message: "Email already exists" });
       }
 
       const user = await storage.createUser({
@@ -88,15 +231,50 @@ export function setupAuth(app: Express) {
     res.status(200).json(req.user);
   });
 
-  app.post("/api/logout", (req, res, next) => {
-    req.logout((err) => {
-      if (err) return next(err);
-      res.sendStatus(200);
-    });
+  app.post("/api/logout", async (req, res, next) => {
+    try {
+      // Sign out from Supabase
+      await supabaseSignOut();
+      
+      // Also sign out from passport session
+      req.logout((err) => {
+        if (err) return next(err);
+        res.sendStatus(200);
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
-  app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+  app.get("/api/user", async (req, res) => {
+    try {
+      // First check if user is authenticated with Passport
+      if (req.isAuthenticated() && req.user) {
+        return res.json(req.user);
+      }
+
+      // If not, check if authenticated with Supabase
+      const supabaseUser = await getCurrentUser();
+      if (supabaseUser) {
+        // Get user from our database by email
+        const user = await storage.getUserByEmail(supabaseUser.email || '');
+        if (user) {
+          // Log in with Passport session
+          req.login(user, (err) => {
+            if (err) {
+              return res.status(500).json({ message: "Session creation failed" });
+            }
+            return res.json(user);
+          });
+        } else {
+          return res.status(404).json({ message: "User not found" });
+        }
+      } else {
+        return res.sendStatus(401);
+      }
+    } catch (error) {
+      console.error("Error in /api/user:", error);
+      return res.status(500).json({ message: "Server error" });
+    }
   });
 }

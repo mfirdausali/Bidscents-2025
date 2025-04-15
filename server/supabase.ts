@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { User } from '@supabase/supabase-js';
 
 // Initialize the Supabase client with environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -9,8 +10,13 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase credentials');
 }
 
-// Create a Supabase client
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Create a Supabase client with auth configuration
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+  }
+});
 
 // Test the connection
 export async function testSupabaseConnection() {
@@ -50,5 +56,157 @@ export async function ensureTablesExist() {
     }
   } catch (error) {
     console.error('Error ensuring tables exist:', error);
+  }
+}
+
+// Auth related functions
+
+/**
+ * Register a new user with email verification
+ * @param email User's email
+ * @param password User's password
+ * @param userData Additional user data to store
+ */
+export async function registerUserWithEmailVerification(
+  email: string,
+  password: string,
+  userData: {
+    username: string;
+    firstName?: string | null;
+    lastName?: string | null;
+  }
+) {
+  try {
+    // First, use Supabase Auth to create the user with email verification
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${process.env.APP_URL || 'http://localhost:5000'}/verify-email`,
+        data: {
+          username: userData.username,
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+        }
+      }
+    });
+
+    if (error) {
+      console.error('Error creating auth user:', error);
+      throw new Error(`Auth registration failed: ${error.message}`);
+    }
+
+    console.log('Auth user created successfully, verification email sent');
+    return data;
+  } catch (error: any) {
+    console.error('Exception in registerUserWithEmailVerification:', error);
+    throw error;
+  }
+}
+
+/**
+ * Sign in a user with email and password
+ * @param email User's email
+ * @param password User's password
+ */
+export async function signInWithEmail(email: string, password: string) {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Error signing in:', error);
+      throw new Error(`Sign in failed: ${error.message}`);
+    }
+
+    return data;
+  } catch (error: any) {
+    console.error('Exception in signInWithEmail:', error);
+    throw error;
+  }
+}
+
+/**
+ * Sign out the current user
+ */
+export async function signOut() {
+  try {
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+      console.error('Error signing out:', error);
+      throw new Error(`Sign out failed: ${error.message}`);
+    }
+
+    return true;
+  } catch (error: any) {
+    console.error('Exception in signOut:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get the current authenticated user
+ */
+export async function getCurrentUser(): Promise<User | null> {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (error) {
+      console.error('Error getting current user:', error);
+      return null;
+    }
+
+    return user;
+  } catch (error) {
+    console.error('Exception in getCurrentUser:', error);
+    return null;
+  }
+}
+
+/**
+ * Verify the email with the token
+ * @param token Email verification token
+ */
+export async function verifyEmail(token: string) {
+  try {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: 'email',
+    });
+
+    if (error) {
+      console.error('Error verifying email:', error);
+      throw new Error(`Email verification failed: ${error.message}`);
+    }
+
+    return true;
+  } catch (error: any) {
+    console.error('Exception in verifyEmail:', error);
+    throw error;
+  }
+}
+
+/**
+ * Request a password reset email
+ * @param email User's email
+ */
+export async function resetPassword(email: string) {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.APP_URL || 'http://localhost:5000'}/reset-password`,
+    });
+
+    if (error) {
+      console.error('Error resetting password:', error);
+      throw new Error(`Password reset failed: ${error.message}`);
+    }
+
+    return true;
+  } catch (error: any) {
+    console.error('Exception in resetPassword:', error);
+    throw error;
   }
 }
