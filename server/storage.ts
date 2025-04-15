@@ -295,7 +295,7 @@ export class MemStorage implements IStorage {
   async deleteProduct(id: number): Promise<void> {
     try {
       // Import the object storage module for image deletion
-      const objectStorage = await import('./object-storage');
+      const objectStorage = await import('./supabase-storage');
       
       // Delete associated images from object storage first
       for (const [imageId, image] of this.productImages.entries()) {

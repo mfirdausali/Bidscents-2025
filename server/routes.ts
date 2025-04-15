@@ -8,7 +8,7 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";
-import * as objectStorage from "./object-storage"; // Import the entire module to access all properties
+import * as objectStorage from "./supabase-storage"; // Import the entire module to access all properties
 import path from "path"; // Added import for path
 
 export async function registerRoutes(app: Express): Promise<Server> {
