@@ -210,3 +210,26 @@ export async function resetPassword(email: string) {
     throw error;
   }
 }
+
+/**
+ * Update user password
+ * @param token Password reset token
+ * @param newPassword New password
+ */
+export async function updatePassword(token: string, newPassword: string) {
+  try {
+    const { error } = await supabase.auth.updateUser({ 
+      password: newPassword 
+    });
+
+    if (error) {
+      console.error('Error updating password:', error);
+      throw new Error(`Password update failed: ${error.message}`);
+    }
+
+    return true;
+  } catch (error: any) {
+    console.error('Exception in updatePassword:', error);
+    throw error;
+  }
+}
