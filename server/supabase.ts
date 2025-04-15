@@ -5,9 +5,27 @@ import type { User } from '@supabase/supabase-js';
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 
+// Log environment variables for debugging (excluding sensitive values)
+console.log('Environment check:');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('SUPABASE_URL exists:', !!supabaseUrl);
+console.log('SUPABASE_KEY exists:', !!supabaseKey);
+console.log('Available env vars:', Object.keys(process.env).filter(key => 
+  !key.includes('KEY') && !key.includes('SECRET') && !key.includes('PASSWORD')
+).join(', '));
+
 if (!supabaseUrl || !supabaseKey) {
   console.error('Missing Supabase credentials. Please set SUPABASE_URL and SUPABASE_KEY environment variables.');
-  throw new Error('Missing Supabase credentials');
+  
+  // In production deployment, provide more helpful error message
+  if (process.env.NODE_ENV === 'production') {
+    console.error('For Replit Deployments, ensure SUPABASE_URL and SUPABASE_KEY are added as Secrets');
+    console.error('Check that your deployment has access to the Secrets you added');
+    throw new Error('Missing Supabase credentials');
+  } else {
+    // In development, throw normal error
+    throw new Error('Missing Supabase credentials');
+  }
 }
 
 // Create a Supabase client with auth configuration
