@@ -172,10 +172,11 @@ export class SupabaseStorage implements IStorage {
       last_name: user.lastName,
       address: user.address,
       profile_image: user.profileImage,
-      wallet_balance: user.walletBalance,
-      is_seller: user.isSeller,
-      is_admin: user.isAdmin,
-      is_banned: user.isBanned
+      // Always provide a default value for wallet_balance if not specified
+      wallet_balance: user.walletBalance !== undefined ? user.walletBalance : 0,
+      is_seller: user.isSeller !== undefined ? user.isSeller : false,
+      is_admin: user.isAdmin !== undefined ? user.isAdmin : false,
+      is_banned: user.isBanned !== undefined ? user.isBanned : false
     };
     
     // Create a new user
