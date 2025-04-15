@@ -58,14 +58,6 @@ export const productImages = pgTable("product_images", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Cart items table
-export const cartItems = pgTable("cart_items", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  productId: integer("product_id").references(() => products.id).notNull(),
-  quantity: integer("quantity").notNull().default(1),
-});
-
 // Reviews table
 export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
