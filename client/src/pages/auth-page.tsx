@@ -155,10 +155,10 @@ export default function AuthPage() {
   };
 
   const onRegisterSubmit = (data: RegisterFormValues) => {
-    // If using email verification
+    // Remove confirmPassword and terms from data before sending to API
     const { confirmPassword, terms, ...registerData } = data;
     
-    // Use the new verification-based registration
+    // Use the new verification-based registration with Supabase Auth
     registerWithVerificationMutation.mutate({
       username: registerData.username,
       email: registerData.email,
@@ -194,58 +194,218 @@ export default function AuthPage() {
                     Sign in to your account to continue
                   </CardDescription>
                 </CardHeader>
-                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)}>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="login-username">Username</Label>
-                      <Input
-                        id="login-username"
-                        {...loginForm.register("username")}
-                        placeholder="Enter your username"
-                      />
-                      {loginForm.formState.errors.username && (
-                        <p className="text-sm text-red-500">
-                          {loginForm.formState.errors.username.message}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <Label htmlFor="login-password">Password</Label>
-                        <a href="#" className="text-sm text-gold hover:underline">
-                          Forgot password?
-                        </a>
-                      </div>
-                      <Input
-                        id="login-password"
-                        type="password"
-                        {...loginForm.register("password")}
-                        placeholder="Enter your password"
-                      />
-                      {loginForm.formState.errors.password && (
-                        <p className="text-sm text-red-500">
-                          {loginForm.formState.errors.password.message}
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
-                      disabled={loginMutation.isPending}
-                    >
-                      {loginMutation.isPending ? (
-                        <span className="flex items-center">
-                          <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
-                          Signing in...
-                        </span>
-                      ) : (
-                        "Sign In"
-                      )}
-                    </Button>
-                  </CardFooter>
-                </form>
+                
+                {isEmailVerified && (
+                  <Alert className="mx-6 mb-4 bg-green-50 border-green-200">
+                    <AlertCircle className="h-4 w-4 text-green-600" />
+                    <AlertTitle className="text-green-600">Email verified</AlertTitle>
+                    <AlertDescription className="text-green-700">
+                      Your email has been successfully verified. You can now log in.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {registrationSuccess && (
+                  <Alert className="mx-6 mb-4 bg-blue-50 border-blue-200">
+                    <Mail className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-600">Check your email</AlertTitle>
+                    <AlertDescription className="text-blue-700">
+                      We've sent you a verification email. Please check your inbox and click the verification link.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {resetRequested && (
+                  <Alert className="mx-6 mb-4 bg-blue-50 border-blue-200">
+                    <Lock className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-600">Password reset email sent</AlertTitle>
+                    <AlertDescription className="text-blue-700">
+                      Check your email for instructions to reset your password.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {showResetPassword ? (
+                  <>
+                    <form onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)}>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="reset-email">Email</Label>
+                          <Input
+                            id="reset-email"
+                            type="email"
+                            {...resetPasswordForm.register("email")}
+                            placeholder="Enter your email address"
+                          />
+                          {resetPasswordForm.formState.errors.email && (
+                            <p className="text-sm text-red-500">
+                              {resetPasswordForm.formState.errors.email.message}
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex-col space-y-2">
+                        <Button 
+                          type="submit" 
+                          className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
+                          disabled={resetPasswordMutation.isPending}
+                        >
+                          {resetPasswordMutation.isPending ? (
+                            <span className="flex items-center">
+                              <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
+                              Sending...
+                            </span>
+                          ) : (
+                            "Send Reset Link"
+                          )}
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="ghost"
+                          className="w-full text-sm"
+                          onClick={() => setShowResetPassword(false)}
+                        >
+                          Back to login
+                        </Button>
+                      </CardFooter>
+                    </form>
+                  </>
+                ) : useEmailLogin ? (
+                  <>
+                    <form onSubmit={emailLoginForm.handleSubmit(onEmailLoginSubmit)}>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="login-email">Email</Label>
+                          <Input
+                            id="login-email"
+                            type="email"
+                            {...emailLoginForm.register("email")}
+                            placeholder="Enter your email"
+                          />
+                          {emailLoginForm.formState.errors.email && (
+                            <p className="text-sm text-red-500">
+                              {emailLoginForm.formState.errors.email.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <Label htmlFor="login-email-password">Password</Label>
+                            <button 
+                              type="button"
+                              onClick={() => setShowResetPassword(true)}
+                              className="text-sm text-gold hover:underline"
+                            >
+                              Forgot password?
+                            </button>
+                          </div>
+                          <Input
+                            id="login-email-password"
+                            type="password"
+                            {...emailLoginForm.register("password")}
+                            placeholder="Enter your password"
+                          />
+                          {emailLoginForm.formState.errors.password && (
+                            <p className="text-sm text-red-500">
+                              {emailLoginForm.formState.errors.password.message}
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex-col space-y-2">
+                        <Button 
+                          type="submit" 
+                          className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
+                          disabled={loginWithEmailMutation.isPending}
+                        >
+                          {loginWithEmailMutation.isPending ? (
+                            <span className="flex items-center">
+                              <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
+                              Signing in...
+                            </span>
+                          ) : (
+                            "Sign In with Email"
+                          )}
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="ghost"
+                          className="w-full text-sm"
+                          onClick={() => setUseEmailLogin(false)}
+                        >
+                          Sign in with username instead
+                        </Button>
+                      </CardFooter>
+                    </form>
+                  </>
+                ) : (
+                  <>
+                    <form onSubmit={loginForm.handleSubmit(onLoginSubmit)}>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="login-username">Username</Label>
+                          <Input
+                            id="login-username"
+                            {...loginForm.register("username")}
+                            placeholder="Enter your username"
+                          />
+                          {loginForm.formState.errors.username && (
+                            <p className="text-sm text-red-500">
+                              {loginForm.formState.errors.username.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <Label htmlFor="login-password">Password</Label>
+                            <button 
+                              type="button"
+                              onClick={() => setShowResetPassword(true)}
+                              className="text-sm text-gold hover:underline"
+                            >
+                              Forgot password?
+                            </button>
+                          </div>
+                          <Input
+                            id="login-password"
+                            type="password"
+                            {...loginForm.register("password")}
+                            placeholder="Enter your password"
+                          />
+                          {loginForm.formState.errors.password && (
+                            <p className="text-sm text-red-500">
+                              {loginForm.formState.errors.password.message}
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex-col space-y-2">
+                        <Button 
+                          type="submit" 
+                          className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
+                          disabled={loginMutation.isPending}
+                        >
+                          {loginMutation.isPending ? (
+                            <span className="flex items-center">
+                              <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
+                              Signing in...
+                            </span>
+                          ) : (
+                            "Sign In"
+                          )}
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="ghost"
+                          className="w-full text-sm"
+                          onClick={() => setUseEmailLogin(true)}
+                        >
+                          Sign in with email instead
+                        </Button>
+                      </CardFooter>
+                    </form>
+                  </>
+                )}
               </Card>
             </TabsContent>
             
@@ -381,15 +541,15 @@ export default function AuthPage() {
                     <Button 
                       type="submit" 
                       className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
-                      disabled={registerMutation.isPending}
+                      disabled={registerWithVerificationMutation.isPending}
                     >
-                      {registerMutation.isPending ? (
+                      {registerWithVerificationMutation.isPending ? (
                         <span className="flex items-center">
                           <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
-                          Creating account...
+                          Setting up account...
                         </span>
                       ) : (
-                        "Create Account"
+                        "Create Account with Email Verification"
                       )}
                     </Button>
                   </CardFooter>
