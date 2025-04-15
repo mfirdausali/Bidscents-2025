@@ -1,13 +1,30 @@
-import { users, products, categories, cartItems, reviews, orders, orderItems, productImages } from "@shared/schema";
+import { users, products, categories, reviews, orders, orderItems, productImages } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
-  CartItem, InsertCartItem, CartItemWithProduct,
   Review, InsertReview,
   Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
   ProductImage, InsertProductImage
 } from "@shared/schema";
+
+// Define cart types since they're removed from schema but still required by the interface
+interface CartItem {
+  id: number;
+  userId: number;
+  productId: number;
+  quantity: number;
+}
+
+interface InsertCartItem {
+  userId: number;
+  productId: number;
+  quantity: number;
+}
+
+interface CartItemWithProduct extends CartItem {
+  product: Product;
+}
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import connectPg from "connect-pg-simple";
@@ -946,5 +963,8 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Use the DatabaseStorage implementation for persistence
-export const storage = new DatabaseStorage();
+// Import the SupabaseStorage implementation
+import { SupabaseStorage } from "./supabase-storage";
+
+// Use the SupabaseStorage implementation for persistence
+export const storage = new SupabaseStorage();
