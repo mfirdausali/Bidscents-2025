@@ -125,12 +125,6 @@ export const insertCategorySchema = createInsertSchema(categories).pick({
   description: true,
 });
 
-export const insertCartItemSchema = createInsertSchema(cartItems).pick({
-  userId: true,
-  productId: true,
-  quantity: true,
-});
-
 export const insertReviewSchema = createInsertSchema(reviews).pick({
   userId: true,
   productId: true,
@@ -168,9 +162,6 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Category = typeof categories.$inferSelect;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 
-export type CartItem = typeof cartItems.$inferSelect;
-export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
-
 export type Review = typeof reviews.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 
@@ -190,10 +181,6 @@ export type ProductWithDetails = Product & {
   reviews?: Review[];
   averageRating?: number;
   images?: ProductImage[]; // Added images array
-};
-
-export type CartItemWithProduct = CartItem & {
-  product: Product;
 };
 
 export type OrderWithItems = Order & {
