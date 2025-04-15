@@ -102,6 +102,31 @@ export async function getImageFromStorage(imageId: string): Promise<Buffer | nul
     
     if (error || !data) {
       console.error('Error retrieving image from Supabase Storage:', error);
+      
+      // Try to get from Replit Object Storage as a fallback during migration
+      try {
+        console.log(`Trying to get image ${imageId} from Replit Object Storage as fallback...`);
+        // Importing dynamically to avoid circular dependencies
+        const replitObjectStorage = await import('./object-storage');
+        const imageBuffer = await replitObjectStorage.getImageFromStorage(imageId);
+        
+        if (imageBuffer) {
+          console.log(`Found image ${imageId} in Replit Object Storage, migrating to Supabase...`);
+          
+          // Migrate the image to Supabase Storage
+          await uploadProductImage(
+            imageBuffer,
+            imageId,
+            'image/jpeg' // Assuming JPEG format, but this might not be accurate
+          );
+          
+          console.log(`Successfully migrated image ${imageId} to Supabase Storage`);
+          return imageBuffer;
+        }
+      } catch (replitError) {
+        console.error('Error trying to retrieve from Replit Object Storage:', replitError);
+      }
+      
       return null;
     }
     
