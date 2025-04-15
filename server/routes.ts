@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertProductSchema, insertCartItemSchema, insertReviewSchema, insertProductImageSchema } from "@shared/schema";
+import { insertProductSchema, insertReviewSchema, insertProductImageSchema } from "@shared/schema";
 import { productImages } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -303,92 +303,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/cart", async (req, res, next) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      const validatedData = insertCartItemSchema.parse({
-        ...req.body,
-        userId: req.user.id,
-      });
-
-      // Check if the product exists
-      const product = await storage.getProductById(validatedData.productId);
-      if (!product) {
-        return res.status(404).json({ message: "Product not found" });
-      }
-
-      // Check if the item is already in the cart
-      const existingItem = await storage.getCartItemByProductId(req.user.id, validatedData.productId);
-
-      if (existingItem) {
-        // Update quantity if the item already exists
-        const updatedItem = await storage.updateCartItem(
-          existingItem.id, 
-          existingItem.quantity + (validatedData.quantity || 1)
-        );
-        return res.json(updatedItem);
-      }
-
-      // Create new cart item
-      const cartItem = await storage.addToCart(validatedData);
-      res.status(201).json(cartItem);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.put("/api/cart/:id", async (req, res, next) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      const id = parseInt(req.params.id);
-      const quantity = z.number().min(1).parse(req.body.quantity);
-
-      const cartItem = await storage.getCartItemById(id);
-
-      if (!cartItem) {
-        return res.status(404).json({ message: "Cart item not found" });
-      }
-
-      if (cartItem.userId !== req.user.id) {
-        return res.status(403).json({ message: "Unauthorized: You can only update your own cart" });
-      }
-
-      const updatedItem = await storage.updateCartItem(id, quantity);
-      res.json(updatedItem);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.delete("/api/cart/:id", async (req, res, next) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      const id = parseInt(req.params.id);
-      const cartItem = await storage.getCartItemById(id);
-
-      if (!cartItem) {
-        return res.status(404).json({ message: "Cart item not found" });
-      }
-
-      if (cartItem.userId !== req.user.id) {
-        return res.status(403).json({ message: "Unauthorized: You can only remove items from your own cart" });
-      }
-
-      await storage.removeFromCart(id);
-      res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
-  });
 
   // Reviews endpoints
   app.get("/api/products/:id/reviews", async (req, res, next) => {
