@@ -222,7 +222,7 @@ export class SupabaseStorage implements IStorage {
     // Apply filters if provided
     if (filters) {
       if (filters.categoryId) {
-        query = query.eq('categoryId', filters.categoryId);
+        query = query.eq('category_id', filters.categoryId);
       }
       
       if (filters.brand) {
@@ -249,8 +249,11 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
+    // Convert snake_case to camelCase
+    const mappedProducts = (data || []).map(product => this.mapSnakeToCamelCase(product));
+    
     // Add product details (category, seller, reviews, etc.)
-    return this.addProductDetails(data as Product[]);
+    return this.addProductDetails(mappedProducts as Product[]);
   }
 
   async getProductById(id: number): Promise<ProductWithDetails | undefined> {
@@ -265,8 +268,11 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     
+    // Convert snake_case to camelCase
+    const mappedProduct = this.mapSnakeToCamelCase(data);
+    
     // Add product details
-    const productsWithDetails = await this.addProductDetails([data as Product]);
+    const productsWithDetails = await this.addProductDetails([mappedProduct]);
     return productsWithDetails[0];
   }
 
@@ -274,28 +280,58 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('isFeatured', true);
+      .eq('is_featured', true);
     
     if (error) {
       console.error('Error getting featured products:', error);
       return [];
     }
     
-    return this.addProductDetails(data as Product[]);
+    // Map from snake_case to camelCase for our application logic
+    const mappedProducts = (data || []).map(product => this.mapSnakeToCamelCase(product));
+    
+    return this.addProductDetails(mappedProducts as Product[]);
+  }
+  
+  // Helper method to convert snake_case to camelCase for product objects
+  private mapSnakeToCamelCase(product: any): Product {
+    return {
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      description: product.description,
+      price: product.price,
+      imageUrl: product.image_url,
+      stockQuantity: product.stock_quantity,
+      categoryId: product.category_id,
+      sellerId: product.seller_id,
+      isNew: product.is_new,
+      isFeatured: product.is_featured,
+      createdAt: product.created_at,
+      remainingPercentage: product.remaining_percentage,
+      batchCode: product.batch_code,
+      purchaseYear: product.purchase_year,
+      boxCondition: product.box_condition,
+      listingType: product.listing_type,
+      volume: product.volume
+    };
   }
 
   async getSellerProducts(sellerId: number): Promise<ProductWithDetails[]> {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('sellerId', sellerId);
+      .eq('seller_id', sellerId);
     
     if (error) {
       console.error('Error getting seller products:', error);
       return [];
     }
     
-    return this.addProductDetails(data as Product[]);
+    // Convert snake_case to camelCase
+    const mappedProducts = (data || []).map(product => this.mapSnakeToCamelCase(product));
+    
+    return this.addProductDetails(mappedProducts as Product[]);
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
@@ -393,23 +429,33 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('reviews')
       .select('*')
-      .eq('productId', productId)
-      .order('createdAt', { ascending: false });
+      .eq('product_id', productId)
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error getting product reviews:', error);
       return [];
     }
     
-    return data as Review[];
+    // Map snake_case to camelCase
+    const reviews = (data || []).map(review => ({
+      id: review.id,
+      userId: review.user_id,
+      productId: review.product_id,
+      rating: review.rating,
+      comment: review.comment,
+      createdAt: review.created_at
+    }));
+    
+    return reviews as Review[];
   }
 
   async getUserProductReview(userId: number, productId: number): Promise<Review | undefined> {
     const { data, error } = await supabase
       .from('reviews')
       .select('*')
-      .eq('userId', userId)
-      .eq('productId', productId)
+      .eq('user_id', userId)
+      .eq('product_id', productId)
       .single();
     
     if (error || !data) {
@@ -420,13 +466,31 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     
-    return data as Review;
+    // Map snake_case to camelCase
+    const review = {
+      id: data.id,
+      userId: data.user_id,
+      productId: data.product_id,
+      rating: data.rating,
+      comment: data.comment,
+      createdAt: data.created_at
+    };
+    
+    return review as Review;
   }
 
   async createReview(review: InsertReview): Promise<Review> {
+    // Convert to snake_case for DB
+    const dbReview = {
+      user_id: review.userId,
+      product_id: review.productId,
+      rating: review.rating,
+      comment: review.comment
+    };
+    
     const { data, error } = await supabase
       .from('reviews')
-      .insert([review])
+      .insert([dbReview])
       .select()
       .single();
     
@@ -435,7 +499,17 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to create review: ${error?.message}`);
     }
     
-    return data as Review;
+    // Map snake_case to camelCase
+    const newReview = {
+      id: data.id,
+      userId: data.user_id,
+      productId: data.product_id,
+      rating: data.rating,
+      comment: data.comment,
+      createdAt: data.created_at
+    };
+    
+    return newReview as Review;
   }
   
   // Order methods
@@ -580,23 +654,41 @@ export class SupabaseStorage implements IStorage {
   // Product Image methods
   async getProductImages(productId: number): Promise<ProductImage[]> {
     const { data, error } = await supabase
-      .from('productImages')
+      .from('product_images')
       .select('*')
-      .eq('productId', productId)
-      .order('imageOrder', { ascending: true });
+      .eq('product_id', productId)
+      .order('image_order', { ascending: true });
     
     if (error) {
       console.error('Error getting product images:', error);
       return [];
     }
     
-    return data as ProductImage[];
+    // Map snake_case to camelCase
+    const images = (data || []).map(img => ({
+      id: img.id,
+      productId: img.product_id,
+      imageUrl: img.image_url,
+      imageOrder: img.image_order,
+      imageName: img.image_name,
+      createdAt: img.created_at
+    }));
+    
+    return images as ProductImage[];
   }
 
   async createProductImage(productImage: InsertProductImage): Promise<ProductImage> {
+    // Convert to snake_case for DB
+    const dbProductImage = {
+      product_id: productImage.productId,
+      image_url: productImage.imageUrl,
+      image_order: productImage.imageOrder,
+      image_name: productImage.imageName
+    };
+    
     const { data, error } = await supabase
-      .from('productImages')
-      .insert([productImage])
+      .from('product_images')
+      .insert([dbProductImage])
       .select()
       .single();
     
@@ -605,12 +697,20 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to create product image: ${error?.message}`);
     }
     
-    return data as ProductImage;
+    // Convert back to camelCase
+    return {
+      id: data.id,
+      productId: data.product_id,
+      imageUrl: data.image_url,
+      imageOrder: data.image_order,
+      imageName: data.image_name,
+      createdAt: data.created_at
+    } as ProductImage;
   }
 
   async deleteProductImage(id: number): Promise<void> {
     const { error } = await supabase
-      .from('productImages')
+      .from('product_images')
       .delete()
       .eq('id', id);
     
@@ -648,7 +748,7 @@ export class SupabaseStorage implements IStorage {
       const { data: reviewsResult, error: reviewsError } = await supabase
         .from('reviews')
         .select('*')
-        .eq('productId', product.id);
+        .eq('product_id', product.id);
       
       // Get product images
       const images = await this.getProductImages(product.id);
