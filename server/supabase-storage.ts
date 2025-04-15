@@ -77,7 +77,23 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     
-    return data as User;
+    // Map snake_case to camelCase
+    const mappedUser = {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      address: data.address,
+      profileImage: data.profile_image,
+      walletBalance: data.wallet_balance,
+      isSeller: data.is_seller,
+      isAdmin: data.is_admin,
+      isBanned: data.is_banned
+    };
+    
+    return mappedUser as User;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
@@ -88,11 +104,29 @@ export class SupabaseStorage implements IStorage {
       .single();
     
     if (error || !data) {
-      console.error('Error getting user by username:', error);
+      if (!error?.message.includes('No rows found')) {
+        console.error('Error getting user by username:', error);
+      }
       return undefined;
     }
     
-    return data as User;
+    // Map snake_case to camelCase
+    const mappedUser = {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      address: data.address,
+      profileImage: data.profile_image,
+      walletBalance: data.wallet_balance,
+      isSeller: data.is_seller,
+      isAdmin: data.is_admin,
+      isBanned: data.is_banned
+    };
+    
+    return mappedUser as User;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -103,17 +137,51 @@ export class SupabaseStorage implements IStorage {
       .single();
     
     if (error || !data) {
-      console.error('Error getting user by email:', error);
+      if (!error?.message.includes('No rows found')) {
+        console.error('Error getting user by email:', error);
+      }
       return undefined;
     }
     
-    return data as User;
+    // Map snake_case to camelCase
+    const mappedUser = {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      address: data.address,
+      profileImage: data.profile_image,
+      walletBalance: data.wallet_balance,
+      isSeller: data.is_seller,
+      isAdmin: data.is_admin,
+      isBanned: data.is_banned
+    };
+    
+    return mappedUser as User;
   }
 
   async createUser(user: InsertUser): Promise<User> {
+    // Convert camelCase to snake_case for DB
+    const dbUser = {
+      username: user.username,
+      password: user.password,
+      email: user.email,
+      first_name: user.firstName,
+      last_name: user.lastName,
+      address: user.address,
+      profile_image: user.profileImage,
+      wallet_balance: user.walletBalance,
+      is_seller: user.isSeller,
+      is_admin: user.isAdmin,
+      is_banned: user.isBanned
+    };
+    
+    // Create a new user
     const { data, error } = await supabase
       .from('users')
-      .insert([user])
+      .insert([dbUser])
       .select()
       .single();
     
@@ -122,13 +190,44 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to create user: ${error?.message}`);
     }
     
-    return data as User;
+    // Map snake_case to camelCase
+    const mappedUser = {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      address: data.address,
+      profileImage: data.profile_image,
+      walletBalance: data.wallet_balance,
+      isSeller: data.is_seller,
+      isAdmin: data.is_admin,
+      isBanned: data.is_banned
+    };
+    
+    return mappedUser as User;
   }
 
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
+    // Convert camelCase to snake_case for DB
+    const dbUserData: any = {};
+    
+    if (userData.username !== undefined) dbUserData.username = userData.username;
+    if (userData.password !== undefined) dbUserData.password = userData.password;
+    if (userData.email !== undefined) dbUserData.email = userData.email;
+    if (userData.firstName !== undefined) dbUserData.first_name = userData.firstName;
+    if (userData.lastName !== undefined) dbUserData.last_name = userData.lastName;
+    if (userData.address !== undefined) dbUserData.address = userData.address;
+    if (userData.profileImage !== undefined) dbUserData.profile_image = userData.profileImage;
+    if (userData.walletBalance !== undefined) dbUserData.wallet_balance = userData.walletBalance;
+    if (userData.isSeller !== undefined) dbUserData.is_seller = userData.isSeller;
+    if (userData.isAdmin !== undefined) dbUserData.is_admin = userData.isAdmin;
+    if (userData.isBanned !== undefined) dbUserData.is_banned = userData.isBanned;
+    
     const { data, error } = await supabase
       .from('users')
-      .update(userData)
+      .update(dbUserData)
       .eq('id', id)
       .select()
       .single();
@@ -138,7 +237,23 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to update user: ${error?.message}`);
     }
     
-    return data as User;
+    // Map snake_case to camelCase
+    const mappedUser = {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      address: data.address,
+      profileImage: data.profile_image,
+      walletBalance: data.wallet_balance,
+      isSeller: data.is_seller,
+      isAdmin: data.is_admin,
+      isBanned: data.is_banned
+    };
+    
+    return mappedUser as User;
   }
 
   async getAllUsers(): Promise<User[]> {
@@ -151,23 +266,55 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
-    return data as User[];
+    // Map snake_case to camelCase for all users
+    const mappedUsers = (data || []).map(user => ({
+      id: user.id,
+      username: user.username,
+      password: user.password,
+      email: user.email,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      address: user.address,
+      profileImage: user.profile_image,
+      walletBalance: user.wallet_balance,
+      isSeller: user.is_seller,
+      isAdmin: user.is_admin,
+      isBanned: user.is_banned
+    }));
+    
+    return mappedUsers as User[];
   }
 
   async banUser(id: number, isBanned: boolean): Promise<User> {
     const { data, error } = await supabase
       .from('users')
-      .update({ isBanned })
+      .update({ is_banned: isBanned })
       .eq('id', id)
       .select()
       .single();
     
     if (error || !data) {
-      console.error('Error banning user:', error);
+      console.error('Error banning/unbanning user:', error);
       throw new Error(`Failed to update user ban status: ${error?.message}`);
     }
     
-    return data as User;
+    // Map snake_case to camelCase
+    const mappedUser = {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      address: data.address,
+      profileImage: data.profile_image,
+      walletBalance: data.wallet_balance,
+      isSeller: data.is_seller,
+      isAdmin: data.is_admin,
+      isBanned: data.is_banned
+    };
+    
+    return mappedUser as User;
   }
 
   // Category methods
@@ -181,7 +328,14 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
-    return data as Category[];
+    // Map snake_case to camelCase
+    const mappedCategories = (data || []).map(category => ({
+      id: category.id,
+      name: category.name,
+      description: category.description
+    }));
+    
+    return mappedCategories as Category[];
   }
 
   async getCategoryById(id: number): Promise<Category | undefined> {
@@ -196,13 +350,26 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     
-    return data as Category;
+    // Map snake_case to camelCase
+    const mappedCategory = {
+      id: data.id,
+      name: data.name,
+      description: data.description
+    };
+    
+    return mappedCategory as Category;
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
+    // Convert to snake_case for DB if needed
+    const dbCategory = {
+      name: category.name,
+      description: category.description
+    };
+    
     const { data, error } = await supabase
       .from('categories')
-      .insert([category])
+      .insert([dbCategory])
       .select()
       .single();
     
@@ -211,7 +378,14 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to create category: ${error?.message}`);
     }
     
-    return data as Category;
+    // Map snake_case to camelCase
+    const mappedCategory = {
+      id: data.id,
+      name: data.name,
+      description: data.description
+    };
+    
+    return mappedCategory as Category;
   }
 
   // Product methods
@@ -335,9 +509,29 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
+    // Convert camelCase to snake_case for DB
+    const dbProduct = {
+      name: product.name,
+      brand: product.brand,
+      description: product.description,
+      price: product.price,
+      image_url: product.imageUrl,
+      stock_quantity: product.stockQuantity,
+      category_id: product.categoryId,
+      seller_id: product.sellerId,
+      is_new: product.isNew,
+      is_featured: product.isFeatured,
+      remaining_percentage: product.remainingPercentage,
+      batch_code: product.batchCode,
+      purchase_year: product.purchaseYear,
+      box_condition: product.boxCondition,
+      listing_type: product.listingType,
+      volume: product.volume
+    };
+    
     const { data, error } = await supabase
       .from('products')
-      .insert([product])
+      .insert([dbProduct])
       .select()
       .single();
     
@@ -346,13 +540,36 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to create product: ${error?.message}`);
     }
     
-    return data as Product;
+    // Map snake_case to camelCase
+    const mappedProduct = this.mapSnakeToCamelCase(data);
+    
+    return mappedProduct as Product;
   }
 
   async updateProduct(id: number, product: InsertProduct): Promise<Product> {
+    // Convert camelCase to snake_case for DB
+    const dbProduct: any = {};
+    
+    if (product.name !== undefined) dbProduct.name = product.name;
+    if (product.brand !== undefined) dbProduct.brand = product.brand;
+    if (product.description !== undefined) dbProduct.description = product.description;
+    if (product.price !== undefined) dbProduct.price = product.price;
+    if (product.imageUrl !== undefined) dbProduct.image_url = product.imageUrl;
+    if (product.stockQuantity !== undefined) dbProduct.stock_quantity = product.stockQuantity;
+    if (product.categoryId !== undefined) dbProduct.category_id = product.categoryId;
+    if (product.sellerId !== undefined) dbProduct.seller_id = product.sellerId;
+    if (product.isNew !== undefined) dbProduct.is_new = product.isNew;
+    if (product.isFeatured !== undefined) dbProduct.is_featured = product.isFeatured;
+    if (product.remainingPercentage !== undefined) dbProduct.remaining_percentage = product.remainingPercentage;
+    if (product.batchCode !== undefined) dbProduct.batch_code = product.batchCode;
+    if (product.purchaseYear !== undefined) dbProduct.purchase_year = product.purchaseYear;
+    if (product.boxCondition !== undefined) dbProduct.box_condition = product.boxCondition;
+    if (product.listingType !== undefined) dbProduct.listing_type = product.listingType;
+    if (product.volume !== undefined) dbProduct.volume = product.volume;
+    
     const { data, error } = await supabase
       .from('products')
-      .update(product)
+      .update(dbProduct)
       .eq('id', id)
       .select()
       .single();
@@ -362,7 +579,10 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to update product: ${error?.message}`);
     }
     
-    return data as Product;
+    // Map snake_case to camelCase
+    const mappedProduct = this.mapSnakeToCamelCase(data);
+    
+    return mappedProduct as Product;
   }
 
   async deleteProduct(id: number): Promise<void> {
@@ -514,9 +734,16 @@ export class SupabaseStorage implements IStorage {
   
   // Order methods
   async createOrder(order: InsertOrder): Promise<Order> {
+    // Convert to snake_case for DB
+    const dbOrder = {
+      user_id: order.userId,
+      total: order.total,
+      status: order.status
+    };
+    
     const { data, error } = await supabase
       .from('orders')
-      .insert([order])
+      .insert([dbOrder])
       .select()
       .single();
     
@@ -525,13 +752,30 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to create order: ${error?.message}`);
     }
     
-    return data as Order;
+    // Map snake_case to camelCase
+    const newOrder = {
+      id: data.id,
+      userId: data.user_id,
+      total: data.total,
+      status: data.status,
+      createdAt: data.created_at
+    };
+    
+    return newOrder as Order;
   }
   
   async addOrderItem(orderItem: InsertOrderItem): Promise<OrderItem> {
+    // Convert to snake_case for DB
+    const dbOrderItem = {
+      order_id: orderItem.orderId,
+      product_id: orderItem.productId,
+      quantity: orderItem.quantity,
+      price: orderItem.price
+    };
+    
     const { data, error } = await supabase
-      .from('orderItems')
-      .insert([orderItem])
+      .from('order_items')
+      .insert([dbOrderItem])
       .select()
       .single();
     
@@ -540,7 +784,16 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to create order item: ${error?.message}`);
     }
     
-    return data as OrderItem;
+    // Map snake_case to camelCase
+    const newOrderItem = {
+      id: data.id,
+      orderId: data.order_id,
+      productId: data.product_id,
+      quantity: data.quantity,
+      price: data.price
+    };
+    
+    return newOrderItem as OrderItem;
   }
   
   async getOrderById(id: number): Promise<OrderWithItems | undefined> {
@@ -556,22 +809,40 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     
+    // Convert order from snake_case to camelCase
+    const mappedOrder = {
+      id: order.id,
+      userId: order.user_id,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at
+    };
+    
     // Get order items
     const { data: orderItems, error: itemsError } = await supabase
-      .from('orderItems')
+      .from('order_items')
       .select('*')
-      .eq('orderId', id);
+      .eq('order_id', id);
     
     if (itemsError) {
       console.error('Error getting order items:', itemsError);
       throw new Error(`Failed to get order items: ${itemsError.message}`);
     }
     
+    // Convert order items from snake_case to camelCase
+    const mappedOrderItems = (orderItems || []).map(item => ({
+      id: item.id,
+      orderId: item.order_id,
+      productId: item.product_id,
+      quantity: item.quantity,
+      price: item.price
+    }));
+    
     // Get user
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('*')
-      .eq('id', order.userId)
+      .eq('id', order.user_id)
       .single();
     
     if (userError || !user) {
@@ -579,8 +850,25 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`User not found for order: ${id}`);
     }
     
+    // Convert user from snake_case to camelCase
+    const mappedUser = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      address: user.address,
+      profileImage: user.profile_image,
+      walletBalance: user.wallet_balance,
+      isSeller: user.is_seller,
+      isAdmin: user.is_admin,
+      isBanned: user.is_banned,
+      // Don't include password in the mapped user
+      password: ''
+    };
+    
     // Get products for each order item
-    const items = await Promise.all((orderItems || []).map(async (item) => {
+    const items = await Promise.all(mappedOrderItems.map(async (item) => {
       const { data: product, error: productError } = await supabase
         .from('products')
         .select('*')
@@ -592,13 +880,16 @@ export class SupabaseStorage implements IStorage {
         throw new Error(`Product not found for order item: ${item.id}`);
       }
       
-      return { ...item, product } as OrderItem & { product: Product };
+      // Map product from snake_case to camelCase
+      const mappedProduct = this.mapSnakeToCamelCase(product);
+      
+      return { ...item, product: mappedProduct } as OrderItem & { product: Product };
     }));
     
     return {
-      ...order,
+      ...mappedOrder,
       items,
-      user,
+      user: mappedUser as User,
     } as OrderWithItems;
   }
   
@@ -606,8 +897,8 @@ export class SupabaseStorage implements IStorage {
     const { data: userOrders, error } = await supabase
       .from('orders')
       .select('*')
-      .eq('userId', userId)
-      .order('createdAt', { ascending: false });
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error getting user orders:', error);
@@ -623,7 +914,7 @@ export class SupabaseStorage implements IStorage {
     const { data: allOrders, error } = await supabase
       .from('orders')
       .select('*')
-      .order('createdAt', { ascending: false });
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error getting all orders:', error);
@@ -648,7 +939,16 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to update order status: ${error?.message}`);
     }
     
-    return data as Order;
+    // Map from snake_case to camelCase
+    const order = {
+      id: data.id,
+      userId: data.user_id,
+      total: data.total,
+      status: data.status,
+      createdAt: data.created_at
+    };
+    
+    return order as Order;
   }
 
   // Product Image methods
