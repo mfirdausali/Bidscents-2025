@@ -314,7 +314,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="text-center mt-10"></div>
+          <div className="text-center mt-10">｀｀</div>
         </div>
       </section>
 
