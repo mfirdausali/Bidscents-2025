@@ -198,6 +198,25 @@ export function setupAuth(app: Express) {
       res.status(500).json({ message: error.message || "Password reset failed" });
     }
   });
+  
+  // Update password
+  app.post("/api/update-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ message: "Token and password are required" });
+      }
+      
+      // Update password in Supabase
+      await updatePassword(token, password);
+      
+      res.status(200).json({ message: "Password updated successfully" });
+    } catch (error: any) {
+      console.error("Password update error:", error);
+      res.status(500).json({ message: error.message || "Password update failed" });
+    }
+  });
 
   // Keep legacy endpoints for backward compatibility
 
