@@ -27,17 +27,8 @@ interface CartItemWithProduct extends CartItem {
 }
 import { IStorage } from "./storage";
 import { supabase } from "./supabase";
-import connectPg from "connect-pg-simple";
 import session from "express-session";
-import pkg from "pg";
-const { Pool } = pkg;
-
-// Still need a PostgreSQL pool for session store
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const PgSessionStore = connectPg(session);
+import createMemoryStore from "memorystore";
 
 type ProductFilter = {
   categoryId?: number;
@@ -55,13 +46,13 @@ export class SupabaseStorage implements IStorage {
   sessionStore: any;
 
   constructor() {
-    // Initialize the session store with the PostgreSQL connection
-    this.sessionStore = new PgSessionStore({
-      pool,
-      tableName: 'session'
+    // Initialize in-memory session store instead of PostgreSQL
+    const MemoryStore = createMemoryStore(session);
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
     });
     
-    console.log('SupabaseStorage initialized');
+    console.log('SupabaseStorage initialized with in-memory session store');
   }
 
   // User methods
