@@ -84,22 +84,29 @@ export async function ensureTablesExist() {
  */
 export async function getUserByProviderId(providerId: string, provider: string) {
   try {
-    const { data, error } = await supabase.auth.admin.listUsers({
-      filters: {
-        id: providerId
-      }
-    });
+    // First, try to get the user directly by ID
+    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(providerId);
+
+    if (!userError && userData?.user) {
+      return userData.user;
+    }
+
+    // If that fails, list all users and find by ID
+    const { data, error } = await supabase.auth.admin.listUsers();
 
     if (error) {
       console.error('Error getting user by provider ID:', error);
       return null;
     }
 
-    if (data.users.length === 0) {
+    // Find the user with the matching ID
+    const user = data.users.find(user => user.id === providerId);
+    
+    if (!user) {
       return null;
     }
 
-    return data.users[0];
+    return user;
   } catch (error) {
     console.error('Exception in getUserByProviderId:', error);
     return null;

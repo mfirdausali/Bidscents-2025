@@ -745,6 +745,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Facebook OAuth callback endpoint
+  app.post('/api/auth/sync-oauth-user', async (req, res) => {
+    try {
+      const { email, providerId, provider } = req.body;
+
+      if (!email || !providerId || !provider) {
+        return res.status(400).json({ message: 'Missing required OAuth information' });
+      }
+
+      // First, check if we already have a user with this email
+      let user = await storage.getUserByEmail(email);
+
+      if (user) {
+        // User exists - log them in
+        req.login(user, (err) => {
+          if (err) {
+            console.error('Error in OAuth login session:', err);
+            return res.status(500).json({ message: 'Failed to create session' });
+          }
+          return res.status(200).json({ user });
+        });
+      } else {
+        // User doesn't exist - create a new account
+        // Generate a username from email
+        const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+        let username = baseUsername;
+        let counter = 1;
+        
+        // Check if username is taken, if so, increment counter until we find a free one
+        while (await storage.getUserByUsername(username)) {
+          username = `${baseUsername}${counter}`;
+          counter++;
+        }
+
+        // Create the user
+        const newUser = await storage.createUser({
+          email,
+          username,
+          firstName: null,
+          lastName: null,
+          address: null,
+          profileImage: null,
+          walletBalance: 0,
+          isSeller: true,
+          isAdmin: false,
+          isBanned: false
+        });
+
+        // Log the new user in
+        req.login(newUser, (err) => {
+          if (err) {
+            console.error('Error in OAuth registration session:', err);
+            return res.status(500).json({ message: 'Failed to create session' });
+          }
+          return res.status(201).json({ user: newUser });
+        });
+      }
+    } catch (error) {
+      console.error('Error syncing OAuth user:', error);
+      res.status(500).json({ message: 'Failed to process OAuth login' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
