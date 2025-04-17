@@ -22,11 +22,21 @@ const resetPasswordSchema = z.object({
 
 type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
-// Initialize Supabase client using environment variables
-// This is safe to include in client-side code (these are public keys)
-const supabaseUrl = 'https://rjazuitnzsximznfcbfw.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqYXp1aXRuenN4aW16bmZjYmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyNTY4MzgsImV4cCI6MjA1NDgzMjgzOH0.7I6R0fOmUvM-GKYpT1aT9vfIVkgdp8XESSRDwYPFu3k';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// IMPORTANT: We use a direct Supabase client for password reset
+// This avoids conflicts with any other Supabase instances
+// We need hardcoded values here since env vars aren't available client-side
+const SUPABASE_URL = 'https://rjazuitnzsximznfcbfw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqYXp1aXRuenN4aW16bmZjYmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyNTY4MzgsImV4cCI6MjA1NDgzMjgzOH0.7I6R0fOmUvM-GKYpT1aT9vfIVkgdp8XESSRDwYPFu3k';
+
+// Create a dedicated client just for password reset operations
+const passwordResetClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true, // Important! Tells Supabase to extract token from URL
+    storageKey: 'supabase.reset.auth.token' // Use a dedicated storage key to avoid conflicts
+  }
+});
 
 export default function ResetPasswordPage() {
   const [location, navigate] = useLocation();
@@ -37,29 +47,58 @@ export default function ResetPasswordPage() {
   // Extract token from URL hash or query parameters
   const [token, setToken] = useState('');
   
-  // Check if Supabase has an active session when component mounts
+  // Check if Supabase already has an active session in the dedicated client
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
+        console.log("DEBUG: Checking for existing password reset session...");
+        const { data, error } = await passwordResetClient.auth.getSession();
         
         if (error) {
-          console.error("Error getting session:", error);
+          console.error("DEBUG: Error getting session:", error);
           setSessionStatus('no-session');
         } else if (data?.session) {
-          console.log("Supabase already has an active session");
+          console.log("DEBUG: Found active reset session:", data.session.access_token.substring(0, 10) + '...');
           setSessionStatus('has-session');
+          // If we have a session, store its token
+          setToken('ACTIVE_SESSION');
         } else {
-          console.log("No active Supabase session found");
+          console.log("DEBUG: No active password reset session found");
           setSessionStatus('no-session');
+          
+          // Special case: Check if we have URL parameters that passwordResetClient should process
+          setTimeout(() => {
+            // The timeout is to let Supabase's detectSessionInUrl work first
+            passwordResetClient.auth.getSession().then(({ data }) => {
+              if (data?.session) {
+                console.log("DEBUG: Session established from URL by passwordResetClient!");
+                setSessionStatus('session-from-url');
+                setToken('SESSION_FROM_URL');
+              }
+            });
+          }, 500);
         }
       } catch (err) {
-        console.error("Exception checking session:", err);
+        console.error("DEBUG: Exception checking session:", err);
         setSessionStatus('error');
       }
     };
     
     checkSession();
+    
+    // Listen for auth state changes from the password reset client
+    const { data: { subscription } } = passwordResetClient.auth.onAuthStateChange((event, session) => {
+      console.log("DEBUG: Auth state changed:", event, !!session);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        console.log("DEBUG: User signed in or token refreshed via auth state change");
+        setSessionStatus('auth-state-change');
+        setToken('AUTH_STATE_CHANGE');
+      }
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
   
   // We don't need to manually extract the token from the URL
@@ -96,7 +135,7 @@ export default function ResetPasswordPage() {
           
           // Try to manually set the session with the extracted token
           try {
-            const { error } = await supabase.auth.setSession({
+            const { error } = await passwordResetClient.auth.setSession({
               access_token: accessToken,
               refresh_token: '',
             });
@@ -228,7 +267,7 @@ export default function ResetPasswordPage() {
         console.log("Using Supabase recovery flow to update password");
         
         // Simply call updateUser - Supabase SDK already has the session from the URL hash
-        const { error } = await supabase.auth.updateUser({
+        const { error } = await passwordResetClient.auth.updateUser({
           password: data.password
         });
         
@@ -254,7 +293,7 @@ export default function ResetPasswordPage() {
           console.log("Attempting to set session with token first");
           
           // Set the session using the token from the URL
-          const { error: sessionError } = await supabase.auth.setSession({
+          const { error: sessionError } = await passwordResetClient.auth.setSession({
             access_token: token,
             refresh_token: '',
           });
@@ -263,7 +302,7 @@ export default function ResetPasswordPage() {
             console.log("Session set successfully, updating password");
             
             // Now update the password
-            const { error } = await supabase.auth.updateUser({
+            const { error } = await passwordResetClient.auth.updateUser({
               password: data.password,
             });
             
