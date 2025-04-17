@@ -28,13 +28,44 @@ type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 const SUPABASE_URL = 'https://rjazuitnzsximznfcbfw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqYXp1aXRuenN4aW16bmZjYmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyNTY4MzgsImV4cCI6MjA1NDgzMjgzOH0.7I6R0fOmUvM-GKYpT1aT9vfIVkgdp8XESSRDwYPFu3k';
 
-// Create a dedicated client just for password reset operations
+// A function to parse the token from the URL hash
+function parseHashFragment() {
+  if (typeof window === 'undefined') return null;
+  
+  // The Supabase recovery hash looks like:
+  // #access_token=xxx&refresh_token=xxx&expires_in=yyy&token_type=bearer&type=recovery
+  const hash = window.location.hash;
+  if (!hash || !hash.startsWith('#')) return null;
+  
+  try {
+    // Parse the hash parameters
+    const hashParams = new URLSearchParams(hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+    const type = hashParams.get('type');
+    
+    // Only handle recovery flows
+    if (type === 'recovery' && accessToken) {
+      return {
+        accessToken,
+        refreshToken: refreshToken || '',
+        type
+      };
+    }
+  } catch (error) {
+    console.error('Failed to parse hash fragment:', error);
+  }
+  
+  return null;
+}
+
+// Create a dedicated client with hash detection disabled - we'll handle it manually
 const passwordResetClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true, // Important! Tells Supabase to extract token from URL
-    storageKey: 'supabase.reset.auth.token' // Use a dedicated storage key to avoid conflicts
+    detectSessionInUrl: false, // We handle URL parsing ourselves for better control
+    storageKey: 'supabase-password-reset' // Unique storage key to avoid conflicts
   }
 });
 
@@ -47,51 +78,93 @@ export default function ResetPasswordPage() {
   // Extract token from URL hash or query parameters
   const [token, setToken] = useState('');
   
-  // Check if Supabase already has an active session in the dedicated client
+  // This effect is no longer needed since we've consolidated all token detection in the second effect
+  // The code has been merged with the other useEffect
+  
+  // This function is no longer needed as we have a cleaner implementation with parseHashFragment
+
+  // Handle the URL parameters and tokens when the component mounts
   useEffect(() => {
-    const checkSession = async () => {
+    console.log('RESET PAGE: Initializing password reset page');
+    
+    // First, try to parse the hash from the URL (recovery flow)
+    const hashData = parseHashFragment();
+    
+    if (hashData) {
+      console.log('RESET PAGE: Found recovery token in URL hash, setting up session...');
+      
+      // Set up a session with the token from the hash
+      (async () => {
+        try {
+          // Step 1: Try setting the session with the extracted token
+          const { error: sessionError } = await passwordResetClient.auth.setSession({
+            access_token: hashData.accessToken,
+            refresh_token: hashData.refreshToken
+          });
+          
+          if (sessionError) {
+            console.error('RESET PAGE: Error setting session with hash tokens:', sessionError);
+            // If session can't be set, store the token for later use with updatePassword
+            setToken(hashData.accessToken);
+            setSessionStatus('token-extracted');
+          } else {
+            console.log('RESET PAGE: Successfully set session with hash tokens!');
+            setSessionStatus('session-from-hash');
+            setToken('SESSION_FROM_HASH');
+          }
+        } catch (err) {
+          console.error('RESET PAGE: Exception setting session from hash:', err);
+          setSessionStatus('error-hash');
+          // Still store the token for later use
+          setToken(hashData.accessToken);
+        }
+      })();
+      
+      return; // Skip further checks if we found and processed hash tokens
+    }
+    
+    console.log('RESET PAGE: No hash token found, checking for existing session...');
+    
+    // Check if there's already an active session in the client
+    (async () => {
       try {
-        console.log("DEBUG: Checking for existing password reset session...");
         const { data, error } = await passwordResetClient.auth.getSession();
         
         if (error) {
-          console.error("DEBUG: Error getting session:", error);
+          console.error('RESET PAGE: Error getting session:', error);
           setSessionStatus('no-session');
         } else if (data?.session) {
-          console.log("DEBUG: Found active reset session:", data.session.access_token.substring(0, 10) + '...');
-          setSessionStatus('has-session');
-          // If we have a session, store its token
-          setToken('ACTIVE_SESSION');
+          console.log('RESET PAGE: Found active session!');
+          setSessionStatus('existing-session');
+          setToken('EXISTING_SESSION');
         } else {
-          console.log("DEBUG: No active password reset session found");
-          setSessionStatus('no-session');
+          console.log('RESET PAGE: No active session found');
           
-          // Special case: Check if we have URL parameters that passwordResetClient should process
-          setTimeout(() => {
-            // The timeout is to let Supabase's detectSessionInUrl work first
-            passwordResetClient.auth.getSession().then(({ data }) => {
-              if (data?.session) {
-                console.log("DEBUG: Session established from URL by passwordResetClient!");
-                setSessionStatus('session-from-url');
-                setToken('SESSION_FROM_URL');
-              }
-            });
-          }, 500);
+          // Fallback to checking query parameters
+          const params = new URLSearchParams(window.location.search);
+          const queryToken = params.get("token");
+          
+          if (queryToken) {
+            console.log('RESET PAGE: Found token in query parameters');
+            setToken(queryToken);
+            setSessionStatus('token-from-query');
+          } else {
+            console.log('RESET PAGE: No token or session available');
+            setSessionStatus('no-token');
+          }
         }
       } catch (err) {
-        console.error("DEBUG: Exception checking session:", err);
-        setSessionStatus('error');
+        console.error('RESET PAGE: Exception in session check:', err);
+        setSessionStatus('error-session');
       }
-    };
+    })();
     
-    checkSession();
-    
-    // Listen for auth state changes from the password reset client
+    // Listen for auth state changes
     const { data: { subscription } } = passwordResetClient.auth.onAuthStateChange((event, session) => {
-      console.log("DEBUG: Auth state changed:", event, !!session);
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        console.log("DEBUG: User signed in or token refreshed via auth state change");
-        setSessionStatus('auth-state-change');
+      console.log(`RESET PAGE: Auth state changed - Event: ${event}, Session exists: ${!!session}`);
+      
+      if (session) {
+        setSessionStatus(`auth-${event.toLowerCase()}`);
         setToken('AUTH_STATE_CHANGE');
       }
     });
@@ -99,143 +172,6 @@ export default function ResetPasswordPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
-  
-  // We don't need to manually extract the token from the URL
-  // Supabase handles this automatically from the hash fragment
-  
-  // Process hash params manually if Supabase doesn't do it automatically
-  const processHashParams = async () => {
-    const hash = window.location.hash;
-    
-    // Remove the # and parse parameters
-    if (hash && hash.startsWith('#')) {
-      try {
-        // Handle hash fragment in different formats
-        const hashContent = hash.substring(1);
-        let accessToken = '';
-        
-        // Try URLSearchParams first
-        try {
-          const params = new URLSearchParams(hashContent);
-          accessToken = params.get('access_token') || '';
-        } catch (e) {
-          // If that fails, try manual parsing
-          const parts = hashContent.split('&');
-          for (const part of parts) {
-            if (part.startsWith('access_token=')) {
-              accessToken = part.split('=')[1];
-              break;
-            }
-          }
-        }
-        
-        if (accessToken) {
-          console.log('Manually extracted access token from hash');
-          
-          // Try to manually set the session with the extracted token
-          try {
-            const { error } = await passwordResetClient.auth.setSession({
-              access_token: accessToken,
-              refresh_token: '',
-            });
-            
-            if (!error) {
-              console.log('Successfully set session manually with token from hash');
-              setSessionStatus('manual-session-set');
-              return true;
-            } else {
-              console.error('Failed to manually set session:', error);
-            }
-          } catch (err) {
-            console.error('Error setting session manually:', err);
-          }
-        }
-      } catch (err) {
-        console.error('Error processing hash parameters:', err);
-      }
-    }
-    return false;
-  };
-
-  // Check if we have a recovery flow in progress
-  useEffect(() => {
-    console.log('Checking URL for reset token parameters...');
-    
-    // Helper function to extract the access token from the hash
-    const getAccessTokenFromHash = (hash: string): string | null => {
-      if (!hash || !hash.includes('access_token=')) return null;
-      
-      try {
-        // Try URLSearchParams first
-        try {
-          const params = new URLSearchParams(hash.substring(1));
-          return params.get('access_token');
-        } catch (e) {
-          // If that fails, try regex
-          const match = hash.match(/access_token=([^&]+)/);
-          return match ? match[1] : null;
-        }
-      } catch (err) {
-        console.error('Error extracting access token:', err);
-        return null;
-      }
-    };
-    
-    const hash = window.location.hash;
-    if (hash) {
-      console.log('Found hash in URL, checking format');
-      
-      // First, try to manually process it
-      processHashParams().then(success => {
-        if (!success) {
-          // If not successful, continue with normal flow
-          
-          // Check if we have a valid Supabase recovery hash fragment
-          // Format is: #access_token=xxx&refresh_token=xxx&expires_in=xxx&token_type=bearer&type=recovery
-          if (hash.includes('access_token=') && hash.includes('type=recovery')) {
-            console.log('Found Supabase recovery parameters in URL hash');
-            
-            // Extract access token directly, don't rely on Supabase
-            const accessToken = getAccessTokenFromHash(hash);
-            if (accessToken) {
-              console.log('Extracted access token from hash');
-              setToken(accessToken);
-            } else {
-              setToken('SUPABASE_RECOVERY_FLOW');
-            }
-            return;
-          }
-          
-          // Try to parse the hash parameters anyway
-          const accessToken = getAccessTokenFromHash(hash);
-          if (accessToken) {
-            console.log('Found access_token in hash parameters');
-            setToken(accessToken);
-            return;
-          }
-        }
-      });
-    }
-    
-    // Fallback to checking query parameters
-    const params = new URLSearchParams(window.location.search);
-    const queryToken = params.get("token");
-    if (queryToken) {
-      console.log('Found token in query parameters');
-      setToken(queryToken);
-    } else {
-      // If no token in URL, check localStorage for a session
-      // If Supabase auth already processed the recovery token, we should still be able to reset
-      const session = localStorage.getItem('supabase.auth.token');
-      if (session) {
-        console.log('Found existing Supabase session in localStorage');
-        // We don't need the token itself, just a marker that we can reset
-        setToken('EXISTING_SESSION');
-      } else {
-        console.log('No token or session found');
-      }
-    }
   }, []); // Empty dependency array means this runs once on component mount
   
   const resetPasswordForm = useForm<ResetPasswordFormValues>({
@@ -250,7 +186,7 @@ export default function ResetPasswordPage() {
     if (!token) {
       toast({
         title: "Error",
-        description: "Missing reset token",
+        description: "Missing reset token. Please use the password reset link from your email.",
         variant: "destructive",
       });
       return;
@@ -259,55 +195,60 @@ export default function ResetPasswordPage() {
     setIsSubmitting(true);
     
     try {
-      console.log("Starting password update with token type:", token);
+      console.log('RESET PAGE: Starting password reset with token type:', token.startsWith('eyJ') ? 'JWT Token' : token);
       
-      // CASE 1: When we have a recovery flow directly from Supabase's email link
-      //         The Supabase SDK already has the token in the hash
-      if (token === 'SUPABASE_RECOVERY_FLOW' || token === 'EXISTING_SESSION') {
-        console.log("Using Supabase recovery flow to update password");
+      // Different approaches based on the token status
+      
+      // CASE 1: We have a session marker from our detection logic
+      if (token === 'SESSION_FROM_HASH' || token === 'EXISTING_SESSION' || 
+          token === 'AUTH_STATE_CHANGE' || sessionStatus.startsWith('auth-')) {
         
-        // Simply call updateUser - Supabase SDK already has the session from the URL hash
+        console.log('RESET PAGE: Using existing session for password update');
+        
+        // If we have a session, just call updateUser directly
         const { error } = await passwordResetClient.auth.updateUser({
           password: data.password
         });
         
         if (error) {
-          console.error("Error updating password with Supabase recovery flow:", error);
-          throw error;
+          console.error('RESET PAGE: Error updating password with existing session:', error);
+          throw new Error(`Password update failed: ${error.message}`);
         }
         
-        console.log("Password updated successfully with Supabase recovery flow");
+        console.log('RESET PAGE: Password updated successfully with existing session');
         toast({
           title: "Success",
           description: "Your password has been reset successfully",
         });
         
-        // Redirect to login page
         navigate("/auth");
         return;
       }
       
-      // CASE 2: We have an actual token string from the URL/parameters
-      if (token !== 'SUPABASE_AUTH_FLOW' && token !== 'SUPABASE_RECOVERY_FLOW' && token !== 'EXISTING_SESSION') {
+      // CASE 2: We have an actual token string extracted from URL
+      if (token.startsWith('ey')) { // JWT tokens start with 'ey'
         try {
-          console.log("Attempting to set session with token first");
+          console.log('RESET PAGE: Using extracted token to set session first');
           
-          // Set the session using the token from the URL
+          // Set the session using the extracted token
           const { error: sessionError } = await passwordResetClient.auth.setSession({
             access_token: token,
-            refresh_token: '',
+            refresh_token: '' // We may not have a refresh token
           });
           
-          if (!sessionError) {
-            console.log("Session set successfully, updating password");
+          if (sessionError) {
+            console.error('RESET PAGE: Failed to set session with token:', sessionError);
+            // Continue to server-side approach
+          } else {
+            console.log('RESET PAGE: Session set successfully, updating password');
             
             // Now update the password
             const { error } = await passwordResetClient.auth.updateUser({
-              password: data.password,
+              password: data.password
             });
             
             if (!error) {
-              console.log("Password updated successfully with extracted token");
+              console.log('RESET PAGE: Password updated successfully after setting session');
               toast({
                 title: "Success",
                 description: "Your password has been reset successfully",
@@ -316,44 +257,51 @@ export default function ResetPasswordPage() {
               return;
             }
             
-            console.log("Failed to update password after setting session:", error);
+            console.error('RESET PAGE: Failed to update password after setting session:', error);
           }
         } catch (err) {
-          console.log("Error trying to set session with token:", err);
+          console.error('RESET PAGE: Exception in token-based update:', err);
         }
       }
       
-      // CASE 3: Fallback - Just try directly (might work if browser already has the session)
-      console.log("Trying to update password directly");
-      const { error } = await supabase.auth.updateUser({
-        password: data.password
-      });
-      
-      if (!error) {
-        console.log("Password updated successfully with direct approach");
-        toast({
-          title: "Success",
-          description: "Your password has been reset successfully",
+      // CASE 3: Try direct updateUser as a fallback
+      try {
+        console.log('RESET PAGE: Trying direct password update as fallback');
+        const { error } = await passwordResetClient.auth.updateUser({
+          password: data.password
         });
-        navigate("/auth");
-        return;
+        
+        if (!error) {
+          console.log('RESET PAGE: Password updated successfully with direct approach');
+          toast({
+            title: "Success",
+            description: "Your password has been reset successfully",
+          });
+          navigate("/auth");
+          return;
+        }
+        
+        console.error('RESET PAGE: Direct password update failed:', error);
+      } catch (err) {
+        console.error('RESET PAGE: Exception in direct update:', err);
       }
       
-      // CASE 4: Last resort - try server-side API if all client-side attempts fail
-      console.log("Direct approach failed, trying server API");
+      // CASE 4: Server-side API as last resort
+      console.log('RESET PAGE: All client-side approaches failed, trying server API');
+      
       const response = await fetch("/api/update-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          token,
+          token: token, // Send whatever token we have
           password: data.password,
         }),
       });
       
       if (response.ok) {
-        console.log("Password updated successfully via server API");
+        console.log('RESET PAGE: Password reset successful via server API');
         toast({
           title: "Success",
           description: "Your password has been reset successfully",
@@ -361,13 +309,13 @@ export default function ResetPasswordPage() {
         navigate("/auth");
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to reset password");
+        throw new Error(errorData.message || "Failed to reset password via server");
       }
     } catch (error: any) {
-      console.error("Password reset error:", error);
+      console.error('RESET PAGE: Password reset failed:', error);
       toast({
-        title: "Error",
-        description: error.message || "An unexpected error occurred",
+        title: "Password Reset Failed",
+        description: error.message || "An unexpected error occurred. Please try again or request a new reset link.",
         variant: "destructive",
       });
     } finally {
