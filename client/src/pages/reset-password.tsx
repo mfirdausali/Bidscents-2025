@@ -289,27 +289,45 @@ export default function ResetPasswordPage() {
       // CASE 4: Server-side API as last resort
       console.log('RESET PAGE: All client-side approaches failed, trying server API');
       
-      const response = await fetch("/api/update-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token: token, // Send whatever token we have
-          password: data.password,
-        }),
-      });
-      
-      if (response.ok) {
-        console.log('RESET PAGE: Password reset successful via server API');
-        toast({
-          title: "Success",
-          description: "Your password has been reset successfully",
+      try {
+        // Use our custom server-side endpoint to handle the token
+        console.log('RESET PAGE: Sending token to server-side API, length:', token.length);
+        
+        const response = await fetch("/api/update-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token: token, // Send whatever token we have
+            password: data.password,
+          }),
         });
-        navigate("/auth");
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to reset password via server");
+        
+        const responseData = await response.json();
+        console.log('RESET PAGE: Server API response status:', response.status);
+        
+        if (response.ok) {
+          console.log('RESET PAGE: Password reset successful via server API');
+          toast({
+            title: "Success",
+            description: "Your password has been reset successfully",
+          });
+          navigate("/auth");
+        } else {
+          console.error('RESET PAGE: Server API error:', responseData.message);
+          throw new Error(responseData.message || "Failed to reset password via server");
+        }
+      } catch (serverError: any) {
+        console.error('RESET PAGE: Server API exception:', serverError);
+        
+        // Check if there's a details array in the response that has more info
+        if (serverError.details && Array.isArray(serverError.details)) {
+          console.error('RESET PAGE: Error details:', serverError.details);
+          throw new Error(`Password reset failed: ${serverError.message}. Please request a new reset link.`);
+        } else {
+          throw new Error(`Password reset failed. Please try again or request a new reset link.`);
+        }
       }
     } catch (error: any) {
       console.error('RESET PAGE: Password reset failed:', error);
