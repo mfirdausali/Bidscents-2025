@@ -6,8 +6,8 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  email: text("email").notNull().unique(),
+  // Removed password field as we'll use Supabase auth.users for password management
+  email: text("email").notNull().unique(), // Used as foreign key to link with auth.users
   firstName: text("first_name"),
   lastName: text("last_name"),
   address: text("address"),
@@ -89,7 +89,7 @@ export const orderItems = pgTable("order_items", {
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
-  password: true,
+  // password removed as it's now managed in auth.users
   email: true,
   firstName: true,
   lastName: true,
