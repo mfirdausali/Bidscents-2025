@@ -136,7 +136,7 @@ export default function AuthPage() {
       email: "",
       firstName: "",
       lastName: "",
-      isSeller: false,
+      isSeller: true,
       isAdmin: false,
       terms: false,
     },
@@ -492,7 +492,7 @@ export default function AuthPage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center space-x-2">
+                    {/* <div className="flex items-center space-x-2">
                       <Checkbox
                         id="isSeller"
                         checked={registerForm.watch("isSeller")}
@@ -502,7 +502,7 @@ export default function AuthPage() {
                         }}
                       />
                       <Label htmlFor="isSeller">I want to sell perfumes</Label>
-                    </div>
+                    </div> */}
                     {/* <div className="flex items-center space-x-2">
                       <Checkbox
                         id="isAdmin"

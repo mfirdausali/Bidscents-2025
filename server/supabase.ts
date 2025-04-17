@@ -100,7 +100,7 @@ export async function registerUserWithEmailVerification(
       email,
       password,
       options: {
-        emailRedirectTo: `${process.env.APP_URL || 'http://localhost:5000'}/verify-email`,
+        emailRedirectTo: `${process.env.APP_URL}/verify-email`,
         data: {
           username: userData.username,
           first_name: userData.firstName,
@@ -214,7 +214,7 @@ export async function verifyEmail(token: string) {
 export async function resetPassword(email: string) {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.APP_URL || 'http://localhost:5000'}/reset-password`,
+      redirectTo: `${process.env.APP_URL}/reset-password`,
     });
 
     if (error) {
