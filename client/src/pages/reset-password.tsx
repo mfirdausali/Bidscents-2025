@@ -41,23 +41,43 @@ export default function ResetPasswordPage() {
   
   // Check if we have a recovery flow in progress
   useEffect(() => {
-    console.log('Checking URL for Supabase recovery parameters...');
+    console.log('Checking URL for reset token parameters...');
     
     const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      console.log('Found recovery parameters in URL hash, setting token to "SUPABASE_AUTH_FLOW"');
-      // We just need to know recovery is in progress, the actual token handling is done by Supabase
-      setToken('SUPABASE_AUTH_FLOW');
-    } else {
-      // Fallback for any custom token parameter 
-      const params = new URLSearchParams(window.location.search);
-      const queryToken = params.get("token");
-      if (queryToken) {
-        console.log('Found token in query parameters');
-        setToken(queryToken);
-      } else {
-        console.log('No token found in URL');
+    if (hash) {
+      console.log('Found hash in URL:', hash);
+      
+      // Remove the # character and parse parameters
+      const hashParams = hash.substring(1).split('&').reduce((params, param) => {
+        const [key, value] = param.split('=');
+        params[key] = decodeURIComponent(value);
+        return params;
+      }, {} as Record<string, string>);
+      
+      // Check for access_token which is the one Supabase provides
+      if (hashParams.access_token) {
+        console.log('Found access_token in hash parameters');
+        // Extract access token from URL for direct use with Supabase
+        setToken(hashParams.access_token);
+        return;
       }
+      
+      // Check if there's a recovery type
+      if (hashParams.type === 'recovery') {
+        console.log('Found recovery type but no access token');
+        setToken('SUPABASE_AUTH_FLOW');
+        return;
+      }
+    }
+      
+    // Fallback to checking query parameters
+    const params = new URLSearchParams(window.location.search);
+    const queryToken = params.get("token");
+    if (queryToken) {
+      console.log('Found token in query parameters');
+      setToken(queryToken);
+    } else {
+      console.log('No token found in URL');
     }
   }, []); // Empty dependency array means this runs once on component mount
   
@@ -82,52 +102,83 @@ export default function ResetPasswordPage() {
     setIsSubmitting(true);
     
     try {
-      console.log("Starting password update directly with Supabase client");
+      console.log("Starting password update with token type:", token === 'SUPABASE_AUTH_FLOW' ? 'SUPABASE_AUTH_FLOW' : 'access_token');
       
-      // For SUPABASE_AUTH_FLOW, use the client directly - it will use the recovery token in the URL
-      if (token === 'SUPABASE_AUTH_FLOW') {
-        // Update user's password directly with Supabase client
-        const { error } = await supabase.auth.updateUser({
-          password: data.password
-        });
-        
-        if (error) {
-          console.error("Error updating password with Supabase client:", error);
-          throw error;
+      // First try: If we have a real token (not the placeholder), try to use it with setSession 
+      if (token !== 'SUPABASE_AUTH_FLOW') {
+        try {
+          console.log("Attempting to set session with token first");
+          
+          // Set the session using the token from the URL
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: token,
+            refresh_token: '',
+          });
+          
+          if (!sessionError) {
+            console.log("Session set successfully, updating password");
+            
+            // Now update the password
+            const { error } = await supabase.auth.updateUser({
+              password: data.password,
+            });
+            
+            if (!error) {
+              console.log("Password updated successfully with extracted token");
+              toast({
+                title: "Success",
+                description: "Your password has been reset successfully",
+              });
+              navigate("/auth");
+              return;
+            }
+            
+            console.log("Failed to update password after setting session:", error);
+          }
+        } catch (err) {
+          console.log("Error trying to set session with token:", err);
         }
-        
-        console.log("Password updated successfully with Supabase client");
+      }
+      
+      // Second try: For SUPABASE_AUTH_FLOW, use the client directly as it should have the hash params
+      console.log("Trying to update password directly");
+      const { error } = await supabase.auth.updateUser({
+        password: data.password
+      });
+      
+      if (!error) {
+        console.log("Password updated successfully with direct approach");
         toast({
           title: "Success",
           description: "Your password has been reset successfully",
         });
-        
-        // Redirect to login page
+        navigate("/auth");
+        return;
+      }
+      
+      // Last resort: Try server-side with our API endpoint
+      console.log("Direct approach failed, trying server API");
+      const response = await fetch("/api/update-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token,
+          password: data.password,
+        }),
+      });
+      
+      if (response.ok) {
+        console.log("Password updated successfully via server API");
+        toast({
+          title: "Success",
+          description: "Your password has been reset successfully",
+        });
         navigate("/auth");
       } else {
-        // Fallback to using our API endpoint
-        const response = await fetch("/api/update-password", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            token,
-            password: data.password,
-          }),
-        });
-        
-        if (response.ok) {
-          toast({
-            title: "Success",
-            description: "Your password has been reset successfully",
-          });
-          // Redirect to login page
-          navigate("/auth");
-        } else {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to reset password");
-        }
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to reset password");
       }
     } catch (error: any) {
       console.error("Password reset error:", error);
