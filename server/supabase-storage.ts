@@ -157,7 +157,6 @@ export class SupabaseStorage implements IStorage {
     // Convert camelCase to snake_case for DB
     const dbUser = {
       username: user.username,
-      password: user.password,
       email: user.email,
       first_name: user.firstName,
       last_name: user.lastName,
