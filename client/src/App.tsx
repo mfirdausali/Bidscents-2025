@@ -27,6 +27,7 @@ function Router() {
       <Route path="/register" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/auth-callback" component={AuthCallback} />
       <Route path="/products" component={ProductsPage} />
       <Route path="/products/:id" component={ProductDetailPage} />
       <Route path="/sellers/:id" component={SellerProfilePage} />
