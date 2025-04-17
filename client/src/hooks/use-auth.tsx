@@ -8,6 +8,7 @@ import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { signInWithFacebook } from "@/lib/supabase";
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -19,14 +20,21 @@ type AuthContextType = {
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
   registerWithVerificationMutation: UseMutationResult<RegisterWithVerificationResponse, Error, RegisterWithVerificationData>;
   resetPasswordMutation: UseMutationResult<void, Error, { email: string }>;
+  loginWithFacebookMutation: UseMutationResult<any, Error, void>;
   isEmailVerified: boolean;
   setIsEmailVerified: (value: boolean) => void;
 };
 
-type LoginData = Pick<InsertUser, "username" | "password">;
+type LoginData = { username: string; password: string };
 type EmailLoginData = { email: string; password: string };
 
-type RegisterWithVerificationData = Pick<InsertUser, "username" | "email" | "password" | "firstName" | "lastName">;
+type RegisterWithVerificationData = { 
+  username: string;
+  email: string;
+  password: string;
+  firstName?: string | null;
+  lastName?: string | null;
+};
 type RegisterWithVerificationResponse = { 
   message: string; 
   user: { 
@@ -211,6 +219,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
   });
+  
+  // Facebook login mutation
+  const loginWithFacebookMutation = useMutation({
+    mutationFn: async () => {
+      return await signInWithFacebook();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Redirecting to Facebook",
+        description: "You'll be redirected to Facebook to complete the login process.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Facebook login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   return (
     <AuthContext.Provider
@@ -224,6 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         registerMutation,
         registerWithVerificationMutation,
         resetPasswordMutation,
+        loginWithFacebookMutation,
         isEmailVerified,
         setIsEmailVerified,
       }}
