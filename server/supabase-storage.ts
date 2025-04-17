@@ -755,22 +755,8 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`User not found for order: ${id}`);
     }
     
-    // Convert user from snake_case to camelCase
-    const mappedUser = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      address: user.address,
-      profileImage: user.profile_image,
-      walletBalance: user.wallet_balance,
-      isSeller: user.is_seller,
-      isAdmin: user.is_admin,
-      isBanned: user.is_banned,
-      // Don't include password in the mapped user
-      password: ''
-    };
+    // Use helper method to map user without password
+    const mappedUser = this.mapUserFromDb(user);
     
     // Get products for each order item
     const items = await Promise.all(mappedOrderItems.map(async (item) => {
