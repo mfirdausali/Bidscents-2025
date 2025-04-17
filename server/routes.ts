@@ -35,6 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`SERVER API: Token length: ${token.length} characters`);
       
       // Try multiple approaches to update the password
+      let approachResults = [];
       
       // APPROACH 1: Direct updateUser with token
       try {
@@ -48,6 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (sessionError) {
           console.error('SERVER API: Session error:', sessionError.message);
+          approachResults.push(`Approach 1 failed: ${sessionError.message}`);
         } else {
           console.log('SERVER API: Session set successfully', !!sessionData.session);
           
@@ -61,10 +63,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(200).json({ message: "Password updated successfully" });
           } else {
             console.error('SERVER API: Update error after session:', updateError.message);
+            approachResults.push(`Update failed after session: ${updateError.message}`);
           }
         }
       } catch (err: any) {
         console.error('SERVER API: Approach 1 exception:', err.message);
+        approachResults.push(`Approach 1 exception: ${err.message}`);
       }
       
       // APPROACH 2: Attempt to decode JWT and use admin capabilities if available
@@ -80,30 +84,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (userId) {
               console.log('SERVER API: Extracted user ID from token:', userId);
+              approachResults.push(`Found user ID: ${userId}`);
               
-              // Here we would use admin API to reset the password if we had admin access
-              // This is a placeholder for that functionality
-              console.log('SERVER API: Would use admin API to reset password for user:', userId);
-              
-              // For now, let's try a generic approach instead
-              const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-                'placeholder@example.com',  // We don't know the email, this will fail safely
-                { redirectTo: `${process.env.APP_URL || 'http://localhost:5000'}/reset-password` }
-              );
-              
-              if (resetError) {
-                console.log('SERVER API: Could not trigger password reset for extracted user ID');
+              // APPROACH 2B: Use the admin API with the user ID
+              try {
+                console.log('SERVER API: Attempting admin update with extracted user ID');
+                
+                // Create a new admin client with admin key
+                const adminKey = process.env.SUPABASE_KEY;
+                if (adminKey && adminKey.startsWith('ey')) {
+                  const adminClient = createClient(
+                    process.env.SUPABASE_URL || '',
+                    adminKey,
+                    {
+                      auth: {
+                        autoRefreshToken: false,
+                        persistSession: false
+                      }
+                    }
+                  );
+                  
+                  // Try to update the password directly with the admin client
+                  const { error } = await adminClient.auth.admin.updateUserById(
+                    userId,
+                    { password: password }
+                  );
+                  
+                  if (error) {
+                    console.error('SERVER API: Admin update failed:', error.message);
+                    approachResults.push(`Admin update failed: ${error.message}`);
+                  } else {
+                    console.log('SERVER API: Password updated successfully via admin API');
+                    return res.status(200).json({ message: "Password updated successfully" });
+                  }
+                } else {
+                  console.log('SERVER API: No valid admin key available');
+                  approachResults.push('No valid admin key available');
+                }
+              } catch (adminErr: any) {
+                console.error('SERVER API: Admin update exception:', adminErr.message);
+                approachResults.push(`Admin update exception: ${adminErr.message}`);
               }
+            } else {
+              approachResults.push(`No user ID in token`);
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error('SERVER API: Failed to parse token payload');
+            approachResults.push(`Token payload parsing failed: ${err.message}`);
           }
+        } else {
+          approachResults.push(`Token does not appear to be a valid JWT format`);
         }
       } catch (err: any) {
         console.error('SERVER API: Approach 2 exception:', err.message);
+        approachResults.push(`Approach 2 exception: ${err.message}`);
       }
       
-      // APPROACH 3: Last resort - try the original Supabase auth flow 
+      // APPROACH 3: Last resort - try the original Supabase auth flow with a fresh client
       try {
         console.log('SERVER API: Approach 3 - Last resort direct method');
         
@@ -119,23 +156,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         );
         
-        // Try with a direct approach
-        const { error } = await resetClient.auth.updateUser({ password });
+        // First try setting a session with this new client
+        const { error: sessionError } = await resetClient.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        });
         
-        if (!error) {
-          console.log('SERVER API: Password updated successfully with approach 3');
-          return res.status(200).json({ message: "Password updated successfully" });
+        if (sessionError) {
+          console.error('SERVER API: Approach 3 session error:', sessionError.message);
+          approachResults.push(`Approach 3 session error: ${sessionError.message}`);
         } else {
-          console.error('SERVER API: Update error with approach 3:', error.message);
+          // Try with a direct approach
+          const { error } = await resetClient.auth.updateUser({ password });
+          
+          if (!error) {
+            console.log('SERVER API: Password updated successfully with approach 3');
+            return res.status(200).json({ message: "Password updated successfully" });
+          } else {
+            console.error('SERVER API: Update error with approach 3:', error.message);
+            approachResults.push(`Approach 3 update error: ${error.message}`);
+          }
         }
       } catch (err: any) {
         console.error('SERVER API: Approach 3 exception:', err.message);
+        approachResults.push(`Approach 3 exception: ${err.message}`);
       }
       
-      // If we got this far, all approaches failed
+      // If we got this far, all approaches failed - return detailed information
       console.error('SERVER API: All password reset approaches failed');
       return res.status(400).json({ 
-        message: "Invalid or expired password reset token. Please request a new password reset link."
+        message: "Invalid or expired password reset token. Please request a new password reset link.",
+        details: approachResults
       });
     } catch (error: any) {
       console.error('SERVER API: Password reset error:', error);
@@ -148,7 +199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      return res.status(500).json({ 
+      return res.status(400).json({ // Changed from 500 to 400 to ensure client can handle it consistently
         message: "Failed to reset password: " + (error.message || "Unknown error") 
       });
     }
