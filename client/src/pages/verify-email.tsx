@@ -12,9 +12,20 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     const verifyEmail = async () => {
       try {
-        // Get token from URL
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get("token");
+        // Extract token from URL or hash
+        // Supabase returns auth tokens in the URL hash/fragment after #
+        const hash = window.location.hash;
+        let token = '';
+        
+        if (hash && hash.includes('access_token=')) {
+          // Extract access_token from hash
+          const hashParams = new URLSearchParams(hash.substring(1)); // Remove the # character
+          token = hashParams.get("access_token") || '';
+        } else {
+          // Fallback to checking query parameters
+          const params = new URLSearchParams(window.location.search);
+          token = params.get("token") || '';
+        }
 
         if (!token) {
           setStatus("error");

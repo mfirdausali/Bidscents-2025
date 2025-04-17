@@ -26,9 +26,19 @@ export default function ResetPasswordPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Get token from URL
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get("token");
+  // Extract token from URL hash or query parameters
+  const hash = window.location.hash;
+  let token = '';
+  
+  if (hash && hash.includes('access_token=')) {
+    // Extract access_token from hash
+    const hashParams = new URLSearchParams(hash.substring(1)); // Remove the # character
+    token = hashParams.get("access_token") || '';
+  } else {
+    // Fallback to checking query parameters
+    const params = new URLSearchParams(window.location.search);
+    token = params.get("token") || '';
+  }
   
   const resetPasswordForm = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
