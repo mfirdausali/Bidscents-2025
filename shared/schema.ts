@@ -13,7 +13,7 @@ export const users = pgTable("users", {
   address: text("address"),
   profileImage: text("profile_image"),
   walletBalance: doublePrecision("wallet_balance").default(0).notNull(),
-  isSeller: boolean("is_seller").default(false).notNull(),
+  isSeller: boolean("is_seller").default(true).notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   isBanned: boolean("is_banned").default(false).notNull(),
 });
