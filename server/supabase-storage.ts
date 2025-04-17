@@ -121,23 +121,8 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     
-    // Map snake_case to camelCase
-    const mappedUser = {
-      id: data.id,
-      username: data.username,
-      password: data.password,
-      email: data.email,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      address: data.address,
-      profileImage: data.profile_image,
-      walletBalance: data.wallet_balance,
-      isSeller: data.is_seller,
-      isAdmin: data.is_admin,
-      isBanned: data.is_banned
-    };
-    
-    return mappedUser as User;
+    // Use helper method to map user without password
+    return this.mapUserFromDb(data);
   }
 
   async createUser(user: InsertUser): Promise<User> {
@@ -168,23 +153,8 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to create user: ${error?.message}`);
     }
     
-    // Map snake_case to camelCase
-    const mappedUser = {
-      id: data.id,
-      username: data.username,
-      password: data.password,
-      email: data.email,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      address: data.address,
-      profileImage: data.profile_image,
-      walletBalance: data.wallet_balance,
-      isSeller: data.is_seller,
-      isAdmin: data.is_admin,
-      isBanned: data.is_banned
-    };
-    
-    return mappedUser as User;
+    // Use helper method to map user without password
+    return this.mapUserFromDb(data);
   }
 
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
@@ -192,7 +162,7 @@ export class SupabaseStorage implements IStorage {
     const dbUserData: any = {};
     
     if (userData.username !== undefined) dbUserData.username = userData.username;
-    if (userData.password !== undefined) dbUserData.password = userData.password;
+    // Remove password field - passwords are now managed by Supabase Auth
     if (userData.email !== undefined) dbUserData.email = userData.email;
     if (userData.firstName !== undefined) dbUserData.first_name = userData.firstName;
     if (userData.lastName !== undefined) dbUserData.last_name = userData.lastName;
@@ -215,23 +185,8 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to update user: ${error?.message}`);
     }
     
-    // Map snake_case to camelCase
-    const mappedUser = {
-      id: data.id,
-      username: data.username,
-      password: data.password,
-      email: data.email,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      address: data.address,
-      profileImage: data.profile_image,
-      walletBalance: data.wallet_balance,
-      isSeller: data.is_seller,
-      isAdmin: data.is_admin,
-      isBanned: data.is_banned
-    };
-    
-    return mappedUser as User;
+    // Use helper method to map user without password
+    return this.mapUserFromDb(data);
   }
 
   async getAllUsers(): Promise<User[]> {
@@ -244,21 +199,8 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
-    // Map snake_case to camelCase for all users
-    const mappedUsers = (data || []).map(user => ({
-      id: user.id,
-      username: user.username,
-      password: user.password,
-      email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      address: user.address,
-      profileImage: user.profile_image,
-      walletBalance: user.wallet_balance,
-      isSeller: user.is_seller,
-      isAdmin: user.is_admin,
-      isBanned: user.is_banned
-    }));
+    // Use helper method to map each user without password
+    const mappedUsers = (data || []).map(user => this.mapUserFromDb(user));
     
     return mappedUsers as User[];
   }
@@ -276,23 +218,8 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to update user ban status: ${error?.message}`);
     }
     
-    // Map snake_case to camelCase
-    const mappedUser = {
-      id: data.id,
-      username: data.username,
-      password: data.password,
-      email: data.email,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      address: data.address,
-      profileImage: data.profile_image,
-      walletBalance: data.wallet_balance,
-      isSeller: data.is_seller,
-      isAdmin: data.is_admin,
-      isBanned: data.is_banned
-    };
-    
-    return mappedUser as User;
+    // Use helper method to map user without password
+    return this.mapUserFromDb(data);
   }
 
   // Category methods
