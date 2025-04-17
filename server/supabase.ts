@@ -77,6 +77,35 @@ export async function ensureTablesExist() {
   }
 }
 
+/**
+ * Get user by provider ID
+ * @param providerId External provider ID
+ * @param provider Provider name (e.g., 'facebook')
+ */
+export async function getUserByProviderId(providerId: string, provider: string) {
+  try {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      filters: {
+        id: providerId
+      }
+    });
+
+    if (error) {
+      console.error('Error getting user by provider ID:', error);
+      return null;
+    }
+
+    if (data.users.length === 0) {
+      return null;
+    }
+
+    return data.users[0];
+  } catch (error) {
+    console.error('Exception in getUserByProviderId:', error);
+    return null;
+  }
+}
+
 // Auth related functions
 
 /**
