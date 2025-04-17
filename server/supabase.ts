@@ -190,16 +190,26 @@ export async function getCurrentUser(): Promise<User | null> {
  */
 export async function verifyEmail(token: string) {
   try {
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash: token,
-      type: 'email',
-    });
+    // When a user comes from an email verification link, they are already verified
+    // We just need to validate that the token is valid
+    const { data, error } = await supabase.auth.getUser(token);
 
     if (error) {
       console.error('Error verifying email:', error);
       throw new Error(`Email verification failed: ${error.message}`);
     }
 
+    if (!data.user) {
+      throw new Error('No user found with this verification token');
+    }
+
+    // Check if the user's email is verified
+    if (!data.user.email_confirmed_at) {
+      console.error('User email not confirmed:', data.user.email);
+      throw new Error('Email not confirmed');
+    }
+
+    console.log('Email verified successfully for user:', data.user.email);
     return true;
   } catch (error: any) {
     console.error('Exception in verifyEmail:', error);

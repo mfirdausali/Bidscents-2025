@@ -141,10 +141,15 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Invalid verification token" });
       }
       
+      // Try to verify the token
       await verifyEmail(token);
       
+      // Verification successful
+      console.log('Email verification successful for token');
+      
       // Redirect to login page after successful verification
-      res.redirect('/login?verified=true');
+      // Changed from '/login' to '/auth' to match the actual route
+      res.redirect('/auth?verified=true');
     } catch (error: any) {
       console.error("Email verification error:", error);
       res.status(500).json({ message: error.message || "Email verification failed" });
