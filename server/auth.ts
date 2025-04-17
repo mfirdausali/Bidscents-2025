@@ -12,7 +12,8 @@ import {
   signOut as supabaseSignOut,
   getCurrentUser,
   verifyEmail,
-  resetPassword
+  resetPassword,
+  updatePassword
 } from './supabase';
 
 declare global {
@@ -113,7 +114,7 @@ export function setupAuth(app: Express) {
         address: null,
         profileImage: null,
         walletBalance: 0,
-        isSeller: false, 
+        isSeller: true, // Set to true by default
         isAdmin: false,
         isBanned: false
       });
