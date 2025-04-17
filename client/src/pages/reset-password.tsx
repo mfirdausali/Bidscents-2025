@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -27,18 +27,48 @@ export default function ResetPasswordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Extract token from URL hash or query parameters
-  const hash = window.location.hash;
-  let token = '';
+  const [token, setToken] = useState('');
   
-  if (hash && hash.includes('access_token=')) {
-    // Extract access_token from hash
-    const hashParams = new URLSearchParams(hash.substring(1)); // Remove the # character
-    token = hashParams.get("access_token") || '';
-  } else {
+  // Use effect to get the token from URL once the component is mounted
+  useEffect(() => {
+    const hash = window.location.hash;
+    
+    if (hash) {
+      // Properly parse hash parameters from Supabase
+      // Example URL hash: #access_token=eyJhbGc...&expires_in=3600&refresh_token=...&token_type=bearer&type=recovery
+      const hashWithoutPound = hash.substring(1); // Remove the # character
+      
+      // For recovery links, Supabase includes 'type=recovery' and an access_token
+      if (hashWithoutPound.includes('type=recovery')) {
+        // First check if there's an access_token in standard format
+        const accessTokenMatch = hashWithoutPound.match(/access_token=([\w-]+\.[\w-]+\.[\w-]+)/);
+        if (accessTokenMatch && accessTokenMatch[1]) {
+          console.log('Found access token in hash');
+          setToken(accessTokenMatch[1]);
+          return;
+        }
+        
+        // If not found in standard format, try URL params approach
+        const hashParams = new URLSearchParams(hashWithoutPound);
+        const accessToken = hashParams.get("access_token");
+        if (accessToken) {
+          console.log('Found access token via URLSearchParams');
+          setToken(accessToken);
+          return;
+        }
+      }
+    }
+    
     // Fallback to checking query parameters
     const params = new URLSearchParams(window.location.search);
-    token = params.get("token") || '';
-  }
+    const queryToken = params.get("token");
+    if (queryToken) {
+      console.log('Found token in query parameters');
+      setToken(queryToken);
+    } else {
+      console.log('No token found in URL');
+    }
+  }, []); // Empty dependency array means this runs once on component mount
   
   const resetPasswordForm = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),

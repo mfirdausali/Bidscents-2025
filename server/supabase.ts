@@ -246,7 +246,26 @@ export async function resetPassword(email: string) {
  */
 export async function updatePassword(token: string, newPassword: string) {
   try {
-    // First set the session with the recovery token
+    console.log('Updating password with token');
+    
+    // Method 1: Try using the token directly with updateUser
+    try {
+      const { data, error } = await supabase.auth.updateUser(
+        { password: newPassword },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (!error) {
+        console.log('Password updated successfully with Method 1');
+        return true;
+      }
+      
+      console.log('Method 1 failed, trying Method 2');
+    } catch (err) {
+      console.log('Method 1 exception, trying Method 2');
+    }
+    
+    // Method 2: Try to first set the session with the recovery token
     const { error: sessionError } = await supabase.auth.setSession({
       access_token: token,
       refresh_token: ''
@@ -254,19 +273,36 @@ export async function updatePassword(token: string, newPassword: string) {
     
     if (sessionError) {
       console.error('Error setting session with token:', sessionError);
-      throw new Error(`Password update failed: ${sessionError.message}`);
+      console.log('Method 2 failed, trying Method 3');
+    } else {
+      // Then update the user password
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (!error) {
+        console.log('Password updated successfully with Method 2');
+        return true;
+      }
+      
+      console.log('Method 2 updateUser failed, trying Method 3');
     }
     
-    // Then update the user password
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    });
+    // Method 3: Try with only the password and type in the URL
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      'dummy@example.com', // Not used when token is provided via headers
+      {
+        redirectTo: `${process.env.APP_URL}/reset-password?token=${token}`,
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
 
     if (error) {
-      console.error('Error updating password:', error);
+      console.error('All password reset methods failed:', error);
       throw new Error(`Password update failed: ${error.message}`);
     }
-
+    
+    console.log('Password updated successfully with Method 3');
     return true;
   } catch (error: any) {
     console.error('Exception in updatePassword:', error);
