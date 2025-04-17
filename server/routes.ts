@@ -12,7 +12,6 @@ import * as objectStorage from "./object-storage"; // Import the entire module t
 import path from "path"; // Added import for path
 import { supabase } from "./supabase"; // Import Supabase for server-side operations
 import { createClient } from '@supabase/supabase-js';
-import { hashPassword } from "./auth.js"; // Import the hash function for passwords
 import { users } from "@shared/schema"; // Import the users schema for database updates
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -126,43 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       approachResults.push(`Admin update failed: ${error.message}`);
                     } else {
                       console.log('SERVER API: Password updated successfully in auth.users');
-                      
-                      // Also update the password in public.users
-                      try {
-                        // Get the user from public.users by email
-                        const userEmail = userData.user.email;
-                        if (userEmail) {
-                          // Hash the password for storage in public.users
-                          const hashedPassword = await hashPassword(password);
-                          
-                          // Find the user in public.users by email and update their password
-                          const dbUser = await storage.getUserByEmail(userEmail);
-                          
-                          if (dbUser) {
-                            console.log('SERVER API: Found user in public.users, updating password');
-                            
-                            // Update the password in public.users
-                            await db.update(users)
-                              .set({ password: hashedPassword })
-                              .where(eq(users.email, userEmail));
-                              
-                            console.log('SERVER API: Password also updated in public.users');
-                            return res.status(200).json({ message: "Password updated successfully in auth and database" });
-                          } else {
-                            console.log('SERVER API: User not found in public.users');
-                            return res.status(200).json({ message: "Password updated successfully in auth only" });
-                          }
-                        } else {
-                          console.log('SERVER API: No email available to update public.users');
-                          return res.status(200).json({ message: "Password updated successfully in auth only" });
-                        }
-                      } catch (dbError: any) {
-                        console.error('SERVER API: Failed to update password in public.users:', dbError.message);
-                        // Still return success since auth password was updated
-                        return res.status(200).json({ 
-                          message: "Password updated successfully in auth but failed to update in database",
-                        });
-                      }
+                      return res.status(200).json({ message: "Password updated successfully" });
                     }
                   }
                 } else {

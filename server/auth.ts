@@ -2,8 +2,6 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 import {
@@ -22,21 +20,7 @@ declare global {
   }
 }
 
-const scryptAsync = promisify(scrypt);
-
-// Export this function so it can be used in other files like routes.ts
-export async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
-}
-
-async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
-}
+// No longer need password hashing or comparison functions as we're using Supabase auth
 
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
@@ -51,15 +35,27 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Keep legacy local strategy for backward compatibility
+  // Update local strategy to verify with Supabase auth
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
+        // Get user from database first to check if username exists
         const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
+        if (!user) {
           return done(null, false);
-        } else {
-          return done(null, user);
+        }
+        
+        // Then verify credentials with Supabase
+        try {
+          const result = await signInWithEmail(user.email, password);
+          if (result?.user) {
+            return done(null, user);
+          } else {
+            return done(null, false);
+          }
+        } catch (authError) {
+          console.error("Authentication error:", authError);
+          return done(null, false);
         }
       } catch (error) {
         return done(error);
@@ -105,11 +101,9 @@ export function setupAuth(app: Express) {
 
       // Create user in our database too (for backward compatibility)
       // Only creating basic info, the rest will be completed after email verification
-      const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
         username,
         email,
-        password: hashedPassword,
         firstName: firstName || null,
         lastName: lastName || null,
         address: null,
@@ -212,19 +206,31 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const existingUser = await storage.getUserByUsername(req.body.username);
+      const { username, email, password, ...otherFields } = req.body;
+      
+      const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
-      const existingEmail = await storage.getUserByEmail(req.body.email);
+      const existingEmail = await storage.getUserByEmail(email);
       if (existingEmail) {
         return res.status(400).json({ message: "Email already exists" });
       }
 
+      // First register with Supabase Auth
+      try {
+        await registerUserWithEmailVerification(email, password, { username });
+      } catch (authError: any) {
+        console.error("Supabase registration error:", authError);
+        return res.status(400).json({ message: authError.message || "Registration failed with auth provider" });
+      }
+      
+      // Then create in our database
       const user = await storage.createUser({
-        ...req.body,
-        password: await hashPassword(req.body.password),
+        username,
+        email,
+        ...otherFields
       });
 
       req.login(user, (err) => {
