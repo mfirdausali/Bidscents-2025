@@ -246,8 +246,20 @@ export async function resetPassword(email: string) {
  */
 export async function updatePassword(token: string, newPassword: string) {
   try {
-    const { error } = await supabase.auth.updateUser({ 
-      password: newPassword 
+    // First set the session with the recovery token
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: token,
+      refresh_token: ''
+    });
+    
+    if (sessionError) {
+      console.error('Error setting session with token:', sessionError);
+      throw new Error(`Password update failed: ${sessionError.message}`);
+    }
+    
+    // Then update the user password
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
     });
 
     if (error) {
