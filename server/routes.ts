@@ -10,10 +10,83 @@ import { z } from "zod";
 import multer from "multer";
 import * as objectStorage from "./object-storage"; // Import the entire module to access all properties
 import path from "path"; // Added import for path
+import { supabase } from "./supabase"; // Import Supabase for server-side operations
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
+
+  // Password reset endpoint - server-side fallback for when client-side methods fail
+  app.post("/api/update-password", async (req, res) => {
+    try {
+      // Validate the request body
+      const resetSchema = z.object({
+        token: z.string().min(1, "Token is required"),
+        password: z.string().min(6, "Password must be at least 6 characters")
+      });
+      
+      const { token, password } = resetSchema.parse(req.body);
+      
+      // Log the request for debugging (not including the password)
+      console.log(`SERVER: Password reset request received with token type: ${token.startsWith('ey') ? 'JWT Token' : 'Custom Token'}`);
+
+      // First, try using the token directly with the updateUser API
+      // Set session with the token first
+      await supabase.auth.setSession({
+        access_token: token,
+        refresh_token: ''
+      });
+      
+      // Then update the password
+      const { error } = await supabase.auth.updateUser({
+        password: password
+      });
+
+      if (error) {
+        console.error('SERVER: Direct updateUser failed:', error);
+        
+        // If that fails, try with admin methods to explicitly set the user's password
+        // This requires that we set the token in a session first
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        });
+        
+        if (sessionError) {
+          console.error('SERVER: Failed to set session with token:', sessionError);
+          return res.status(401).json({ 
+            message: "Invalid or expired password reset token"
+          });
+        }
+        
+        // Now try updating the password with the established session
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: password
+        });
+        
+        if (updateError) {
+          console.error('SERVER: Failed to update password after setting session:', updateError);
+          return res.status(400).json({ 
+            message: "Failed to update password: " + updateError.message 
+          });
+        }
+      }
+      
+      console.log('SERVER: Password reset successful');
+      return res.status(200).json({ message: "Password updated successfully" });
+    } catch (error: any) {
+      console.error('SERVER: Password reset error:', error);
+      
+      // Handle different types of errors
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid request data", details: error.errors });
+      }
+      
+      return res.status(500).json({ 
+        message: "Failed to reset password: " + (error.message || "Unknown error") 
+      });
+    }
+  });
 
   // Configure multer for file uploads
   const upload = multer({

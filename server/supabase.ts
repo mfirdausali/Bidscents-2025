@@ -284,10 +284,15 @@ export async function updatePassword(token: string, newPassword: string) {
     // Method 2: Try using the token directly with updateUser
     try {
       console.log('SERVER: Trying Method 2 - Direct update with token as auth');
-      // @ts-ignore - The headers property exists in the API but not in the types
+      // We use setSession first to establish a session with the token
+      await supabase.auth.setSession({
+        access_token: token,
+        refresh_token: '',
+      });
+      
+      // Then we update the password
       const { data, error } = await supabase.auth.updateUser(
-        { password: newPassword },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { password: newPassword }
       );
       
       if (!error) {
