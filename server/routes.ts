@@ -11,6 +11,7 @@ import multer from "multer";
 import * as objectStorage from "./object-storage"; // Import the entire module to access all properties
 import path from "path"; // Added import for path
 import { supabase } from "./supabase"; // Import Supabase for server-side operations
+import { createClient } from '@supabase/supabase-js';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -19,6 +20,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Password reset endpoint - server-side fallback for when client-side methods fail
   app.post("/api/update-password", async (req, res) => {
     try {
+      console.log('SERVER API: Password reset request received');
+      
       // Validate the request body
       const resetSchema = z.object({
         token: z.string().min(1, "Token is required"),
@@ -28,58 +31,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { token, password } = resetSchema.parse(req.body);
       
       // Log the request for debugging (not including the password)
-      console.log(`SERVER: Password reset request received with token type: ${token.startsWith('ey') ? 'JWT Token' : 'Custom Token'}`);
-
-      // First, try using the token directly with the updateUser API
-      // Set session with the token first
-      await supabase.auth.setSession({
-        access_token: token,
-        refresh_token: ''
-      });
+      console.log(`SERVER API: Token type: ${token.startsWith('ey') ? 'JWT Token' : 'Custom Token'}`);
+      console.log(`SERVER API: Token length: ${token.length} characters`);
       
-      // Then update the password
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      });
-
-      if (error) {
-        console.error('SERVER: Direct updateUser failed:', error);
+      // Try multiple approaches to update the password
+      
+      // APPROACH 1: Direct updateUser with token
+      try {
+        console.log('SERVER API: Approach 1 - Setting session with token');
         
-        // If that fails, try with admin methods to explicitly set the user's password
-        // This requires that we set the token in a session first
-        const { error: sessionError } = await supabase.auth.setSession({
+        // First try setting the session with the token
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: token,
           refresh_token: ''
         });
         
         if (sessionError) {
-          console.error('SERVER: Failed to set session with token:', sessionError);
-          return res.status(401).json({ 
-            message: "Invalid or expired password reset token"
+          console.error('SERVER API: Session error:', sessionError.message);
+        } else {
+          console.log('SERVER API: Session set successfully', !!sessionData.session);
+          
+          // Now try to update the password
+          const { error: updateError } = await supabase.auth.updateUser({
+            password: password
           });
+          
+          if (!updateError) {
+            console.log('SERVER API: Password updated successfully');
+            return res.status(200).json({ message: "Password updated successfully" });
+          } else {
+            console.error('SERVER API: Update error after session:', updateError.message);
+          }
         }
-        
-        // Now try updating the password with the established session
-        const { error: updateError } = await supabase.auth.updateUser({
-          password: password
-        });
-        
-        if (updateError) {
-          console.error('SERVER: Failed to update password after setting session:', updateError);
-          return res.status(400).json({ 
-            message: "Failed to update password: " + updateError.message 
-          });
-        }
+      } catch (err: any) {
+        console.error('SERVER API: Approach 1 exception:', err.message);
       }
       
-      console.log('SERVER: Password reset successful');
-      return res.status(200).json({ message: "Password updated successfully" });
+      // APPROACH 2: Attempt to decode JWT and use admin capabilities if available
+      try {
+        console.log('SERVER API: Approach 2 - Trying to extract user ID from token');
+        
+        // Basic JWT parsing - this is a simplified approach
+        const tokenParts = token.split('.');
+        if (tokenParts.length === 3) {
+          try {
+            const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+            const userId = payload.sub;
+            
+            if (userId) {
+              console.log('SERVER API: Extracted user ID from token:', userId);
+              
+              // Here we would use admin API to reset the password if we had admin access
+              // This is a placeholder for that functionality
+              console.log('SERVER API: Would use admin API to reset password for user:', userId);
+              
+              // For now, let's try a generic approach instead
+              const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+                'placeholder@example.com',  // We don't know the email, this will fail safely
+                { redirectTo: `${process.env.APP_URL || 'http://localhost:5000'}/reset-password` }
+              );
+              
+              if (resetError) {
+                console.log('SERVER API: Could not trigger password reset for extracted user ID');
+              }
+            }
+          } catch (err) {
+            console.error('SERVER API: Failed to parse token payload');
+          }
+        }
+      } catch (err: any) {
+        console.error('SERVER API: Approach 2 exception:', err.message);
+      }
+      
+      // APPROACH 3: Last resort - try the original Supabase auth flow 
+      try {
+        console.log('SERVER API: Approach 3 - Last resort direct method');
+        
+        // Create a separate client for this attempt
+        const resetClient = createClient(
+          process.env.SUPABASE_URL || '',
+          process.env.SUPABASE_KEY || '',
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false
+            }
+          }
+        );
+        
+        // Try with a direct approach
+        const { error } = await resetClient.auth.updateUser({ password });
+        
+        if (!error) {
+          console.log('SERVER API: Password updated successfully with approach 3');
+          return res.status(200).json({ message: "Password updated successfully" });
+        } else {
+          console.error('SERVER API: Update error with approach 3:', error.message);
+        }
+      } catch (err: any) {
+        console.error('SERVER API: Approach 3 exception:', err.message);
+      }
+      
+      // If we got this far, all approaches failed
+      console.error('SERVER API: All password reset approaches failed');
+      return res.status(400).json({ 
+        message: "Invalid or expired password reset token. Please request a new password reset link."
+      });
     } catch (error: any) {
-      console.error('SERVER: Password reset error:', error);
+      console.error('SERVER API: Password reset error:', error);
       
       // Handle different types of errors
       if (error.name === 'ZodError') {
-        return res.status(400).json({ message: "Invalid request data", details: error.errors });
+        return res.status(400).json({ 
+          message: "Invalid request data", 
+          details: error.errors 
+        });
       }
       
       return res.status(500).json({ 
