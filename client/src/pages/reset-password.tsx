@@ -4,6 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
+import { createClient } from '@supabase/supabase-js';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,12 @@ const resetPasswordSchema = z.object({
 
 type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
+// Initialize Supabase client using environment variables
+// Public Supabase URL and anon key are safe to include in client-side code
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://rjazuitnzsximznfcbfw.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqYXp1aXRuenN4aW16bmZjYmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyNTY4MzgsImV4cCI6MjA1NDgzMjgzOH0.7I6R0fOmUvM-GKYpT1aT9vfIVkgdp8XESSRDwYPFu3k';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 export default function ResetPasswordPage() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
@@ -29,44 +36,28 @@ export default function ResetPasswordPage() {
   // Extract token from URL hash or query parameters
   const [token, setToken] = useState('');
   
-  // Use effect to get the token from URL once the component is mounted
+  // We don't need to manually extract the token from the URL
+  // Supabase handles this automatically from the hash fragment
+  
+  // Check if we have a recovery flow in progress
   useEffect(() => {
+    console.log('Checking URL for Supabase recovery parameters...');
+    
     const hash = window.location.hash;
-    
-    if (hash) {
-      // Properly parse hash parameters from Supabase
-      // Example URL hash: #access_token=eyJhbGc...&expires_in=3600&refresh_token=...&token_type=bearer&type=recovery
-      const hashWithoutPound = hash.substring(1); // Remove the # character
-      
-      // For recovery links, Supabase includes 'type=recovery' and an access_token
-      if (hashWithoutPound.includes('type=recovery')) {
-        // First check if there's an access_token in standard format
-        const accessTokenMatch = hashWithoutPound.match(/access_token=([\w-]+\.[\w-]+\.[\w-]+)/);
-        if (accessTokenMatch && accessTokenMatch[1]) {
-          console.log('Found access token in hash');
-          setToken(accessTokenMatch[1]);
-          return;
-        }
-        
-        // If not found in standard format, try URL params approach
-        const hashParams = new URLSearchParams(hashWithoutPound);
-        const accessToken = hashParams.get("access_token");
-        if (accessToken) {
-          console.log('Found access token via URLSearchParams');
-          setToken(accessToken);
-          return;
-        }
-      }
-    }
-    
-    // Fallback to checking query parameters
-    const params = new URLSearchParams(window.location.search);
-    const queryToken = params.get("token");
-    if (queryToken) {
-      console.log('Found token in query parameters');
-      setToken(queryToken);
+    if (hash && hash.includes('type=recovery')) {
+      console.log('Found recovery parameters in URL hash, setting token to "SUPABASE_AUTH_FLOW"');
+      // We just need to know recovery is in progress, the actual token handling is done by Supabase
+      setToken('SUPABASE_AUTH_FLOW');
     } else {
-      console.log('No token found in URL');
+      // Fallback for any custom token parameter 
+      const params = new URLSearchParams(window.location.search);
+      const queryToken = params.get("token");
+      if (queryToken) {
+        console.log('Found token in query parameters');
+        setToken(queryToken);
+      } else {
+        console.log('No token found in URL');
+      }
     }
   }, []); // Empty dependency array means this runs once on component mount
   
@@ -91,33 +82,55 @@ export default function ResetPasswordPage() {
     setIsSubmitting(true);
     
     try {
-      const response = await fetch("/api/update-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token,
-          password: data.password,
-        }),
-      });
+      console.log("Starting password update directly with Supabase client");
       
-      if (response.ok) {
+      // For SUPABASE_AUTH_FLOW, use the client directly - it will use the recovery token in the URL
+      if (token === 'SUPABASE_AUTH_FLOW') {
+        // Update user's password directly with Supabase client
+        const { error } = await supabase.auth.updateUser({
+          password: data.password
+        });
+        
+        if (error) {
+          console.error("Error updating password with Supabase client:", error);
+          throw error;
+        }
+        
+        console.log("Password updated successfully with Supabase client");
         toast({
           title: "Success",
           description: "Your password has been reset successfully",
         });
+        
         // Redirect to login page
         navigate("/auth");
       } else {
-        const errorData = await response.json();
-        toast({
-          title: "Error",
-          description: errorData.message || "Failed to reset password",
-          variant: "destructive",
+        // Fallback to using our API endpoint
+        const response = await fetch("/api/update-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token,
+            password: data.password,
+          }),
         });
+        
+        if (response.ok) {
+          toast({
+            title: "Success",
+            description: "Your password has been reset successfully",
+          });
+          // Redirect to login page
+          navigate("/auth");
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to reset password");
+        }
       }
     } catch (error: any) {
+      console.error("Password reset error:", error);
       toast({
         title: "Error",
         description: error.message || "An unexpected error occurred",
