@@ -54,6 +54,23 @@ export class SupabaseStorage implements IStorage {
     
     console.log('SupabaseStorage initialized with in-memory session store');
   }
+  
+  // Helper method to map DB user to our User type without password
+  private mapUserFromDb(data: any): User {
+    return {
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      address: data.address,
+      profileImage: data.profile_image,
+      walletBalance: data.wallet_balance,
+      isSeller: data.is_seller,
+      isAdmin: data.is_admin,
+      isBanned: data.is_banned
+    } as User;
+  }
 
   // User methods
   async getUser(id: number): Promise<User | undefined> {
@@ -68,23 +85,8 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     
-    // Map snake_case to camelCase
-    const mappedUser = {
-      id: data.id,
-      username: data.username,
-      password: data.password,
-      email: data.email,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      address: data.address,
-      profileImage: data.profile_image,
-      walletBalance: data.wallet_balance,
-      isSeller: data.is_seller,
-      isAdmin: data.is_admin,
-      isBanned: data.is_banned
-    };
-    
-    return mappedUser as User;
+    // Use helper method to map user without password
+    return this.mapUserFromDb(data);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
@@ -101,23 +103,8 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     
-    // Map snake_case to camelCase
-    const mappedUser = {
-      id: data.id,
-      username: data.username,
-      password: data.password,
-      email: data.email,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      address: data.address,
-      profileImage: data.profile_image,
-      walletBalance: data.wallet_balance,
-      isSeller: data.is_seller,
-      isAdmin: data.is_admin,
-      isBanned: data.is_banned
-    };
-    
-    return mappedUser as User;
+    // Use helper method to map user without password
+    return this.mapUserFromDb(data);
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
