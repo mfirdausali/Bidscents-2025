@@ -182,38 +182,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (!error) {
             console.log('SERVER API: Password updated successfully with approach 3');
-            
-            // Get the user's email from the session
-            const { data: userData } = await resetClient.auth.getUser();
-            
-            if (userData?.user?.email) {
-              try {
-                // Also update the password in public.users
-                const userEmail = userData.user.email;
-                
-                // Hash the password for storage in public.users
-                const hashedPassword = await hashPassword(password);
-                
-                // Find the user in public.users by email
-                const dbUser = await storage.getUserByEmail(userEmail);
-                
-                if (dbUser) {
-                  console.log('SERVER API: Found user in public.users, updating password via approach 3');
-                  
-                  // Update the password in public.users
-                  await db.update(users)
-                    .set({ password: hashedPassword })
-                    .where(eq(users.email, userEmail));
-                    
-                  console.log('SERVER API: Password also updated in public.users via approach 3');
-                  return res.status(200).json({ message: "Password updated successfully in auth and database" });
-                }
-              } catch (dbError: any) {
-                console.error('SERVER API: Failed to update password in public.users via approach 3:', dbError.message);
-                // Still return success since auth password was updated
-              }
-            }
-            
             return res.status(200).json({ message: "Password updated successfully" });
           } else {
             console.error('SERVER API: Update error with approach 3:', error.message);
@@ -606,10 +574,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User is not a seller" });
       }
 
-      // Don't expose sensitive information
-      const { password, ...sellerProfile } = seller;
-
-      res.json(sellerProfile);
+      // Return seller profile directly since password is no longer in the schema
+      res.json(seller);
     } catch (error) {
       next(error);
     }
