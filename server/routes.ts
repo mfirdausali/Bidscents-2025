@@ -515,7 +515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (!userCheck.isSeller) {
-          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+          return res.status(403).json({ xmessage: "Unauthorized: Seller account required" });
         }
       } else {
         return res.status(403).json({ message: "Unauthorized: User not authenticated" });
@@ -538,8 +538,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const image = imageData;
 
       // Check if the product belongs to the seller
-      const product = await storage.getProductById(image.productId);
+      const productId = image.productId;
+      console.log(`Checking product ID: ${productId}`);
+      
+      if (!productId) {
+        return res.status(400).json({ message: "Invalid product ID in image metadata" });
+      }
+      
+      const product = await storage.getProductById(productId);
       if (!product) {
+        console.log(`Product ${productId} not found`);
         return res.status(404).json({ message: "Product not found" });
       }
 
@@ -644,8 +652,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const image = imageData;
 
       // Check if the product belongs to the seller
-      const product = await storage.getProductById(image.productId);
+      const productId = image.productId;
+      console.log(`Checking product ID for deletion: ${productId}`);
+      
+      if (!productId) {
+        return res.status(400).json({ message: "Invalid product ID in image metadata" });
+      }
+      
+      const product = await storage.getProductById(productId);
       if (!product) {
+        console.log(`Product ${productId} not found during image deletion`);
         return res.status(404).json({ message: "Product not found" });
       }
 
