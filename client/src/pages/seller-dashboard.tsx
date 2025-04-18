@@ -362,7 +362,7 @@ export default function SellerDashboard() {
       brand: product.brand,
       description: product.description || "",
       price: product.price,
-      imageUrl: product.imageUrl,
+      imageUrl: product.imageUrl || "",
       stockQuantity: product.stockQuantity,
       categoryId: product.categoryId || 1,
       isNew: product.isNew === null ? false : product.isNew,
