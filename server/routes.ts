@@ -970,13 +970,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized: You can only add images to your own products" });
       }
       
-      // Create image record in database with the provided imageUrl (should be a UUID placeholder)
+      // IMPORTANT: Use the exact UUID provided in the request
+      // This ensures the database and object storage use the same ID
+      // Don't generate another UUID here
+      
+      // Create image record in database with the provided imageUrl
       const productImage = await storage.createProductImage({
         productId,
         imageUrl: req.body.imageUrl,
         imageOrder: req.body.imageOrder,
         imageName: req.body.imageName || 'unnamed'
       });
+      
+      // Log for debugging
+      console.log(`Created new product image record:`, productImage);
       
       res.status(200).json(productImage);
     } catch (error) {

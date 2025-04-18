@@ -226,8 +226,12 @@ export default function SellerDashboard() {
     mutationFn: async ({ productId, images }: { productId: number, images: File[] }) => {
       // Step 1: Create placeholder entries for each image in the database
       const registerPromises = images.map(async (file, index) => {
-        // Generate a random UUID for the image
+        // Generate a random UUID for the image - this will be used both in the database
+        // and as the actual object storage key to ensure consistency
         const imageId = crypto.randomUUID();
+        const imageUrl = `image-id-${imageId}`;
+        
+        console.log(`Creating product image with ID: ${imageUrl} for file: ${file.name}`);
         
         // Register the image metadata in the database
         const registerResponse = await fetch('/api/product-images', {
@@ -237,7 +241,7 @@ export default function SellerDashboard() {
           },
           body: JSON.stringify({
             productId,
-            imageUrl: `image-id-${imageId}`, // Temporary URL with UUID
+            imageUrl: imageUrl, // Use the same imageUrl that we'll use for storage
             imageOrder: index,
             imageName: file.name || `Image ${index + 1}`,
             sellerId: user?.id || 0 // Include seller ID for authorization
