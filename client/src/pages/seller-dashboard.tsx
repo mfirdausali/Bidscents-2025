@@ -594,10 +594,14 @@ export default function SellerDashboard() {
                                         // Then try any available image
                                         : product.images && product.images.length > 0
                                           ? `/api/images/${product.images[0].imageUrl}`
-                                          // Fallback to the old imageUrl field if no images in the table
-                                          : `/api/images/${product.imageUrl}`
+                                          // Default placeholder if no images are available
+                                          : "/placeholder.jpg"
                                     } 
                                     alt={product.name}
+                                    onError={(e) => {
+                                      // If image fails to load, use placeholder
+                                      (e.target as HTMLImageElement).src = "/placeholder.jpg";
+                                    }}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
@@ -703,10 +707,14 @@ export default function SellerDashboard() {
                                         // Then try any available image
                                         : product.images && product.images.length > 0
                                           ? `/api/images/${product.images[0].imageUrl}`
-                                          // Fallback to the old imageUrl field if no images in the table
-                                          : `/api/images/${product.imageUrl}`
+                                          // Default placeholder if no images are available
+                                          : "/placeholder.jpg"
                                     }
                                     alt={product.name}
+                                    onError={(e) => {
+                                      // If image fails to load, use placeholder
+                                      (e.target as HTMLImageElement).src = "/placeholder.jpg";
+                                    }}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
