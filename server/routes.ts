@@ -523,16 +523,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const imageId = parseInt(req.params.id);
 
-      // Get the image metadata from request parameters
-      // Use the product information directly
-      const productId = parseInt(req.body.productId || '0'); 
-      
-      if (!productId) {
-        return res.status(400).json({ message: "Product ID is required" });
+      // Verify the image exists in database
+      const result = await db.select().from(productImages).where(eq(productImages.id, imageId));
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Image not found" });
       }
-      
+
+      const image = result[0];
+
       // Check if the product belongs to the seller
-      const product = await storage.getProductById(productId);
+      const product = await storage.getProductById(image.productId);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
@@ -545,9 +545,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.file) {
         return res.status(400).json({ message: "No image file provided" });
       }
-      
-      // Generate a new UUID for the image
-      const uuid = objectStorage.generateImageId();
+
+      // Generate a new UUID for the image if it doesn't already have one
+      let uuid = "";
+      if (image.imageUrl && image.imageUrl.startsWith('image-id-')) {
+        // Get the UUID from the image URL
+        const imageUrlParts = image.imageUrl.split('-');
+        uuid = imageUrlParts[imageUrlParts.length - 1];
+      } else {
+        // Generate a new UUID
+        uuid = objectStorage.generateImageId();
+      }
 
       // Upload to object storage
       const uploadResult = await objectStorage.uploadProductImage(
@@ -559,13 +567,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!uploadResult.success) {
         return res.status(500).json({ message: "Failed to upload image to storage" });
       }
-      
-      // No need to update the database table with SQL
-      // Instead, we'll just save the metadata to the product's imageUrl field
-      await storage.updateProduct(productId, {
-        ...product,
-        imageUrl: uuid
-      });
+
+      // Update the image URL in the database to the actual one from object storage
+      await db.update(productImages)
+        .set({ imageUrl: uuid }) // Store just the UUID
+        .where(eq(productImages.id, imageId));
 
       res.status(200).json({ 
         message: "Image uploaded successfully",

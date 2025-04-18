@@ -2,10 +2,6 @@
 import { db } from '../server/db.js';
 import { sql } from 'drizzle-orm';
 
-// Fix for ESM import
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-
 async function createProductImagesTable() {
   try {
     console.log('Creating product_images table...');
