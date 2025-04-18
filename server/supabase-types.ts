@@ -89,7 +89,7 @@ export interface Database {
           purchase_year: number | null
           box_condition: string | null
           listing_type: string | null
-          volume: string | null
+          volume: number
         }
         Insert: {
           id?: number
@@ -109,7 +109,7 @@ export interface Database {
           purchase_year?: number | null
           box_condition?: string | null
           listing_type?: string | null
-          volume?: string | null
+          volume?: number
         }
         Update: {
           id?: number
@@ -129,7 +129,7 @@ export interface Database {
           purchase_year?: number | null
           box_condition?: string | null
           listing_type?: string | null
-          volume?: string | null
+          volume?: number | null
         }
       }
       product_images: {

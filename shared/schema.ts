@@ -45,7 +45,7 @@ export const products = pgTable("products", {
   purchaseYear: integer("purchase_year"), // When was it originally purchased
   boxCondition: text("box_condition"), // Condition of the box/packaging
   listingType: text("listing_type").default("fixed"), // fixed, negotiable, auction
-  volume: text("volume") // Bottle size (e.g., "50ml", "100ml", "3.4oz")
+  volume: integer("volume") // Bottle size (e.g., "50ml", "100ml", "3.4oz")
 });
 
 // Product Images table

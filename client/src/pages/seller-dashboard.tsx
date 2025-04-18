@@ -81,7 +81,7 @@ const productSchema = z.object({
   purchaseYear: z.number().int().min(1970).max(new Date().getFullYear()).optional(),
   boxCondition: z.enum(["Good", "Damaged", "No Box"]).default("Good"),
   listingType: z.enum(["fixed", "negotiable", "auction"]).default("fixed"),
-  volume: z.string().min(2, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }).optional(),
+  volume: z.number().int().min(1, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -128,7 +128,7 @@ export default function SellerDashboard() {
       purchaseYear: new Date().getFullYear(),
       boxCondition: "Good",
       listingType: "fixed",
-      volume: "",
+      volume: 100,
     },
   });
 
@@ -355,7 +355,7 @@ export default function SellerDashboard() {
       purchaseYear: product.purchaseYear || new Date().getFullYear(),
       boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
       listingType: (product.listingType as "fixed" | "negotiable" | "auction") || "fixed",
-      volume: product.volume || "",
+      volume: product.volume || 100,
     });
     
     setIsDialogOpen(true);
@@ -432,7 +432,7 @@ export default function SellerDashboard() {
       purchaseYear: new Date().getFullYear(),
       boxCondition: "Good",
       listingType: "fixed",
-      volume: "",
+      volume: 100,
     });
     setIsDialogOpen(true);
   };
