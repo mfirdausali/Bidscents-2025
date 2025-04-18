@@ -417,11 +417,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete all associated images first
       try {
         const productImages = await storage.getProductImages(id);
+        console.log(`Deleting ${productImages.length} images for product ${id}`);
+        
         for (const image of productImages) {
-          // If the image is not a placeholder, delete from object storage
-          if (image.imageUrl && !image.imageUrl.startsWith('image-id-')) {
-            await objectStorage.deleteProductImage(image.imageUrl);
+          // Always try to delete from object storage if we have an imageUrl
+          if (image.imageUrl) {
+            const deleteResult = await objectStorage.deleteProductImage(image.imageUrl);
+            console.log(`Deleted image ${image.imageUrl} from storage: ${deleteResult ? 'success' : 'failed'}`);
           }
+          // Also remove from database
           await storage.deleteProductImage(image.id);
         }
       } catch (err) {
@@ -576,7 +580,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Delete the image from object storage
       if (image.imageUrl) {
-        await objectStorage.deleteProductImage(image.imageUrl);
+        const deleteResult = await objectStorage.deleteProductImage(image.imageUrl);
+        console.log(`Deleted individual image ${image.imageUrl} from storage: ${deleteResult ? 'success' : 'failed'}`);
       }
       
       // Delete from database
