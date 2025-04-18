@@ -441,16 +441,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products/:id/images", async (req, res, next) => {
     try {
       const productId = parseInt(req.params.id);
-      const images = await storage.getProductImages(productId);
-      res.json(images);
+      console.log(`GET /api/products/${productId}/images`);
+      
+      // Get images directly from Supabase
+      const { data: images, error } = await supabase
+        .from('product_images')
+        .select('*')
+        .eq('product_id', productId)
+        .order('image_order', { ascending: true });
+        
+      if (error) {
+        console.error('Error retrieving product images:', error);
+        return res.status(500).json({ message: "Failed to retrieve product images" });
+      }
+      
+      console.log(`Found ${images?.length || 0} images for product ${productId}`);
+      res.json(images || []);
     } catch (error) {
+      console.error("Error in GET /api/products/:id/images:", error);
       next(error);
     }
   });
 
-  // Image upload endpoint - creates a product image and uploads the file
+  // Simplified endpoint to handle image upload in a single step 
   app.post("/api/products/:id/images", upload.single('image'), async (req, res, next) => {
     try {
+      console.log(`POST /api/products/:id/images - Starting image upload process`);
+      
       // Check authentication
       let sellerId = 0;
       if (req.isAuthenticated() && req.user) {
@@ -458,17 +475,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
         }
         sellerId = req.user.id;
+        console.log(`User authenticated via session, seller ID: ${sellerId}`);
       } else if (req.query.sellerId) {
         // If not via session, check if sellerId was provided in query
         sellerId = parseInt(req.query.sellerId as string);
+        console.log(`Using seller ID from query: ${sellerId}`);
         
         // Verify user exists and is a seller
-        const userCheck = await storage.getUser(sellerId);
-        if (!userCheck) {
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', sellerId)
+          .single();
+          
+        if (userError || !user) {
+          console.error('User verification error:', userError);
           return res.status(403).json({ message: "Unauthorized: User not found" });
         }
         
-        if (!userCheck.isSeller) {
+        if (!user.is_seller) {
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
         }
       } else {
@@ -477,14 +502,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get product ID from URL
       const productId = parseInt(req.params.id);
+      console.log(`Product ID from URL: ${productId}`);
       
       // Verify the product exists and belongs to the seller
-      const product = await storage.getProductById(productId);
-      if (!product) {
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+      
+      if (productError || !product) {
+        console.error('Product verification error:', productError);
         return res.status(404).json({ message: "Product not found" });
       }
       
-      if (product.sellerId !== sellerId) {
+      if (product.seller_id !== sellerId) {
         return res.status(403).json({ message: "Unauthorized: You can only add images to your own products" });
       }
       
@@ -493,44 +525,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No image file provided" });
       }
       
-      // Generate a UUID for the image
+      // Determine image order
+      const imageOrder = req.body.imageOrder ? parseInt(req.body.imageOrder) : 0;
+      console.log(`Using image order: ${imageOrder}`);
+      
+      // STEP 1: Generate a new UUID for the image
       const uuid = objectStorage.generateImageId();
+      console.log(`Generated image UUID: ${uuid}`);
       
-      // Create image record in database
-      const productImage = await storage.createProductImage({
-        productId,
-        imageUrl: uuid,
-        imageOrder: req.body.imageOrder ? parseInt(req.body.imageOrder) : 0,
-        imageName: req.file.originalname || 'unnamed'
-      });
+      // STEP 2: Add record in product_images table
+      const { data: imageRecord, error: insertError } = await supabase
+        .from('product_images')
+        .insert({
+          product_id: productId,
+          image_url: uuid,  // Store just the UUID in the database
+          image_order: imageOrder,
+          image_name: req.file.originalname || 'unnamed'
+        })
+        .select()
+        .single();
       
-      // Upload the file to object storage
+      if (insertError) {
+        console.error('Error inserting image record:', insertError);
+        return res.status(500).json({ message: "Failed to create image record in database" });
+      }
+      
+      console.log(`Image record created with ID: ${imageRecord.id}`);
+      
+      // STEP 3: Upload image to object storage
+      console.log(`Uploading file to object storage with UUID: ${uuid}`);
       const uploadResult = await objectStorage.uploadProductImage(
         req.file.buffer,
-        uuid,
+        uuid,  // Use UUID as the storage key
         req.file.mimetype
       );
       
+      console.log('Upload result:', uploadResult);
+      
       if (!uploadResult.success) {
-        // Clean up if upload fails
-        await storage.deleteProductImage(productImage.id);
+        // Clean up database record if upload fails
+        console.error('Upload to object storage failed, removing database record');
+        await supabase
+          .from('product_images')
+          .delete()
+          .eq('id', imageRecord.id);
+          
         return res.status(500).json({ message: "Failed to upload image to storage" });
       }
       
-      // Return success response
+      // STEP 4: Return success with image details
       res.status(201).json({
-        ...productImage,
-        url: objectStorage.getImagePublicUrl(uuid),
+        id: imageRecord.id,
+        productId: imageRecord.product_id,
+        imageUrl: imageRecord.image_url,
+        imageOrder: imageRecord.image_order,
         message: "Image uploaded successfully"
       });
     } catch (error) {
+      console.error("Error in POST /api/products/:id/images:", error);
       next(error);
     }
   });
 
-  app.delete("/api/products/:productId/images/:imageId", async (req, res, next) => {
+  app.delete("/api/product-images/:id", async (req, res, next) => {
     try {
-      // Check authentication
+      // First check if the user is authenticated via session
       let sellerId = 0;
       if (req.isAuthenticated() && req.user) {
         if (!req.user.isSeller) {
@@ -538,7 +597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         sellerId = req.user.id;
       } else if (req.query.sellerId) {
-        // If not via session, check if sellerId was provided in query
+        // If not via session, check if sellerId was provided in the query parameter
         sellerId = parseInt(req.query.sellerId as string);
         
         // Verify user exists and is a seller
@@ -554,35 +613,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized: User not authenticated" });
       }
 
-      const productId = parseInt(req.params.productId);
-      const imageId = parseInt(req.params.imageId);
+      const id = parseInt(req.params.id);
+
+      // Query the database for the specific image by ID using Supabase
+      const { data: imageData, error: imageError } = await supabase
+        .from('product_images')
+        .select('*')
+        .eq('id', id)
+        .single();
       
-      // Verify the product exists and belongs to the seller
-      const product = await storage.getProductById(productId);
-      if (!product) {
-        return res.status(404).json({ message: "Product not found" });
+      if (imageError || !imageData) {
+        console.log('Error retrieving image for deletion:', imageError);
+        return res.status(404).json({ message: "Image not found" });
       }
       
+      const image = imageData;
+
+      // Check if the product belongs to the seller
+      const productId = image.productId;
+      console.log(`Checking product ID for deletion: ${productId}`);
+      
+      if (!productId) {
+        return res.status(400).json({ message: "Invalid product ID in image metadata" });
+      }
+      
+      const product = await storage.getProductById(productId);
+      if (!product) {
+        console.log(`Product ${productId} not found during image deletion`);
+        return res.status(404).json({ message: "Product not found" });
+      }
+
       if (product.sellerId !== sellerId) {
         return res.status(403).json({ message: "Unauthorized: You can only delete images from your own products" });
       }
       
-      // Get the image record
-      const images = await storage.getProductImages(productId);
-      const image = images.find(img => img.id === imageId);
-      
-      if (!image) {
-        return res.status(404).json({ message: "Image not found" });
-      }
-      
-      // Delete the image from object storage
-      if (image.imageUrl) {
+      // Delete the image from object storage if it's not a placeholder
+      if (image.imageUrl && !image.imageUrl.startsWith('image-id-')) {
         await objectStorage.deleteProductImage(image.imageUrl);
       }
-      
-      // Delete from database
-      await storage.deleteProductImage(imageId);
-      
+
+      await storage.deleteProductImage(id);
       res.status(204).send();
     } catch (error) {
       next(error);
