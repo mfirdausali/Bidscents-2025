@@ -553,24 +553,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const imageUrlParts = image.imageUrl.split('-');
         uuid = imageUrlParts[imageUrlParts.length - 1];
       } else {
-        // Generate a new UUID
+        // Generate a new UUID using the function from object-storage.ts
         uuid = objectStorage.generateImageId();
       }
 
-      // Upload to object storage
+      console.log(`Using image UUID: ${uuid}`);
+      
+      // Upload to object storage using the function from object-storage.ts
       const uploadResult = await objectStorage.uploadProductImage(
         req.file.buffer,
         uuid,
         req.file.mimetype
       );
 
+      console.log('Upload result:', uploadResult);
+
       if (!uploadResult.success) {
         return res.status(500).json({ message: "Failed to upload image to storage" });
       }
 
-      // Update the image URL in the database to the actual one from object storage
+      // Update the image URL in the database to just the UUID (not full URL)
+      // We'll construct the full URL when serving images
       await db.update(productImages)
-        .set({ imageUrl: uuid }) // Store just the UUID
+        .set({ imageUrl: uuid })
         .where(eq(productImages.id, imageId));
 
       res.status(200).json({ 
@@ -891,6 +896,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/images/:imageId', async (req, res, next) => {
     try {
       const { imageId } = req.params;
+      
+      console.log(`Attempting to retrieve image with ID: ${imageId}`);
 
       // Determine content type based on file extension or default to jpeg
       let contentType = 'image/jpeg';
@@ -898,15 +905,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (imageId.endsWith('.gif')) contentType = 'image/gif';
       if (imageId.endsWith('.webp')) contentType = 'image/webp';
 
-      // Get the image from Replit Object Storage
+      // Get the image from Replit Object Storage using the function from object-storage.ts
       const imageBuffer = await objectStorage.getImageFromStorage(imageId);
 
       if (imageBuffer) {
+        console.log(`Image ${imageId} found - serving with content type ${contentType}`);
         // If we have the image, send it back with the appropriate content type
         res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
         return res.send(imageBuffer);
       }
 
+      console.log(`Image ${imageId} not found in storage`);
       // If we get here, the image was not found
       res.status(404).json({ message: 'Image not found' });
     } catch (error) {
