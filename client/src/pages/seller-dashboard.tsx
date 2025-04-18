@@ -200,14 +200,15 @@ export default function SellerDashboard() {
   // Delete product mutation
   const deleteProductMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/products/${id}`);
+      // Include the seller ID in the query parameter
+      await apiRequest("DELETE", `/api/products/${id}?sellerId=${user?.id || 0}`);
     },
     onSuccess: () => {
       toast({
         title: "Product deleted",
         description: "Your product has been deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/seller/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seller/products", user?.id] });
       setIsDeleting(null);
     },
     onError: (error) => {
@@ -238,7 +239,8 @@ export default function SellerDashboard() {
             productId,
             imageUrl: `image-id-${imageId}`, // Temporary URL with UUID
             imageOrder: index,
-            imageName: file.name || `Image ${index + 1}`
+            imageName: file.name || `Image ${index + 1}`,
+            sellerId: user?.id || 0 // Include seller ID for authorization
           }),
         });
         
@@ -252,6 +254,7 @@ export default function SellerDashboard() {
         // Step 2: Upload the actual image file to object storage
         const formData = new FormData();
         formData.append('image', file);
+        formData.append('sellerId', String(user?.id || 0)); // Include seller ID for authorization
         
         const uploadResponse = await fetch(`/api/product-images/${registeredImage.id}/upload`, {
           method: 'POST',
