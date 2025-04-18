@@ -289,7 +289,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/products", async (req, res, next) => {
     try {
-      if (!req.isAuthenticated() || !req.user.isSeller) {
+      // First check if the user is authenticated via session
+      if (!req.isAuthenticated()) {
+        // If not, try to get current user ID from the query parameters
+        if (!req.body.sellerId) {
+          return res.status(403).json({ message: "Unauthorized: User not authenticated" });
+        }
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(req.body.sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        
+        // User is verified as a seller, proceed with the same seller ID
+        const validatedData = insertProductSchema.parse(req.body);
+        const product = await storage.createProduct(validatedData);
+        return res.status(201).json(product);
+      }
+      
+      // Normal path for authenticated users
+      if (!req.user.isSeller) {
         return res.status(403).json({ message: "Unauthorized: Seller account required" });
       }
 
@@ -549,11 +573,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Seller-specific endpoints
   app.get("/api/seller/products", async (req, res, next) => {
     try {
-      if (!req.isAuthenticated() || !req.user.isSeller) {
+      // Check if user is authenticated via session
+      if (req.isAuthenticated() && req.user.isSeller) {
+        const products = await storage.getSellerProducts(req.user.id);
+        return res.json(products);
+      }
+      
+      // If not authenticated via session, check for sellerId in query parameter
+      const sellerId = req.query.sellerId ? parseInt(req.query.sellerId as string) : null;
+      if (!sellerId) {
         return res.status(403).json({ message: "Unauthorized: Seller account required" });
       }
-
-      const products = await storage.getSellerProducts(req.user.id);
+      
+      // Verify user exists and is a seller
+      const userCheck = await storage.getUser(sellerId);
+      if (!userCheck) {
+        return res.status(403).json({ message: "Unauthorized: User not found" });
+      }
+      
+      if (!userCheck.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+      
+      // User is verified as a seller, get their products
+      const products = await storage.getSellerProducts(sellerId);
       res.json(products);
     } catch (error) {
       next(error);

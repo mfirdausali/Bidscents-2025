@@ -101,7 +101,22 @@ export default function SellerDashboard() {
 
   // Fetch seller's products
   const { data: products, isLoading: isLoadingProducts } = useQuery<ProductWithDetails[]>({
-    queryKey: ["/api/seller/products"],
+    queryKey: ["/api/seller/products", user?.id],
+    queryFn: async ({ queryKey }) => {
+      // Add the sellerId as a query parameter if we have the user
+      const endpoint = user?.id 
+        ? `/api/seller/products?sellerId=${user.id}` 
+        : "/api/seller/products";
+      
+      const res = await fetch(endpoint, { credentials: "include" });
+      
+      if (!res.ok) {
+        throw new Error('Failed to fetch seller products');
+      }
+      
+      return await res.json();
+    },
+    enabled: !!user,
   });
   
   // Fetch categories for the dropdown
