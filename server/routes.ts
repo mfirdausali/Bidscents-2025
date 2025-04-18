@@ -523,13 +523,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const imageId = parseInt(req.params.id);
 
-      // Verify the image exists in database
-      const result = await db.select().from(productImages).where(eq(productImages.id, imageId));
-      if (result.length === 0) {
+      // Verify the image exists in database using Supabase
+      const { data: imageData, error: imageError } = await supabase
+        .from('product_images')
+        .select('*')
+        .eq('id', imageId)
+        .single();
+      
+      if (imageError || !imageData) {
+        console.log('Error retrieving image metadata:', imageError);
         return res.status(404).json({ message: "Image not found" });
       }
-
-      const image = result[0];
+      
+      const image = imageData;
 
       // Check if the product belongs to the seller
       const product = await storage.getProductById(image.productId);
@@ -572,11 +578,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to upload image to storage" });
       }
 
-      // Update the image URL in the database to just the UUID (not full URL)
-      // We'll construct the full URL when serving images
-      await db.update(productImages)
-        .set({ imageUrl: uuid })
-        .where(eq(productImages.id, imageId));
+      // Update the image URL in the database using Supabase instead of direct db connection
+      const { data: updateData, error: updateError } = await supabase
+        .from('product_images')
+        .update({ imageUrl: uuid })
+        .eq('id', imageId);
+      
+      if (updateError) {
+        console.error('Error updating image URL in database:', updateError);
+        return res.status(500).json({ message: "Failed to update image in database" });
+      }
+      
+      console.log('Image URL updated in database');
 
       res.status(200).json({ 
         message: "Image uploaded successfully",
@@ -616,13 +629,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const id = parseInt(req.params.id);
 
-      // Query the database for the specific image by ID
-      const result = await db.select().from(productImages).where(eq(productImages.id, id));
-      if (result.length === 0) {
+      // Query the database for the specific image by ID using Supabase
+      const { data: imageData, error: imageError } = await supabase
+        .from('product_images')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (imageError || !imageData) {
+        console.log('Error retrieving image for deletion:', imageError);
         return res.status(404).json({ message: "Image not found" });
       }
-
-      const image = result[0];
+      
+      const image = imageData;
 
       // Check if the product belongs to the seller
       const product = await storage.getProductById(image.productId);
