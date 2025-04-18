@@ -931,6 +931,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Handle the /api/product-images endpoint for backward compatibility
+  app.post("/api/product-images", async (req, res, next) => {
+    try {
+      // Check authentication
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.body.sellerId) {
+        // If not via session, check if sellerId was provided in the request body
+        sellerId = parseInt(req.body.sellerId.toString());
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
+      }
+
+      // Get product ID from request body
+      const productId = req.body.productId;
+      
+      // Verify the product exists and belongs to the seller
+      const product = await storage.getProductById(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      if (product.sellerId !== sellerId) {
+        return res.status(403).json({ message: "Unauthorized: You can only add images to your own products" });
+      }
+      
+      // Create image record in database with the provided imageUrl (should be a UUID placeholder)
+      const productImage = await storage.createProductImage({
+        productId,
+        imageUrl: req.body.imageUrl,
+        imageOrder: req.body.imageOrder,
+        imageName: req.body.imageName || 'unnamed'
+      });
+      
+      res.status(200).json(productImage);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Handle the /api/product-images/:id/upload endpoint for backward compatibility
+  app.post("/api/product-images/:id/upload", upload.single('image'), async (req, res, next) => {
+    try {
+      // Check authentication
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.body.sellerId) {
+        // If not via session, check if sellerId was provided in the form data
+        sellerId = parseInt(req.body.sellerId.toString());
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
+      }
+
+      // Get image ID from URL
+      const imageId = parseInt(req.params.id);
+      
+      // Get the product image record
+      const productImage = await db.query.productImages.findFirst({
+        where: eq(productImages.id, imageId)
+      });
+      
+      if (!productImage) {
+        return res.status(404).json({ message: "Product image record not found" });
+      }
+      
+      // Verify the product belongs to the seller
+      const product = await storage.getProductById(productImage.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Associated product not found" });
+      }
+      
+      if (product.sellerId !== sellerId) {
+        return res.status(403).json({ message: "Unauthorized: You can only upload images to your own products" });
+      }
+      
+      // Make sure we have a file
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+      
+      // Extract the UUID from the placeholder URL
+      let imageUrl = productImage.imageUrl;
+      
+      // Upload the file to object storage
+      const uploadResult = await objectStorage.uploadProductImage(
+        req.file.buffer,
+        imageUrl,
+        req.file.mimetype
+      );
+      
+      if (!uploadResult.success) {
+        return res.status(500).json({ message: "Failed to upload image to storage" });
+      }
+      
+      // Return success response
+      res.status(200).json({
+        ...productImage,
+        url: objectStorage.getImagePublicUrl(imageUrl),
+        message: "Image uploaded successfully"
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
