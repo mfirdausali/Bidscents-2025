@@ -1,5 +1,8 @@
-const { Pool } = require('pg');
-require('dotenv').config();
+import pg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
+const { Pool } = pg;
 
 // Create a new Pool instance using the DATABASE_URL environment variable
 const pool = new Pool({
