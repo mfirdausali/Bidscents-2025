@@ -256,10 +256,12 @@ export default function SellerDashboard() {
         formData.append('image', file);
         formData.append('sellerId', String(user?.id || 0)); // Include seller ID for authorization
         
+        console.log('About to upload image to storage for product image id:', registeredImage.id);
         const uploadResponse = await fetch(`/api/product-images/${registeredImage.id}/upload`, {
           method: 'POST',
           body: formData,
         });
+        console.log('Upload response status:', uploadResponse.status);
         
         if (!uploadResponse.ok) {
           throw new Error(`Failed to upload image ${index}`);

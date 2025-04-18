@@ -1015,18 +1015,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const imageId = parseInt(req.params.id);
       
       console.log(`Looking for product image with id ${imageId}`);
-      // Get all product images for all products
-      const allProductImages = await storage.getProductImages(0); // Get all product images
-      // Find the specific one with the matching ID
-      const productImage = allProductImages.find(img => img.id === imageId);
-      console.log(`Found product image:`, productImage);
       
-      if (!productImage) {
+      // Since we're having issues with the database method, use a direct approach
+      // Get the product images from all products
+      let foundProductImage = null;
+      const allProducts = await storage.getProducts();
+      for (const product of allProducts) {
+        if (product.images) {
+          for (const image of product.images) {
+            if (image.id === imageId) {
+              foundProductImage = image;
+              break;
+            }
+          }
+          if (foundProductImage) break;
+        }
+      }
+      
+      console.log(`Found product image:`, foundProductImage);
+      
+      if (!foundProductImage) {
         return res.status(404).json({ message: "Product image record not found" });
       }
       
       // Verify the product belongs to the seller
-      const product = await storage.getProductById(productImage.productId);
+      const product = await storage.getProductById(foundProductImage.productId);
       if (!product) {
         return res.status(404).json({ message: "Associated product not found" });
       }
@@ -1041,10 +1054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Extract the UUID from the placeholder URL
-      let imageUrl = productImage.imageUrl;
-      
-      // If imageUrl starts with 'image-id-', keep it as is
-      // This ensures we're using the same ID format for upload and retrieval
+      let imageUrl = foundProductImage.imageUrl;
       
       console.log(`Attempting to upload image to object storage with ID: ${imageUrl}`);
       console.log(`Image size: ${req.file.size} bytes, type: ${req.file.mimetype}`);
@@ -1064,11 +1074,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Return success response
       res.status(200).json({
-        ...productImage,
+        ...foundProductImage,
         url: objectStorage.getImagePublicUrl(imageUrl),
         message: "Image uploaded successfully"
       });
     } catch (error) {
+      console.error("Error in upload handler:", error);
       next(error);
     }
   });
