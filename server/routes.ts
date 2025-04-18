@@ -1014,10 +1014,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get image ID from URL
       const imageId = parseInt(req.params.id);
       
-      // Get all product images for the product
-      const productImages = await storage.getProductImages(0); // Get all product images
+      console.log(`Looking for product image with id ${imageId}`);
+      // Get all product images for all products
+      const allProductImages = await storage.getProductImages(0); // Get all product images
       // Find the specific one with the matching ID
-      const productImage = productImages.find(img => img.id === imageId);
+      const productImage = allProductImages.find(img => img.id === imageId);
+      console.log(`Found product image:`, productImage);
       
       if (!productImage) {
         return res.status(404).json({ message: "Product image record not found" });
@@ -1041,12 +1043,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract the UUID from the placeholder URL
       let imageUrl = productImage.imageUrl;
       
+      // If imageUrl starts with 'image-id-', keep it as is
+      // This ensures we're using the same ID format for upload and retrieval
+      
+      console.log(`Attempting to upload image to object storage with ID: ${imageUrl}`);
+      console.log(`Image size: ${req.file.size} bytes, type: ${req.file.mimetype}`);
+      
       // Upload the file to object storage
       const uploadResult = await objectStorage.uploadProductImage(
         req.file.buffer,
         imageUrl,
         req.file.mimetype
       );
+      
+      console.log(`Upload result:`, uploadResult);
       
       if (!uploadResult.success) {
         return res.status(500).json({ message: "Failed to upload image to storage" });
