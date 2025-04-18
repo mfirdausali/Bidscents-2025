@@ -5,7 +5,6 @@ import { storage } from "./storage";
 import { insertProductSchema, insertReviewSchema, insertProductImageSchema } from "@shared/schema";
 import { productImages } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";
 import * as objectStorage from "./object-storage"; // Import the entire module to access all properties
@@ -1015,10 +1014,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get image ID from URL
       const imageId = parseInt(req.params.id);
       
-      // Get the product image record
-      const productImage = await db.query.productImages.findFirst({
-        where: eq(productImages.id, imageId)
-      });
+      // Get all product images for the product
+      const productImages = await storage.getProductImages(0); // Get all product images
+      // Find the specific one with the matching ID
+      const productImage = productImages.find(img => img.id === imageId);
       
       if (!productImage) {
         return res.status(404).json({ message: "Product image record not found" });
