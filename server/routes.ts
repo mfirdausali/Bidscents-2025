@@ -331,8 +331,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/products/:id", async (req, res, next) => {
     try {
-      if (!req.isAuthenticated() || !req.user.isSeller) {
-        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      // First check if the user is authenticated via session
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.body.sellerId) {
+        // If not via session, check if sellerId was provided in the request body
+        sellerId = parseInt(req.body.sellerId.toString());
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
       }
 
       const id = parseInt(req.params.id);
@@ -342,13 +362,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      if (product.sellerId !== req.user.id) {
+      if (product.sellerId !== sellerId) {
         return res.status(403).json({ message: "Unauthorized: You can only edit your own products" });
       }
 
       const validatedData = insertProductSchema.parse({
         ...req.body,
-        sellerId: req.user.id,
+        sellerId: sellerId, // Use the determined sellerId
       });
 
       const updatedProduct = await storage.updateProduct(id, validatedData);
@@ -360,8 +380,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/products/:id", async (req, res, next) => {
     try {
-      if (!req.isAuthenticated() || !req.user.isSeller) {
-        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      // First check if the user is authenticated via session
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.query.sellerId) {
+        // If not via session, check if sellerId was provided in the query parameter
+        sellerId = parseInt(req.query.sellerId as string);
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
       }
 
       const id = parseInt(req.params.id);
@@ -371,8 +411,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      if (product.sellerId !== req.user.id) {
+      if (product.sellerId !== sellerId) {
         return res.status(403).json({ message: "Unauthorized: You can only delete your own products" });
+      }
+
+      // Delete all associated images first
+      try {
+        const productImages = await storage.getProductImages(id);
+        for (const image of productImages) {
+          // If the image is not a placeholder, delete from object storage
+          if (image.imageUrl && !image.imageUrl.startsWith('image-id-')) {
+            await objectStorage.deleteProductImage(image.imageUrl);
+          }
+          await storage.deleteProductImage(image.id);
+        }
+      } catch (err) {
+        console.error("Error deleting product images:", err);
+        // Continue with product deletion even if image deletion fails
       }
 
       await storage.deleteProduct(id);
@@ -396,8 +451,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint to register product images (metadata only)
   app.post("/api/product-images", async (req, res, next) => {
     try {
-      if (!req.isAuthenticated() || !req.user.isSeller) {
-        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      // First check if the user is authenticated via session
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.body.sellerId) {
+        // If not via session, check if sellerId was provided in the request
+        sellerId = req.body.sellerId;
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
       }
 
       const validatedData = insertProductImageSchema.parse(req.body);
@@ -408,7 +483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      if (product.sellerId !== req.user.id) {
+      if (product.sellerId !== sellerId) {
         return res.status(403).json({ message: "Unauthorized: You can only add images to your own products" });
       }
 
@@ -422,8 +497,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint to upload the actual image file to object storage
   app.post("/api/product-images/:id/upload", upload.single('image'), async (req, res, next) => {
     try {
-      if (!req.isAuthenticated() || !req.user.isSeller) {
-        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      // First check if the user is authenticated via session
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.body.sellerId) {
+        // If not via session, check if sellerId was provided in the request
+        sellerId = parseInt(req.body.sellerId);
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
       }
 
       const imageId = parseInt(req.params.id);
@@ -442,7 +537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      if (product.sellerId !== req.user.id) {
+      if (product.sellerId !== sellerId) {
         return res.status(403).json({ message: "Unauthorized: You can only upload images to your own products" });
       }
 
@@ -451,9 +546,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No image file provided" });
       }
 
-      // Get the UUID from the image URL
-      const imageUrlParts = image.imageUrl.split('-');
-      const uuid = imageUrlParts[imageUrlParts.length - 1];
+      // Generate a new UUID for the image if it doesn't already have one
+      let uuid = "";
+      if (image.imageUrl && image.imageUrl.startsWith('image-id-')) {
+        // Get the UUID from the image URL
+        const imageUrlParts = image.imageUrl.split('-');
+        uuid = imageUrlParts[imageUrlParts.length - 1];
+      } else {
+        // Generate a new UUID
+        uuid = objectStorage.generateImageId();
+      }
 
       // Upload to object storage
       const uploadResult = await objectStorage.uploadProductImage(
@@ -468,7 +570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update the image URL in the database to the actual one from object storage
       await db.update(productImages)
-        .set({ imageUrl: uploadResult.url })
+        .set({ imageUrl: uuid }) // Store just the UUID
         .where(eq(productImages.id, imageId));
 
       res.status(200).json({ 
@@ -483,8 +585,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/product-images/:id", async (req, res, next) => {
     try {
-      if (!req.isAuthenticated() || !req.user.isSeller) {
-        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      // First check if the user is authenticated via session
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.query.sellerId) {
+        // If not via session, check if sellerId was provided in the query parameter
+        sellerId = parseInt(req.query.sellerId as string);
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
       }
 
       const id = parseInt(req.params.id);
@@ -503,8 +625,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      if (product.sellerId !== req.user.id) {
+      if (product.sellerId !== sellerId) {
         return res.status(403).json({ message: "Unauthorized: You can only delete images from your own products" });
+      }
+      
+      // Delete the image from object storage if it's not a placeholder
+      if (image.imageUrl && !image.imageUrl.startsWith('image-id-')) {
+        await objectStorage.deleteProductImage(image.imageUrl);
       }
 
       await storage.deleteProductImage(id);
