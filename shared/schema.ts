@@ -32,7 +32,7 @@ export const products = pgTable("products", {
   brand: text("brand").notNull(),
   description: text("description"),
   price: doublePrecision("price").notNull(),
-  imageUrl: text("image_url").notNull(),
+  imageUrl: text("image_url"), // OBSOLETE: This field is no longer used. Images stored in product_images table
   stockQuantity: integer("stock_quantity").notNull().default(1), // Most secondhand items have quantity 1
   categoryId: integer("category_id").references(() => categories.id),
   sellerId: integer("seller_id").references(() => users.id).notNull(),
@@ -106,7 +106,8 @@ export const insertProductSchema = createInsertSchema(products).pick({
   brand: true,
   description: true,
   price: true,
-  imageUrl: true,
+  // imageUrl is obsolete but kept in schema for compatibility
+  imageUrl: true, 
   stockQuantity: true,
   categoryId: true,
   sellerId: true,
