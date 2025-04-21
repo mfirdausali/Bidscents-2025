@@ -1,11 +1,12 @@
-import { users, products, categories, reviews, orders, orderItems, productImages } from "@shared/schema";
+import { users, products, categories, reviews, orders, orderItems, productImages, messages } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
   Review, InsertReview,
   Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
-  ProductImage, InsertProductImage
+  ProductImage, InsertProductImage,
+  Message, InsertMessage, MessageWithDetails
 } from "@shared/schema";
 
 // Define cart types since they're removed from schema but still in interface
@@ -961,5 +962,177 @@ export class SupabaseStorage implements IStorage {
         images,
       };
     }));
+  }
+  
+  // Message methods
+  async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
+    const { data, error } = await supabase
+      .from('messages')
+      .select(`
+        *,
+        sender:sender_id(*),
+        receiver:receiver_id(*)
+      `)
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('Error getting user messages:', error);
+      throw new Error('Failed to retrieve user messages');
+    }
+    
+    // Map from snake_case to camelCase
+    const messages = (data || []).map(msg => ({
+      id: msg.id,
+      senderId: msg.sender_id,
+      receiverId: msg.receiver_id,
+      content: msg.content,
+      isRead: msg.is_read,
+      createdAt: new Date(msg.created_at),
+      productId: msg.product_id,
+      // Add sender and receiver details
+      sender: msg.sender ? this.mapUserFromDb(msg.sender) : undefined,
+      receiver: msg.receiver ? this.mapUserFromDb(msg.receiver) : undefined
+    }));
+    
+    return messages as MessageWithDetails[];
+  }
+  
+  async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
+    const { data, error } = await supabase
+      .from('messages')
+      .select(`
+        *,
+        sender:sender_id(*),
+        receiver:receiver_id(*)
+      `)
+      .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
+      .order('created_at', { ascending: true });
+      
+    if (error) {
+      console.error('Error getting conversation:', error);
+      throw new Error('Failed to retrieve conversation');
+    }
+    
+    // Map from snake_case to camelCase
+    const messages = (data || []).map(msg => ({
+      id: msg.id,
+      senderId: msg.sender_id,
+      receiverId: msg.receiver_id,
+      content: msg.content,
+      isRead: msg.is_read,
+      createdAt: new Date(msg.created_at),
+      productId: msg.product_id,
+      // Add sender and receiver details
+      sender: msg.sender ? this.mapUserFromDb(msg.sender) : undefined,
+      receiver: msg.receiver ? this.mapUserFromDb(msg.receiver) : undefined
+    }));
+    
+    return messages as MessageWithDetails[];
+  }
+  
+  async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
+    const { data, error } = await supabase
+      .from('messages')
+      .select(`
+        *,
+        sender:sender_id(*),
+        receiver:receiver_id(*)
+      `)
+      .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
+      .eq('product_id', productId)
+      .order('created_at', { ascending: true });
+      
+    if (error) {
+      console.error('Error getting conversation for product:', error);
+      throw new Error('Failed to retrieve product conversation');
+    }
+    
+    // Map from snake_case to camelCase
+    const messages = (data || []).map(msg => ({
+      id: msg.id,
+      senderId: msg.sender_id,
+      receiverId: msg.receiver_id,
+      content: msg.content,
+      isRead: msg.is_read,
+      createdAt: new Date(msg.created_at),
+      productId: msg.product_id,
+      // Add sender and receiver details
+      sender: msg.sender ? this.mapUserFromDb(msg.sender) : undefined,
+      receiver: msg.receiver ? this.mapUserFromDb(msg.receiver) : undefined
+    }));
+    
+    return messages as MessageWithDetails[];
+  }
+  
+  async sendMessage(message: InsertMessage): Promise<Message> {
+    // Convert camelCase to snake_case for DB
+    const dbMessage = {
+      sender_id: message.senderId,
+      receiver_id: message.receiverId,
+      content: message.content, 
+      product_id: message.productId || null,
+      is_read: message.isRead || false
+    };
+    
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([dbMessage])
+      .select()
+      .single();
+      
+    if (error || !data) {
+      console.error('Error sending message:', error);
+      throw new Error('Failed to send message');
+    }
+    
+    // Convert snake_case to camelCase
+    return {
+      id: data.id,
+      senderId: data.sender_id,
+      receiverId: data.receiver_id,
+      content: data.content,
+      isRead: data.is_read,
+      createdAt: new Date(data.created_at),
+      productId: data.product_id,
+    } as Message;
+  }
+  
+  async markMessageAsRead(id: number): Promise<Message> {
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error || !data) {
+      console.error('Error marking message as read:', error);
+      throw new Error('Failed to mark message as read');
+    }
+    
+    // Convert snake_case to camelCase
+    return {
+      id: data.id,
+      senderId: data.sender_id,
+      receiverId: data.receiver_id,
+      content: data.content,
+      isRead: data.is_read,
+      createdAt: new Date(data.created_at),
+      productId: data.product_id,
+    } as Message;
+  }
+  
+  async markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void> {
+    const { error } = await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('receiver_id', receiverId)
+      .eq('sender_id', senderId);
+      
+    if (error) {
+      console.error('Error marking all messages as read:', error);
+      throw new Error('Failed to mark all messages as read');
+    }
   }
 }
