@@ -966,13 +966,10 @@ export class SupabaseStorage implements IStorage {
   
   // Message methods
   async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
+    // First get all messages without trying to join users
     const { data, error } = await supabase
       .from('messages')
-      .select(`
-        *,
-        sender:sender_id(*),
-        receiver:receiver_id(*)
-      `)
+      .select('*')
       .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
       .order('created_at', { ascending: false });
       
@@ -981,8 +978,35 @@ export class SupabaseStorage implements IStorage {
       throw new Error('Failed to retrieve user messages');
     }
     
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    // Create a unique set of user IDs from sender_id and receiver_id
+    const userIds = new Set<number>();
+    data.forEach(msg => {
+      userIds.add(msg.sender_id);
+      userIds.add(msg.receiver_id);
+    });
+    
+    // Fetch user details for all users involved in messages
+    const users: Record<number, any> = {};
+    
+    // We'll use the getUser method to fetch each user since we know it works
+    for (const uid of userIds) {
+      try {
+        const user = await this.getUser(uid);
+        if (user) {
+          users[uid] = user;
+        }
+      } catch (err) {
+        console.warn(`Could not fetch user ${uid}:`, err);
+        // Continue with other users even if one fails
+      }
+    }
+    
     // Map from snake_case to camelCase
-    const messages = (data || []).map(msg => ({
+    const messages = data.map(msg => ({
       id: msg.id,
       senderId: msg.sender_id,
       receiverId: msg.receiver_id,
@@ -990,22 +1014,19 @@ export class SupabaseStorage implements IStorage {
       isRead: msg.is_read,
       createdAt: new Date(msg.created_at),
       productId: msg.product_id,
-      // Add sender and receiver details
-      sender: msg.sender ? this.mapUserFromDb(msg.sender) : undefined,
-      receiver: msg.receiver ? this.mapUserFromDb(msg.receiver) : undefined
+      // Add sender and receiver details if available
+      sender: users[msg.sender_id],
+      receiver: users[msg.receiver_id]
     }));
     
     return messages as MessageWithDetails[];
   }
   
   async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
+    // Get messages without trying to join users table
     const { data, error } = await supabase
       .from('messages')
-      .select(`
-        *,
-        sender:sender_id(*),
-        receiver:receiver_id(*)
-      `)
+      .select('*')
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
       .order('created_at', { ascending: true });
       
@@ -1014,8 +1035,16 @@ export class SupabaseStorage implements IStorage {
       throw new Error('Failed to retrieve conversation');
     }
     
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    // We only need these two users
+    const user1 = await this.getUser(userId1);
+    const user2 = await this.getUser(userId2);
+    
     // Map from snake_case to camelCase
-    const messages = (data || []).map(msg => ({
+    const messages = data.map(msg => ({
       id: msg.id,
       senderId: msg.sender_id,
       receiverId: msg.receiver_id,
@@ -1024,8 +1053,8 @@ export class SupabaseStorage implements IStorage {
       createdAt: new Date(msg.created_at),
       productId: msg.product_id,
       // Add sender and receiver details
-      sender: msg.sender ? this.mapUserFromDb(msg.sender) : undefined,
-      receiver: msg.receiver ? this.mapUserFromDb(msg.receiver) : undefined
+      sender: msg.sender_id === userId1 ? user1 : user2,
+      receiver: msg.receiver_id === userId1 ? user1 : user2
     }));
     
     return messages as MessageWithDetails[];
