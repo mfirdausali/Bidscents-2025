@@ -134,7 +134,7 @@ export function MessagingDialog({
           </DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="h-[50vh] p-4 border rounded-md">
+        <div className="h-[400px] overflow-y-auto p-4 border rounded-md">
           {loading ? (
             <div className="flex justify-center items-center h-full">
               <p>Loading conversation...</p>
@@ -175,7 +175,7 @@ export function MessagingDialog({
               <div ref={messagesEndRef} />
             </>
           )}
-        </ScrollArea>
+        </div>
         
         <DialogFooter className="flex">
           <div className="flex items-center w-full space-x-2">

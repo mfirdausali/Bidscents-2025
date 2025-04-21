@@ -406,7 +406,7 @@ export default function MessagesPage() {
                   </div>
                   
                   {/* Messages Area */}
-                  <ScrollArea className="flex-1 p-4">
+                  <div className="flex-1 p-4 h-[400px] overflow-y-auto">
                     {loadingChat ? (
                       <div className="flex justify-center items-center h-full">
                         <p>Loading conversation...</p>
@@ -458,7 +458,7 @@ export default function MessagesPage() {
                         <div ref={messagesEndRef} />
                       </div>
                     )}
-                  </ScrollArea>
+                  </div>
                   
                   {/* Message Input Area */}
                   <div className="p-4 border-t">
