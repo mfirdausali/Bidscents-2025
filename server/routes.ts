@@ -1243,9 +1243,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Save the message to database
             const savedMessage = await storage.sendMessage(messageData);
             
-            // Add sender and receiver details to the saved message
-            const messageWithDetails = await storage.getConversation(userId, data.receiverId);
-            const detailedMessage = messageWithDetails.find(m => m.id === savedMessage.id);
+            // Get sender details
+            const sender = await storage.getUser(userId);
+            
+            // Get receiver details
+            const receiver = await storage.getUser(data.receiverId);
+            
+            // Get product details if available
+            let product = null;
+            if (data.productId) {
+              try {
+                product = await storage.getProductById(data.productId);
+              } catch (err) {
+                console.warn('Product not found for message:', data.productId);
+              }
+            }
+            
+            // Create a detailed message object with all necessary info
+            const detailedMessage = {
+              ...savedMessage,
+              sender: sender ? {
+                id: sender.id,
+                username: sender.username,
+                profileImage: sender.profileImage
+              } : undefined,
+              receiver: receiver ? {
+                id: receiver.id,
+                username: receiver.username,
+                profileImage: receiver.profileImage
+              } : undefined,
+              product: product ? {
+                id: product.id,
+                name: product.name,
+                imageUrl: product.imageUrl
+              } : undefined
+            };
             
             // Send confirmation to sender
             ws.send(JSON.stringify({ 
