@@ -1132,6 +1132,9 @@ export class DatabaseStorage implements IStorage {
   }
   
   private async addMessageDetails(messagesList: Message[]): Promise<MessageWithDetails[]> {
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
     return Promise.all(
       messagesList.map(async (message) => {
         // Get sender
@@ -1150,8 +1153,15 @@ export class DatabaseStorage implements IStorage {
           product = await this.getProductById(message.productId);
         }
         
+        // Decrypt message content if it's encrypted
+        let content = message.content;
+        if (isEncrypted(content)) {
+          content = decryptMessage(content);
+        }
+        
         return {
           ...message,
+          content, // Replace with decrypted content
           sender,
           receiver,
           product
