@@ -406,18 +406,19 @@ export default function MessagesPage() {
                   </div>
                   
                   {/* Messages Area */}
-                  <ScrollArea className="flex-1 p-4">
-                    {loadingChat ? (
-                      <div className="flex justify-center items-center h-full">
-                        <p>Loading conversation...</p>
-                      </div>
-                    ) : activeChat.length === 0 ? (
-                      <div className="flex justify-center items-center h-full text-muted-foreground">
-                        <p>No messages yet. Start the conversation!</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {activeChat.map((msg) => {
+                  <ScrollArea className="flex-1">
+                    <div className="p-4">
+                      {loadingChat ? (
+                        <div className="flex justify-center items-center h-full">
+                          <p>Loading conversation...</p>
+                        </div>
+                      ) : activeChat.length === 0 ? (
+                        <div className="flex justify-center items-center h-full text-muted-foreground">
+                          <p>No messages yet. Start the conversation!</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {activeChat.map((msg) => {
                           const isOwnMessage = msg.senderId === user?.id;
                           return (
                             <div
@@ -458,31 +459,32 @@ export default function MessagesPage() {
                         <div ref={messagesEndRef} />
                       </div>
                     )}
-                  </ScrollArea>
-                  
-                  {/* Message Input Area */}
-                  <div className="p-4 border-t">
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        value={messageText}
-                        onChange={(e) => setMessageText(e.target.value)}
-                        placeholder="Type your message..."
-                        className="flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSendMessage();
-                          }
-                        }}
-                      />
-                      <Button 
-                        onClick={handleSendMessage} 
-                        disabled={!messageText.trim() || loadingChat} 
-                        size="icon"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  </div>
+                </ScrollArea>
+                
+                {/* Message Input Area */}
+                <div className="p-4 border-t">
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      placeholder="Type your message..."
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                    />
+                    <Button 
+                      onClick={handleSendMessage} 
+                      disabled={!messageText.trim() || loadingChat} 
+                      size="icon"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
                   </div>
                 </>
               )}
