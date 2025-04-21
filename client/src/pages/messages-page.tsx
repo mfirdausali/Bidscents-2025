@@ -149,7 +149,18 @@ export default function MessagesPage() {
   };
   
   if (!user) {
-    return null; // Don't render anything if not authenticated
+    // Instead of returning null, we'll render a simple message
+    return (
+      <div className="container mx-auto py-6 max-w-4xl">
+        <div className="flex flex-col items-center justify-center h-64">
+          <h2 className="text-xl font-semibold mb-4">Authentication Required</h2>
+          <p className="text-muted-foreground mb-4">Please log in to view your messages</p>
+          <Button asChild>
+            <Link href="/auth">Sign In</Link>
+          </Button>
+        </div>
+      </div>
+    );
   }
   
   return (
