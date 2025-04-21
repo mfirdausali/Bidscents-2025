@@ -86,6 +86,17 @@ export const orderItems = pgTable("order_items", {
   price: doublePrecision("price").notNull(),
 });
 
+// Messages table
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  senderId: integer("sender_id").references(() => users.id).notNull(),
+  receiverId: integer("receiver_id").references(() => users.id).notNull(),
+  content: text("content").notNull(), // Encrypted message content
+  productId: integer("product_id").references(() => products.id), // Optional reference to product
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -153,6 +164,14 @@ export const insertProductImageSchema = createInsertSchema(productImages).pick({
   imageName: true,
 });
 
+export const insertMessageSchema = createInsertSchema(messages).pick({
+  senderId: true,
+  receiverId: true,
+  content: true,
+  productId: true,
+  isRead: true,
+});
+
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -175,6 +194,9 @@ export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type ProductImage = typeof productImages.$inferSelect;
 export type InsertProductImage = z.infer<typeof insertProductImageSchema>;
 
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+
 // Extended types
 export type ProductWithDetails = Product & {
   category?: Category;
@@ -187,6 +209,12 @@ export type ProductWithDetails = Product & {
 export type OrderWithItems = Order & {
   items: (OrderItem & { product: Product })[];
   user: User;
+};
+
+export type MessageWithDetails = Message & {
+  sender?: User;
+  receiver?: User;
+  product?: ProductWithDetails;
 };
 
 // Note: Relations are handled through joins in the DatabaseStorage implementation
