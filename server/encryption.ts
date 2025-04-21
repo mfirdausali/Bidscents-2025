@@ -26,26 +26,47 @@ export function encryptMessage(message: string): string {
  */
 export function decryptMessage(encryptedMessage: string): string {
   try {
-    const bytes = CryptoJS.AES.decrypt(encryptedMessage, SECRET_KEY);
-    return bytes.toString(CryptoJS.enc.Utf8);
+    // Only attempt to decrypt if it matches our encryption pattern
+    if (isEncrypted(encryptedMessage)) {
+      const bytes = CryptoJS.AES.decrypt(encryptedMessage, SECRET_KEY);
+      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+      
+      // A successful decryption should yield a non-empty string
+      if (decrypted && decrypted.length > 0) {
+        return decrypted;
+      }
+      
+      // If we get an empty string, decryption likely failed
+      console.warn('Decryption resulted in empty string:', encryptedMessage.substring(0, 20) + '...');
+      return encryptedMessage; // Return original if decryption fails
+    }
+    
+    // If it doesn't match our encryption pattern, return as is
+    return encryptedMessage;
   } catch (error) {
     console.error('Error decrypting message:', error);
-    // Return the encrypted message if decryption fails
-    // This makes it clear to the user that something went wrong
-    return `[Encrypted: ${encryptedMessage.substring(0, 10)}...]`;
+    // Return the original message if decryption fails
+    return encryptedMessage;
   }
 }
 
 /**
  * Checks if a message is encrypted
- * This is a basic check and might need improvement for production
  * @param message The message to check
  * @returns Boolean indicating if the message appears to be encrypted
  */
 export function isEncrypted(message: string): boolean {
-  // A very basic check - encrypted messages from CryptoJS AES typically:
-  // - Are longer than the original
-  // - Contain only base64 characters
-  // - Start with 'U2F'
-  return message.length > 20 && /^[A-Za-z0-9+/=]+$/.test(message);
+  try {
+    // Use a more robust method to detect encrypted messages
+    // CryptoJS AES encrypted strings:
+    // - Always start with 'U2FsdGVk' (which is 'Salted' in base64)
+    // - Are always longer than 16 characters
+    // - Consist only of valid base64 characters
+    return message.startsWith('U2FsdGVk') && 
+           message.length > 16 && 
+           /^[A-Za-z0-9+/=]+$/.test(message);
+  } catch (error) {
+    console.error('Error checking if message is encrypted:', error);
+    return false;
+  }
 }
