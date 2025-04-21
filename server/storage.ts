@@ -99,6 +99,14 @@ export interface IStorage {
   createProductImage(productImage: InsertProductImage): Promise<ProductImage>;
   deleteProductImage(id: number): Promise<void>;
   
+  // Message methods
+  getUserMessages(userId: number): Promise<MessageWithDetails[]>;
+  getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]>;
+  getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]>;
+  sendMessage(message: InsertMessage): Promise<Message>;
+  markMessageAsRead(id: number): Promise<Message>;
+  markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void>;
+  
   // Session storage
   sessionStore: any;
 }
@@ -112,6 +120,7 @@ export class MemStorage implements IStorage {
   private orders: Map<number, Order>;
   private orderItems: Map<number, OrderItem>;
   private productImages: Map<number, ProductImage>;
+  private messages: Map<number, Message>;
   sessionStore: any;
   currentIds: {
     users: number;
@@ -122,6 +131,7 @@ export class MemStorage implements IStorage {
     orders: number;
     orderItems: number;
     productImages: number;
+    messages: number;
   };
 
   constructor() {
@@ -133,6 +143,7 @@ export class MemStorage implements IStorage {
     this.orders = new Map();
     this.orderItems = new Map();
     this.productImages = new Map();
+    this.messages = new Map();
     this.currentIds = {
       users: 1,
       categories: 1,
@@ -141,7 +152,8 @@ export class MemStorage implements IStorage {
       reviews: 1,
       orders: 1,
       orderItems: 1,
-      productImages: 1
+      productImages: 1,
+      messages: 1
     };
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // 1 day
@@ -501,6 +513,92 @@ export class MemStorage implements IStorage {
 
   async deleteProductImage(id: number): Promise<void> {
     this.productImages.delete(id);
+  }
+
+  // Message methods
+  async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
+    const userMessages = Array.from(this.messages.values()).filter(
+      message => message.senderId === userId || message.receiverId === userId
+    );
+    
+    return this.addMessageDetails(userMessages);
+  }
+  
+  async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
+    const conversation = Array.from(this.messages.values()).filter(
+      message => 
+        (message.senderId === userId1 && message.receiverId === userId2) || 
+        (message.senderId === userId2 && message.receiverId === userId1)
+    );
+    
+    return this.addMessageDetails(conversation);
+  }
+  
+  async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
+    const conversation = Array.from(this.messages.values()).filter(
+      message => 
+        ((message.senderId === userId1 && message.receiverId === userId2) || 
+        (message.senderId === userId2 && message.receiverId === userId1)) &&
+        message.productId === productId
+    );
+    
+    return this.addMessageDetails(conversation);
+  }
+  
+  async sendMessage(message: InsertMessage): Promise<Message> {
+    const id = this.currentIds.messages++;
+    const createdAt = new Date();
+    
+    // In a real app, you would encrypt the message content here
+    const encryptedMessage: Message = {
+      ...message,
+      id,
+      createdAt,
+      isRead: message.isRead || false
+    };
+    
+    this.messages.set(id, encryptedMessage);
+    return encryptedMessage;
+  }
+  
+  async markMessageAsRead(id: number): Promise<Message> {
+    const message = this.messages.get(id);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+    
+    const updatedMessage: Message = { ...message, isRead: true };
+    this.messages.set(id, updatedMessage);
+    return updatedMessage;
+  }
+  
+  async markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void> {
+    for (const [messageId, message] of this.messages.entries()) {
+      if (message.receiverId === receiverId && message.senderId === senderId) {
+        this.messages.set(messageId, { ...message, isRead: true });
+      }
+    }
+  }
+  
+  private async addMessageDetails(messages: Message[]): Promise<MessageWithDetails[]> {
+    return Promise.all(
+      messages.map(async (message) => {
+        const sender = this.users.get(message.senderId);
+        const receiver = this.users.get(message.receiverId);
+        
+        let product;
+        if (message.productId) {
+          product = await this.getProductById(message.productId);
+        }
+        
+        return {
+          ...message,
+          sender,
+          receiver,
+          product
+        };
+      })
+    );
   }
 
   // Helper methods
