@@ -13,6 +13,7 @@ import { supabase } from "./supabase"; // Import Supabase for server-side operat
 import { createClient } from '@supabase/supabase-js';
 import { users } from "@shared/schema"; // Import the users schema for database updates
 import { WebSocketServer, WebSocket } from 'ws';
+import { encryptMessage, decryptMessage, isEncrypted } from './encryption';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -1108,7 +1109,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const userId = req.user.id;
       const messages = await storage.getUserMessages(userId);
-      res.json(messages);
+      
+      // Decrypt message content
+      const decryptedMessages = messages.map(msg => ({
+        ...msg,
+        content: msg.content ? decryptMessage(msg.content) : msg.content
+      }));
+      
+      res.json(decryptedMessages);
     } catch (error) {
       next(error);
     }
@@ -1139,7 +1147,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conversation = await storage.getConversation(currentUserId, otherUserId);
       }
       
-      res.json(conversation);
+      // Decrypt message content
+      const decryptedConversation = conversation.map(msg => ({
+        ...msg,
+        content: msg.content ? decryptMessage(msg.content) : msg.content
+      }));
+      
+      res.json(decryptedConversation);
     } catch (error) {
       next(error);
     }
@@ -1237,11 +1251,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               productId: data.productId,
             });
             
-            // Encrypt the message content (in a real app)
-            // For this demo, we'll skip actual encryption but would implement it in production
+            // Encrypt the message content before saving
+            const encryptedContent = encryptMessage(messageData.content);
             
-            // Save the message to database
-            const savedMessage = await storage.sendMessage(messageData);
+            // Save the encrypted message to database
+            const savedMessage = await storage.sendMessage({
+              ...messageData,
+              content: encryptedContent
+            });
             
             // Get sender details
             const sender = await storage.getUser(userId);
@@ -1260,8 +1277,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Create a detailed message object with all necessary info
+            // Decrypt the message content before sending it back to clients
             const detailedMessage = {
               ...savedMessage,
+              // Replace encrypted content with original content for sending to clients
+              content: messageData.content, 
               sender: sender ? {
                 id: sender.id,
                 username: sender.username,
