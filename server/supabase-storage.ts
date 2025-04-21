@@ -1005,19 +1005,30 @@ export class SupabaseStorage implements IStorage {
       }
     }
     
-    // Map from snake_case to camelCase
-    const messages = data.map(msg => ({
-      id: msg.id,
-      senderId: msg.sender_id,
-      receiverId: msg.receiver_id,
-      content: msg.content,
-      isRead: msg.is_read,
-      createdAt: new Date(msg.created_at),
-      productId: msg.product_id,
-      // Add sender and receiver details if available
-      sender: users[msg.sender_id],
-      receiver: users[msg.receiver_id]
-    }));
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
+    // Map from snake_case to camelCase and decrypt message content
+    const messages = data.map(msg => {
+      // Decrypt the message content if it's encrypted
+      let content = msg.content;
+      if (isEncrypted(content)) {
+        content = decryptMessage(content);
+      }
+      
+      return {
+        id: msg.id,
+        senderId: msg.sender_id,
+        receiverId: msg.receiver_id,
+        content: content, // Decrypted content
+        isRead: msg.is_read,
+        createdAt: new Date(msg.created_at),
+        productId: msg.product_id,
+        // Add sender and receiver details if available
+        sender: users[msg.sender_id],
+        receiver: users[msg.receiver_id]
+      };
+    });
     
     return messages as MessageWithDetails[];
   }
@@ -1043,19 +1054,30 @@ export class SupabaseStorage implements IStorage {
     const user1 = await this.getUser(userId1);
     const user2 = await this.getUser(userId2);
     
-    // Map from snake_case to camelCase
-    const messages = data.map(msg => ({
-      id: msg.id,
-      senderId: msg.sender_id,
-      receiverId: msg.receiver_id,
-      content: msg.content,
-      isRead: msg.is_read,
-      createdAt: new Date(msg.created_at),
-      productId: msg.product_id,
-      // Add sender and receiver details
-      sender: msg.sender_id === userId1 ? user1 : user2,
-      receiver: msg.receiver_id === userId1 ? user1 : user2
-    }));
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
+    // Map from snake_case to camelCase and decrypt message content
+    const messages = data.map(msg => {
+      // Decrypt the message content if it's encrypted
+      let content = msg.content;
+      if (isEncrypted(content)) {
+        content = decryptMessage(content);
+      }
+      
+      return {
+        id: msg.id,
+        senderId: msg.sender_id,
+        receiverId: msg.receiver_id,
+        content: content, // Decrypted content
+        isRead: msg.is_read,
+        createdAt: new Date(msg.created_at),
+        productId: msg.product_id,
+        // Add sender and receiver details
+        sender: msg.sender_id === userId1 ? user1 : user2,
+        receiver: msg.receiver_id === userId1 ? user1 : user2
+      };
+    });
     
     return messages as MessageWithDetails[];
   }
@@ -1082,29 +1104,43 @@ export class SupabaseStorage implements IStorage {
     const user1 = await this.getUser(userId1);
     const user2 = await this.getUser(userId2);
     
-    // Map from snake_case to camelCase
-    const messages = data.map(msg => ({
-      id: msg.id,
-      senderId: msg.sender_id,
-      receiverId: msg.receiver_id,
-      content: msg.content,
-      isRead: msg.is_read,
-      createdAt: new Date(msg.created_at),
-      productId: msg.product_id,
-      // Add sender and receiver details
-      sender: msg.sender_id === userId1 ? user1 : user2,
-      receiver: msg.receiver_id === userId1 ? user1 : user2
-    }));
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
+    // Map from snake_case to camelCase and decrypt message content
+    const messages = data.map(msg => {
+      // Decrypt the message content if it's encrypted
+      let content = msg.content;
+      if (isEncrypted(content)) {
+        content = decryptMessage(content);
+      }
+      
+      return {
+        id: msg.id,
+        senderId: msg.sender_id,
+        receiverId: msg.receiver_id,
+        content: content, // Decrypted content
+        isRead: msg.is_read,
+        createdAt: new Date(msg.created_at),
+        productId: msg.product_id,
+        // Add sender and receiver details
+        sender: msg.sender_id === userId1 ? user1 : user2,
+        receiver: msg.receiver_id === userId1 ? user1 : user2
+      };
+    });
     
     return messages as MessageWithDetails[];
   }
   
   async sendMessage(message: InsertMessage): Promise<Message> {
-    // Convert camelCase to snake_case for DB
+    // Import encryption utility
+    const { encryptMessage } = await import('./encryption');
+    
+    // Encrypt the message content before storing
     const dbMessage = {
       sender_id: message.senderId,
       receiver_id: message.receiverId,
-      content: message.content, 
+      content: encryptMessage(message.content), // Encrypt the content
       product_id: message.productId || null,
       is_read: message.isRead || false
     };
@@ -1125,7 +1161,7 @@ export class SupabaseStorage implements IStorage {
       id: data.id,
       senderId: data.sender_id,
       receiverId: data.receiver_id,
-      content: data.content,
+      content: data.content, // This will be encrypted
       isRead: data.is_read,
       createdAt: new Date(data.created_at),
       productId: data.product_id,
@@ -1145,12 +1181,21 @@ export class SupabaseStorage implements IStorage {
       throw new Error('Failed to mark message as read');
     }
     
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
+    // Decrypt message content if it's encrypted
+    let content = data.content;
+    if (isEncrypted(content)) {
+      content = decryptMessage(content);
+    }
+    
     // Convert snake_case to camelCase
     return {
       id: data.id,
       senderId: data.sender_id,
       receiverId: data.receiver_id,
-      content: data.content,
+      content: content, // Use decrypted content
       isRead: data.is_read,
       createdAt: new Date(data.created_at),
       productId: data.product_id,
