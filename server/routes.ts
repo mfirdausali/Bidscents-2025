@@ -1096,7 +1096,238 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // Messaging API endpoints
+  // Get all messages for authenticated user
+  app.get("/api/messages", async (req, res, next) => {
+    try {
+      // Check authentication
+      if (!req.isAuthenticated()) {
+        return res.status(403).json({ message: "Unauthorized: Must be logged in to access messages" });
+      }
+      
+      const userId = req.user.id;
+      const messages = await storage.getUserMessages(userId);
+      res.json(messages);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Get conversation between two users
+  app.get("/api/messages/conversation/:userId", async (req, res, next) => {
+    try {
+      // Check authentication
+      if (!req.isAuthenticated()) {
+        return res.status(403).json({ message: "Unauthorized: Must be logged in to access messages" });
+      }
+      
+      const currentUserId = req.user.id;
+      const otherUserId = parseInt(req.params.userId);
+      
+      if (isNaN(otherUserId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+      
+      // Get productId from query params if available for product-specific conversations
+      const productId = req.query.productId ? parseInt(req.query.productId as string) : undefined;
+      
+      let conversation;
+      if (productId && !isNaN(productId)) {
+        conversation = await storage.getConversationForProduct(currentUserId, otherUserId, productId);
+      } else {
+        conversation = await storage.getConversation(currentUserId, otherUserId);
+      }
+      
+      res.json(conversation);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Mark messages as read
+  app.post("/api/messages/mark-read", async (req, res, next) => {
+    try {
+      // Check authentication
+      if (!req.isAuthenticated()) {
+        return res.status(403).json({ message: "Unauthorized: Must be logged in to update messages" });
+      }
+      
+      // Validate request body
+      const schema = z.object({
+        messageId: z.number().optional(),
+        senderId: z.number().optional(),
+      }).refine(data => data.messageId !== undefined || data.senderId !== undefined, {
+        message: "Either messageId or senderId must be provided"
+      });
+      
+      const { messageId, senderId } = schema.parse(req.body);
+      const currentUserId = req.user.id;
+      
+      if (messageId) {
+        // Mark a single message as read
+        await storage.markMessageAsRead(messageId);
+      } else if (senderId) {
+        // Mark all messages from a sender as read
+        await storage.markAllMessagesAsRead(currentUserId, senderId);
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   const httpServer = createServer(app);
+  
+  // Create WebSocket server for real-time messaging
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Map of connected users: userId -> WebSocket connection
+  const connectedUsers = new Map<number, WebSocket>();
+  
+  // WebSocket connection handler
+  wss.on('connection', (ws: WebSocket) => {
+    console.log('New WebSocket connection established');
+    let userId: number | null = null;
+    
+    // Handle messages from clients
+    ws.on('message', async (messageData: string) => {
+      try {
+        const data = JSON.parse(messageData.toString());
+        
+        // Handle authentication
+        if (data.type === 'auth') {
+          userId = parseInt(data.userId);
+          if (isNaN(userId)) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Invalid user ID' }));
+            return;
+          }
+          
+          // Store connection for this user
+          connectedUsers.set(userId, ws);
+          console.log(`User ${userId} authenticated on WebSocket`);
+          
+          // Send connection confirmation
+          ws.send(JSON.stringify({ type: 'auth_success', userId }));
+          return;
+        }
+        
+        // All other message types require authentication
+        if (!userId) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
+          return;
+        }
+        
+        // Handle sending a new message
+        if (data.type === 'send_message') {
+          try {
+            // Validate message data
+            const messageSchema = z.object({
+              senderId: z.number(),
+              receiverId: z.number(),
+              content: z.string().min(1),
+              productId: z.number().optional(),
+            });
+            
+            const messageData = messageSchema.parse({
+              senderId: userId, // Use authenticated user ID as sender
+              receiverId: data.receiverId,
+              content: data.content,
+              productId: data.productId,
+            });
+            
+            // Encrypt the message content (in a real app)
+            // For this demo, we'll skip actual encryption but would implement it in production
+            
+            // Save the message to database
+            const savedMessage = await storage.sendMessage(messageData);
+            
+            // Add sender and receiver details to the saved message
+            const messageWithDetails = await storage.getConversation(userId, data.receiverId);
+            const detailedMessage = messageWithDetails.find(m => m.id === savedMessage.id);
+            
+            // Send confirmation to sender
+            ws.send(JSON.stringify({ 
+              type: 'message_sent', 
+              message: detailedMessage
+            }));
+            
+            // Send notification to receiver if they're connected
+            const receiverWs = connectedUsers.get(data.receiverId);
+            if (receiverWs && receiverWs.readyState === WebSocket.OPEN) {
+              receiverWs.send(JSON.stringify({ 
+                type: 'new_message', 
+                message: detailedMessage
+              }));
+            }
+          } catch (error: any) {
+            console.error('Error processing message:', error);
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              message: 'Failed to send message: ' + (error.message || 'Unknown error')
+            }));
+          }
+          return;
+        }
+        
+        // Handle marking messages as read
+        if (data.type === 'mark_read') {
+          try {
+            if (data.messageId) {
+              // Mark a single message as read
+              await storage.markMessageAsRead(data.messageId);
+            } else if (data.senderId) {
+              // Mark all messages from a specific sender as read
+              await storage.markAllMessagesAsRead(userId, data.senderId);
+            }
+            
+            // Send confirmation
+            ws.send(JSON.stringify({ type: 'messages_marked_read' }));
+            
+            // Notify the sender that their messages were read
+            if (data.senderId) {
+              const senderWs = connectedUsers.get(data.senderId);
+              if (senderWs && senderWs.readyState === WebSocket.OPEN) {
+                senderWs.send(JSON.stringify({ 
+                  type: 'messages_read_by', 
+                  userId: userId 
+                }));
+              }
+            }
+          } catch (error: any) {
+            console.error('Error marking messages as read:', error);
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              message: 'Failed to mark messages as read: ' + (error.message || 'Unknown error')
+            }));
+          }
+          return;
+        }
+        
+        // Unknown message type
+        ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
+        
+      } catch (error: any) {
+        console.error('WebSocket message error:', error);
+        ws.send(JSON.stringify({ 
+          type: 'error', 
+          message: 'Invalid message format' 
+        }));
+      }
+    });
+    
+    // Handle disconnection
+    ws.on('close', () => {
+      if (userId) {
+        console.log(`User ${userId} disconnected from WebSocket`);
+        connectedUsers.delete(userId);
+      }
+    });
+    
+    // Send initial connection message
+    ws.send(JSON.stringify({ type: 'connected', message: 'Connected to BidScents messaging server' }));
+  });
+  
   return httpServer;
 }
