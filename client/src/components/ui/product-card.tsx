@@ -7,6 +7,7 @@ import { Heart, Star, StarHalf, MessageSquare } from "lucide-react";
 import { Badge } from "./badge";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { ContactSellerButton } from "./contact-seller-button";
 
 interface ProductCardProps {
   product: ProductWithDetails;
@@ -15,7 +16,6 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isContacting, setIsContacting] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
 
   // Function to render star ratings
@@ -42,43 +42,6 @@ export function ProductCard({ product }: ProductCardProps) {
     }
 
     return stars;
-  };
-
-  // Handle contact seller
-  const handleContactSeller = () => {
-    if (!user) {
-      toast({
-        title: "Please sign in",
-        description: "You need to be signed in to contact sellers",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsContacting(true);
-    try {
-      // In a real app, this would navigate to a messaging page or open a modal
-      toast({
-        title: "Contacting seller",
-        description: `We're connecting you with the seller of ${product.name}`,
-      });
-      
-      // Simulate a delay before showing success message
-      setTimeout(() => {
-        toast({
-          title: "Seller contacted",
-          description: `Your interest in ${product.name} has been sent to the seller`,
-        });
-        setIsContacting(false);
-      }, 1000);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to contact seller",
-        variant: "destructive",
-      });
-      setIsContacting(false);
-    }
   };
 
   return (
