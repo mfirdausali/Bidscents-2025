@@ -174,13 +174,13 @@ export function useMessaging() {
     const fetchMessages = async () => {
       setLoading(true);
       try {
-        const response = await apiRequest<Message[]>({
-          url: '/api/messages',
-          method: 'GET',
-        });
-        
-        if (response) {
-          setMessages(response);
+        // Get response data from API
+        const res = await fetch('/api/messages');
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(data as Message[]);
+        } else {
+          throw new Error('Failed to fetch messages');
         }
         setError(null);
       } catch (err: any) {
@@ -299,12 +299,13 @@ export function useMessaging() {
         url += `?productId=${productId}`;
       }
       
-      const response = await apiRequest<Message[]>({
-        url,
-        method: 'GET',
-      });
-      
-      return response || [];
+      // Fetch conversation data
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        return data as Message[];
+      }
+      return [];
     } catch (error: any) {
       console.error('Error fetching conversation:', error);
       toast({

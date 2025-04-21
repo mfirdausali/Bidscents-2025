@@ -75,7 +75,13 @@ export function MessagingDialog({
     setLoading(true);
     try {
       const messages = await getConversation(receiverId, productId);
-      setConversation(messages);
+      // Make sure we're handling the response properly
+      if (Array.isArray(messages)) {
+        setConversation(messages);
+      } else {
+        setConversation([]);
+        console.error('Invalid conversation data format');
+      }
     } catch (error) {
       console.error('Failed to load conversation:', error);
     } finally {

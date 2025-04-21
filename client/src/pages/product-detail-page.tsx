@@ -300,9 +300,20 @@ export default function ProductDetailPage() {
                     <p className="font-medium">Seller: {product.seller?.username}</p>
                     <p className="text-gray-500 text-xs">Trusted Seller</p>
                   </div>
-                  <Button variant="outline" className="text-xs h-8" asChild>
-                    <Link href={`/sellers/${product.seller?.id}`}>View Seller</Link>
-                  </Button>
+                  <div className="flex gap-2">
+                    <ContactSellerButton 
+                      sellerId={product.sellerId}
+                      sellerName={product.seller?.username || 'Seller'}
+                      sellerImage={product.seller?.profileImage || undefined}
+                      productId={product.id}
+                      productName={product.name}
+                      size="sm"
+                      variant="secondary"
+                    />
+                    <Button variant="outline" className="text-xs h-8" asChild>
+                      <Link href={`/sellers/${product.seller?.id}`}>View Seller</Link>
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="text-2xl font-semibold mb-4">RM {product.price.toFixed(2)}</div>
