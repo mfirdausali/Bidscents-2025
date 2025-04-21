@@ -17,6 +17,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLiked, setIsLiked] = useState(false);
+  // No longer need isContacting state since we're using the ContactSellerButton component
 
   // Function to render star ratings
   const renderStars = (rating: number | undefined) => {
@@ -156,13 +157,16 @@ export function ProductCard({ product }: ProductCardProps) {
         {/* Action buttons based on listing type */}
         {product.listingType === 'negotiable' ? (
           <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={handleContactSeller}
-              disabled={isContacting}
+            <ContactSellerButton 
+              sellerId={product.sellerId}
+              sellerName={product.seller?.username || 'Seller'}
+              sellerImage={product.seller?.profileImage || null}
+              productId={product.id}
+              productName={product.name}
+              variant="secondary"
+              size="sm"
               className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded-md"
-            >
-              <MessageSquare className="mr-1 h-3 w-3" /> Contact
-            </Button>
+            />
             <Button
               variant="outline"
               className="border-purple-600 text-purple-600 hover:bg-purple-50 text-xs py-2 rounded-md"
@@ -175,31 +179,28 @@ export function ProductCard({ product }: ProductCardProps) {
             <div className="text-xs text-gray-600 mb-1">
               <span>Current Bid: RM {product.price.toFixed(0)}</span>
             </div>
-            <Button
-              onClick={handleContactSeller}
-              disabled={isContacting}
+            <ContactSellerButton 
+              sellerId={product.sellerId}
+              sellerName={product.seller?.username || 'Seller'}
+              sellerImage={product.seller?.profileImage || null}
+              productId={product.id}
+              productName={product.name}
+              variant="secondary"
+              size="default"
               className="bg-amber-500 hover:bg-amber-600 text-white text-xs py-2 w-full rounded-md"
-            >
-              {isContacting ? 'Processing...' : 'Bid Now'}
-            </Button>
+            />
           </div>
         ) : (
-          <Button
-            onClick={handleContactSeller}
-            disabled={isContacting}
+          <ContactSellerButton 
+            sellerId={product.sellerId}
+            sellerName={product.seller?.username || 'Seller'}
+            sellerImage={product.seller?.profileImage || null}
+            productId={product.id}
+            productName={product.name}
+            variant="secondary"
+            size="default"
             className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 w-full rounded-md"
-          >
-            {isContacting ? (
-              <span className="flex items-center justify-center">
-                <span className="animate-spin mr-2 h-3 w-3 border-b-2 border-white rounded-full"></span>
-                Contacting...
-              </span>
-            ) : (
-              <span className="flex items-center justify-center">
-                <MessageSquare className="mr-1 h-3 w-3" /> Contact Seller
-              </span>
-            )}
-          </Button>
+          />
         )}
       </div>
     </div>
