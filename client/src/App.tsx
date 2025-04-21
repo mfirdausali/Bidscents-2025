@@ -11,6 +11,7 @@ import SellerDashboard from "@/pages/seller-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import ProfilePage from "@/pages/profile-page";
 import SellerProfilePage from "@/pages/seller-profile-page";
+import MessagesPage from "@/pages/messages-page";
 import VerifyEmailPage from "@/pages/verify-email";
 import ResetPasswordPage from "@/pages/reset-password";
 import AuthCallback from "@/pages/auth-callback";
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/products/:id" component={ProductDetailPage} />
       <Route path="/sellers/:id" component={SellerProfilePage} />
       <ProtectedRoute path="/profile" component={ProfilePage} />
+      <ProtectedRoute path="/messages" component={MessagesPage} />
       <ProtectedRoute path="/seller/dashboard" component={SellerDashboard} />
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} />
       <Route path="/terms-of-service" component={TermsOfServicePage} />
