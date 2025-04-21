@@ -5,7 +5,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-// import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +28,7 @@ export default function MessagesPage() {
   const [activeChat, setActiveChat] = useState<Message[]>([]);
   const [loadingChat, setLoadingChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Group messages by conversation (unique user pairs)
   const conversations = React.useMemo(() => {
@@ -129,6 +129,8 @@ export default function MessagesPage() {
       });
     } finally {
       setLoadingChat(false);
+      // Close mobile menu when conversation is loaded
+      setIsMobileMenuOpen(false);
     }
   }, [user?.id, getConversation, markAsRead, toast]);
 
@@ -245,7 +247,6 @@ export default function MessagesPage() {
       
       // If we have new messages, add them to the activeChat state
       if (newMessages.length > 0) {
-        console.log('Adding new messages to active chat:', newMessages);
         setActiveChat(prev => {
           // Sort messages by creation time (oldest first)
           return [...prev, ...newMessages].sort((a, b) => 
@@ -270,15 +271,19 @@ export default function MessagesPage() {
     );
   }
   
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   return (
-    <div className="container mx-auto py-4 max-w-7xl h-[calc(100vh-2rem)]">
+    <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="p-3 border-b flex items-center justify-between bg-background z-10">
         <div className="flex items-center space-x-4">
           <Button variant="outline" size="icon" onClick={() => setLocation('/')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-2xl font-bold">Messages</h1>
+          <h1 className="text-xl font-bold">Messages</h1>
         </div>
         <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -298,196 +303,211 @@ export default function MessagesPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-6rem)]">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Conversation List - Left Sidebar */}
-          <div className="md:col-span-1 h-full">
-            <Card className="h-full flex flex-col overflow-hidden">
-              <div className="p-3 border-b">
-                <h2 className="font-semibold text-lg">Conversations</h2>
-              </div>
-              
-              <div className="overflow-y-auto flex-1">
-                {conversations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center h-full">
-                    <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
-                    <h3 className="text-base font-medium mb-2">No messages yet</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Start a conversation by messaging a seller through their product page.
-                    </p>
-                    <Button asChild size="sm">
-                      <Link href="/">Browse Products</Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-0">
-                    {conversations.map((conversation, index) => (
-                      <React.Fragment key={conversation.userId}>
-                        <div 
-                          className={`flex items-center p-3 hover:bg-accent cursor-pointer ${
-                            selectedConversation?.userId === conversation.userId ? 'bg-accent' : ''
-                          }`}
-                          onClick={() => selectConversation(conversation)}
-                        >
-                          <div className="relative flex-shrink-0">
-                            <Avatar>
-                              <AvatarImage src={conversation.profileImage || ''} alt={conversation.username} />
-                              <AvatarFallback>{conversation.username.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            {conversation.unreadCount > 0 && (
-                              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                                {conversation.unreadCount}
-                              </span>
-                            )}
-                          </div>
-                          <div className="ml-3 flex-1 overflow-hidden">
-                            <div className="flex justify-between items-start">
-                              <h3 className="font-medium">{conversation.username}</h3>
-                              <span className="text-xs text-muted-foreground">
-                                {formatMessageTime(conversation.lastMessage.createdAt)}
-                              </span>
-                            </div>
-                            <div className="text-sm text-muted-foreground truncate">
-                              {conversation.lastMessage.senderId === user.id && (
-                                <span className="text-muted-foreground mr-1">You:</span>
-                              )}
-                              {truncateMessage(conversation.lastMessage.content)}
-                            </div>
-                            {conversation.productInfo && (
-                              <Badge variant="outline" className="mt-1 text-xs px-2 py-0">
-                                {conversation.productInfo.name}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        {index < conversations.length - 1 && <Separator />}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Card>
-          </div>
-          
-          {/* Active Conversation - Right Side */}
-          <div className="md:col-span-2 h-full">
-            <Card className="h-full flex flex-col overflow-hidden">
-              {!selectedConversation ? (
-                <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                  <User className="h-16 w-16 text-muted-foreground mb-4" />
-                  <h2 className="text-xl font-medium mb-2">No conversation selected</h2>
-                  <p className="text-muted-foreground mb-6">
-                    Select a conversation from the list to view messages or start a new conversation
-                    by contacting a seller.
+          <div className={`md:w-1/3 lg:w-1/4 border-r md:flex flex-col ${isMobileMenuOpen ? 'fixed inset-0 z-50 bg-background' : 'hidden'} md:relative md:block`}>
+            {/* Mobile header for conversation list */}
+            <div className="border-b p-3 flex items-center justify-between md:hidden">
+              <h2 className="font-semibold text-lg">Conversations</h2>
+              <Button variant="ghost" size="sm" onClick={toggleMobileMenu}>
+                Close
+              </Button>
+            </div>
+            
+            <div className="overflow-y-auto flex-1">
+              {conversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 px-4 text-center h-full">
+                  <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
+                  <h3 className="text-base font-medium mb-2">No messages yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Start a conversation by messaging a seller through their product page.
                   </p>
-                  <Button asChild>
+                  <Button asChild size="sm">
                     <Link href="/">Browse Products</Link>
                   </Button>
                 </div>
               ) : (
-                <>
-                  {/* Conversation Header */}
-                  <div className="p-3 border-b flex items-center flex-shrink-0">
-                    <Avatar className="h-10 w-10 mr-3">
-                      <AvatarImage 
-                        src={selectedConversation.profileImage || ''} 
-                        alt={selectedConversation.username} 
-                      />
-                      <AvatarFallback>
-                        {selectedConversation.username.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h2 className="font-semibold text-lg">{selectedConversation.username}</h2>
-                      {selectedConversation.productName && (
-                        <p className="text-xs text-muted-foreground">
-                          About: {selectedConversation.productName}
-                        </p>
-                      )}
+                <div className="divide-y">
+                  {conversations.map((conversation) => (
+                    <div 
+                      key={conversation.userId}
+                      className={`flex items-center p-3 hover:bg-accent/50 cursor-pointer transition-colors ${
+                        selectedConversation?.userId === conversation.userId ? 'bg-accent' : ''
+                      }`}
+                      onClick={() => selectConversation(conversation)}
+                    >
+                      <div className="relative flex-shrink-0">
+                        <Avatar>
+                          <AvatarImage src={conversation.profileImage || ''} alt={conversation.username} />
+                          <AvatarFallback>{conversation.username.charAt(0).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        {conversation.unreadCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                            {conversation.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <div className="ml-3 flex-1 overflow-hidden">
+                        <div className="flex justify-between items-start">
+                          <h3 className="font-medium">{conversation.username}</h3>
+                          <span className="text-xs text-muted-foreground">
+                            {formatMessageTime(conversation.lastMessage.createdAt)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground truncate">
+                          {conversation.lastMessage.senderId === user.id && (
+                            <span className="text-muted-foreground mr-1">You:</span>
+                          )}
+                          {truncateMessage(conversation.lastMessage.content)}
+                        </div>
+                        {conversation.productInfo && (
+                          <Badge variant="outline" className="mt-1 text-xs px-2 py-0">
+                            {conversation.productInfo.name}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  
-                  {/* Messages Area */}
-                  <div className="flex-1 overflow-y-auto p-4" style={{ height: "calc(100% - 130px)" }}>
-                    {loadingChat ? (
-                      <div className="flex justify-center items-center h-full">
-                        <p>Loading conversation...</p>
-                      </div>
-                    ) : activeChat.length === 0 ? (
-                      <div className="flex justify-center items-center h-full text-muted-foreground">
-                        <p>No messages yet. Start the conversation!</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4 pb-2">
-                        {activeChat.map((msg) => {
-                          const isOwnMessage = msg.senderId === user?.id;
-                          return (
-                            <div
-                              key={msg.id}
-                              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
-                            >
-                              {!isOwnMessage && (
-                                <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
-                                  <AvatarImage 
-                                    src={selectedConversation.profileImage || ''} 
-                                    alt={selectedConversation.username} 
-                                  />
-                                  <AvatarFallback>
-                                    {selectedConversation.username.charAt(0).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                              )}
-                              <div
-                                className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                                  isOwnMessage
-                                    ? 'bg-primary text-primary-foreground rounded-tr-none'
-                                    : 'bg-muted rounded-tl-none'
-                                }`}
-                              >
-                                <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
-                                <div className="text-xs mt-1 opacity-70 flex justify-end">
-                                  {formatMessageTime(msg.createdAt)}
-                                  {isOwnMessage && (
-                                    <span className="ml-2">
-                                      {msg.isRead ? '✓✓' : '✓'}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        <div ref={messagesEndRef} />
-                      </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Main Chat Area - Right Side */}
+          <div className="flex-1 flex flex-col h-full">
+            {/* Mobile top header - Toggle contacts */}
+            <div className="md:hidden border-b p-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full flex items-center justify-between"
+                onClick={toggleMobileMenu}
+              >
+                <span>
+                  {selectedConversation ? selectedConversation.username : 'Select Conversation'}
+                </span>
+                <MessageSquare className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+            
+            {!selectedConversation ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                <User className="h-16 w-16 text-muted-foreground mb-4" />
+                <h2 className="text-xl font-medium mb-2">No conversation selected</h2>
+                <p className="text-muted-foreground mb-6">
+                  {conversations.length > 0 
+                    ? "Select a conversation from the list to view messages." 
+                    : "Start a new conversation by contacting a seller."}
+                </p>
+                <Button asChild>
+                  <Link href="/">Browse Products</Link>
+                </Button>
+              </div>
+            ) : (
+              <>
+                {/* Conversation Header */}
+                <div className="p-3 border-b flex items-center flex-shrink-0 bg-background sticky top-0 z-10">
+                  <Avatar className="h-10 w-10 mr-3">
+                    <AvatarImage 
+                      src={selectedConversation.profileImage || ''} 
+                      alt={selectedConversation.username} 
+                    />
+                    <AvatarFallback>
+                      {selectedConversation.username.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-semibold text-lg truncate">{selectedConversation.username}</h2>
+                    {selectedConversation.productName && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        About: {selectedConversation.productName}
+                      </p>
                     )}
                   </div>
-                  
-                  {/* Message Input Area */}
-                  <div className="p-3 border-t flex-shrink-0 bg-background">
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        value={messageText}
-                        onChange={(e) => setMessageText(e.target.value)}
-                        placeholder="Type your message..."
-                        className="flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSendMessage();
-                          }
-                        }}
-                      />
-                      <Button 
-                        onClick={handleSendMessage} 
-                        disabled={!messageText.trim() || loadingChat} 
-                        size="icon"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
+                </div>
+                
+                {/* Messages Area - Scrollable */}
+                <div className="flex-1 overflow-y-auto p-4 bg-accent/5">
+                  {loadingChat ? (
+                    <div className="flex justify-center items-center h-full">
+                      <p>Loading conversation...</p>
                     </div>
+                  ) : activeChat.length === 0 ? (
+                    <div className="flex justify-center items-center h-full text-muted-foreground">
+                      <p>No messages yet. Start the conversation!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 pb-2">
+                      {activeChat.map((msg) => {
+                        const isOwnMessage = msg.senderId === user?.id;
+                        return (
+                          <div
+                            key={msg.id}
+                            className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                          >
+                            {!isOwnMessage && (
+                              <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
+                                <AvatarImage 
+                                  src={selectedConversation.profileImage || ''} 
+                                  alt={selectedConversation.username} 
+                                />
+                                <AvatarFallback>
+                                  {selectedConversation.username.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
+                            <div
+                              className={`max-w-[80%] px-4 py-2 rounded-lg ${
+                                isOwnMessage
+                                  ? 'bg-primary text-primary-foreground rounded-tr-none'
+                                  : 'bg-background rounded-tl-none shadow-sm'
+                              }`}
+                            >
+                              <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                              <div className="text-xs mt-1 opacity-70 flex justify-end">
+                                {formatMessageTime(msg.createdAt)}
+                                {isOwnMessage && (
+                                  <span className="ml-2">
+                                    {msg.isRead ? '✓✓' : '✓'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
+                
+                {/* Message Input Area - Fixed at bottom */}
+                <div className="p-3 border-t flex-shrink-0 bg-background">
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      placeholder="Type your message..."
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                    />
+                    <Button 
+                      onClick={handleSendMessage} 
+                      disabled={!messageText.trim() || loadingChat} 
+                      size="icon"
+                      className="h-10 w-10 rounded-full"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
                   </div>
-                </>
-              )}
-            </Card>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
