@@ -1,18 +1,21 @@
-import { useState, useEffect, useRef } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { useMessaging } from "@/hooks/use-messaging";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import React, { useState, useEffect, useRef } from 'react';
+import { useMessaging, Message } from '@/hooks/use-messaging';
+import { useAuth } from '@/hooks/use-auth';
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { formatDistance } from "date-fns";
-import { Send } from "lucide-react";
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { Send, ArrowLeft } from 'lucide-react';
 
 interface MessagingDialogProps {
   open: boolean;
@@ -34,160 +37,145 @@ export function MessagingDialog({
   productName,
 }: MessagingDialogProps) {
   const { user } = useAuth();
-  const { getMessages, sendMessage, markAsRead, subscribeToMessages, unsubscribeFromMessages } = useMessaging();
-  const [conversation, setConversation] = useState<any[]>([]);
-  const [messageText, setMessageText] = useState("");
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const { sendMessage, getConversation, markAsRead } = useMessaging();
+  const [messageText, setMessageText] = useState('');
+  const [conversation, setConversation] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Format time relative to now (e.g., "2 hours ago")
-  const formatMessageTime = (dateString: Date) => {
+  
+  // Load conversation when dialog opens
+  useEffect(() => {
+    if (open && receiverId && user?.id) {
+      loadConversation();
+    }
+  }, [open, receiverId, user?.id]);
+  
+  // Mark messages as read when conversation loads
+  useEffect(() => {
+    if (open && conversation.length > 0 && user?.id) {
+      const unreadMessages = conversation.filter(
+        msg => !msg.isRead && msg.senderId === receiverId && msg.receiverId === user.id
+      );
+      
+      if (unreadMessages.length > 0) {
+        markAsRead(undefined, receiverId);
+      }
+    }
+  }, [conversation, open, receiverId, user?.id, markAsRead]);
+  
+  // Scroll to bottom when new messages are added
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversation]);
+  
+  const loadConversation = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
     try {
-      const date = new Date(dateString);
-      return formatDistance(date, new Date(), { addSuffix: true });
+      const messages = await getConversation(receiverId, productId);
+      // Make sure we're handling the response properly
+      if (Array.isArray(messages)) {
+        setConversation(messages);
+      } else {
+        setConversation([]);
+        console.error('Invalid conversation data format');
+      }
     } catch (error) {
-      console.error("Error formatting date:", error);
-      return "Unknown time";
+      console.error('Failed to load conversation:', error);
+    } finally {
+      setLoading(false);
     }
   };
-
-  // Fetch messages when dialog opens
-  useEffect(() => {
-    const loadMessages = async () => {
-      if (open && user) {
-        setLoading(true);
-        try {
-          const messages = await getMessages(receiverId);
-          setConversation(messages);
-          
-          // Mark unread messages as read
-          const unreadMessages = messages.filter(
-            (msg) => msg.senderId !== user.id && !msg.isRead
-          );
-          
-          for (const msg of unreadMessages) {
-            await markAsRead(msg.id);
-          }
-        } catch (error) {
-          console.error("Error loading messages:", error);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadMessages();
+  
+  const handleSendMessage = () => {
+    if (!messageText.trim() || !user?.id) return;
     
-    // Subscribe to message updates
-    if (open && user) {
-      subscribeToMessages((newMessage) => {
-        // Only update if message is part of this conversation
-        if (
-          (newMessage.senderId === receiverId && newMessage.receiverId === user.id) ||
-          (newMessage.senderId === user.id && newMessage.receiverId === receiverId)
-        ) {
-          setConversation((prevMessages) => [...prevMessages, newMessage]);
-          
-          // Mark incoming messages as read
-          if (newMessage.senderId !== user.id && !newMessage.isRead) {
-            markAsRead(newMessage.id);
-          }
-        }
+    const sent = sendMessage(receiverId, messageText, productId);
+    if (sent) {
+      setMessageText('');
+    } else {
+      toast({
+        title: 'Message Not Sent',
+        description: 'Failed to send your message. Please try again.',
+        variant: 'destructive',
       });
     }
-    
-    return () => {
-      // Clean up subscription when dialog closes
-      if (open) {
-        unsubscribeFromMessages();
-      }
-    };
-  }, [open, user, receiverId, getMessages, markAsRead, subscribeToMessages, unsubscribeFromMessages]);
-
-  // Scroll to bottom when new messages arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation]);
-
-  const handleSendMessage = async () => {
-    if (messageText.trim() && user) {
-      try {
-        await sendMessage({
-          content: messageText,
-          receiverId: receiverId,
-          productId: productId || null,
-        });
-        setMessageText("");
-      } catch (error) {
-        console.error("Error sending message:", error);
-      }
+  };
+  
+  // Format timestamp for messages
+  const formatMessageTime = (timestamp: string | Date) => {
+    try {
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+      return format(date, 'MMM d, h:mm a');
+    } catch (error) {
+      return 'Unknown time';
     }
   };
-
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center">
-            <Avatar className="h-8 w-8 mr-2">
-              <AvatarImage src={receiverImage || ""} alt={receiverName} />
+          <DialogTitle className="flex items-center space-x-2">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={receiverImage || ''} alt={receiverName} />
               <AvatarFallback>{receiverName.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex flex-col">
               <span>{receiverName}</span>
               {productName && (
-                <p className="text-xs text-muted-foreground">
-                  About: {productName}
-                </p>
+                <span className="text-xs text-muted-foreground">
+                  Regarding: {productName}
+                </span>
               )}
             </div>
           </DialogTitle>
         </DialogHeader>
         
-        <div className="h-[400px] overflow-auto border rounded-md">
-          <div className="p-4">
-            {loading ? (
-              <div className="flex justify-center items-center h-full">
-                <p>Loading conversation...</p>
-              </div>
-            ) : conversation.length === 0 ? (
-              <div className="flex justify-center items-center h-full text-muted-foreground">
-                <p>No messages yet. Start the conversation!</p>
-              </div>
-            ) : (
-              <div>
-                {conversation.map((msg) => {
-                  const isOwnMessage = msg.senderId === user?.id;
-                  return (
+        <ScrollArea className="h-[50vh] p-4 border rounded-md">
+          {loading ? (
+            <div className="flex justify-center items-center h-full">
+              <p>Loading conversation...</p>
+            </div>
+          ) : conversation.length === 0 ? (
+            <div className="flex justify-center items-center h-full text-muted-foreground">
+              <p>No messages yet. Start the conversation!</p>
+            </div>
+          ) : (
+            <>
+              {conversation.map((msg) => {
+                const isOwnMessage = msg.senderId === user?.id;
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
+                  >
                     <div
-                      key={msg.id}
-                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
+                      className={`max-w-[80%] px-4 py-2 rounded-lg ${
+                        isOwnMessage
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted'
+                      }`}
                     >
-                      <div
-                        className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                          isOwnMessage
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
-                        }`}
-                      >
-                        <div className="text-sm">{msg.content}</div>
-                        <div className="text-xs mt-1 opacity-70">
-                          {formatMessageTime(msg.createdAt)}
-                          {isOwnMessage && (
-                            <span className="ml-2">
-                              {msg.isRead ? '✓✓' : '✓'}
-                            </span>
-                          )}
-                        </div>
+                      <div className="text-sm">{msg.content}</div>
+                      <div className="text-xs mt-1 opacity-70">
+                        {formatMessageTime(msg.createdAt)}
+                        {isOwnMessage && (
+                          <span className="ml-2">
+                            {msg.isRead ? '✓✓' : '✓'}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
-        </div>
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </ScrollArea>
         
         <DialogFooter className="flex">
           <div className="flex items-center w-full space-x-2">
