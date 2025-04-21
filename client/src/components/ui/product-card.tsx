@@ -118,7 +118,7 @@ export function ProductCard({ product }: ProductCardProps) {
           {product.brand} {product.volume && 
             (product.isNew 
               ? `(${product.volume})` 
-              : `(${Math.round((product.remainingPercentage || 100) * parseInt(product.volume) / 100)}ml/${product.volume})`
+              : `(${Math.round((product.remainingPercentage || 100) * (typeof product.volume === 'number' ? product.volume : parseFloat(String(product.volume))) / 100)}ml/${product.volume})`
             )
           }
         </div>

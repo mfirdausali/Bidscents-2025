@@ -63,106 +63,173 @@ export function useMessaging() {
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
-  // Connect to WebSocket
+  // Connect to WebSocket with retry mechanism
   useEffect(() => {
     if (!user) {
       setConnected(false);
       return;
     }
 
-    // Setup WebSocket connection
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 3;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let isCleanupPhase = false;
     
-    const socket = new WebSocket(wsUrl);
-    socketRef.current = socket;
-
-    // Connection opened
-    socket.addEventListener('open', () => {
-      console.log('WebSocket connection established');
-      // Authenticate with the server
-      if (user?.id) {
-        const authMessage = { type: 'auth', userId: user.id };
-        console.log('Sending authentication message to WebSocket server:', authMessage);
-        socket.send(JSON.stringify(authMessage));
-      } else {
-        console.error('Cannot authenticate WebSocket - user ID is missing');
+    // Setup WebSocket connection
+    const connectWebSocket = () => {
+      // Don't attempt reconnection during cleanup
+      if (isCleanupPhase) {
+        console.log('Skipping connection attempt during cleanup');
+        return;
       }
-    });
-
-    // Listen for messages
-    socket.addEventListener('message', (event) => {
-      try {
-        console.log('WebSocket message received:', event.data);
-        const data = JSON.parse(event.data);
+      
+      console.log('Attempting WebSocket connection...');
+      
+      // Clear any existing reconnect timeout
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+      
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      console.log('WebSocket URL:', wsUrl);
+      
+      const socket = new WebSocket(wsUrl);
+      socketRef.current = socket;
+      
+      // Handle connection error and reconnect logic
+      socket.addEventListener('error', (event) => {
+        console.error('WebSocket connection error:', event);
+        setError('WebSocket connection error');
+        setConnected(false);
         
-        // Handle connection confirmation
-        if (data.type === 'connected') {
-          console.log('Connected to messaging server:', data.message);
-        }
-        
-        // Handle authentication success
-        if (data.type === 'auth_success') {
-          setConnected(true);
-          console.log('Authentication successful for user:', data.userId);
-        }
-        
-        // Handle new message received
-        if (data.type === 'new_message') {
-          console.log('New message received:', data.message);
-          setMessages(prev => [data.message, ...prev]);
+        if (!isCleanupPhase && reconnectAttempts < maxReconnectAttempts) {
+          reconnectAttempts++;
+          console.log(`Connection failed. Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
           
-          // Show a toast notification for new messages
+          // Exponential backoff: wait longer between each retry
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+          console.log(`Reconnecting in ${delay}ms...`);
+          
+          reconnectTimeout = setTimeout(() => {
+            connectWebSocket();
+          }, delay);
+        } else if (!isCleanupPhase) {
+          console.error('Max reconnect attempts reached. Giving up.');
           toast({
-            title: `New message from ${data.message.sender?.username || 'someone'}`,
-            description: data.message.content.substring(0, 50) + (data.message.content.length > 50 ? '...' : ''),
-            variant: 'default',
-          });
-        }
-        
-        // Handle sent message confirmation
-        if (data.type === 'message_sent') {
-          console.log('Message sent confirmation received:', data.message);
-          setMessages(prev => [data.message, ...prev]);
-        }
-        
-        // Handle errors
-        if (data.type === 'error') {
-          console.error('WebSocket error:', data.message);
-          setError(data.message);
-          toast({
-            title: 'Messaging Error',
-            description: data.message,
+            title: 'Connection Error',
+            description: 'Failed to connect to messaging server after multiple attempts. Please try again later.',
             variant: 'destructive',
           });
         }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', event.data, error);
-      }
-    });
-
-    // Connection closed
-    socket.addEventListener('close', () => {
-      console.log('WebSocket connection closed');
-      setConnected(false);
-    });
-
-    // Connection error
-    socket.addEventListener('error', (event) => {
-      console.error('WebSocket error:', event);
-      setError('WebSocket connection error');
-      setConnected(false);
-      toast({
-        title: 'Connection Error',
-        description: 'Failed to connect to messaging server. Please try again later.',
-        variant: 'destructive',
       });
-    });
 
+      // Connection opened
+      socket.addEventListener('open', () => {
+        console.log('WebSocket connection established');
+        // Reset reconnect attempts on successful connection
+        reconnectAttempts = 0;
+        
+        // Authenticate with the server
+        if (user?.id) {
+          const authMessage = { type: 'auth', userId: user.id };
+          console.log('Sending authentication message to WebSocket server:', authMessage);
+          socket.send(JSON.stringify(authMessage));
+        } else {
+          console.error('Cannot authenticate WebSocket - user ID is missing');
+        }
+      });
+
+      // Listen for messages
+      socket.addEventListener('message', (event) => {
+        try {
+          console.log('WebSocket message received:', event.data);
+          const data = JSON.parse(event.data);
+          
+          // Handle connection confirmation
+          if (data.type === 'connected') {
+            console.log('Connected to messaging server:', data.message);
+          }
+          
+          // Handle authentication success
+          if (data.type === 'auth_success') {
+            setConnected(true);
+            console.log('Authentication successful for user:', data.userId);
+          }
+          
+          // Handle new message received
+          if (data.type === 'new_message') {
+            console.log('New message received:', data.message);
+            setMessages(prev => [data.message, ...prev]);
+            
+            // Show a toast notification for new messages
+            toast({
+              title: `New message from ${data.message.sender?.username || 'someone'}`,
+              description: data.message.content.substring(0, 50) + (data.message.content.length > 50 ? '...' : ''),
+              variant: 'default',
+            });
+          }
+          
+          // Handle sent message confirmation
+          if (data.type === 'message_sent') {
+            console.log('Message sent confirmation received:', data.message);
+            setMessages(prev => [data.message, ...prev]);
+          }
+          
+          // Handle errors
+          if (data.type === 'error') {
+            console.error('WebSocket error:', data.message);
+            setError(data.message);
+            toast({
+              title: 'Messaging Error',
+              description: data.message,
+              variant: 'destructive',
+            });
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', event.data, error);
+        }
+      });
+
+      // Connection closed
+      socket.addEventListener('close', (event) => {
+        console.log('WebSocket connection closed with code:', event.code);
+        setConnected(false);
+        
+        // Attempt to reconnect on unexpected closure (not intentional via cleanup)
+        if (!isCleanupPhase && reconnectAttempts < maxReconnectAttempts) {
+          reconnectAttempts++;
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+          console.log(`Connection closed. Reconnecting in ${delay}ms... (${reconnectAttempts}/${maxReconnectAttempts})`);
+          
+          reconnectTimeout = setTimeout(() => {
+            connectWebSocket();
+          }, delay);
+        }
+      });
+
+      return socket;
+    };
+
+    // Initialize WebSocket connection
+    const socket = connectWebSocket();
+    
     // Clean up on unmount
     return () => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.close();
+      console.log('Cleaning up WebSocket connection...');
+      isCleanupPhase = true;
+      
+      if (reconnectTimeout) {
+        console.log('Clearing reconnect timeout');
+        clearTimeout(reconnectTimeout);
+      }
+      
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        console.log('Closing WebSocket connection on cleanup');
+        socketRef.current.close();
+      } else if (socketRef.current) {
+        console.log('WebSocket already closed or closing, current state:', socketRef.current.readyState);
       }
     };
   }, [user, toast]);
