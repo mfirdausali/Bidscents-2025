@@ -1,20 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useMessaging, Message } from '@/hooks/use-messaging';
-import { useAuth } from '@/hooks/use-auth';
+import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { useMessaging } from "@/hooks/use-messaging";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
-import { Send } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { formatDistance } from "date-fns";
+import { Send } from "lucide-react";
 
 interface MessagingDialogProps {
   open: boolean;
@@ -36,104 +34,117 @@ export function MessagingDialog({
   productName,
 }: MessagingDialogProps) {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const { sendMessage, getConversation, markAsRead } = useMessaging();
-  const [messageText, setMessageText] = useState('');
-  const [conversation, setConversation] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { getMessages, sendMessage, markAsRead, subscribeToMessages, unsubscribeFromMessages } = useMessaging();
+  const [conversation, setConversation] = useState<any[]>([]);
+  const [messageText, setMessageText] = useState("");
+  const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // Load conversation when dialog opens
-  useEffect(() => {
-    if (open && receiverId && user?.id) {
-      loadConversation();
-    }
-  }, [open, receiverId, user?.id]);
-  
-  // Mark messages as read when conversation loads
-  useEffect(() => {
-    if (open && conversation.length > 0 && user?.id) {
-      const unreadMessages = conversation.filter(
-        msg => !msg.isRead && msg.senderId === receiverId && msg.receiverId === user.id
-      );
-      
-      if (unreadMessages.length > 0) {
-        markAsRead(undefined, receiverId);
-      }
-    }
-  }, [conversation, open, receiverId, user?.id, markAsRead]);
-  
-  // Scroll to bottom when new messages are added
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [conversation]);
-  
-  const loadConversation = async () => {
-    if (!user?.id) return;
-    
-    setLoading(true);
+
+  // Format time relative to now (e.g., "2 hours ago")
+  const formatMessageTime = (dateString: Date) => {
     try {
-      const messages = await getConversation(receiverId, productId);
-      // Make sure we're handling the response properly
-      if (Array.isArray(messages)) {
-        setConversation(messages);
-      } else {
-        setConversation([]);
-        console.error('Invalid conversation data format');
-      }
+      const date = new Date(dateString);
+      return formatDistance(date, new Date(), { addSuffix: true });
     } catch (error) {
-      console.error('Failed to load conversation:', error);
-    } finally {
-      setLoading(false);
+      console.error("Error formatting date:", error);
+      return "Unknown time";
     }
   };
-  
-  const handleSendMessage = () => {
-    if (!messageText.trim() || !user?.id) return;
+
+  // Fetch messages when dialog opens
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (open && user) {
+        setLoading(true);
+        try {
+          const messages = await getMessages(receiverId);
+          setConversation(messages);
+          
+          // Mark unread messages as read
+          const unreadMessages = messages.filter(
+            (msg) => msg.senderId !== user.id && !msg.isRead
+          );
+          
+          for (const msg of unreadMessages) {
+            await markAsRead(msg.id);
+          }
+        } catch (error) {
+          console.error("Error loading messages:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadMessages();
     
-    const sent = sendMessage(receiverId, messageText, productId);
-    if (sent) {
-      setMessageText('');
-    } else {
-      toast({
-        title: 'Message Not Sent',
-        description: 'Failed to send your message. Please try again.',
-        variant: 'destructive',
+    // Subscribe to message updates
+    if (open && user) {
+      subscribeToMessages((newMessage) => {
+        // Only update if message is part of this conversation
+        if (
+          (newMessage.senderId === receiverId && newMessage.receiverId === user.id) ||
+          (newMessage.senderId === user.id && newMessage.receiverId === receiverId)
+        ) {
+          setConversation((prevMessages) => [...prevMessages, newMessage]);
+          
+          // Mark incoming messages as read
+          if (newMessage.senderId !== user.id && !newMessage.isRead) {
+            markAsRead(newMessage.id);
+          }
+        }
       });
     }
-  };
-  
-  // Format timestamp for messages
-  const formatMessageTime = (timestamp: string | Date) => {
-    try {
-      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-      return format(date, 'MMM d, h:mm a');
-    } catch (error) {
-      return 'Unknown time';
+    
+    return () => {
+      // Clean up subscription when dialog closes
+      if (open) {
+        unsubscribeFromMessages();
+      }
+    };
+  }, [open, user, receiverId, getMessages, markAsRead, subscribeToMessages, unsubscribeFromMessages]);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversation]);
+
+  const handleSendMessage = async () => {
+    if (messageText.trim() && user) {
+      try {
+        await sendMessage({
+          content: messageText,
+          receiverId: receiverId,
+          productId: productId || null,
+        });
+        setMessageText("");
+      } catch (error) {
+        console.error("Error sending message:", error);
+      }
     }
   };
-  
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={receiverImage || ''} alt={receiverName} />
+          <DialogTitle className="flex items-center">
+            <Avatar className="h-8 w-8 mr-2">
+              <AvatarImage src={receiverImage || ""} alt={receiverName} />
               <AvatarFallback>{receiverName.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div className="flex flex-col">
+            <div>
               <span>{receiverName}</span>
               {productName && (
-                <span className="text-xs text-muted-foreground">
-                  Regarding: {productName}
-                </span>
+                <p className="text-xs text-muted-foreground">
+                  About: {productName}
+                </p>
               )}
             </div>
           </DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="h-[50vh] border rounded-md">
+        <div className="h-[400px] overflow-auto border rounded-md">
           <div className="p-4">
             {loading ? (
               <div className="flex justify-center items-center h-full">
@@ -176,7 +187,7 @@ export function MessagingDialog({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
         
         <DialogFooter className="flex">
           <div className="flex items-center w-full space-x-2">

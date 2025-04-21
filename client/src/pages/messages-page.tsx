@@ -1,367 +1,352 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Link } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
-import { useMessaging, Message } from '@/hooks/use-messaging';
+import { useMessaging } from '@/hooks/use-messaging';
+import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { format } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
-import { useLocation, Link } from 'wouter';
-import { Badge } from '@/components/ui/badge';
-import { MessageSquare, ArrowLeft, RefreshCw, Send, User } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { User, MessageSquare, Send } from 'lucide-react';
+import { formatDistance } from 'date-fns';
 
-export default function MessagesPage() {
+interface Conversation {
+  userId: number;
+  username: string;
+  profileImage: string | null;
+  lastMessage: {
+    id: number;
+    content: string;
+    createdAt: Date;
+    senderId: number;
+    isRead: boolean;
+  };
+  productId?: number | null;
+  productName?: string | null;
+  unreadCount: number;
+}
+
+export function MessagesPage() {
   const { user } = useAuth();
-  const { messages, loading, error, sendMessage, getConversation, markAsRead } = useMessaging();
-  const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const { 
+    getConversations, 
+    getMessages, 
+    sendMessage, 
+    markAsRead,
+    subscribeToMessages,
+    unsubscribeFromMessages
+  } = useMessaging();
+  
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeChat, setActiveChat] = useState<any[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messageText, setMessageText] = useState('');
-  const [selectedConversation, setSelectedConversation] = useState<{
-    userId: number;
-    username: string;
-    profileImage?: string | null;
-    productId?: number;
-    productName?: string;
-  } | null>(null);
-  const [activeChat, setActiveChat] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
   const [loadingChat, setLoadingChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // Group messages by conversation (unique user pairs)
-  const conversations = React.useMemo(() => {
-    if (!user || !messages.length) return [];
-    
-    const conversationMap = new Map<number, {
-      userId: number;
-      username: string;
-      profileImage?: string | null;
-      lastMessage: Message;
-      unreadCount: number;
-      productInfo?: {
-        id: number;
-        name: string;
-      };
-    }>();
-    
-    // Group messages by the other user in the conversation
-    messages.forEach(message => {
-      let otherUserId: number;
-      let otherUsername: string;
-      let otherUserImage: string | null | undefined;
-      
-      if (message.senderId === user.id) {
-        // Message sent by current user
-        otherUserId = message.receiverId;
-        otherUsername = message.receiver?.username || 'Unknown User';
-        otherUserImage = message.receiver?.profileImage;
-      } else {
-        // Message received by current user
-        otherUserId = message.senderId;
-        otherUsername = message.sender?.username || 'Unknown User';
-        otherUserImage = message.sender?.profileImage;
-      }
-      
-      const existingConversation = conversationMap.get(otherUserId);
-      
-      // Check if message is unread and not sent by current user
-      const isUnread = !message.isRead && message.receiverId === user.id;
-      
-      // Get product info if available
-      const productInfo = message.product ? {
-        id: message.product.id,
-        name: message.product.name
-      } : undefined;
-      
-      if (!existingConversation || 
-          new Date(message.createdAt) > new Date(existingConversation.lastMessage.createdAt)) {
-        conversationMap.set(otherUserId, {
-          userId: otherUserId,
-          username: otherUsername,
-          profileImage: otherUserImage,
-          lastMessage: message,
-          unreadCount: isUnread ? 1 : (existingConversation?.unreadCount || 0),
-          productInfo: productInfo || existingConversation?.productInfo
-        });
-      } else if (isUnread) {
-        // Update unread count for existing conversation
-        existingConversation.unreadCount += 1;
-        conversationMap.set(otherUserId, existingConversation);
-      }
-    });
-    
-    // Convert map to array and sort by most recent message
-    return Array.from(conversationMap.values()).sort((a, b) => 
-      new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
-    );
-  }, [messages, user]);
-  
-  // Fetch conversation messages when a user is selected
-  const loadConversation = useCallback(async (userId: number, productId?: number) => {
-    if (!user?.id) return;
-    
-    setLoadingChat(true);
-    try {
-      const messages = await getConversation(userId, productId);
-      if (Array.isArray(messages)) {
-        setActiveChat(messages);
-        
-        // Mark messages as read
-        const unreadMessages = messages.filter(
-          msg => !msg.isRead && msg.senderId === userId && msg.receiverId === user.id
-        );
-        
-        if (unreadMessages.length > 0) {
-          markAsRead(undefined, userId);
-        }
-      } else {
-        setActiveChat([]);
-        console.error('Invalid conversation data format');
-      }
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-      toast({
-        title: 'Error Loading Conversation',
-        description: 'Failed to load conversation messages. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingChat(false);
-    }
-  }, [user?.id, getConversation, markAsRead, toast]);
 
-  // Check if user is authenticated and handle pre-selected conversation
-  useEffect(() => {
-    if (!user) {
-      toast({
-        title: 'Authentication Required',
-        description: 'You must be logged in to view your messages.',
-        variant: 'destructive',
-      });
-      setLocation('/auth');
-      return;
-    }
-    
-    // Check if there's a selected conversation in session storage
+  // Format time relative to now (e.g., "2 hours ago")
+  const formatMessageTime = (dateString: Date) => {
     try {
-      const savedConversation = sessionStorage.getItem('selectedConversation');
-      if (savedConversation) {
-        const conversationData = JSON.parse(savedConversation);
-        // Set the selected conversation from sessionStorage
-        setSelectedConversation(conversationData);
-        // Load the conversation messages
-        loadConversation(conversationData.userId, conversationData.productId);
-        // Clear the storage after using it
-        sessionStorage.removeItem('selectedConversation');
-      }
+      const date = new Date(dateString);
+      return formatDistance(date, new Date(), { addSuffix: true });
     } catch (error) {
-      console.error('Error loading saved conversation:', error);
-    }
-  }, [user, toast, setLocation, loadConversation]);
-  
-  // Format timestamp for messages
-  const formatMessageTime = (timestamp: string | Date) => {
-    try {
-      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-      const now = new Date();
-      
-      // If message is from today, show only time
-      if (date.toDateString() === now.toDateString()) {
-        return format(date, 'h:mm a');
-      }
-      
-      // If message is from this year, show month and day
-      if (date.getFullYear() === now.getFullYear()) {
-        return format(date, 'MMM d');
-      }
-      
-      // Otherwise show month, day and year
-      return format(date, 'MMM d, yyyy');
-    } catch (error) {
-      return 'Unknown time';
+      console.error("Error formatting date:", error);
+      return "Unknown time";
     }
   };
-  
-  // Truncate message content for preview
-  const truncateMessage = (content: string, maxLength = 60) => {
-    return content.length > maxLength
-      ? content.substring(0, maxLength) + '...'
-      : content;
-  };
-  
-  // Select a conversation to view
-  const selectConversation = useCallback((conversation: typeof conversations[0]) => {
-    setSelectedConversation({
-      userId: conversation.userId,
-      username: conversation.username,
-      profileImage: conversation.profileImage,
-      productId: conversation.productInfo?.id,
-      productName: conversation.productInfo?.name,
-    });
-    
-    loadConversation(conversation.userId, conversation.productInfo?.id);
-  }, [loadConversation]);
-  
-  // Handle sending a message
-  const handleSendMessage = useCallback(() => {
-    if (!messageText.trim() || !user?.id || !selectedConversation) return;
-    
-    const sent = sendMessage(
-      selectedConversation.userId, 
-      messageText, 
-      selectedConversation.productId
-    );
-    
-    if (sent) {
-      setMessageText('');
-      // No need to refresh - WebSocket will deliver the message and we'll update state
-    } else {
-      toast({
-        title: 'Message Not Sent',
-        description: 'Failed to send your message. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
-  
-  // Scroll to bottom of messages when new ones arrive
+
+  // Fetch conversations on component mount
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeChat]);
-  
-  // Listen for WebSocket updates to add new messages directly to activeChat
-  useEffect(() => {
-    if (selectedConversation && user?.id) {
-      // Filter for new messages that belong to the current conversation
-      const newMessages = messages.filter(msg => 
-        // Message is part of the current conversation
-        ((msg.senderId === selectedConversation.userId && msg.receiverId === user.id) ||
-         (msg.senderId === user.id && msg.receiverId === selectedConversation.userId)) &&
-        // Message is not already in activeChat
-        !activeChat.some(chatMsg => chatMsg.id === msg.id)
-      );
-      
-      // If we have new messages, add them to the activeChat state
-      if (newMessages.length > 0) {
-        console.log('Adding new messages to active chat:', newMessages);
-        setActiveChat(prev => {
-          // Sort messages by creation time (oldest first)
-          return [...prev, ...newMessages].sort((a, b) => 
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          );
+    const fetchConversations = async () => {
+      setLoading(true);
+      try {
+        if (user) {
+          const conversationsData = await getConversations();
+          setConversations(conversationsData);
+
+          // Check if there's a receiverId in the URL to auto-select a conversation
+          const params = new URLSearchParams(window.location.search);
+          const receiverId = params.get('receiverId');
+          
+          if (receiverId) {
+            const conversation = conversationsData.find(
+              (c) => c.userId === parseInt(receiverId)
+            );
+            
+            if (conversation) {
+              setSelectedConversation(conversation);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchConversations();
+    
+    // Subscribe to message updates
+    if (user) {
+      subscribeToMessages((newMessage) => {
+        // Update conversation list with new message
+        setConversations((prevConversations) => {
+          return prevConversations.map((conversation) => {
+            if (
+              (conversation.userId === newMessage.senderId && user.id === newMessage.receiverId) ||
+              (conversation.userId === newMessage.receiverId && user.id === newMessage.senderId)
+            ) {
+              return {
+                ...conversation,
+                lastMessage: {
+                  id: newMessage.id,
+                  content: newMessage.content,
+                  createdAt: newMessage.createdAt,
+                  senderId: newMessage.senderId,
+                  isRead: newMessage.isRead,
+                },
+                unreadCount: 
+                  newMessage.senderId !== user.id && !newMessage.isRead
+                    ? conversation.unreadCount + 1
+                    : conversation.unreadCount,
+              };
+            }
+            return conversation;
+          });
         });
+        
+        // Update active chat if this message belongs to the selected conversation
+        if (selectedConversation && 
+            ((selectedConversation.userId === newMessage.senderId && user.id === newMessage.receiverId) || 
+             (selectedConversation.userId === newMessage.receiverId && user.id === newMessage.senderId))) {
+          setActiveChat((prevMessages) => [...prevMessages, newMessage]);
+          
+          // Mark message as read if it's incoming
+          if (newMessage.senderId !== user.id && !newMessage.isRead) {
+            markAsRead(newMessage.id);
+          }
+        }
+      });
+    }
+    
+    return () => {
+      // Unsubscribe when component unmounts
+      unsubscribeFromMessages();
+    };
+  }, [user, getConversations, subscribeToMessages, unsubscribeFromMessages, markAsRead]);
+
+  // Fetch messages when a conversation is selected
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (selectedConversation && user) {
+        setLoadingChat(true);
+        try {
+          const messages = await getMessages(selectedConversation.userId);
+          setActiveChat(messages);
+          
+          // Mark unread messages as read
+          const unreadMessages = messages.filter(
+            (msg) => msg.senderId !== user.id && !msg.isRead
+          );
+          
+          for (const msg of unreadMessages) {
+            await markAsRead(msg.id);
+          }
+          
+          // Update unread count in the selected conversation
+          setConversations((prevConversations) => 
+            prevConversations.map((conversation) => 
+              conversation.userId === selectedConversation.userId
+                ? { ...conversation, unreadCount: 0 }
+                : conversation
+            )
+          );
+        } catch (error) {
+          console.error('Error loading messages:', error);
+        } finally {
+          setLoadingChat(false);
+        }
+      }
+    };
+
+    loadMessages();
+  }, [selectedConversation, user, getMessages, markAsRead]);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [activeChat]);
+
+  const handleSendMessage = async () => {
+    if (messageText.trim() && selectedConversation && user) {
+      try {
+        await sendMessage({
+          content: messageText,
+          receiverId: selectedConversation.userId,
+          productId: selectedConversation.productId || null,
+        });
+        setMessageText('');
+      } catch (error) {
+        console.error('Error sending message:', error);
       }
     }
-  }, [messages, selectedConversation, user?.id, activeChat]);
-  
+  };
+
+  const handleSelectConversation = (conversation: Conversation) => {
+    setSelectedConversation(conversation);
+  };
+
   if (!user) {
     return (
-      <div className="container mx-auto py-6 max-w-7xl">
-        <div className="flex flex-col items-center justify-center h-64">
-          <h2 className="text-xl font-semibold mb-4">Authentication Required</h2>
-          <p className="text-muted-foreground mb-4">Please log in to view your messages</p>
+      <div className="container mx-auto p-4 my-8">
+        <Card className="p-8 max-w-md mx-auto text-center">
+          <h1 className="text-2xl font-bold mb-4">Sign In Required</h1>
+          <p className="mb-6">You need to be signed in to view your messages.</p>
           <Button asChild>
             <Link href="/auth">Sign In</Link>
           </Button>
-        </div>
+        </Card>
       </div>
     );
   }
-  
-  return (
-    <div className="container mx-auto py-6 px-2 md:px-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" size="icon" onClick={() => setLocation('/')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-2xl font-bold">Messages</h1>
+
+  // Render the message bubbles
+  const renderMessages = () => {
+    if (loadingChat) {
+      return (
+        <div className="flex justify-center items-center h-full">
+          <p>Loading conversation...</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+      );
+    } 
+    
+    if (activeChat.length === 0) {
+      return (
+        <div className="flex justify-center items-center h-full text-muted-foreground">
+          <p>No messages yet. Start the conversation!</p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-4">
+        {activeChat.map((msg) => {
+          const isOwnMessage = msg.senderId === user?.id;
+          return (
+            <div
+              key={msg.id}
+              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
+            >
+              {!isOwnMessage && selectedConversation && (
+                <Avatar className="h-8 w-8 mr-2 mt-1">
+                  <AvatarImage 
+                    src={selectedConversation.profileImage || ''} 
+                    alt={selectedConversation.username} 
+                  />
+                  <AvatarFallback>
+                    {selectedConversation.username.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              <div
+                className={`max-w-[80%] px-4 py-2 rounded-lg ${
+                  isOwnMessage
+                    ? 'bg-primary text-primary-foreground rounded-tr-none'
+                    : 'bg-muted rounded-tl-none'
+                }`}
+              >
+                <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                <div className="text-xs mt-1 opacity-70 flex justify-end">
+                  {formatMessageTime(msg.createdAt)}
+                  {isOwnMessage && (
+                    <span className="ml-2">
+                      {msg.isRead ? '✓✓' : '✓'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={messagesEndRef} />
       </div>
+    );
+  };
+
+  return (
+    <div className="container mx-auto p-4 my-8">
+      <h1 className="text-2xl font-bold mb-6">Messages</h1>
       
-      {loading && conversations.length === 0 ? (
+      {loading ? (
         <div className="flex justify-center items-center h-64">
-          <p>Loading your messages...</p>
-        </div>
-      ) : error ? (
-        <div className="bg-destructive/20 p-4 rounded-md text-center">
-          <p>Error loading messages: {error}</p>
-          <Button variant="outline" className="mt-2" onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
+          <p>Loading conversations...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[75vh]">
-          {/* Conversation List - Left Sidebar */}
-          <div className="md:col-span-1 h-full">
-            <Card className="h-full flex flex-col">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Conversations List - Left Side */}
+          <div className="md:col-span-1">
+            <Card className="h-full">
               <div className="p-4 border-b">
-                <h2 className="font-semibold text-lg">Conversations</h2>
+                <h2 className="font-semibold">Conversations</h2>
               </div>
-              
-              <ScrollArea className="flex-1">
+              <ScrollArea className="h-[600px]">
                 {conversations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-                    <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
-                    <h3 className="text-base font-medium mb-2">No messages yet</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Start a conversation by messaging a seller through their product page.
+                  <div className="p-6 text-center text-muted-foreground">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No conversations yet</p>
+                    <p className="text-sm mt-1">
+                      Start by contacting a seller from a product page
                     </p>
-                    <Button asChild size="sm">
-                      <Link href="/">Browse Products</Link>
-                    </Button>
                   </div>
                 ) : (
-                  <div className="space-y-0">
-                    {conversations.map((conversation, index) => (
-                      <React.Fragment key={conversation.userId}>
-                        <div 
-                          className={`flex items-center p-3 hover:bg-accent cursor-pointer ${
-                            selectedConversation?.userId === conversation.userId ? 'bg-accent' : ''
-                          }`}
-                          onClick={() => selectConversation(conversation)}
-                        >
-                          <div className="relative">
-                            <Avatar>
-                              <AvatarImage src={conversation.profileImage || ''} alt={conversation.username} />
-                              <AvatarFallback>{conversation.username.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
+                  conversations.map((conversation) => (
+                    <div
+                      key={conversation.userId}
+                      className={`p-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+                        selectedConversation?.userId === conversation.userId
+                          ? 'bg-muted'
+                          : ''
+                      }`}
+                      onClick={() => handleSelectConversation(conversation)}
+                    >
+                      <div className="flex items-center">
+                        <Avatar className="h-10 w-10 mr-3">
+                          <AvatarImage src={conversation.profileImage || ''} alt={conversation.username} />
+                          <AvatarFallback>
+                            {conversation.username.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-baseline">
+                            <h3 className="font-medium truncate">{conversation.username}</h3>
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {formatMessageTime(conversation.lastMessage.createdAt)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <p className="text-sm text-muted-foreground truncate">
+                              {conversation.lastMessage.senderId === user.id ? (
+                                <span className="text-muted-foreground">You: </span>
+                              ) : null}
+                              {conversation.lastMessage.content}
+                            </p>
                             {conversation.unreadCount > 0 && (
-                              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                              <span className="ml-2 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
                                 {conversation.unreadCount}
                               </span>
                             )}
                           </div>
-                          <div className="ml-3 flex-1 overflow-hidden">
-                            <div className="flex justify-between items-start">
-                              <h3 className="font-medium">{conversation.username}</h3>
-                              <span className="text-xs text-muted-foreground">
-                                {formatMessageTime(conversation.lastMessage.createdAt)}
-                              </span>
-                            </div>
-                            <div className="text-sm text-muted-foreground truncate">
-                              {conversation.lastMessage.senderId === user.id && (
-                                <span className="text-muted-foreground mr-1">You:</span>
-                              )}
-                              {truncateMessage(conversation.lastMessage.content)}
-                            </div>
-                            {conversation.productInfo && (
-                              <Badge variant="outline" className="mt-1 text-xs px-2 py-0">
-                                {conversation.productInfo.name}
-                              </Badge>
-                            )}
-                          </div>
+                          {conversation.productName && (
+                            <p className="text-xs text-muted-foreground mt-1 italic truncate">
+                              About: {conversation.productName}
+                            </p>
+                          )}
                         </div>
-                        {index < conversations.length - 1 && <Separator />}
-                      </React.Fragment>
-                    ))}
-                  </div>
+                      </div>
+                    </div>
+                  ))
                 )}
               </ScrollArea>
             </Card>
@@ -406,85 +391,35 @@ export default function MessagesPage() {
                   </div>
                   
                   {/* Messages Area */}
-                  <ScrollArea className="flex-1">
-                    <div className="p-4">
-                      {loadingChat ? (
-                        <div className="flex justify-center items-center h-full">
-                          <p>Loading conversation...</p>
-                        </div>
-                      ) : activeChat.length === 0 ? (
-                        <div className="flex justify-center items-center h-full text-muted-foreground">
-                          <p>No messages yet. Start the conversation!</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {activeChat.map((msg) => {
-                          const isOwnMessage = msg.senderId === user?.id;
-                          return (
-                            <div
-                              key={msg.id}
-                              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
-                            >
-                              {!isOwnMessage && (
-                                <Avatar className="h-8 w-8 mr-2 mt-1">
-                                  <AvatarImage 
-                                    src={selectedConversation.profileImage || ''} 
-                                    alt={selectedConversation.username} 
-                                  />
-                                  <AvatarFallback>
-                                    {selectedConversation.username.charAt(0).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                              )}
-                              <div
-                                className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                                  isOwnMessage
-                                    ? 'bg-primary text-primary-foreground rounded-tr-none'
-                                    : 'bg-muted rounded-tl-none'
-                                }`}
-                              >
-                                <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
-                                <div className="text-xs mt-1 opacity-70 flex justify-end">
-                                  {formatMessageTime(msg.createdAt)}
-                                  {isOwnMessage && (
-                                    <span className="ml-2">
-                                      {msg.isRead ? '✓✓' : '✓'}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        <div ref={messagesEndRef} />
-                      </div>
-                    )}
+                  <div className="flex-1 p-4 overflow-hidden">
+                    <div className="h-[400px] overflow-auto border rounded p-4">
+                      {renderMessages()}
+                    </div>
                   </div>
-                </ScrollArea>
-                
-                {/* Message Input Area */}
-                <div className="p-4 border-t">
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      placeholder="Type your message..."
-                      className="flex-1"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                    />
-                    <Button 
-                      onClick={handleSendMessage} 
-                      disabled={!messageText.trim() || loadingChat} 
-                      size="icon"
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  
+                  {/* Message Input Area */}
+                  <div className="p-4 border-t">
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        placeholder="Type your message..."
+                        className="flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
+                      />
+                      <Button 
+                        onClick={handleSendMessage} 
+                        disabled={!messageText.trim() || loadingChat} 
+                        size="icon"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}

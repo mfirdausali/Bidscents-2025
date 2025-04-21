@@ -11,7 +11,7 @@ import SellerDashboard from "@/pages/seller-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import ProfilePage from "@/pages/profile-page";
 import SellerProfilePage from "@/pages/seller-profile-page";
-import MessagesPage from "@/pages/messages-page";
+import { MessagesPage } from "@/pages/messages-page";
 import VerifyEmailPage from "@/pages/verify-email";
 import ResetPasswordPage from "@/pages/reset-password";
 import AuthCallback from "@/pages/auth-callback";
