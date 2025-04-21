@@ -549,12 +549,17 @@ export class MemStorage implements IStorage {
     const id = this.currentIds.messages++;
     const createdAt = new Date();
     
-    // In a real app, you would encrypt the message content here
+    // Import encryption utility
+    const { encryptMessage } = await import('./encryption');
+    
+    // Encrypt the message content
     const encryptedMessage: Message = {
       ...message,
       id,
       createdAt,
-      isRead: message.isRead || false
+      isRead: message.isRead || false,
+      // Encrypt the content before storing
+      content: encryptMessage(message.content)
     };
     
     this.messages.set(id, encryptedMessage);
@@ -581,6 +586,9 @@ export class MemStorage implements IStorage {
   }
   
   private async addMessageDetails(messages: Message[]): Promise<MessageWithDetails[]> {
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
     return Promise.all(
       messages.map(async (message) => {
         const sender = this.users.get(message.senderId);
@@ -591,8 +599,15 @@ export class MemStorage implements IStorage {
           product = await this.getProductById(message.productId);
         }
         
+        // Decrypt message content if it's encrypted
+        let content = message.content;
+        if (isEncrypted(content)) {
+          content = decryptMessage(content);
+        }
+        
         return {
           ...message,
+          content,  // Replace with decrypted content
           sender,
           receiver,
           product
@@ -1077,8 +1092,16 @@ export class DatabaseStorage implements IStorage {
   }
   
   async sendMessage(message: InsertMessage): Promise<Message> {
-    // In a real app, you would encrypt the message content here before storing
-    const [newMessage] = await db.insert(messages).values(message).returning();
+    // Import encryption utility
+    const { encryptMessage } = await import('./encryption');
+    
+    // Encrypt the message content before storing
+    const encryptedMessage = {
+      ...message,
+      content: encryptMessage(message.content)
+    };
+    
+    const [newMessage] = await db.insert(messages).values(encryptedMessage).returning();
     return newMessage;
   }
   
