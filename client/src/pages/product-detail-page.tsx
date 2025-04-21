@@ -267,7 +267,7 @@ export default function ProductDetailPage() {
                     <ContactSellerButton 
                       sellerId={product.sellerId}
                       sellerName={product.seller?.username || 'Seller'}
-                      sellerImage={product.seller?.profileImage || undefined}
+                      sellerImage={product.seller?.profileImage || null}
                       productId={product.id}
                       productName={product.name}
                       size="sm"
@@ -344,7 +344,7 @@ export default function ProductDetailPage() {
                   className="h-12 flex-grow shadow-sm"
                   sellerId={product.sellerId}
                   sellerName={product.seller?.username || 'Seller'}
-                  sellerImage={product.seller?.profileImage || undefined}
+                  sellerImage={product.seller?.profileImage || null}
                   productId={product.id}
                   productName={product.name}
                   variant="default"

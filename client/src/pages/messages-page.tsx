@@ -98,48 +98,6 @@ export default function MessagesPage() {
     );
   }, [messages, user]);
   
-  // Check if user is authenticated
-  useEffect(() => {
-    if (!user) {
-      toast({
-        title: 'Authentication Required',
-        description: 'You must be logged in to view your messages.',
-        variant: 'destructive',
-      });
-      setLocation('/auth');
-    }
-  }, [user, toast, setLocation]);
-  
-  // Format timestamp for messages
-  const formatMessageTime = (timestamp: string | Date) => {
-    try {
-      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-      const now = new Date();
-      
-      // If message is from today, show only time
-      if (date.toDateString() === now.toDateString()) {
-        return format(date, 'h:mm a');
-      }
-      
-      // If message is from this year, show month and day
-      if (date.getFullYear() === now.getFullYear()) {
-        return format(date, 'MMM d');
-      }
-      
-      // Otherwise show month, day and year
-      return format(date, 'MMM d, yyyy');
-    } catch (error) {
-      return 'Unknown time';
-    }
-  };
-  
-  // Truncate message content for preview
-  const truncateMessage = (content: string, maxLength = 60) => {
-    return content.length > maxLength
-      ? content.substring(0, maxLength) + '...'
-      : content;
-  };
-  
   // Fetch conversation messages when a user is selected
   const loadConversation = useCallback(async (userId: number, productId?: number) => {
     if (!user?.id) return;
@@ -173,6 +131,65 @@ export default function MessagesPage() {
       setLoadingChat(false);
     }
   }, [user?.id, getConversation, markAsRead, toast]);
+
+  // Check if user is authenticated and handle pre-selected conversation
+  useEffect(() => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'You must be logged in to view your messages.',
+        variant: 'destructive',
+      });
+      setLocation('/auth');
+      return;
+    }
+    
+    // Check if there's a selected conversation in session storage
+    try {
+      const savedConversation = sessionStorage.getItem('selectedConversation');
+      if (savedConversation) {
+        const conversationData = JSON.parse(savedConversation);
+        // Set the selected conversation from sessionStorage
+        setSelectedConversation(conversationData);
+        // Load the conversation messages
+        loadConversation(conversationData.userId, conversationData.productId);
+        // Clear the storage after using it
+        sessionStorage.removeItem('selectedConversation');
+      }
+    } catch (error) {
+      console.error('Error loading saved conversation:', error);
+    }
+  }, [user, toast, setLocation, loadConversation]);
+  
+  // Format timestamp for messages
+  const formatMessageTime = (timestamp: string | Date) => {
+    try {
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+      const now = new Date();
+      
+      // If message is from today, show only time
+      if (date.toDateString() === now.toDateString()) {
+        return format(date, 'h:mm a');
+      }
+      
+      // If message is from this year, show month and day
+      if (date.getFullYear() === now.getFullYear()) {
+        return format(date, 'MMM d');
+      }
+      
+      // Otherwise show month, day and year
+      return format(date, 'MMM d, yyyy');
+    } catch (error) {
+      return 'Unknown time';
+    }
+  };
+  
+  // Truncate message content for preview
+  const truncateMessage = (content: string, maxLength = 60) => {
+    return content.length > maxLength
+      ? content.substring(0, maxLength) + '...'
+      : content;
+  };
   
   // Select a conversation to view
   const selectConversation = useCallback((conversation: typeof conversations[0]) => {

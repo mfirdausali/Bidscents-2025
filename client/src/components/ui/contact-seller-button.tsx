@@ -53,7 +53,17 @@ export function ContactSellerButton({
       return;
     }
 
-    setDialogOpen(true);
+    // Store the selected seller information in sessionStorage to be picked up by the messages page
+    sessionStorage.setItem('selectedConversation', JSON.stringify({
+      userId: sellerId,
+      username: sellerName,
+      profileImage: sellerImage || null,
+      productId,
+      productName
+    }));
+    
+    // Navigate to messages page
+    setLocation('/messages');
   };
 
   return (
