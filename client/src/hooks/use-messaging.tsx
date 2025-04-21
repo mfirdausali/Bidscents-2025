@@ -82,16 +82,18 @@ export function useMessaging() {
       console.log('WebSocket connection established');
       // Authenticate with the server
       if (user?.id) {
-        socket.send(JSON.stringify({ 
-          type: 'auth', 
-          userId: user.id 
-        }));
+        const authMessage = { type: 'auth', userId: user.id };
+        console.log('Sending authentication message to WebSocket server:', authMessage);
+        socket.send(JSON.stringify(authMessage));
+      } else {
+        console.error('Cannot authenticate WebSocket - user ID is missing');
       }
     });
 
     // Listen for messages
     socket.addEventListener('message', (event) => {
       try {
+        console.log('WebSocket message received:', event.data);
         const data = JSON.parse(event.data);
         
         // Handle connection confirmation
@@ -107,6 +109,7 @@ export function useMessaging() {
         
         // Handle new message received
         if (data.type === 'new_message') {
+          console.log('New message received:', data.message);
           setMessages(prev => [data.message, ...prev]);
           
           // Show a toast notification for new messages
@@ -119,6 +122,7 @@ export function useMessaging() {
         
         // Handle sent message confirmation
         if (data.type === 'message_sent') {
+          console.log('Message sent confirmation received:', data.message);
           setMessages(prev => [data.message, ...prev]);
         }
         
@@ -133,7 +137,7 @@ export function useMessaging() {
           });
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        console.error('Error parsing WebSocket message:', event.data, error);
       }
     });
 
@@ -201,7 +205,20 @@ export function useMessaging() {
 
   // Send a message
   const sendMessage = useCallback((receiverId: number, content: string, productId?: number) => {
-    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+    console.log('Attempting to send message to receiverId:', receiverId, 'with productId:', productId);
+    
+    if (!socketRef.current) {
+      console.error('WebSocket is not initialized');
+      toast({
+        title: 'Connection Error',
+        description: 'WebSocket connection not initialized. Please try again later.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    
+    if (socketRef.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not open. Current state:', socketRef.current.readyState);
       toast({
         title: 'Connection Error',
         description: 'Not connected to messaging server. Please try again.',
@@ -211,6 +228,7 @@ export function useMessaging() {
     }
 
     if (!user) {
+      console.error('User is not authenticated');
       toast({
         title: 'Authentication Error',
         description: 'You must be logged in to send messages.',
@@ -227,7 +245,12 @@ export function useMessaging() {
         ...(productId && { productId }),
       };
 
-      socketRef.current.send(JSON.stringify(message));
+      console.log('Sending WebSocket message:', message);
+      const messageJson = JSON.stringify(message);
+      console.log('Serialized message:', messageJson);
+      
+      socketRef.current.send(messageJson);
+      console.log('Message sent successfully');
       return true;
     } catch (error) {
       console.error('Error sending message:', error);
@@ -242,8 +265,15 @@ export function useMessaging() {
 
   // Mark a message as read
   const markAsRead = useCallback((messageId?: number, senderId?: number) => {
-    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-      console.error('Not connected to messaging server');
+    console.log('Attempting to mark messages as read. MessageId:', messageId, 'SenderId:', senderId);
+    
+    if (!socketRef.current) {
+      console.error('WebSocket is not initialized');
+      return false;
+    }
+    
+    if (socketRef.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not open. Current state:', socketRef.current.readyState);
       return false;
     }
 
@@ -264,16 +294,22 @@ export function useMessaging() {
         ...(senderId && { senderId }),
       };
 
+      console.log('Sending mark as read message:', message);
       socketRef.current.send(JSON.stringify(message));
+      console.log('Mark as read message sent successfully');
       
       // Update local state as well
-      setMessages(prev => prev.map(msg => {
-        if ((messageId && msg.id === messageId) || 
-            (senderId && msg.senderId === senderId && msg.receiverId === user.id)) {
-          return { ...msg, isRead: true };
-        }
-        return msg;
-      }));
+      setMessages(prev => {
+        console.log('Updating local messages state for read status');
+        return prev.map(msg => {
+          if ((messageId && msg.id === messageId) || 
+              (senderId && msg.senderId === senderId && msg.receiverId === user.id)) {
+            console.log('Marking message as read locally:', msg.id);
+            return { ...msg, isRead: true };
+          }
+          return msg;
+        });
+      });
       
       return true;
     } catch (error) {
@@ -284,7 +320,10 @@ export function useMessaging() {
   
   // Get conversation with a specific user
   const getConversation = useCallback(async (userId: number, productId?: number) => {
+    console.log('Fetching conversation with userId:', userId, 'productId:', productId);
+    
     if (!user) {
+      console.error('User is not authenticated');
       toast({
         title: 'Authentication Error',
         description: 'You must be logged in to view conversations.',
@@ -299,13 +338,21 @@ export function useMessaging() {
         url += `?productId=${productId}`;
       }
       
+      console.log('Fetching conversation from URL:', url);
+      
       // Fetch conversation data
       const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        return data as Message[];
+      console.log('Conversation API response status:', res.status);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Error response from conversation API:', errorText);
+        throw new Error(`Failed to fetch conversation: ${res.status} ${res.statusText}`);
       }
-      return [];
+      
+      const data = await res.json();
+      console.log('Conversation data received:', data);
+      return data as Message[];
     } catch (error: any) {
       console.error('Error fetching conversation:', error);
       toast({
