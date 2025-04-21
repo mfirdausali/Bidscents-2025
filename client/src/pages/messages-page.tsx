@@ -199,11 +199,7 @@ export default function MessagesPage() {
     
     if (sent) {
       setMessageText('');
-      
-      // Optionally refresh the conversation after sending
-      setTimeout(() => {
-        loadConversation(selectedConversation.userId, selectedConversation.productId);
-      }, 500);
+      // No need to refresh - WebSocket will deliver the message and we'll update state
     } else {
       toast({
         title: 'Message Not Sent',
@@ -211,36 +207,37 @@ export default function MessagesPage() {
         variant: 'destructive',
       });
     }
-  }, [messageText, user?.id, selectedConversation, sendMessage, loadConversation, toast]);
+  }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChat]);
   
-  // Listen for WebSocket updates to reload conversation
+  // Listen for WebSocket updates to add new messages directly to activeChat
   useEffect(() => {
     if (selectedConversation && user?.id) {
-      // This adds the message to local state, but we'll also
-      // refresh the full conversation when a new WebSocket message arrives
-      
-      // Find messages in the global messages state that match this conversation
+      // Filter for new messages that belong to the current conversation
       const newMessages = messages.filter(msg => 
-        (msg.senderId === selectedConversation.userId && msg.receiverId === user.id) ||
-        (msg.senderId === user.id && msg.receiverId === selectedConversation.userId)
+        // Message is part of the current conversation
+        ((msg.senderId === selectedConversation.userId && msg.receiverId === user.id) ||
+         (msg.senderId === user.id && msg.receiverId === selectedConversation.userId)) &&
+        // Message is not already in activeChat
+        !activeChat.some(chatMsg => chatMsg.id === msg.id)
       );
       
-      // If we have new messages that aren't in activeChat, reload
+      // If we have new messages, add them to the activeChat state
       if (newMessages.length > 0) {
-        const latestReceivedMsgId = newMessages[0]?.id;
-        const latestActiveChatMsgId = activeChat[0]?.id;
-        
-        if (latestReceivedMsgId !== latestActiveChatMsgId) {
-          loadConversation(selectedConversation.userId, selectedConversation.productId);
-        }
+        console.log('Adding new messages to active chat:', newMessages);
+        setActiveChat(prev => {
+          // Sort messages by creation time (oldest first)
+          return [...prev, ...newMessages].sort((a, b) => 
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        });
       }
     }
-  }, [messages, selectedConversation, user?.id, activeChat, loadConversation]);
+  }, [messages, selectedConversation, user?.id, activeChat]);
   
   if (!user) {
     return (
