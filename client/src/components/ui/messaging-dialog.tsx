@@ -12,10 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Send, ArrowLeft } from 'lucide-react';
+import { Send } from 'lucide-react';
 
 interface MessagingDialogProps {
   open: boolean;
@@ -134,47 +133,49 @@ export function MessagingDialog({
           </DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="h-[50vh] p-4 border rounded-md">
-          {loading ? (
-            <div className="flex justify-center items-center h-full">
-              <p>Loading conversation...</p>
-            </div>
-          ) : conversation.length === 0 ? (
-            <div className="flex justify-center items-center h-full text-muted-foreground">
-              <p>No messages yet. Start the conversation!</p>
-            </div>
-          ) : (
-            <>
-              {conversation.map((msg) => {
-                const isOwnMessage = msg.senderId === user?.id;
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
-                  >
+        <ScrollArea className="h-[50vh] border rounded-md">
+          <div className="p-4">
+            {loading ? (
+              <div className="flex justify-center items-center h-full">
+                <p>Loading conversation...</p>
+              </div>
+            ) : conversation.length === 0 ? (
+              <div className="flex justify-center items-center h-full text-muted-foreground">
+                <p>No messages yet. Start the conversation!</p>
+              </div>
+            ) : (
+              <div>
+                {conversation.map((msg) => {
+                  const isOwnMessage = msg.senderId === user?.id;
+                  return (
                     <div
-                      className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                        isOwnMessage
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
-                      }`}
+                      key={msg.id}
+                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
                     >
-                      <div className="text-sm">{msg.content}</div>
-                      <div className="text-xs mt-1 opacity-70">
-                        {formatMessageTime(msg.createdAt)}
-                        {isOwnMessage && (
-                          <span className="ml-2">
-                            {msg.isRead ? '✓✓' : '✓'}
-                          </span>
-                        )}
+                      <div
+                        className={`max-w-[80%] px-4 py-2 rounded-lg ${
+                          isOwnMessage
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        <div className="text-sm">{msg.content}</div>
+                        <div className="text-xs mt-1 opacity-70">
+                          {formatMessageTime(msg.createdAt)}
+                          {isOwnMessage && (
+                            <span className="ml-2">
+                              {msg.isRead ? '✓✓' : '✓'}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-              <div ref={messagesEndRef} />
-            </>
-          )}
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
         </ScrollArea>
         
         <DialogFooter className="flex">
