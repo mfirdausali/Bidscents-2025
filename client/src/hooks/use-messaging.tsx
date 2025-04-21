@@ -161,7 +161,16 @@ export function useMessaging() {
           // Handle new message received
           if (data.type === 'new_message') {
             console.log('New message received:', data.message);
-            setMessages(prev => [data.message, ...prev]);
+            
+            // Add the message to our state only if it doesn't already exist
+            setMessages(prev => {
+              // Check if message already exists in our state
+              const exists = prev.some(msg => msg.id === data.message.id);
+              if (!exists) {
+                return [data.message, ...prev];
+              }
+              return prev;
+            });
             
             // Show a toast notification for new messages
             toast({
@@ -174,7 +183,16 @@ export function useMessaging() {
           // Handle sent message confirmation
           if (data.type === 'message_sent') {
             console.log('Message sent confirmation received:', data.message);
-            setMessages(prev => [data.message, ...prev]);
+            
+            // Add the message to our state only if it doesn't already exist
+            setMessages(prev => {
+              // Check if message already exists in our state
+              const exists = prev.some(msg => msg.id === data.message.id);
+              if (!exists) {
+                return [data.message, ...prev];
+              }
+              return prev;
+            });
           }
           
           // Handle errors
