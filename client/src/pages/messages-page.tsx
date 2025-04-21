@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -305,7 +305,7 @@ export default function MessagesPage() {
                 <h2 className="font-semibold text-lg">Conversations</h2>
               </div>
               
-              <ScrollArea className="flex-1">
+              <div className="flex-1 overflow-y-auto">
                 {conversations.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
                     <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
@@ -363,7 +363,7 @@ export default function MessagesPage() {
                     ))}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </Card>
           </div>
           
