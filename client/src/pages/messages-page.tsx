@@ -271,8 +271,9 @@ export default function MessagesPage() {
   }
   
   return (
-    <div className="container mx-auto py-6 px-2 md:px-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto py-4 max-w-7xl h-[calc(100vh-2rem)]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-4">
           <Button variant="outline" size="icon" onClick={() => setLocation('/')}>
             <ArrowLeft className="h-4 w-4" />
@@ -297,17 +298,17 @@ export default function MessagesPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[75vh]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-6rem)]">
           {/* Conversation List - Left Sidebar */}
           <div className="md:col-span-1 h-full">
-            <Card className="h-full flex flex-col">
-              <div className="p-4 border-b">
+            <Card className="h-full flex flex-col overflow-hidden">
+              <div className="p-3 border-b">
                 <h2 className="font-semibold text-lg">Conversations</h2>
               </div>
               
-              <div className="flex-1 overflow-y-auto">
+              <div className="overflow-y-auto flex-1">
                 {conversations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center h-full">
                     <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
                     <h3 className="text-base font-medium mb-2">No messages yet</h3>
                     <p className="text-sm text-muted-foreground mb-4">
@@ -327,7 +328,7 @@ export default function MessagesPage() {
                           }`}
                           onClick={() => selectConversation(conversation)}
                         >
-                          <div className="relative">
+                          <div className="relative flex-shrink-0">
                             <Avatar>
                               <AvatarImage src={conversation.profileImage || ''} alt={conversation.username} />
                               <AvatarFallback>{conversation.username.charAt(0).toUpperCase()}</AvatarFallback>
@@ -369,7 +370,7 @@ export default function MessagesPage() {
           
           {/* Active Conversation - Right Side */}
           <div className="md:col-span-2 h-full">
-            <Card className="h-full flex flex-col">
+            <Card className="h-full flex flex-col overflow-hidden">
               {!selectedConversation ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-6">
                   <User className="h-16 w-16 text-muted-foreground mb-4" />
@@ -383,9 +384,9 @@ export default function MessagesPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="flex flex-col h-full">
-                  {/* Conversation Header - Fixed at top */}
-                  <div className="p-4 border-b flex items-center">
+                <>
+                  {/* Conversation Header */}
+                  <div className="p-3 border-b flex items-center flex-shrink-0">
                     <Avatar className="h-10 w-10 mr-3">
                       <AvatarImage 
                         src={selectedConversation.profileImage || ''} 
@@ -405,8 +406,8 @@ export default function MessagesPage() {
                     </div>
                   </div>
                   
-                  {/* Messages Area - Scrollable middle section that takes up available space */}
-                  <div className="flex-1 overflow-y-auto p-4">
+                  {/* Messages Area */}
+                  <div className="flex-1 overflow-y-auto p-4" style={{ height: "calc(100% - 130px)" }}>
                     {loadingChat ? (
                       <div className="flex justify-center items-center h-full">
                         <p>Loading conversation...</p>
@@ -416,7 +417,7 @@ export default function MessagesPage() {
                         <p>No messages yet. Start the conversation!</p>
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-4 pb-2">
                         {activeChat.map((msg) => {
                           const isOwnMessage = msg.senderId === user?.id;
                           return (
@@ -425,7 +426,7 @@ export default function MessagesPage() {
                               className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
                             >
                               {!isOwnMessage && (
-                                <Avatar className="h-8 w-8 mr-2 mt-1">
+                                <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
                                   <AvatarImage 
                                     src={selectedConversation.profileImage || ''} 
                                     alt={selectedConversation.username} 
@@ -460,8 +461,8 @@ export default function MessagesPage() {
                     )}
                   </div>
                   
-                  {/* Message Input Area - Fixed at bottom */}
-                  <div className="p-4 border-t mt-auto">
+                  {/* Message Input Area */}
+                  <div className="p-3 border-t flex-shrink-0 bg-background">
                     <div className="flex items-center space-x-2">
                       <Input
                         value={messageText}
@@ -484,7 +485,7 @@ export default function MessagesPage() {
                       </Button>
                     </div>
                   </div>
-                </div>
+                </>
               )}
             </Card>
           </div>
