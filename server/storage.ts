@@ -1018,6 +1018,125 @@ export class DatabaseStorage implements IStorage {
     await db.delete(productImages).where(eq(productImages.id, id));
   }
 
+  // Message methods
+  async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
+    const userMessages = await db.select()
+      .from(messages)
+      .where(
+        or(
+          eq(messages.senderId, userId),
+          eq(messages.receiverId, userId)
+        )
+      )
+      .orderBy(messages.createdAt);
+    
+    return this.addMessageDetails(userMessages);
+  }
+  
+  async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
+    const conversation = await db.select()
+      .from(messages)
+      .where(
+        or(
+          and(
+            eq(messages.senderId, userId1),
+            eq(messages.receiverId, userId2)
+          ),
+          and(
+            eq(messages.senderId, userId2),
+            eq(messages.receiverId, userId1)
+          )
+        )
+      )
+      .orderBy(messages.createdAt);
+    
+    return this.addMessageDetails(conversation);
+  }
+  
+  async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
+    const conversation = await db.select()
+      .from(messages)
+      .where(
+        and(
+          or(
+            and(
+              eq(messages.senderId, userId1),
+              eq(messages.receiverId, userId2)
+            ),
+            and(
+              eq(messages.senderId, userId2),
+              eq(messages.receiverId, userId1)
+            )
+          ),
+          eq(messages.productId, productId)
+        )
+      )
+      .orderBy(messages.createdAt);
+    
+    return this.addMessageDetails(conversation);
+  }
+  
+  async sendMessage(message: InsertMessage): Promise<Message> {
+    // In a real app, you would encrypt the message content here before storing
+    const [newMessage] = await db.insert(messages).values(message).returning();
+    return newMessage;
+  }
+  
+  async markMessageAsRead(id: number): Promise<Message> {
+    const [updatedMessage] = await db
+      .update(messages)
+      .set({ isRead: true })
+      .where(eq(messages.id, id))
+      .returning();
+    
+    if (!updatedMessage) {
+      throw new Error("Message not found");
+    }
+    
+    return updatedMessage;
+  }
+  
+  async markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void> {
+    await db
+      .update(messages)
+      .set({ isRead: true })
+      .where(
+        and(
+          eq(messages.receiverId, receiverId),
+          eq(messages.senderId, senderId)
+        )
+      );
+  }
+  
+  private async addMessageDetails(messagesList: Message[]): Promise<MessageWithDetails[]> {
+    return Promise.all(
+      messagesList.map(async (message) => {
+        // Get sender
+        const [sender] = message.senderId ? 
+          await db.select().from(users).where(eq(users.id, message.senderId)) : 
+          [];
+        
+        // Get receiver
+        const [receiver] = message.receiverId ? 
+          await db.select().from(users).where(eq(users.id, message.receiverId)) : 
+          [];
+        
+        // Get product if applicable
+        let product;
+        if (message.productId) {
+          product = await this.getProductById(message.productId);
+        }
+        
+        return {
+          ...message,
+          sender,
+          receiver,
+          product
+        };
+      })
+    );
+  }
+
   // Helper methods
   private async addProductDetails(products: Product[]): Promise<ProductWithDetails[]> {
     return Promise.all(products.map(async (product) => {

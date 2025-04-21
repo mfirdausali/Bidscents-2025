@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertProductSchema, insertReviewSchema, insertProductImageSchema } from "@shared/schema";
+import { insertProductSchema, insertReviewSchema, insertProductImageSchema, insertMessageSchema } from "@shared/schema";
 import { productImages } from "@shared/schema";
 import { db } from "./db";
 import { z } from "zod";
@@ -12,6 +12,7 @@ import path from "path"; // Added import for path
 import { supabase } from "./supabase"; // Import Supabase for server-side operations
 import { createClient } from '@supabase/supabase-js';
 import { users } from "@shared/schema"; // Import the users schema for database updates
+import { WebSocketServer, WebSocket } from 'ws';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
