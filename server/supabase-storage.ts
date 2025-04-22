@@ -69,7 +69,10 @@ export class SupabaseStorage implements IStorage {
       walletBalance: data.wallet_balance,
       isSeller: data.is_seller,
       isAdmin: data.is_admin,
-      isBanned: data.is_banned
+      isBanned: data.is_banned,
+      shopName: data.shop_name,
+      location: data.location,
+      bio: data.bio
     } as User;
   }
 
@@ -173,6 +176,9 @@ export class SupabaseStorage implements IStorage {
     if (userData.isSeller !== undefined) dbUserData.is_seller = userData.isSeller;
     if (userData.isAdmin !== undefined) dbUserData.is_admin = userData.isAdmin;
     if (userData.isBanned !== undefined) dbUserData.is_banned = userData.isBanned;
+    if (userData.shopName !== undefined) dbUserData.shop_name = userData.shopName;
+    if (userData.location !== undefined) dbUserData.location = userData.location;
+    if (userData.bio !== undefined) dbUserData.bio = userData.bio;
     
     const { data, error } = await supabase
       .from('users')

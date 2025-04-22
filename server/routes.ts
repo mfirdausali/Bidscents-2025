@@ -19,6 +19,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
 
+  // User profile update endpoint
+  app.patch("/api/user/:id", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized: Please log in to update your profile" });
+      }
+
+      const id = parseInt(req.params.id);
+      
+      // Users can only update their own profiles
+      if (req.user.id !== id && !req.user.isAdmin) {
+        return res.status(403).json({ message: "Forbidden: You can only update your own profile" });
+      }
+
+      // Create a schema for profile update validation
+      const updateSchema = z.object({
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        address: z.string().optional(),
+        profileImage: z.string().optional(),
+        shopName: z.string().optional(),
+        location: z.string().optional(),
+        bio: z.string().optional(),
+      });
+      
+      // Validate and extract the update data
+      const updateData = updateSchema.parse(req.body);
+      
+      // Update the user profile
+      const updatedUser = await storage.updateUser(id, updateData);
+      res.json(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Password reset endpoint - server-side fallback for when client-side methods fail
   app.post("/api/update-password", async (req, res) => {
     try {
