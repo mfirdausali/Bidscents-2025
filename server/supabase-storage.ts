@@ -70,6 +70,7 @@ export class SupabaseStorage implements IStorage {
       isSeller: data.is_seller,
       isAdmin: data.is_admin,
       isBanned: data.is_banned,
+      isVerified: data.is_verified,
       shopName: data.shop_name,
       location: data.location,
       bio: data.bio
@@ -142,7 +143,11 @@ export class SupabaseStorage implements IStorage {
       wallet_balance: user.walletBalance !== undefined ? user.walletBalance : 0,
       is_seller: user.isSeller !== undefined ? user.isSeller : true,
       is_admin: user.isAdmin !== undefined ? user.isAdmin : false,
-      is_banned: user.isBanned !== undefined ? user.isBanned : false
+      is_banned: user.isBanned !== undefined ? user.isBanned : false,
+      is_verified: user.isVerified !== undefined ? user.isVerified : false,
+      shop_name: user.shopName,
+      location: user.location,
+      bio: user.bio
     };
     
     // Create a new user
@@ -176,6 +181,7 @@ export class SupabaseStorage implements IStorage {
     if (userData.isSeller !== undefined) dbUserData.is_seller = userData.isSeller;
     if (userData.isAdmin !== undefined) dbUserData.is_admin = userData.isAdmin;
     if (userData.isBanned !== undefined) dbUserData.is_banned = userData.isBanned;
+    if (userData.isVerified !== undefined) dbUserData.is_verified = userData.isVerified;
     if (userData.shopName !== undefined) dbUserData.shop_name = userData.shopName;
     if (userData.location !== undefined) dbUserData.location = userData.location;
     if (userData.bio !== undefined) dbUserData.bio = userData.bio;
