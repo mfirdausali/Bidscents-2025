@@ -1,7 +1,12 @@
 import React from "react";
 import { CheckCircle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface VerifiedBadgeProps {
   className?: string;
@@ -9,10 +14,10 @@ interface VerifiedBadgeProps {
   tooltipText?: string;
 }
 
-export function VerifiedBadge({ 
-  className, 
+export function VerifiedBadge({
+  className,
   size = "md",
-  tooltipText = "Verified Seller"
+  tooltipText = "Verified Seller",
 }: VerifiedBadgeProps) {
   // Define size-dependent styles
   const sizeStyles = {
@@ -25,15 +30,14 @@ export function VerifiedBadge({
     <TooltipProvider>
       <Tooltip delayDuration={300}>
         <TooltipTrigger type="button" className="focus:outline-none">
-          <span className={cn(
-            "inline-flex items-center justify-center text-primary",
-            className
-          )}>
-            <CheckCircle 
-              className={cn(
-                "fill-primary text-white", 
-                sizeStyles[size]
-              )} 
+          <span
+            className={cn(
+              "inline-flex items-center justify-center text-secondary",
+              className,
+            )}
+          >
+            <CheckCircle
+              className={cn("fill-primary text-white", sizeStyles[size])}
             />
           </span>
         </TooltipTrigger>

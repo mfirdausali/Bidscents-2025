@@ -27,9 +27,9 @@ interface ProfileEditModalProps {
   onClose: () => void;
   userData: {
     id: number;
-    shopName?: string;
-    location?: string;
-    bio?: string;
+    shopName?: string | null;
+    location?: string | null;
+    bio?: string | null;
   };
   onSuccess: () => void;
 }
