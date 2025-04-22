@@ -66,6 +66,8 @@ export class SupabaseStorage implements IStorage {
       lastName: data.last_name,
       address: data.address,
       profileImage: data.profile_image,
+      avatarUrl: data.avatar_url,
+      coverPhoto: data.cover_photo,
       walletBalance: data.wallet_balance,
       isSeller: data.is_seller,
       isAdmin: data.is_admin,
@@ -139,6 +141,8 @@ export class SupabaseStorage implements IStorage {
       last_name: user.lastName,
       address: user.address,
       profile_image: user.profileImage,
+      avatar_url: user.avatarUrl,
+      cover_photo: user.coverPhoto,
       // Always provide a default value for wallet_balance if not specified
       wallet_balance: user.walletBalance !== undefined ? user.walletBalance : 0,
       is_seller: user.isSeller !== undefined ? user.isSeller : true,
@@ -177,6 +181,8 @@ export class SupabaseStorage implements IStorage {
     if (userData.lastName !== undefined) dbUserData.last_name = userData.lastName;
     if (userData.address !== undefined) dbUserData.address = userData.address;
     if (userData.profileImage !== undefined) dbUserData.profile_image = userData.profileImage;
+    if (userData.avatarUrl !== undefined) dbUserData.avatar_url = userData.avatarUrl;
+    if (userData.coverPhoto !== undefined) dbUserData.cover_photo = userData.coverPhoto;
     if (userData.walletBalance !== undefined) dbUserData.wallet_balance = userData.walletBalance;
     if (userData.isSeller !== undefined) dbUserData.is_seller = userData.isSeller;
     if (userData.isAdmin !== undefined) dbUserData.is_admin = userData.isAdmin;
