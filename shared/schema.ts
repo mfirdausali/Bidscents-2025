@@ -12,6 +12,8 @@ export const users = pgTable("users", {
   lastName: text("last_name"),
   address: text("address"),
   profileImage: text("profile_image"),
+  avatarUrl: text("avatar_url"), // Profile photo stored in object storage
+  coverPhoto: text("cover_photo"), // Cover photo stored in object storage
   walletBalance: doublePrecision("wallet_balance").default(0).notNull(),
   isSeller: boolean("is_seller").default(true).notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
@@ -110,6 +112,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   lastName: true,
   address: true,
   profileImage: true,
+  avatarUrl: true, // New field for avatar/profile picture
+  coverPhoto: true, // New field for cover photo
   walletBalance: true,
   isSeller: true,
   isAdmin: true,
