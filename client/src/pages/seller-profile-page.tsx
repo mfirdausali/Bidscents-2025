@@ -116,72 +116,20 @@ export default function SellerProfilePage() {
     document.getElementById("products-section")?.scrollIntoView({ behavior: "smooth" });
   };
   
-  // Initialize form data when seller data is loaded
-  useEffect(() => {
-    if (seller) {
-      setFormData({
-        shopName: seller.shopName || "",
-        location: seller.location || "",
-        bio: seller.bio || ""
-      });
-    }
-  }, [seller]);
-  
-  // Handle input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+  // Handle opening the edit profile modal
+  const handleOpenProfileModal = () => {
+    setIsProfileModalOpen(true);
+  };
+
+  // Handle closing the edit profile modal
+  const handleCloseProfileModal = () => {
+    setIsProfileModalOpen(false);
   };
   
-  // Handle edit mode
-  const handleEditToggle = () => {
-    if (isEditMode) {
-      // Cancel edit mode
-      setIsEditMode(false);
-      // Reset form data to original values
-      if (seller) {
-        setFormData({
-          shopName: seller.shopName || "",
-          location: seller.location || "",
-          bio: seller.bio || ""
-        });
-      }
-    } else {
-      // Enter edit mode
-      setIsEditMode(true);
-    }
-  };
-  
-  // Update profile mutation
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: { shopName?: string; location?: string; bio?: string }) => {
-      return await apiRequest("PATCH", `/api/user/${sellerId}`, data);
-    },
-    onSuccess: () => {
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been successfully updated.",
-      });
-      setIsEditMode(false);
-      // Invalidate and refetch the seller data
-      queryClient.invalidateQueries({ queryKey: ["/api/sellers", sellerId] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update failed",
-        description: error.message || "Failed to update profile. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
-  
-  // Handle save changes
-  const handleSaveChanges = () => {
-    updateProfileMutation.mutate({
-      shopName: formData.shopName,
-      location: formData.location,
-      bio: formData.bio
-    });
+  // Handle successful profile update
+  const handleProfileUpdateSuccess = () => {
+    // Refresh the seller data
+    queryClient.invalidateQueries({ queryKey: ["/api/sellers", sellerId] });
   };
 
   // If there was an error fetching the seller
@@ -249,16 +197,6 @@ export default function SellerProfilePage() {
                 <div className="flex items-center gap-2">
                   {isSellerLoading ? (
                     <Skeleton className="h-8 w-48" />
-                  ) : isEditMode && isProfileOwner ? (
-                    <div className="flex gap-2 items-center">
-                      <Input
-                        name="shopName"
-                        value={formData.shopName}
-                        onChange={handleInputChange}
-                        placeholder="Shop Name"
-                        className="text-2xl font-bold h-auto py-1"
-                      />
-                    </div>
                   ) : (
                     <>
                       <h1 className="text-2xl md:text-3xl font-bold">
@@ -350,17 +288,7 @@ export default function SellerProfilePage() {
                         <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div className="w-full">
                           <p className="font-medium">Location</p>
-                          {isEditMode && isProfileOwner ? (
-                            <Input
-                              name="location"
-                              value={formData.location}
-                              onChange={handleInputChange}
-                              placeholder="Your location"
-                              className="mt-1"
-                            />
-                          ) : (
-                            <p className="text-muted-foreground">{seller?.location || seller?.address || "Not specified"}</p>
-                          )}
+                          <p className="text-muted-foreground">{seller?.location || seller?.address || "Not specified"}</p>
                         </div>
                       </div>
 
@@ -398,37 +326,14 @@ export default function SellerProfilePage() {
                     <div className="flex justify-between items-center mb-2">
                       <p className="font-medium">About</p>
                       {isProfileOwner && (
-                        <div>
-                          {isEditMode ? (
-                            <div className="flex gap-2">
-                              <Button 
-                                size="sm" 
-                                onClick={handleSaveChanges}
-                                disabled={updateProfileMutation.isPending}
-                              >
-                                <Save className="h-4 w-4 mr-1" />
-                                Save
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
-                                onClick={handleEditToggle}
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Cancel
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={handleEditToggle}
-                            >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Edit Profile
-                            </Button>
-                          )}
-                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={handleOpenProfileModal}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit Profile
+                        </Button>
                       )}
                     </div>
                     
@@ -438,14 +343,6 @@ export default function SellerProfilePage() {
                         <Skeleton className="h-4 w-full mb-2" />
                         <Skeleton className="h-4 w-3/4" />
                       </>
-                    ) : isEditMode && isProfileOwner ? (
-                      <Textarea
-                        name="bio"
-                        value={formData.bio}
-                        onChange={handleInputChange}
-                        placeholder="Tell buyers about yourself and your shop"
-                        className="resize-none min-h-[100px]"
-                      />
                     ) : (
                       <p className="text-muted-foreground text-sm">
                         {seller?.bio || "Welcome to my perfume shop! I specialize in collecting and selling rare, vintage, and limited-edition fragrances from around the world."}
@@ -598,6 +495,21 @@ export default function SellerProfilePage() {
       </main>
       
       <Footer />
+
+      {/* Profile Edit Modal */}
+      {seller && (
+        <ProfileEditModal
+          isOpen={isProfileModalOpen}
+          onClose={handleCloseProfileModal}
+          userData={{
+            id: sellerId,
+            shopName: seller.shopName,
+            location: seller.location,
+            bio: seller.bio
+          }}
+          onSuccess={handleProfileUpdateSuccess}
+        />
+      )}
     </div>
   );
 }
