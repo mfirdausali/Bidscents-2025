@@ -10,6 +10,7 @@ interface MetaTagsProps {
   twitterCard?: 'summary' | 'summary_large_image' | 'app' | 'player';
   shopName?: string;
   location?: string;
+  jsonLd?: Record<string, any>; // Add support for structured data
 }
 
 /**
@@ -24,7 +25,8 @@ export const MetaTags = ({
   type = 'website',
   twitterCard = 'summary_large_image',
   shopName,
-  location
+  location,
+  jsonLd
 }: MetaTagsProps) => {
   // Fall back to site URL if specific page URL is not provided
   const pageUrl = url || typeof window !== 'undefined' ? window.location.href : '';
@@ -71,6 +73,13 @@ export const MetaTags = ({
           <meta property="article:publisher" content="https://bidscents.com" />
           <meta property="article:modified_time" content={new Date().toISOString()} />
         </>
+      )}
+      
+      {/* JSON-LD Structured Data */}
+      {jsonLd && (
+        <script type="application/ld+json">
+          {JSON.stringify(jsonLd)}
+        </script>
       )}
     </Helmet>
   );
