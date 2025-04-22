@@ -14,7 +14,9 @@ import {
   ThumbsUp, 
   Truck, 
   Users,
-  X
+  X,
+  Camera,
+  ImagePlus
 } from "lucide-react";
 
 import { Header } from "@/components/ui/header";

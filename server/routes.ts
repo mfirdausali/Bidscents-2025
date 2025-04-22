@@ -55,6 +55,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+
   // Password reset endpoint - server-side fallback for when client-side methods fail
   app.post("/api/update-password", async (req, res) => {
     try {
@@ -271,6 +273,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve social media preview image
   app.get('/social-preview.jpg', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/public/social-preview.jpg'));
+  });
+  
+  // Profile image upload endpoint
+  app.post("/api/user/avatar", upload.single('image'), async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized: Please log in to upload a profile image" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+
+      // Validate the image
+      const validationResult = await objectStorage.validateImage(
+        req.file.buffer,
+        800, // Max width for profile photos
+        800, // Max height for profile photos
+        2    // Max size in MB
+      );
+
+      if (!validationResult.valid) {
+        return res.status(400).json({ message: validationResult.message });
+      }
+
+      // Upload the profile image
+      const uploadResult = await objectStorage.uploadProfileImage(
+        req.file.buffer,
+        req.user.id,
+        req.file.mimetype
+      );
+
+      if (!uploadResult.success) {
+        return res.status(500).json({ message: "Failed to upload profile image" });
+      }
+
+      // Update the user record in the database with the new avatar URL
+      const updatedUser = await storage.updateUser(req.user.id, {
+        avatarUrl: uploadResult.url
+      });
+
+      return res.json({
+        message: "Profile image uploaded successfully",
+        imageUrl: objectStorage.getImagePublicUrl(uploadResult.url),
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error("Error in profile image upload:", error);
+      next(error);
+    }
+  });
+
+  // Cover photo upload endpoint
+  app.post("/api/user/cover", upload.single('image'), async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized: Please log in to upload a cover photo" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+
+      // Validate the image - cover photos can be larger
+      const validationResult = await objectStorage.validateImage(
+        req.file.buffer,
+        2048, // Max width for cover photos
+        1024, // Max height for cover photos
+        5     // Max size in MB
+      );
+
+      if (!validationResult.valid) {
+        return res.status(400).json({ message: validationResult.message });
+      }
+
+      // Upload the cover photo
+      const uploadResult = await objectStorage.uploadCoverPhoto(
+        req.file.buffer,
+        req.user.id,
+        req.file.mimetype
+      );
+
+      if (!uploadResult.success) {
+        return res.status(500).json({ message: "Failed to upload cover photo" });
+      }
+
+      // Update the user record in the database with the new cover photo URL
+      const updatedUser = await storage.updateUser(req.user.id, {
+        coverPhoto: uploadResult.url
+      });
+
+      return res.json({
+        message: "Cover photo uploaded successfully",
+        imageUrl: objectStorage.getImagePublicUrl(uploadResult.url),
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error("Error in cover photo upload:", error);
+      next(error);
+    }
   });
 
   // Categories endpoints
