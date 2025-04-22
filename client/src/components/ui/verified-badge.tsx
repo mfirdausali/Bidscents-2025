@@ -13,14 +13,12 @@ export function VerifiedBadge({ size = "md", className }: VerifiedBadgeProps) {
     md: "h-4.5 w-4.5",
     lg: "h-5.5 w-5.5"
   };
-  
+
   return (
     <div className={cn("text-primary", className)}>
-      <CheckCircle 
-        className={cn(
-          "fill-primary text-white", 
-          sizeClasses[size]
-        )} 
+      <CheckCircle
+        className={cn("fill-[#009C41] text-white", sizeClasses[size])}
+        aria-hidden="true"
       />
     </div>
   );
