@@ -32,7 +32,7 @@ export function VerifiedBadge({
         <TooltipTrigger type="button" className="focus:outline-none">
           <span
             className={cn(
-              "inline-flex items-center justify-center text-secondary",
+              "inline-flex items-center justify-center text-primary",
               className,
             )}
           >
