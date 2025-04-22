@@ -16,6 +16,9 @@ export const users = pgTable("users", {
   isSeller: boolean("is_seller").default(true).notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   isBanned: boolean("is_banned").default(false).notNull(),
+  shopName: text("shop_name"),
+  location: text("location"),
+  bio: text("bio"),
 });
 
 // Categories table
@@ -110,6 +113,9 @@ export const insertUserSchema = createInsertSchema(users).pick({
   isSeller: true,
   isAdmin: true,
   isBanned: true,
+  shopName: true,
+  location: true,
+  bio: true,
 });
 
 export const insertProductSchema = createInsertSchema(products).pick({
