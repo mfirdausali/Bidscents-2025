@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Helmet } from "react-helmet";
 import { 
   Calendar,
   ChevronLeft,
@@ -244,7 +245,7 @@ export default function SellerProfilePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* SEO Meta Tags */}
+      {/* SEO Meta Tags with Structured Data JSON-LD */}
       <MetaTags
         title={`${getSellerName()} | BidScents Perfume Seller`}
         description={getSellerDescription()}
@@ -252,33 +253,27 @@ export default function SellerProfilePage() {
         shopName={shopName}
         location={location}
         type="profile"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Person",
+          "name": getSellerName(),
+          "description": getSellerDescription(),
+          "image": getProfileImageUrl() || undefined,
+          "url": typeof window !== 'undefined' ? window.location.href : '',
+          "jobTitle": "Perfume Seller",
+          "worksFor": {
+            "@type": "Organization",
+            "name": "BidScents Marketplace"
+          },
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": location || undefined
+          },
+          ...(isVerifiedFromSupabase || seller?.isVerified ? {
+            "knowsAbout": ["Fragrances", "Perfumes", "Luxury Scents"]
+          } : {})
+        }}
       />
-      
-      {/* Structured Data JSON-LD for search engines */}
-      <Helmet>
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Person",
-            "name": getSellerName(),
-            "description": getSellerDescription(),
-            "image": getProfileImageUrl() || undefined,
-            "url": typeof window !== 'undefined' ? window.location.href : '',
-            "jobTitle": "Perfume Seller",
-            "worksFor": {
-              "@type": "Organization",
-              "name": "BidScents Marketplace"
-            },
-            "address": {
-              "@type": "PostalAddress",
-              "addressLocality": location || undefined
-            },
-            ...(isVerifiedFromSupabase || seller?.isVerified ? {
-              "knowsAbout": ["Fragrances", "Perfumes", "Luxury Scents"]
-            } : {})
-          })}
-        </script>
-      </Helmet>
       
       <Header />
       
@@ -293,8 +288,11 @@ export default function SellerProfilePage() {
               ) : seller?.coverPhoto ? (
                 <img 
                   src={`/api/images/${seller.coverPhoto}`}
-                  alt="Cover" 
+                  alt={`${getSellerName()} cover photo`}
                   className="w-full h-full object-cover"
+                  loading="eager"
+                  fetchPriority="high"
+                  itemProp="image"
                 />
               ) : (
                 <div className="h-full w-full bg-gradient-to-r from-purple-200 to-indigo-200" />
@@ -425,7 +423,7 @@ export default function SellerProfilePage() {
                 <CardHeader>
                   <h2 className="text-xl font-semibold">Seller Information</h2>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4" itemScope itemType="https://schema.org/Person">
                   {isSellerLoading ? (
                     <>
                       <Skeleton className="h-6 w-full" />
