@@ -14,10 +14,14 @@ import { createClient } from '@supabase/supabase-js';
 import { users } from "@shared/schema"; // Import the users schema for database updates
 import { WebSocketServer, WebSocket } from 'ws';
 import { encryptMessage, decryptMessage, isEncrypted } from './encryption';
+import { generateSellerPreview } from './social-preview';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
+  
+  // Social preview routes for better WhatsApp/Facebook sharing
+  app.get("/social/seller/:id", generateSellerPreview);
 
   // User profile update endpoint
   app.patch("/api/user/:id", async (req, res, next) => {

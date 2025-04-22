@@ -254,6 +254,15 @@ export default function SellerProfilePage() {
     }
     return `https://bidscents.replit.app/sellers/${sellerId}`;
   };
+  
+  // Get the social preview URL for WhatsApp sharing
+  const getSocialPreviewUrl = () => {
+    const baseUrl = typeof window !== 'undefined' 
+      ? `${window.location.protocol}//${window.location.host}`
+      : "https://bidscents.replit.app";
+    
+    return `${baseUrl}/social/seller/${sellerId}`;
+  };
 
   // Ensure seller metadata doesn't have null values for type safety
   const shopName = seller?.shopName || undefined;
@@ -299,6 +308,7 @@ export default function SellerProfilePage() {
         location={location}
         type="profile"
         jsonLd={personSchema}
+        socialUrl={getSocialPreviewUrl()}
       />
       
       <Header />

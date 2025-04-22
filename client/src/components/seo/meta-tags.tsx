@@ -11,6 +11,7 @@ interface MetaTagsProps {
   shopName?: string;
   location?: string;
   jsonLd?: Record<string, any>; // Add support for structured data
+  socialUrl?: string; // URL to server-side generated social preview
 }
 
 /**
@@ -26,7 +27,8 @@ export const MetaTags = ({
   twitterCard = 'summary_large_image',
   shopName,
   location,
-  jsonLd
+  jsonLd,
+  socialUrl
 }: MetaTagsProps) => {
   // Fall back to site URL if specific page URL is not provided
   const pageUrl = url || typeof window !== 'undefined' ? window.location.href : 'https://bidscents.replit.app';
@@ -81,6 +83,9 @@ export const MetaTags = ({
       <meta property="al:android:app_name" content="BidScents" />
       <meta property="al:android:package" content="com.bidscents.app" />
       <meta property="al:web:url" content={pageUrl} />
+      
+      {/* Special link for WhatsApp and other platforms that don't properly parse client-side meta tags */}
+      {socialUrl && <link rel="alternate" href={socialUrl} />}
       
       {/* Article Specific Tags if type is article */}
       {type === 'article' && (
