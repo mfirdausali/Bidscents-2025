@@ -32,6 +32,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { ProductCard } from "../components/ui/product-card";
 import { ProductFilters } from "../components/product-filters";
 import { ProfileEditModal } from "../components/ui/profile-edit-modal";
+import { VerifiedBadge } from "../components/ui/verified-badge";
 import { User, ProductWithDetails } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -199,14 +200,16 @@ export default function SellerProfilePage() {
                     <Skeleton className="h-8 w-48" />
                   ) : (
                     <>
-                      <h1 className="text-2xl md:text-3xl font-bold">
-                        {seller?.shopName || (seller?.firstName && seller?.lastName 
-                          ? `${seller.firstName} ${seller.lastName}'s Shop` 
-                          : seller?.username)}
-                      </h1>
-                      <Badge variant="secondary" className="hidden md:inline-flex">
-                        Verified Seller
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <h1 className="text-2xl md:text-3xl font-bold">
+                          {seller?.shopName || (seller?.firstName && seller?.lastName 
+                            ? `${seller.firstName} ${seller.lastName}'s Shop` 
+                            : seller?.username)}
+                        </h1>
+                        {!isSellerLoading && seller?.isVerified && (
+                          <VerifiedBadge size="lg" className="ml-1" />
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -239,7 +242,12 @@ export default function SellerProfilePage() {
           {/* Mobile Badges and Buttons */}
           <div className="md:hidden mt-4 mb-6">
             <div className="flex flex-wrap gap-2 mb-4">
-              <Badge variant="secondary">Verified Seller</Badge>
+              {!isSellerLoading && seller?.isVerified && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-secondary">
+                  <VerifiedBadge size="sm" />
+                  <span className="text-sm font-medium">Verified</span>
+                </div>
+              )}
               {!isSellerLoading && seller?.isSeller && (
                 <Badge variant="secondary">Professional Seller</Badge>
               )}
