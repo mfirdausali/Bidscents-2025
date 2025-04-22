@@ -1,17 +1,20 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Edit,
   MessageSquare, 
   MapPin,
   Star, 
   Store, 
   ThumbsUp, 
   Truck, 
-  Users
+  Users,
+  Save,
+  X
 } from "lucide-react";
 
 import { Header } from "@/components/ui/header";
@@ -27,6 +30,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { ProductCard } from "../components/ui/product-card";
 import { ProductFilters } from "../components/product-filters";
 import { User, ProductWithDetails } from "@shared/schema";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function SellerProfilePage() {
   const [match, params] = useRoute("/sellers/:id");
@@ -36,6 +42,18 @@ export default function SellerProfilePage() {
   const [sortOption, setSortOption] = useState("popular");
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
+  // Edit mode states
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [formData, setFormData] = useState({
+    shopName: "",
+    location: "",
+    bio: ""
+  });
+  
+  // Check if the current user is the owner of this profile
+  const isProfileOwner = user?.id === sellerId;
   
   const productsPerPage = 12;
 
@@ -100,6 +118,74 @@ export default function SellerProfilePage() {
     setCurrentPage(pageNumber);
     // Scroll to top of product section
     document.getElementById("products-section")?.scrollIntoView({ behavior: "smooth" });
+  };
+  
+  // Initialize form data when seller data is loaded
+  useEffect(() => {
+    if (seller) {
+      setFormData({
+        shopName: seller.shopName || "",
+        location: seller.location || "",
+        bio: seller.bio || ""
+      });
+    }
+  }, [seller]);
+  
+  // Handle input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+  
+  // Handle edit mode
+  const handleEditToggle = () => {
+    if (isEditMode) {
+      // Cancel edit mode
+      setIsEditMode(false);
+      // Reset form data to original values
+      if (seller) {
+        setFormData({
+          shopName: seller.shopName || "",
+          location: seller.location || "",
+          bio: seller.bio || ""
+        });
+      }
+    } else {
+      // Enter edit mode
+      setIsEditMode(true);
+    }
+  };
+  
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { shopName?: string; location?: string; bio?: string }) => {
+      return await apiRequest("PATCH", `/api/user/${sellerId}`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been successfully updated.",
+      });
+      setIsEditMode(false);
+      // Invalidate and refetch the seller data
+      queryClient.invalidateQueries({ queryKey: ["/api/sellers", sellerId] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Handle save changes
+  const handleSaveChanges = () => {
+    updateProfileMutation.mutate({
+      shopName: formData.shopName,
+      location: formData.location,
+      bio: formData.bio
+    });
   };
 
   // If there was an error fetching the seller
@@ -167,12 +253,22 @@ export default function SellerProfilePage() {
                 <div className="flex items-center gap-2">
                   {isSellerLoading ? (
                     <Skeleton className="h-8 w-48" />
+                  ) : isEditMode && isProfileOwner ? (
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        name="shopName"
+                        value={formData.shopName}
+                        onChange={handleInputChange}
+                        placeholder="Shop Name"
+                        className="text-2xl font-bold h-auto py-1"
+                      />
+                    </div>
                   ) : (
                     <>
                       <h1 className="text-2xl md:text-3xl font-bold">
-                        {seller?.firstName && seller?.lastName 
+                        {seller?.shopName || (seller?.firstName && seller?.lastName 
                           ? `${seller.firstName} ${seller.lastName}'s Shop` 
-                          : seller?.username}
+                          : seller?.username)}
                       </h1>
                       <Badge variant="secondary" className="hidden md:inline-flex">
                         Verified Seller
@@ -256,9 +352,19 @@ export default function SellerProfilePage() {
 
                       <div className="flex items-start gap-3">
                         <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
+                        <div className="w-full">
                           <p className="font-medium">Location</p>
-                          <p className="text-muted-foreground">{seller?.address || "Not specified"}</p>
+                          {isEditMode && isProfileOwner ? (
+                            <Input
+                              name="location"
+                              value={formData.location}
+                              onChange={handleInputChange}
+                              placeholder="Your location"
+                              className="mt-1"
+                            />
+                          ) : (
+                            <p className="text-muted-foreground">{seller?.location || seller?.address || "Not specified"}</p>
+                          )}
                         </div>
                       </div>
 
