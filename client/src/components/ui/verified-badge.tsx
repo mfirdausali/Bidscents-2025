@@ -37,7 +37,7 @@ export function VerifiedBadge({
             )}
           >
             <CheckCircle
-              className={cn("fill-primary text-white", sizeStyles[size])}
+              className={cn("fill-[#009C41] text-white", sizeStyles[size])}
             />
           </span>
         </TooltipTrigger>
