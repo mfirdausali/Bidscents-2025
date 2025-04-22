@@ -229,19 +229,63 @@ export default function SellerProfilePage() {
 
   // Get the absolute URL for the profile image to use in social meta tags
   const getProfileImageUrl = () => {
-    if (!seller?.avatarUrl) return "";
+    if (!seller?.avatarUrl) {
+      // Provide a fallback image for social sharing when no avatar exists
+      const baseUrl = typeof window !== 'undefined' 
+        ? `${window.location.protocol}//${window.location.host}`
+        : "https://bidscents.replit.app";
+      
+      return `${baseUrl}/logo-social.svg`; // Default store logo for social sharing
+    }
     
     // Create an absolute URL for the avatar image
+    // Use an absolute URL instead of a relative URL for better compatibility with social platforms
     const baseUrl = typeof window !== 'undefined' 
       ? `${window.location.protocol}//${window.location.host}`
-      : "";
+      : "https://bidscents.replit.app"; // Fallback to replit app domain
     
     return `${baseUrl}/api/images/${seller.avatarUrl}`;
+  };
+
+  // Get the current URL for meta tags
+  const getCurrentUrl = () => {
+    if (typeof window !== 'undefined') {
+      return window.location.href;
+    }
+    return `https://bidscents.replit.app/sellers/${sellerId}`;
   };
 
   // Ensure seller metadata doesn't have null values for type safety
   const shopName = seller?.shopName || undefined;
   const location = seller?.location || undefined;
+
+  // Enhanced person schema for structured data
+  const personSchema = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": getSellerName(),
+    "description": getSellerDescription(),
+    "image": getProfileImageUrl(),
+    "url": getCurrentUrl(),
+    "jobTitle": "Perfume Seller",
+    "worksFor": {
+      "@type": "Organization",
+      "name": "BidScents Marketplace",
+      "url": "https://bidscents.replit.app"
+    },
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": location || undefined
+    },
+    ...(isVerifiedFromSupabase || seller?.isVerified ? {
+      "knowsAbout": ["Fragrances", "Perfumes", "Luxury Scents", "Perfume Collection"],
+      "award": "Verified Seller"
+    } : {}),
+    "memberOf": {
+      "@type": "Organization",
+      "name": "BidScents Perfume Community"
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -250,29 +294,11 @@ export default function SellerProfilePage() {
         title={`${getSellerName()} | BidScents Perfume Seller`}
         description={getSellerDescription()}
         image={getProfileImageUrl()}
+        url={getCurrentUrl()}
         shopName={shopName}
         location={location}
         type="profile"
-        jsonLd={{
-          "@context": "https://schema.org",
-          "@type": "Person",
-          "name": getSellerName(),
-          "description": getSellerDescription(),
-          "image": getProfileImageUrl() || undefined,
-          "url": typeof window !== 'undefined' ? window.location.href : '',
-          "jobTitle": "Perfume Seller",
-          "worksFor": {
-            "@type": "Organization",
-            "name": "BidScents Marketplace"
-          },
-          "address": {
-            "@type": "PostalAddress",
-            "addressLocality": location || undefined
-          },
-          ...(isVerifiedFromSupabase || seller?.isVerified ? {
-            "knowsAbout": ["Fragrances", "Perfumes", "Luxury Scents"]
-          } : {})
-        }}
+        jsonLd={personSchema}
       />
       
       <Header />
