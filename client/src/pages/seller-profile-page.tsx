@@ -35,6 +35,7 @@ import { ProfileEditModal } from "../components/ui/profile-edit-modal";
 import { VerifiedBadge } from "../components/ui/verified-badge";
 import { User, ProductWithDetails } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { supabase } from "@/lib/supabase";
 
 export default function SellerProfilePage() {
   const [match, params] = useRoute("/sellers/:id");
@@ -127,6 +128,34 @@ export default function SellerProfilePage() {
     setIsProfileModalOpen(false);
   };
   
+  // Check if the user is verified directly from Supabase
+  const [isVerifiedFromSupabase, setIsVerifiedFromSupabase] = useState<boolean | null>(null);
+  
+  useEffect(() => {
+    async function checkVerificationStatus() {
+      if (sellerId) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('is_verified')
+            .eq('id', sellerId)
+            .single();
+          
+          if (error) {
+            console.error('Error fetching verification status:', error);
+            return;
+          }
+          
+          setIsVerifiedFromSupabase(!!data?.is_verified);
+        } catch (error) {
+          console.error('Error in verification check:', error);
+        }
+      }
+    }
+    
+    checkVerificationStatus();
+  }, [sellerId]);
+
   // Handle successful profile update
   const handleProfileUpdateSuccess = () => {
     // Refresh the seller data
@@ -206,7 +235,7 @@ export default function SellerProfilePage() {
                             ? `${seller.firstName} ${seller.lastName}'s Shop` 
                             : seller?.username)}
                         </h1>
-                        {!isSellerLoading && seller?.isVerified && (
+                        {!isSellerLoading && (seller?.isVerified || isVerifiedFromSupabase) && (
                           <VerifiedBadge size="lg" className="ml-1" />
                         )}
                       </div>
@@ -242,7 +271,7 @@ export default function SellerProfilePage() {
           {/* Mobile Badges and Buttons */}
           <div className="md:hidden mt-4 mb-6">
             <div className="flex flex-wrap gap-2 mb-4">
-              {!isSellerLoading && seller?.isVerified && (
+              {!isSellerLoading && (seller?.isVerified || isVerifiedFromSupabase) && (
                 <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-secondary">
                   <VerifiedBadge size="sm" />
                   <span className="text-sm font-medium">Verified</span>
