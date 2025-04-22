@@ -35,6 +35,15 @@ export default function ProfilePage() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  
+  // Redirect to /sellers/:id if user is logged in
+  useEffect(() => {
+    if (user?.id) {
+      setLocation(`/sellers/${user.id}`);
+    }
+  }, [user, setLocation]);
+
+  // Fallback UI in case redirection doesn't happen immediately
   const [activeTab, setActiveTab] = useState("overview");
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
