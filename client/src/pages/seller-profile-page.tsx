@@ -399,17 +399,60 @@ export default function SellerProfilePage() {
                   <Separator />
 
                   <div>
-                    <p className="font-medium mb-2">About</p>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="font-medium">About</p>
+                      {isProfileOwner && (
+                        <div>
+                          {isEditMode ? (
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                onClick={handleSaveChanges}
+                                disabled={updateProfileMutation.isPending}
+                              >
+                                <Save className="h-4 w-4 mr-1" />
+                                Save
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={handleEditToggle}
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={handleEditToggle}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit Profile
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
                     {isSellerLoading ? (
                       <>
                         <Skeleton className="h-4 w-full mb-2" />
                         <Skeleton className="h-4 w-full mb-2" />
                         <Skeleton className="h-4 w-3/4" />
                       </>
+                    ) : isEditMode && isProfileOwner ? (
+                      <Textarea
+                        name="bio"
+                        value={formData.bio}
+                        onChange={handleInputChange}
+                        placeholder="Tell buyers about yourself and your shop"
+                        className="resize-none min-h-[100px]"
+                      />
                     ) : (
                       <p className="text-muted-foreground text-sm">
-                        Welcome to my perfume shop! I specialize in collecting and selling rare, 
-                        vintage, and limited-edition fragrances from around the world.
+                        {seller?.bio || "Welcome to my perfume shop! I specialize in collecting and selling rare, vintage, and limited-edition fragrances from around the world."}
                       </p>
                     )}
                   </div>
