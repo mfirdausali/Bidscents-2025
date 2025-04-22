@@ -36,6 +36,7 @@ import { ProductFilters } from "../components/product-filters";
 import { ProfileEditModal } from "../components/ui/profile-edit-modal";
 import { ImageUploadModal } from "../components/ui/image-upload-modal";
 import { VerifiedBadge } from "../components/ui/verified-badge";
+import { MetaTags } from "../components/seo/meta-tags";
 import { User, ProductWithDetails } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
@@ -210,8 +211,75 @@ export default function SellerProfilePage() {
     );
   }
 
+  // Prepare SEO-friendly meta tags for social sharing
+  const getSellerName = () => {
+    if (isSellerLoading || !seller) return "Perfume Seller";
+    return seller.shopName || 
+      (seller.firstName && seller.lastName ? `${seller.firstName} ${seller.lastName}'s Shop` : seller.username);
+  };
+
+  const getSellerDescription = () => {
+    if (isSellerLoading || !seller) return "Premium perfumes from a trusted seller on BidScents";
+    return seller.bio || 
+      `${getSellerName()} offers premium perfumes and fragrances. ${
+        seller.isVerified || isVerifiedFromSupabase ? 'Verified seller with authentic products.' : ''
+      }`;
+  };
+
+  // Get the absolute URL for the profile image to use in social meta tags
+  const getProfileImageUrl = () => {
+    if (!seller?.avatarUrl) return "";
+    
+    // Create an absolute URL for the avatar image
+    const baseUrl = typeof window !== 'undefined' 
+      ? `${window.location.protocol}//${window.location.host}`
+      : "";
+    
+    return `${baseUrl}/api/images/${seller.avatarUrl}`;
+  };
+
+  // Ensure seller metadata doesn't have null values for type safety
+  const shopName = seller?.shopName || undefined;
+  const location = seller?.location || undefined;
+
   return (
     <div className="min-h-screen flex flex-col">
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={`${getSellerName()} | BidScents Perfume Seller`}
+        description={getSellerDescription()}
+        image={getProfileImageUrl()}
+        shopName={shopName}
+        location={location}
+        type="profile"
+      />
+      
+      {/* Structured Data JSON-LD for search engines */}
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Person",
+            "name": getSellerName(),
+            "description": getSellerDescription(),
+            "image": getProfileImageUrl() || undefined,
+            "url": typeof window !== 'undefined' ? window.location.href : '',
+            "jobTitle": "Perfume Seller",
+            "worksFor": {
+              "@type": "Organization",
+              "name": "BidScents Marketplace"
+            },
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": location || undefined
+            },
+            ...(isVerifiedFromSupabase || seller?.isVerified ? {
+              "knowsAbout": ["Fragrances", "Perfumes", "Luxury Scents"]
+            } : {})
+          })}
+        </script>
+      </Helmet>
+      
       <Header />
       
       <main className="flex-grow">
@@ -254,11 +322,14 @@ export default function SellerProfilePage() {
                   seller?.avatarUrl ? (
                     <img 
                       src={`/api/images/${seller.avatarUrl}`} 
-                      alt={`${seller.firstName || ''} ${seller.lastName || ''}`} 
+                      alt={`${seller.firstName || ''} ${seller.lastName || ''} - ${seller.shopName || 'Perfume Shop'} Profile`} 
                       className="w-full h-full object-cover"
+                      loading="eager" // Load profile image eagerly for SEO importance
+                      fetchPriority="high" // Give high priority to this image for loading
+                      itemProp="image" // Schema.org markup
                     />
                   ) : (
-                    <div className="h-full w-full flex items-center justify-center bg-gray-100 text-gray-500">
+                    <div className="h-full w-full flex items-center justify-center bg-gray-100 text-gray-500" aria-label="No profile image available">
                       <Store className="h-12 w-12" />
                     </div>
                   )
@@ -284,7 +355,7 @@ export default function SellerProfilePage() {
                   ) : (
                     <>
                       <div className="flex items-center gap-1">
-                        <h1 className="text-2xl md:text-3xl font-bold">
+                        <h1 className="text-2xl md:text-3xl font-bold" itemProp="name">
                           {seller?.shopName || (seller?.firstName && seller?.lastName 
                             ? `${seller.firstName} ${seller.lastName}'s Shop` 
                             : seller?.username)}
@@ -379,7 +450,7 @@ export default function SellerProfilePage() {
                         <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div className="w-full">
                           <p className="font-medium">Location</p>
-                          <p className="text-muted-foreground">{seller?.location || seller?.address || "Not specified"}</p>
+                          <p className="text-muted-foreground" itemProp="location">{seller?.location || seller?.address || "Not specified"}</p>
                         </div>
                       </div>
 
@@ -435,7 +506,7 @@ export default function SellerProfilePage() {
                         <Skeleton className="h-4 w-3/4" />
                       </>
                     ) : (
-                      <p className="text-muted-foreground text-sm">
+                      <p className="text-muted-foreground text-sm" itemProp="description">
                         {seller?.bio || "Welcome to my perfume shop! I specialize in collecting and selling rare, vintage, and limited-edition fragrances from around the world."}
                       </p>
                     )}
