@@ -34,6 +34,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { ProductCard } from "../components/ui/product-card";
 import { ProductFilters } from "../components/product-filters";
 import { ProfileEditModal } from "../components/ui/profile-edit-modal";
+import { ImageUploadModal } from "../components/ui/image-upload-modal";
 import { VerifiedBadge } from "../components/ui/verified-badge";
 import { User, ProductWithDetails } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -49,8 +50,10 @@ export default function SellerProfilePage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
-  // Modal state
+  // Modal states
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
   
   // Check if the current user is the owner of this profile
   const isProfileOwner = user?.id === sellerId;
@@ -158,6 +161,24 @@ export default function SellerProfilePage() {
     checkVerificationStatus();
   }, [sellerId]);
 
+  // Handle avatar modal open/close
+  const handleOpenAvatarModal = () => {
+    setIsAvatarModalOpen(true);
+  };
+  
+  const handleCloseAvatarModal = () => {
+    setIsAvatarModalOpen(false);
+  };
+  
+  // Handle cover photo modal open/close
+  const handleOpenCoverModal = () => {
+    setIsCoverModalOpen(true);
+  };
+  
+  const handleCloseCoverModal = () => {
+    setIsCoverModalOpen(false);
+  };
+
   // Handle successful profile update
   const handleProfileUpdateSuccess = () => {
     // Refresh the seller data
@@ -197,24 +218,43 @@ export default function SellerProfilePage() {
         <div className="container mx-auto px-4 py-8">
           {/* Cover Image and Profile Section */}
           <div className="relative mb-8">
-            <div className="h-48 md:h-64 w-full rounded-lg overflow-hidden bg-gray-100">
+            <div className="h-48 md:h-64 w-full rounded-lg overflow-hidden bg-gray-100 relative">
               {/* Cover image placeholder if loading or no image */}
               {isSellerLoading ? (
                 <Skeleton className="h-full w-full" />
+              ) : seller?.coverPhoto ? (
+                <img 
+                  src={`/api/images/${seller.coverPhoto}`}
+                  alt="Cover" 
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="h-full w-full bg-gradient-to-r from-purple-200 to-indigo-200" />
+              )}
+              
+              {/* Upload cover image button (only for profile owner) */}
+              {isProfileOwner && !isSellerLoading && (
+                <Button 
+                  size="sm"
+                  variant="secondary"
+                  className="absolute top-3 right-3 opacity-80 hover:opacity-100"
+                  onClick={handleOpenCoverModal}
+                >
+                  <ImagePlus className="h-4 w-4 mr-1" />
+                  {seller?.coverPhoto ? 'Change Cover' : 'Add Cover Photo'}
+                </Button>
               )}
             </div>
 
             <div className="flex flex-col md:flex-row gap-6 mt-4 md:mt-0 md:items-end md:absolute md:bottom-0 md:translate-y-1/2 md:left-8">
-              <div className="w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden border-4 border-background bg-background">
+              <div className="w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden border-4 border-background bg-background relative group">
                 {isSellerLoading ? (
                   <Skeleton className="h-full w-full" />
                 ) : (
-                  seller?.profileImage ? (
+                  seller?.avatarUrl ? (
                     <img 
-                      src={seller.profileImage} 
-                      alt={`${seller.firstName} ${seller.lastName}`} 
+                      src={`/api/images/${seller.avatarUrl}`} 
+                      alt={`${seller.firstName || ''} ${seller.lastName || ''}`} 
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -222,6 +262,18 @@ export default function SellerProfilePage() {
                       <Store className="h-12 w-12" />
                     </div>
                   )
+                )}
+                
+                {/* Profile upload button (only for profile owner) */}
+                {isProfileOwner && !isSellerLoading && (
+                  <Button 
+                    size="icon"
+                    variant="secondary"
+                    className="absolute bottom-1 right-1 rounded-full h-8 w-8 opacity-90 hover:opacity-100 group-hover:opacity-100"
+                    onClick={handleOpenAvatarModal}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
 
@@ -535,19 +587,40 @@ export default function SellerProfilePage() {
       
       <Footer />
 
-      {/* Profile Edit Modal */}
-      {seller && (
-        <ProfileEditModal
-          isOpen={isProfileModalOpen}
-          onClose={handleCloseProfileModal}
-          userData={{
-            id: sellerId,
-            shopName: seller.shopName,
-            location: seller.location,
-            bio: seller.bio
-          }}
-          onSuccess={handleProfileUpdateSuccess}
-        />
+      {/* Modals */}
+      {seller && isProfileOwner && (
+        <>
+          {/* Profile Edit Modal */}
+          <ProfileEditModal
+            isOpen={isProfileModalOpen}
+            onClose={handleCloseProfileModal}
+            userData={{
+              id: sellerId,
+              shopName: seller.shopName,
+              location: seller.location,
+              bio: seller.bio
+            }}
+            onSuccess={handleProfileUpdateSuccess}
+          />
+          
+          {/* Avatar upload modal */}
+          <ImageUploadModal
+            isOpen={isAvatarModalOpen}
+            onClose={handleCloseAvatarModal}
+            userId={sellerId}
+            imageType="avatar"
+            onSuccess={handleProfileUpdateSuccess}
+          />
+          
+          {/* Cover photo upload modal */}
+          <ImageUploadModal
+            isOpen={isCoverModalOpen}
+            onClose={handleCloseCoverModal}
+            userId={sellerId}
+            imageType="cover"
+            onSuccess={handleProfileUpdateSuccess}
+          />
+        </>
       )}
     </div>
   );
