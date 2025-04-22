@@ -1,6 +1,13 @@
 import { Client } from '@replit/object-storage';
 import { randomUUID } from 'crypto';
 
+// Define constants for file types
+export const IMAGE_TYPES = {
+  PRODUCT: 'product',
+  PROFILE: 'profile',
+  COVER: 'cover'
+};
+
 // Initialize the Replit Object Storage client with a hardcoded bucket ID
 // This is the default bucket ID format used by Replit
 export const storageClient = new Client({
@@ -83,10 +90,11 @@ export function getImagePublicUrl(imageId: string): string {
 
 /**
  * Generate a new UUID for an image
+ * @param type Optional type prefix to help identify image usage
  * @returns A new UUID string
  */
-export function generateImageId(): string {
-  return randomUUID();
+export function generateImageId(type: string = IMAGE_TYPES.PRODUCT): string {
+  return `${type}_${randomUUID()}`;
 }
 
 /**
@@ -109,5 +117,103 @@ export async function getImageFromStorage(imageId: string): Promise<Buffer | nul
     console.error('Error in getImageFromStorage:', error);
     return null;
   }
+}
+
+/**
+ * Upload a user profile image
+ * @param imageBuffer The image buffer to upload
+ * @param userId The user ID associated with the profile image
+ * @param contentType The content type of the image
+ * @returns Promise with the result of the upload
+ */
+export async function uploadProfileImage(
+  imageBuffer: Buffer,
+  userId: number,
+  contentType: string
+): Promise<{ url: string, success: boolean }> {
+  try {
+    // Create an ID that includes the type prefix
+    const imageId = generateImageId(IMAGE_TYPES.PROFILE);
+    
+    // Upload the image using the existing method
+    const result = await storageClient.uploadFromBytes(imageId, imageBuffer);
+    
+    if (!result.ok) {
+      console.error('Error uploading profile image:', result.error);
+      throw new Error('Failed to upload profile image');
+    }
+    
+    console.log(`Successfully uploaded profile image ${imageId} for user ${userId}`);
+    return { url: imageId, success: true };
+  } catch (error) {
+    console.error('Error in uploadProfileImage:', error);
+    return {
+      url: '',
+      success: false
+    };
+  }
+}
+
+/**
+ * Upload a user cover photo
+ * @param imageBuffer The image buffer to upload
+ * @param userId The user ID associated with the cover photo
+ * @param contentType The content type of the image
+ * @returns Promise with the result of the upload
+ */
+export async function uploadCoverPhoto(
+  imageBuffer: Buffer,
+  userId: number,
+  contentType: string
+): Promise<{ url: string, success: boolean }> {
+  try {
+    // Create an ID that includes the type prefix
+    const imageId = generateImageId(IMAGE_TYPES.COVER);
+    
+    // Upload the image using the existing method
+    const result = await storageClient.uploadFromBytes(imageId, imageBuffer);
+    
+    if (!result.ok) {
+      console.error('Error uploading cover photo:', result.error);
+      throw new Error('Failed to upload cover photo');
+    }
+    
+    console.log(`Successfully uploaded cover photo ${imageId} for user ${userId}`);
+    return { url: imageId, success: true };
+  } catch (error) {
+    console.error('Error in uploadCoverPhoto:', error);
+    return {
+      url: '',
+      success: false
+    };
+  }
+}
+
+/**
+ * Validate an image's dimensions and size before upload
+ * @param buffer Image buffer to validate
+ * @param maxWidth Maximum width allowed
+ * @param maxHeight Maximum height allowed
+ * @param maxSizeMB Maximum size in MB
+ * @returns Promise with validation result
+ */
+export async function validateImage(
+  buffer: Buffer,
+  maxWidth: number = 2048,
+  maxHeight: number = 2048,
+  maxSizeMB: number = 5
+): Promise<{ valid: boolean, message?: string }> {
+  // Check file size
+  if (buffer.length > maxSizeMB * 1024 * 1024) {
+    return { 
+      valid: false, 
+      message: `Image size exceeds the maximum allowed size of ${maxSizeMB}MB` 
+    };
+  }
+  
+  // Additional validation could be added here in the future
+  // such as detecting image dimensions
+  
+  return { valid: true };
 }
 
