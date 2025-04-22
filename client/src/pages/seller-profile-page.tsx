@@ -291,7 +291,6 @@ export default function SellerProfilePage() {
                   alt={`${getSellerName()} cover photo`}
                   className="w-full h-full object-cover"
                   loading="eager"
-                  fetchPriority="high"
                   itemProp="image"
                 />
               ) : (
@@ -323,7 +322,6 @@ export default function SellerProfilePage() {
                       alt={`${seller.firstName || ''} ${seller.lastName || ''} - ${seller.shopName || 'Perfume Shop'} Profile`} 
                       className="w-full h-full object-cover"
                       loading="eager" // Load profile image eagerly for SEO importance
-                      fetchPriority="high" // Give high priority to this image for loading
                       itemProp="image" // Schema.org markup
                     />
                   ) : (
