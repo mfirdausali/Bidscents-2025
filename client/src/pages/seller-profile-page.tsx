@@ -8,12 +8,12 @@ import {
   Edit,
   MessageSquare, 
   MapPin,
+  Save,
   Star, 
   Store, 
   ThumbsUp, 
   Truck, 
   Users,
-  Save,
   X
 } from "lucide-react";
 
@@ -25,13 +25,14 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { ProductCard } from "../components/ui/product-card";
 import { ProductFilters } from "../components/product-filters";
+import { ProfileEditModal } from "../components/ui/profile-edit-modal";
 import { User, ProductWithDetails } from "@shared/schema";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function SellerProfilePage() {
@@ -44,13 +45,8 @@ export default function SellerProfilePage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
-  // Edit mode states
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [formData, setFormData] = useState({
-    shopName: "",
-    location: "",
-    bio: ""
-  });
+  // Modal state
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
   // Check if the current user is the owner of this profile
   const isProfileOwner = user?.id === sellerId;
