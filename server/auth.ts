@@ -184,10 +184,17 @@ export function setupAuth(app: Express) {
         return res.status(404).json({ message: "User account not found" });
       }
 
-      // SECURITY ENHANCEMENT: Update providerId if it's not set
-      // This helps migrate existing users to the new security model
+      // Ensure the Supabase authentication is linked to our user record
+      // Handle three cases:
+      // 1. No providerId: New security system, needs to be linked
+      // 2. providerId matches: Correct authentication 
+      // 3. providerId doesn't match: Security issue, need to be careful
+
       if (!user.providerId && authData.user.id) {
+        // Case 1: First login after security update - link accounts
         try {
+          console.log(`Linking Supabase user ${authData.user.id} to local user ${user.id}`);
+          
           // Update the user record with the provider ID
           await storage.updateUser(user.id, {
             providerId: authData.user.id,
@@ -207,18 +214,31 @@ export function setupAuth(app: Express) {
             return;
           }
         } catch (updateError) {
-          console.error("Failed to update user with providerId:", updateError);
+          console.error("Failed to update user with Supabase providerId:", updateError);
           // Continue with login even if the update fails
         }
+      } 
+      else if (user.providerId === authData.user.id) {
+        // Case 2: Accounts already properly linked
+        console.log(`User ${user.username} authenticated with matching Supabase ID`);
+        req.login(user, (err) => {
+          if (err) {
+            return res.status(500).json({ message: "Session creation failed" });
+          }
+          res.status(200).json({ user });
+        });
       }
-
-      // Log in with Passport session for backward compatibility
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Session creation failed" });
-        }
-        res.status(200).json({ user });
-      });
+      else {
+        // Case 3: providerId exists but doesn't match Supabase ID - security issue
+        console.warn(`Security warning: User ${user.username} has mismatched providerId`);
+        console.warn(`DB providerId: ${user.providerId}, Supabase ID: ${authData.user.id}`);
+        
+        // For security, return a specific error to handle on the client
+        return res.status(403).json({ 
+          message: "Account authentication mismatch. Please contact support.",
+          code: "AUTH_MISMATCH"
+        });
+      }
     } catch (error: any) {
       console.error("Login error:", error);
       res.status(401).json({ message: error.message || "Authentication failed" });
@@ -324,11 +344,37 @@ export function setupAuth(app: Express) {
         // Get user from our database by email
         const user = await storage.getUserByEmail(supabaseUser.email || '');
         if (user) {
-          // SECURITY FIX: Additional validation to ensure proper authentication
-          // Check if the Supabase auth ID matches our user's providerId (if available)
-          // Otherwise, require explicit login rather than auto-session creation
-          if (user.providerId && user.providerId === supabaseUser.id) {
-            // Only create a session if the provider IDs match
+          // SECURITY FIX: Additional validation for Supabase authentication
+          // Create or update providerId field if not present
+          if (!user.providerId && supabaseUser.id) {
+            try {
+              // Update the user with the Supabase ID for proper security
+              await storage.updateUser(user.id, {
+                providerId: supabaseUser.id,
+                provider: 'supabase'
+              });
+              
+              console.log(`Updated user ${user.username} with Supabase providerId ${supabaseUser.id}`);
+              
+              // After updating, create the session since it's now secure
+              req.login(user, (err) => {
+                if (err) {
+                  return res.status(500).json({ message: "Session creation failed" });
+                }
+                return res.json({
+                  ...user,
+                  providerId: supabaseUser.id,
+                  provider: 'supabase'
+                });
+              });
+            } catch (updateError) {
+              console.error("Failed to update user with Supabase providerId:", updateError);
+              // Continue with the validation check even if update fails
+            }
+          } 
+          // If providerId already exists, validate it matches Supabase ID
+          else if (user.providerId === supabaseUser.id) {
+            // IDs match - create session
             req.login(user, (err) => {
               if (err) {
                 return res.status(500).json({ message: "Session creation failed" });
@@ -336,9 +382,9 @@ export function setupAuth(app: Express) {
               return res.json(user);
             });
           } else {
-            // User is authenticated with Supabase but not fully verified
-            // Return user data without creating a session
-            console.log("User found by email but providerId doesn't match - not creating session");
+            // User has a providerId but it doesn't match Supabase ID
+            // This is a security concern - don't create a session
+            console.log("User found by email but Supabase ID doesn't match providerId - not creating session");
             return res.status(200).json({ 
               user: user,
               authenticated: false,
