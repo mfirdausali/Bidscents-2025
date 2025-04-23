@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   shopName: text("shop_name"),
   location: text("location"),
   bio: text("bio"),
+  providerId: text("provider_id"), // Stores the ID from the auth provider (e.g., Supabase user UUID)
+  provider: text("provider"), // The authentication provider used (e.g., 'supabase', 'facebook')
 });
 
 // Categories table
@@ -122,6 +124,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   shopName: true,
   location: true,
   bio: true,
+  providerId: true, // Auth provider's user ID for secure linking
+  provider: true, // The authentication provider used
 });
 
 export const insertProductSchema = createInsertSchema(products).pick({
