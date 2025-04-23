@@ -103,6 +103,11 @@ export function setupAuth(app: Express) {
         { username, firstName, lastName }
       );
 
+      let providerId = null;
+      if (authData?.user?.id) {
+        providerId = authData.user.id;
+      }
+
       // Create user in our database too (for backward compatibility)
       // Only creating basic info, the rest will be completed after email verification
       const user = await storage.createUser({
@@ -115,7 +120,10 @@ export function setupAuth(app: Express) {
         walletBalance: 0,
         isSeller: true, // Set to true by default
         isAdmin: false,
-        isBanned: false
+        isBanned: false,
+        // Security enhancement: Store provider ID for secure authentication
+        providerId: providerId,
+        provider: 'supabase'
       });
 
       res.status(201).json({ 
@@ -176,6 +184,34 @@ export function setupAuth(app: Express) {
         return res.status(404).json({ message: "User account not found" });
       }
 
+      // SECURITY ENHANCEMENT: Update providerId if it's not set
+      // This helps migrate existing users to the new security model
+      if (!user.providerId && authData.user.id) {
+        try {
+          // Update the user record with the provider ID
+          await storage.updateUser(user.id, {
+            providerId: authData.user.id,
+            provider: 'supabase'
+          });
+          
+          // Refresh the user data after update
+          const updatedUser = await storage.getUserByEmail(email);
+          if (updatedUser) {
+            // Log in with the updated user info
+            req.login(updatedUser, (err) => {
+              if (err) {
+                return res.status(500).json({ message: "Session creation failed" });
+              }
+              return res.status(200).json({ user: updatedUser });
+            });
+            return;
+          }
+        } catch (updateError) {
+          console.error("Failed to update user with providerId:", updateError);
+          // Continue with login even if the update fails
+        }
+      }
+
       // Log in with Passport session for backward compatibility
       req.login(user, (err) => {
         if (err) {
@@ -223,17 +259,27 @@ export function setupAuth(app: Express) {
       }
 
       // First register with Supabase Auth
+      let authData;
       try {
-        await registerUserWithEmailVerification(email, password, { username });
+        authData = await registerUserWithEmailVerification(email, password, { username });
       } catch (authError: any) {
         console.error("Supabase registration error:", authError);
         return res.status(400).json({ message: authError.message || "Registration failed with auth provider" });
       }
       
-      // Then create in our database
+      // Extract the provider ID for secure authentication
+      let providerId = null;
+      if (authData?.user?.id) {
+        providerId = authData.user.id;
+      }
+      
+      // Then create in our database with security enhancement
       const user = await storage.createUser({
         username,
         email,
+        // Security enhancement - store provider ID and provider type
+        providerId: providerId,
+        provider: 'supabase',
         ...otherFields
       });
 
@@ -278,13 +324,27 @@ export function setupAuth(app: Express) {
         // Get user from our database by email
         const user = await storage.getUserByEmail(supabaseUser.email || '');
         if (user) {
-          // Log in with Passport session
-          req.login(user, (err) => {
-            if (err) {
-              return res.status(500).json({ message: "Session creation failed" });
-            }
-            return res.json(user);
-          });
+          // SECURITY FIX: Additional validation to ensure proper authentication
+          // Check if the Supabase auth ID matches our user's providerId (if available)
+          // Otherwise, require explicit login rather than auto-session creation
+          if (user.providerId && user.providerId === supabaseUser.id) {
+            // Only create a session if the provider IDs match
+            req.login(user, (err) => {
+              if (err) {
+                return res.status(500).json({ message: "Session creation failed" });
+              }
+              return res.json(user);
+            });
+          } else {
+            // User is authenticated with Supabase but not fully verified
+            // Return user data without creating a session
+            console.log("User found by email but providerId doesn't match - not creating session");
+            return res.status(200).json({ 
+              user: user,
+              authenticated: false,
+              message: "Additional authentication required"
+            });
+          }
         } else {
           return res.status(404).json({ message: "User not found" });
         }
