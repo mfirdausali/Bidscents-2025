@@ -41,6 +41,19 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// Add global error handler for unhandled rejections
+// This prevents the browser console from showing unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+  // Prevent the default browser behavior which shows error in console
+  event.preventDefault();
+  
+  // Log the error in a more controlled way
+  console.error('Handled previously unhandled promise rejection:', event.reason);
+  
+  // The error is now considered "handled" and won't show as an unhandled rejection
+  return true;
+});
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -49,9 +62,17 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: Infinity,
       retry: false,
+      // Add global error handler for all queries
+      onError: (error) => {
+        console.error('Query error (handled):', error);
+      }
     },
     mutations: {
       retry: false,
+      // Add global error handler for all mutations
+      onError: (error) => {
+        console.error('Mutation error (handled):', error);
+      }
     },
   },
 });
