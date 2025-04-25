@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
 import { Header } from "@/components/ui/header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,28 +10,24 @@ import {
 } from "@/components/ui/table";
 import { 
   Dialog, DialogContent, DialogDescription, 
-  DialogHeader, DialogTitle, DialogFooter 
+  DialogHeader, DialogTitle 
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { User, Order } from "@shared/schema";
 import { 
   Users, Package, Truck, AlertCircle, CheckCircle, 
-  UserX, UserCheck, ShoppingBag, MessageSquare
+  UserX, UserCheck, ShoppingBag 
 } from "lucide-react";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [_, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("users");
   const [userToAction, setUserToAction] = useState<User | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
   const [dialogAction, setDialogAction] = useState<"ban" | "unban" | null>(null);
-  const [messageText, setMessageText] = useState('');
   
   // Fetch all users
   const { data: users = [] } = useQuery<User[]>({
@@ -118,24 +113,6 @@ export default function AdminDashboard() {
   
   const handleUpdateOrderStatus = (orderId: number, status: string) => {
     updateOrderStatusMutation.mutate({ orderId, status });
-  };
-  
-  // Message user
-  const handleMessageUser = (targetUser: User) => {
-    setUserToAction(targetUser);
-    setIsMessageDialogOpen(true);
-    // Default admin message greeting
-    setMessageText(`Hello ${targetUser.firstName || targetUser.username},\n\nThis is an official message from the marketplace administration. `);
-  };
-  
-  const sendAdminMessage = () => {
-    if (userToAction && messageText.trim()) {
-      // Store the message in sessionStorage to pre-fill the message field
-      sessionStorage.setItem('templateMessage', messageText);
-      
-      // Navigate to messages with the user
-      navigate(`/messages?userId=${userToAction.id}`);
-    }
   };
   
   // Calculate stats
@@ -248,36 +225,25 @@ export default function AdminDashboard() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="flex space-x-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleBanUser(user)}
-                                className={user.isBanned ? "text-green-600" : "text-red-600"}
-                                disabled={user.isAdmin} // Can't ban admins
-                              >
-                                {user.isBanned ? (
-                                  <>
-                                    <UserCheck className="h-4 w-4 mr-1" />
-                                    Unban
-                                  </>
-                                ) : (
-                                  <>
-                                    <UserX className="h-4 w-4 mr-1" />
-                                    Ban
-                                  </>
-                                )}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleMessageUser(user)}
-                                className="text-blue-600"
-                              >
-                                <MessageSquare className="h-4 w-4 mr-1" />
-                                Message
-                              </Button>
-                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleBanUser(user)}
+                              className={user.isBanned ? "text-green-600" : "text-red-600"}
+                              disabled={user.isAdmin} // Can't ban admins
+                            >
+                              {user.isBanned ? (
+                                <>
+                                  <UserCheck className="h-4 w-4 mr-1" />
+                                  Unban
+                                </>
+                              ) : (
+                                <>
+                                  <UserX className="h-4 w-4 mr-1" />
+                                  Ban
+                                </>
+                              )}
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -405,47 +371,6 @@ export default function AdminDashboard() {
               {dialogAction === "ban" ? "Ban User" : "Unban User"}
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Message User Dialog */}
-      <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              <span>Send Administrative Message</span>
-            </DialogTitle>
-            <DialogDescription>
-              Send an official message to {userToAction?.username || 'this user'}. This will redirect you to the messaging page.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            <Textarea
-              placeholder="Type your message here..."
-              className="min-h-[150px]"
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground mt-2">
-              This message will appear as coming from an administrator.
-            </p>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMessageDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="default" 
-              onClick={sendAdminMessage}
-              className="bg-primary"
-              disabled={!messageText.trim()}
-            >
-              Continue to Messaging
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
