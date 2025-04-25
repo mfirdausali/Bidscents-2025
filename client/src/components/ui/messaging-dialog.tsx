@@ -134,30 +134,7 @@ export function MessagingDialog({
           </DialogTitle>
         </DialogHeader>
         
-        {/* Security Alert Banner */}
-        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md mb-2 text-sm">
-          <div className="mb-1 font-semibold text-blue-800 flex items-center">
-            <span role="img" aria-label="lock" className="mr-1">🔐</span> Stay Safe: Important Reminder
-          </div>
-          <p className="text-blue-700 text-xs mb-2">For your safety, please keep in mind:</p>
-          <ul className="text-blue-700 text-xs space-y-1 pl-4">
-            <li className="flex items-start">
-              <span role="img" aria-label="check" className="mr-1 flex-shrink-0">✅</span>
-              <span>Double check payment details before making any transfers.</span>
-            </li>
-            <li className="flex items-start">
-              <span role="img" aria-label="document" className="mr-1 flex-shrink-0">📄</span>
-              <span>Always ask for proof of purchase, such as a receipt, invoice, or original packaging.</span>
-            </li>
-            <li className="flex items-start">
-              <span role="img" aria-label="prohibited" className="mr-1 flex-shrink-0">🚫</span>
-              <span>Never share personal or banking information outside of our secure platform.</span>
-            </li>
-          </ul>
-          <p className="text-blue-700 text-xs mt-2 italic">
-            If something feels off, report the user immediately or contact us at admin@bidscents.com.
-          </p>
-        </div>
+
         
         <div className="h-[400px] overflow-y-auto p-4 border rounded-md">
           {loading ? (
@@ -170,6 +147,33 @@ export function MessagingDialog({
             </div>
           ) : (
             <>
+              {/* Security Alert Banner */}
+              <div className="w-full flex justify-center mb-4">
+                <div className="max-w-[90%] p-3 bg-blue-50 border border-blue-100 rounded-md text-sm shadow-sm">
+                  <div className="mb-1 font-semibold text-blue-800 flex items-center">
+                    <span role="img" aria-label="lock" className="mr-1">🔐</span> Stay Safe: Important Reminder
+                  </div>
+                  <p className="text-blue-700 text-xs mb-2">For your safety, please keep in mind:</p>
+                  <ul className="text-blue-700 text-xs space-y-1 pl-4">
+                    <li className="flex items-start">
+                      <span role="img" aria-label="check" className="mr-1 flex-shrink-0">✅</span>
+                      <span>Double check payment details before making any transfers.</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span role="img" aria-label="document" className="mr-1 flex-shrink-0">📄</span>
+                      <span>Always ask for proof of purchase, such as a receipt, invoice, or original packaging.</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span role="img" aria-label="prohibited" className="mr-1 flex-shrink-0">🚫</span>
+                      <span>Never share personal or banking information outside of our secure platform.</span>
+                    </li>
+                  </ul>
+                  <p className="text-blue-700 text-xs mt-2 italic">
+                    If something feels off, report the user immediately or contact us at admin@bidscents.com.
+                  </p>
+                </div>
+              </div>
+
               {conversation.map((msg) => {
                 const isOwnMessage = msg.senderId === user?.id;
                 return (
