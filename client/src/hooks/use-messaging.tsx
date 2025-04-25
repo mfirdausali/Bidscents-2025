@@ -501,6 +501,28 @@ export function useMessaging() {
     }
   }, [user, toast]);
 
+  // Helper function to check if a user can send more messages
+  const canSendMoreMessages = useCallback((receiverId: number, productId?: number) => {
+    const conversationKey = productId ? `${receiverId}-${productId}` : `${receiverId}`;
+    const messageInfo = messageCountMap[conversationKey];
+    
+    // If no message info yet, or if seller has already replied, user can send messages
+    if (!messageInfo || messageInfo.hasSellerReplied) {
+      return {
+        canSend: true,
+        remainingMessages: 5,
+        hasSellerReplied: messageInfo?.hasSellerReplied || false
+      };
+    }
+    
+    const remainingMessages = Math.max(0, 5 - messageInfo.count);
+    return {
+      canSend: remainingMessages > 0,
+      remainingMessages,
+      hasSellerReplied: false
+    };
+  }, [messageCountMap]);
+
   return {
     connected,
     messages,
@@ -509,5 +531,7 @@ export function useMessaging() {
     sendMessage,
     markAsRead,
     getConversation,
+    canSendMoreMessages,
+    messageCountMap,
   };
 }
