@@ -53,13 +53,17 @@ export function ContactSellerButton({
       return;
     }
 
-    // Store the selected seller information in sessionStorage to be picked up by the messages page
+    // Create a template message for the conversation
+    const templateMessage = `Hi ${sellerName}, I am interested in buying "${productName}" from you.`;
+    
+    // Store the selected seller information and template message in sessionStorage to be picked up by the messages page
     sessionStorage.setItem('selectedConversation', JSON.stringify({
       userId: sellerId,
       username: sellerName,
       profileImage: sellerImage || null,
       productId,
-      productName
+      productName,
+      templateMessage
     }));
     
     // Navigate to messages page

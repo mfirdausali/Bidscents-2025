@@ -153,6 +153,12 @@ export default function MessagesPage() {
         const conversationData = JSON.parse(savedConversation);
         // Set the selected conversation from sessionStorage
         setSelectedConversation(conversationData);
+        
+        // Set template message if coming from a product card/detail page
+        if (conversationData.templateMessage) {
+          setMessageText(conversationData.templateMessage);
+        }
+        
         // Load the conversation messages
         loadConversation(conversationData.userId, conversationData.productId);
         // Clear the storage after using it
