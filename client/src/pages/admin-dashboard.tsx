@@ -18,7 +18,7 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { User, Order } from "@shared/schema";
 import { 
   Users, Package, Truck, AlertCircle, CheckCircle, 
-  UserX, UserCheck, ShoppingBag 
+  UserX, UserCheck, ShoppingBag, MessageSquare
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -225,25 +225,37 @@ export default function AdminDashboard() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleBanUser(user)}
-                              className={user.isBanned ? "text-green-600" : "text-red-600"}
-                              disabled={user.isAdmin} // Can't ban admins
-                            >
-                              {user.isBanned ? (
-                                <>
-                                  <UserCheck className="h-4 w-4 mr-1" />
-                                  Unban
-                                </>
-                              ) : (
-                                <>
-                                  <UserX className="h-4 w-4 mr-1" />
-                                  Ban
-                                </>
-                              )}
-                            </Button>
+                            <div className="flex space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleBanUser(user)}
+                                className={user.isBanned ? "text-green-600" : "text-red-600"}
+                                disabled={user.isAdmin} // Can't ban admins
+                              >
+                                {user.isBanned ? (
+                                  <>
+                                    <UserCheck className="h-4 w-4 mr-1" />
+                                    Unban
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserX className="h-4 w-4 mr-1" />
+                                    Ban
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleMessageUser(user)}
+                                className="text-blue-600"
+                                disabled={user.id === currentUser?.id} // Can't message yourself
+                              >
+                                <MessageSquare className="h-4 w-4 mr-1" />
+                                Message
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
