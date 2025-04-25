@@ -89,27 +89,16 @@ export function MessagingDialog({
     }
   };
   
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     if (!messageText.trim() || !user?.id) return;
     
-    try {
-      const sent = await sendMessage(receiverId, messageText, productId);
-      if (sent) {
-        setMessageText('');
-        // Refresh the conversation
-        loadConversation();
-      } else {
-        toast({
-          title: 'Message Not Sent',
-          description: 'Failed to send your message. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
+    const sent = sendMessage(receiverId, messageText, productId);
+    if (sent) {
+      setMessageText('');
+    } else {
       toast({
-        title: 'Message Error',
-        description: 'There was an error sending your message. Please try again.',
+        title: 'Message Not Sent',
+        description: 'Failed to send your message. Please try again.',
         variant: 'destructive',
       });
     }
