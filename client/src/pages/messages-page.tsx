@@ -122,8 +122,8 @@ export default function MessagesPage() {
           markAsRead(undefined, userId);
         }
         
-        // Check message limit status
-        const status = canSendMoreMessages(userId, productId);
+        // Check message limit status - canSendMoreMessages is now async
+        const status = await canSendMoreMessages(userId, productId);
         setMessageStatus(status);
       } else {
         setActiveChat([]);
@@ -222,7 +222,7 @@ export default function MessagesPage() {
   }, [loadConversation]);
   
   // Handle sending a message
-  const handleSendMessage = useCallback(() => {
+  const handleSendMessage = useCallback(async () => {
     if (!messageText.trim() || !user?.id || !selectedConversation) return;
     
     // Check if the user can send more messages
@@ -235,7 +235,24 @@ export default function MessagesPage() {
       return;
     }
     
-    const sent = sendMessage(
+    // Get the latest message status before sending
+    const currentStatus = await canSendMoreMessages(
+      selectedConversation.userId,
+      selectedConversation.productId
+    );
+    
+    // Final check with the latest data
+    if (!currentStatus.canSend) {
+      toast({
+        title: 'Message Limit Reached',
+        description: 'You can send up to 5 messages until the seller responds. Please wait for a reply.',
+        variant: 'destructive',
+      });
+      setMessageStatus(currentStatus);
+      return;
+    }
+    
+    const sent = await sendMessage(
       selectedConversation.userId, 
       messageText, 
       selectedConversation.productId
@@ -244,16 +261,8 @@ export default function MessagesPage() {
     if (sent) {
       setMessageText('');
       
-      // Update local message status to reflect the sent message
-      if (!messageStatus.hasSellerReplied) {
-        setMessageStatus(prev => ({
-          ...prev,
-          remainingMessages: Math.max(0, prev.remainingMessages - 1),
-          canSend: prev.remainingMessages > 1 // Will there be messages left after this one
-        }));
-      }
-      
-      // No need to refresh - WebSocket will deliver the message and we'll update state
+      // After sending, refresh the conversation to get the updated message limit
+      loadConversation(selectedConversation.userId, selectedConversation.productId);
     } else {
       toast({
         title: 'Message Not Sent',
@@ -261,7 +270,7 @@ export default function MessagesPage() {
         variant: 'destructive',
       });
     }
-  }, [messageText, user?.id, selectedConversation, sendMessage, toast, messageStatus]);
+  }, [messageText, user?.id, selectedConversation, sendMessage, toast, messageStatus, canSendMoreMessages, loadConversation]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {

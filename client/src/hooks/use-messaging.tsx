@@ -62,12 +62,6 @@ export function useMessaging() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  
-  // State to track conversation message limits
-  const [messageCountMap, setMessageCountMap] = useState<Record<string, {
-    count: number,
-    hasSellerReplied: boolean
-  }>>({});
 
   // Connect to WebSocket with retry mechanism
   useEffect(() => {
@@ -295,7 +289,7 @@ export function useMessaging() {
   }, [user, toast]);
 
   // Send a message
-  const sendMessage = useCallback((receiverId: number, content: string, productId?: number) => {
+  const sendMessage = useCallback(async (receiverId: number, content: string, productId?: number) => {
     console.log('Attempting to send message to receiverId:', receiverId, 'with productId:', productId);
     
     if (!socketRef.current) {
@@ -328,21 +322,79 @@ export function useMessaging() {
       return false;
     }
     
-    // Check if the buyer has reached the message limit before seller's first reply
-    const conversationKey = productId ? `${receiverId}-${productId}` : `${receiverId}`;
-    const messageInfo = messageCountMap[conversationKey];
-    
-    // If we have message info and seller hasn't replied yet, check the count
-    if (messageInfo && !messageInfo.hasSellerReplied && messageInfo.count >= 5) {
-      toast({
-        title: 'Message Limit Reached',
-        description: 'You can send up to 5 messages until the seller responds. Please wait for a reply.',
-        variant: 'destructive',
-      });
-      return false;
+    // Skip the check for sellers, they can always send messages
+    if (user.isSeller) {
+      try {
+        const message: WebSocketSendMessage = {
+          type: 'send_message',
+          receiverId,
+          content,
+          ...(productId && { productId }),
+        };
+  
+        console.log('Sending WebSocket message:', message);
+        const messageJson = JSON.stringify(message);
+        console.log('Serialized message:', messageJson);
+        
+        socketRef.current.send(messageJson);
+        console.log('Message sent successfully');
+        return true;
+      } catch (error) {
+        console.error('Error sending message:', error);
+        toast({
+          title: 'Send Error',
+          description: 'Failed to send your message. Please try again.',
+          variant: 'destructive',
+        });
+        return false;
+      }
     }
-
+    
+    // For buyers, check the message limit directly from conversation history
     try {
+      // First, check if the seller has already replied in this conversation
+      let url = `/api/messages/conversation/${receiverId}`;
+      if (productId) {
+        url += `?productId=${productId}`;
+      }
+      
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Failed to check conversation: ${res.status}`);
+      }
+      
+      const conversationData = await res.json() as Message[];
+      
+      // Check if the seller has replied
+      const hasSellerReplied = conversationData.some(msg => msg.senderId === receiverId);
+      
+      // If seller has replied, no limit applies
+      if (hasSellerReplied) {
+        const message: WebSocketSendMessage = {
+          type: 'send_message',
+          receiverId,
+          content,
+          ...(productId && { productId }),
+        };
+  
+        socketRef.current.send(JSON.stringify(message));
+        return true;
+      }
+      
+      // Count messages sent by the current user to this receiver
+      const sentMessageCount = conversationData.filter(msg => msg.senderId === user.id).length;
+      
+      // If already 5 or more messages sent without a reply, block sending
+      if (sentMessageCount >= 5) {
+        toast({
+          title: 'Message Limit Reached',
+          description: 'You can send up to 5 messages until the seller responds. Please wait for a reply.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+      
+      // If under the limit, allow sending
       const message: WebSocketSendMessage = {
         type: 'send_message',
         receiverId,
@@ -350,36 +402,23 @@ export function useMessaging() {
         ...(productId && { productId }),
       };
 
-      console.log('Sending WebSocket message:', message);
-      const messageJson = JSON.stringify(message);
-      console.log('Serialized message:', messageJson);
-      
-      socketRef.current.send(messageJson);
-      console.log('Message sent successfully');
-      
-      // Update the message count for this conversation
-      setMessageCountMap(prev => {
-        const currentInfo = prev[conversationKey] || { count: 0, hasSellerReplied: false };
-        return {
-          ...prev,
-          [conversationKey]: {
-            count: currentInfo.count + 1,
-            hasSellerReplied: currentInfo.hasSellerReplied
-          }
-        };
-      });
-      
+      socketRef.current.send(JSON.stringify(message));
       return true;
+      
     } catch (error) {
-      console.error('Error sending message:', error);
-      toast({
-        title: 'Send Error',
-        description: 'Failed to send your message. Please try again.',
-        variant: 'destructive',
-      });
-      return false;
+      console.error('Error checking message limits:', error);
+      // Allow sending the message if we can't check the limit
+      const message: WebSocketSendMessage = {
+        type: 'send_message',
+        receiverId,
+        content,
+        ...(productId && { productId }),
+      };
+
+      socketRef.current.send(JSON.stringify(message));
+      return true;
     }
-  }, [user, toast, messageCountMap]);
+  }, [user, toast]);
 
   // Mark a message as read
   const markAsRead = useCallback((messageId?: number, senderId?: number) => {
@@ -471,33 +510,6 @@ export function useMessaging() {
       const data = await res.json() as Message[];
       console.log('Conversation data received:', data);
       
-      // Update message count and seller reply status for this conversation
-      const conversationKey = productId ? `${userId}-${productId}` : `${userId}`;
-      
-      let hasSellerReplied = false;
-      
-      // If this is a buyer viewing messages
-      if (!user.isSeller) {
-        // Check if the seller has replied by checking if any messages are from them
-        hasSellerReplied = data.some(msg => msg.senderId === userId);
-      } else {
-        // If this is a seller, check if the buyer has sent any messages
-        // (this isn't used for limits but completes the data model)
-        hasSellerReplied = data.some(msg => msg.senderId === userId);
-      }
-      
-      // Count messages sent by the current user 
-      const userMessageCount = data.filter(msg => msg.senderId === user.id).length;
-      
-      // Update the message count and seller reply status
-      setMessageCountMap(prev => ({
-        ...prev,
-        [conversationKey]: {
-          count: userMessageCount,
-          hasSellerReplied
-        }
-      }));
-      
       return data;
     } catch (error: any) {
       console.error('Error fetching conversation:', error);
@@ -511,9 +523,17 @@ export function useMessaging() {
   }, [user, toast]);
 
   // Helper function to check if a user can send more messages
-  const canSendMoreMessages = useCallback((receiverId: number, productId?: number) => {
-    // If this is the seller sending messages to a buyer, always allow it
-    if (user?.isSeller) {
+  const canSendMoreMessages = useCallback(async (receiverId: number, productId?: number) => {
+    if (!user) {
+      return {
+        canSend: false,
+        remainingMessages: 0,
+        hasSellerReplied: false
+      };
+    }
+    
+    // If user is a seller, they can always send messages
+    if (user.isSeller) {
       return {
         canSend: true,
         remainingMessages: 5,
@@ -521,25 +541,51 @@ export function useMessaging() {
       };
     }
     
-    const conversationKey = productId ? `${receiverId}-${productId}` : `${receiverId}`;
-    const messageInfo = messageCountMap[conversationKey];
-    
-    // If no message info yet, or if seller has already replied, user can send messages
-    if (!messageInfo || messageInfo.hasSellerReplied) {
+    try {
+      // Query the conversation directly
+      let url = `/api/messages/conversation/${receiverId}`;
+      if (productId) {
+        url += `?productId=${productId}`;
+      }
+      
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Failed to check conversation: ${res.status}`);
+      }
+      
+      const conversationData = await res.json() as Message[];
+      
+      // Check if the seller has replied by checking if any messages are from them
+      const hasSellerReplied = conversationData.some(msg => msg.senderId === receiverId);
+      
+      // If seller has replied, no limit applies
+      if (hasSellerReplied) {
+        return {
+          canSend: true,
+          remainingMessages: 5,
+          hasSellerReplied: true
+        };
+      }
+      
+      // Count messages sent by the current user
+      const sentMessageCount = conversationData.filter(msg => msg.senderId === user.id).length;
+      const remainingMessages = Math.max(0, 5 - sentMessageCount);
+      
+      return {
+        canSend: remainingMessages > 0,
+        remainingMessages,
+        hasSellerReplied: false
+      };
+    } catch (error) {
+      console.error('Error checking message limits:', error);
+      // Allow sending if we can't check the limit
       return {
         canSend: true,
         remainingMessages: 5,
-        hasSellerReplied: messageInfo?.hasSellerReplied || false
+        hasSellerReplied: false
       };
     }
-    
-    const remainingMessages = Math.max(0, 5 - messageInfo.count);
-    return {
-      canSend: remainingMessages > 0,
-      remainingMessages,
-      hasSellerReplied: false
-    };
-  }, [messageCountMap, user?.isSeller]);
+  }, [user]);
 
   return {
     connected,
@@ -549,7 +595,6 @@ export function useMessaging() {
     sendMessage,
     markAsRead,
     getConversation,
-    canSendMoreMessages,
-    messageCountMap,
+    canSendMoreMessages
   };
 }
