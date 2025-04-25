@@ -474,10 +474,19 @@ export function useMessaging() {
       // Update message count and seller reply status for this conversation
       const conversationKey = productId ? `${userId}-${productId}` : `${userId}`;
       
-      // Check if the seller has replied by checking if any messages are from them
-      const hasSellerReplied = data.some(msg => msg.senderId === userId);
+      let hasSellerReplied = false;
       
-      // Count messages sent by the current user to this seller
+      // If this is a buyer viewing messages
+      if (!user.isSeller) {
+        // Check if the seller has replied by checking if any messages are from them
+        hasSellerReplied = data.some(msg => msg.senderId === userId);
+      } else {
+        // If this is a seller, check if the buyer has sent any messages
+        // (this isn't used for limits but completes the data model)
+        hasSellerReplied = data.some(msg => msg.senderId === userId);
+      }
+      
+      // Count messages sent by the current user 
       const userMessageCount = data.filter(msg => msg.senderId === user.id).length;
       
       // Update the message count and seller reply status
@@ -503,6 +512,15 @@ export function useMessaging() {
 
   // Helper function to check if a user can send more messages
   const canSendMoreMessages = useCallback((receiverId: number, productId?: number) => {
+    // If this is the seller sending messages to a buyer, always allow it
+    if (user?.isSeller) {
+      return {
+        canSend: true,
+        remainingMessages: 5,
+        hasSellerReplied: true
+      };
+    }
+    
     const conversationKey = productId ? `${receiverId}-${productId}` : `${receiverId}`;
     const messageInfo = messageCountMap[conversationKey];
     
@@ -521,7 +539,7 @@ export function useMessaging() {
       remainingMessages,
       hasSellerReplied: false
     };
-  }, [messageCountMap]);
+  }, [messageCountMap, user?.isSeller]);
 
   return {
     connected,
