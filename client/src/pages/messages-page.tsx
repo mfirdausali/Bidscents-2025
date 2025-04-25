@@ -149,13 +149,22 @@ export default function MessagesPage() {
     // Check if there's a selected conversation in session storage
     try {
       const savedConversation = sessionStorage.getItem('selectedConversation');
+      const directTemplateMessage = sessionStorage.getItem('templateMessage');
+      
+      // First check for direct template message (for admin messages)
+      if (directTemplateMessage) {
+        setMessageText(directTemplateMessage);
+        sessionStorage.removeItem('templateMessage');
+      }
+      
+      // Next check for selected conversation data
       if (savedConversation) {
         const conversationData = JSON.parse(savedConversation);
         // Set the selected conversation from sessionStorage
         setSelectedConversation(conversationData);
         
-        // Set template message if coming from a product card/detail page
-        if (conversationData.templateMessage) {
+        // Set template message if coming from a product card/detail page and we don't already have a direct template
+        if (conversationData.templateMessage && !directTemplateMessage) {
           setMessageText(conversationData.templateMessage);
         }
         
@@ -164,10 +173,30 @@ export default function MessagesPage() {
         // Clear the storage after using it
         sessionStorage.removeItem('selectedConversation');
       }
+      
+      // Check URL parameters for direct conversation navigation (for admin dashboard redirect)
+      const urlParams = new URLSearchParams(window.location.search);
+      const userIdParam = urlParams.get('userId');
+      if (userIdParam && !savedConversation) {
+        const userId = parseInt(userIdParam);
+        // Load conversation with this user
+        const found = conversations.find(c => c.userId === userId);
+        if (found) {
+          selectConversation(found);
+        } else {
+          // If we can't find the user in existing conversations, attempt to load anyway
+          setSelectedConversation({
+            userId: userId,
+            username: 'User ' + userId,
+            profileImage: null
+          });
+          loadConversation(userId);
+        }
+      }
     } catch (error) {
       console.error('Error loading saved conversation:', error);
     }
-  }, [user, toast, setLocation, loadConversation]);
+  }, [user, toast, setLocation, loadConversation, conversations, selectConversation]);
   
   // Format timestamp for messages
   const formatMessageTime = (timestamp: string | Date) => {
