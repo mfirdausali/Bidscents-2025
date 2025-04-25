@@ -239,7 +239,7 @@ export default function AdminDashboard() {
                               <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Active</span>
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="space-x-2">
                             <Button 
                               variant="outline" 
                               size="sm"
@@ -258,6 +258,15 @@ export default function AdminDashboard() {
                                   Ban
                                 </>
                               )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleMessageUser(user)}
+                              className="text-blue-600"
+                            >
+                              <MessageSquare className="h-4 w-4 mr-1" />
+                              Message
                             </Button>
                           </TableCell>
                         </TableRow>
