@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { Header } from "@/components/ui/header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,12 +19,13 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { User, Order } from "@shared/schema";
 import { 
   Users, Package, Truck, AlertCircle, CheckCircle, 
-  UserX, UserCheck, ShoppingBag 
+  UserX, UserCheck, ShoppingBag, MessageSquare
 } from "lucide-react";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("users");
   const [userToAction, setUserToAction] = useState<User | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -113,6 +115,19 @@ export default function AdminDashboard() {
   
   const handleUpdateOrderStatus = (orderId: number, status: string) => {
     updateOrderStatusMutation.mutate({ orderId, status });
+  };
+
+  // Handler for messaging a user
+  const handleMessageUser = (targetUser: User) => {
+    // Store user data in sessionStorage to be accessed by the messages page
+    sessionStorage.setItem("selectedConversation", JSON.stringify({
+      userId: targetUser.id,
+      username: targetUser.username,
+      isAdmin: targetUser.isAdmin
+    }));
+    
+    // Redirect to messages page
+    setLocation("/messages");
   };
   
   // Calculate stats
