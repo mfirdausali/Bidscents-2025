@@ -14,7 +14,7 @@ import { MessageSquare, ArrowLeft, RefreshCw, Send, User } from 'lucide-react';
 
 export default function MessagesPage() {
   const { user } = useAuth();
-  const { messages, loading, error, sendMessage, getConversation, markAsRead, canSendMoreMessages } = useMessaging();
+  const { messages, loading, error, sendMessage, getConversation, markAsRead } = useMessaging();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [messageText, setMessageText] = useState('');
@@ -25,11 +25,6 @@ export default function MessagesPage() {
     productId?: number;
     productName?: string;
   } | null>(null);
-  const [messageStatus, setMessageStatus] = useState<{
-    canSend: boolean;
-    remainingMessages: number;
-    hasSellerReplied: boolean;
-  }>({ canSend: true, remainingMessages: 5, hasSellerReplied: false });
   const [activeChat, setActiveChat] = useState<Message[]>([]);
   const [loadingChat, setLoadingChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -121,10 +116,6 @@ export default function MessagesPage() {
         if (unreadMessages.length > 0) {
           markAsRead(undefined, userId);
         }
-        
-        // Check message limit status - canSendMoreMessages is now async
-        const status = await canSendMoreMessages(userId, productId);
-        setMessageStatus(status);
       } else {
         setActiveChat([]);
         console.error('Invalid conversation data format');
@@ -141,7 +132,7 @@ export default function MessagesPage() {
       // Close mobile menu when conversation is loaded
       setIsMobileMenuOpen(false);
     }
-  }, [user?.id, getConversation, markAsRead, toast, canSendMoreMessages]);
+  }, [user?.id, getConversation, markAsRead, toast]);
 
   // Check if user is authenticated and handle pre-selected conversation
   useEffect(() => {
@@ -222,37 +213,10 @@ export default function MessagesPage() {
   }, [loadConversation]);
   
   // Handle sending a message
-  const handleSendMessage = useCallback(async () => {
+  const handleSendMessage = useCallback(() => {
     if (!messageText.trim() || !user?.id || !selectedConversation) return;
     
-    // Check if the user can send more messages
-    if (!messageStatus.canSend) {
-      toast({
-        title: 'Message Limit Reached',
-        description: 'You can send up to 5 messages until the seller responds. Please wait for a reply.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    // Get the latest message status before sending
-    const currentStatus = await canSendMoreMessages(
-      selectedConversation.userId,
-      selectedConversation.productId
-    );
-    
-    // Final check with the latest data
-    if (!currentStatus.canSend) {
-      toast({
-        title: 'Message Limit Reached',
-        description: 'You can send up to 5 messages until the seller responds. Please wait for a reply.',
-        variant: 'destructive',
-      });
-      setMessageStatus(currentStatus);
-      return;
-    }
-    
-    const sent = await sendMessage(
+    const sent = sendMessage(
       selectedConversation.userId, 
       messageText, 
       selectedConversation.productId
@@ -260,9 +224,7 @@ export default function MessagesPage() {
     
     if (sent) {
       setMessageText('');
-      
-      // After sending, refresh the conversation to get the updated message limit
-      loadConversation(selectedConversation.userId, selectedConversation.productId);
+      // No need to refresh - WebSocket will deliver the message and we'll update state
     } else {
       toast({
         title: 'Message Not Sent',
@@ -270,7 +232,7 @@ export default function MessagesPage() {
         variant: 'destructive',
       });
     }
-  }, [messageText, user?.id, selectedConversation, sendMessage, toast, messageStatus, canSendMoreMessages, loadConversation]);
+  }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
@@ -291,18 +253,6 @@ export default function MessagesPage() {
       
       // If we have new messages, add them to the activeChat state
       if (newMessages.length > 0) {
-        // Check if any messages are from the seller (which means they've replied)
-        const sellerMessages = newMessages.filter(msg => msg.senderId === selectedConversation.userId);
-        
-        // If seller has replied, update message status to allow unlimited future messages
-        if (sellerMessages.length > 0 && !messageStatus.hasSellerReplied) {
-          setMessageStatus({
-            canSend: true,
-            remainingMessages: 5,
-            hasSellerReplied: true
-          });
-        }
-        
         setActiveChat(prev => {
           // Sort messages by creation time (oldest first)
           return [...prev, ...newMessages].sort((a, b) => 
@@ -311,7 +261,7 @@ export default function MessagesPage() {
         });
       }
     }
-  }, [messages, selectedConversation, user?.id, activeChat, messageStatus.hasSellerReplied]);
+  }, [messages, selectedConversation, user?.id, activeChat]);
   
   if (!user) {
     return (
@@ -568,23 +518,6 @@ export default function MessagesPage() {
                 
                 {/* Message Input Area - Fixed at bottom */}
                 <div className="p-3 border-t flex-shrink-0 bg-background">
-                  {/* Message limit indicator */}
-                  {!messageStatus.hasSellerReplied && (
-                    <div className={`text-xs mb-2 ${messageStatus.remainingMessages <= 1 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {messageStatus.remainingMessages > 0 ? (
-                        <>
-                          <span className="font-medium">
-                            {messageStatus.remainingMessages} message{messageStatus.remainingMessages !== 1 ? 's' : ''} remaining
-                          </span> until seller responds
-                        </>
-                      ) : (
-                        <span className="font-medium">
-                          Message limit reached. Please wait for seller to respond.
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  
                   <div className="flex items-center space-x-2">
                     <Input
                       value={messageText}
@@ -597,11 +530,10 @@ export default function MessagesPage() {
                           handleSendMessage();
                         }
                       }}
-                      disabled={!messageStatus.canSend}
                     />
                     <Button 
                       onClick={handleSendMessage} 
-                      disabled={!messageText.trim() || loadingChat || !messageStatus.canSend} 
+                      disabled={!messageText.trim() || loadingChat} 
                       size="icon"
                       className="h-10 w-10 rounded-full"
                     >
