@@ -18,6 +18,7 @@ import AuthCallback from "@/pages/auth-callback";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import TermsOfServicePage from "./pages/terms-of-service";
+import PrivacyPolicyPage from "./pages/privacy-policy"; // Added import
 
 function Router() {
   return (
@@ -37,6 +38,7 @@ function Router() {
       <ProtectedRoute path="/seller/dashboard" component={SellerDashboard} />
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} />
       <Route path="/terms-of-service" component={TermsOfServicePage} />
+      <Route path="/privacy-policy" component={PrivacyPolicyPage} /> {/* Added Privacy Policy route */}
       <Route component={NotFound} />
     </Switch>
   );
