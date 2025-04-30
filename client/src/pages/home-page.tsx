@@ -14,7 +14,7 @@ import { ProductCard } from "@/components/ui/product-card";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Input } from "@/components/ui/input";
-import { Loader2, Star, StarHalf, Diamond, MapPin, Flame } from "lucide-react";
+import { Loader2, Star, StarHalf, Diamond, MapPin, Flame, RefreshCw, Lock } from "lucide-react";
 import { FeaturedProductCarousel } from "@/components/ui/featured-product-carousel";
 
 export default function HomePage() {
@@ -238,78 +238,38 @@ export default function HomePage() {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Step 1 */}
             <div className="bg-white p-6 rounded-lg shadow-sm text-center">
               <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-8 w-8"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+                <RefreshCw className="h-8 w-8" />
               </div>
-              <h3 className="text-xl font-bold mb-3">Authentication</h3>
+              <h3 className="text-xl font-bold mb-3">Swap market</h3>
               <p className="text-gray-600">
-                Every perfume is verified through batch code validation and
-                expert review before it's listed on our platform.
+                Swap your own fragrance with others without spending any money
+                at all
               </p>
             </div>
 
             {/* Step 2 */}
             <div className="bg-white p-6 rounded-lg shadow-sm text-center">
               <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-8 w-8"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                </svg>
+                <Lock className="h-8 w-8" />
               </div>
               <h3 className="text-xl font-bold mb-3">Secure Payments</h3>
               <p className="text-gray-600">
-                Our escrow payment system via Billplz protects both buyers and
-                sellers throughout the transaction.
+                Our escrow payment system protects both buyers and sellers
+                throughout the transaction.
               </p>
             </div>
 
             {/* Step 3 */}
             <div className="bg-white p-6 rounded-lg shadow-sm text-center">
               <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-8 w-8"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                  />
-                </svg>
+                <Lock className="h-8 w-8" />
               </div>
-              <h3 className="text-xl font-bold mb-3">Safe Delivery</h3>
+              <h3 className="text-xl font-bold mb-3">Authentication Guide</h3>
               <p className="text-gray-600">
-                Track your package every step of the way with our integrated
-                shipping partners across Malaysia.
+                We will show you how to spot fake perfumes through packaging,
+                scent, and price.
               </p>
             </div>
           </div>
