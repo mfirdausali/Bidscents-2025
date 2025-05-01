@@ -591,13 +591,22 @@ export default function SellerDashboard() {
     };
     
     // Create auction data with proper type handling
+    // Format the date as 'YYYY-MM-DD HH:MM:SS'
+    const date = data.auctionEndDate instanceof Date ? data.auctionEndDate : new Date(data.auctionEndDate);
+    const formattedDate = date.getFullYear() + '-' + 
+                         String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+                         String(date.getDate()).padStart(2, '0') + ' ' + 
+                         String(date.getHours()).padStart(2, '0') + ':' + 
+                         String(date.getMinutes()).padStart(2, '0') + ':' + 
+                         String(date.getSeconds()).padStart(2, '0');
+    
     const auctionData = {
       productId: 0, // Will be replaced with actual product ID after product creation
       startingPrice: data.startingPrice,
       reservePrice: data.reservePrice,
       buyNowPrice: data.buyNowPrice,
       bidIncrement: data.bidIncrement,
-      endsAt: data.auctionEndDate instanceof Date ? data.auctionEndDate.toISOString() : new Date(data.auctionEndDate).toISOString(),
+      endsAt: formattedDate,
       status: "active"
     } as InsertAuction;
     
@@ -1131,65 +1140,81 @@ export default function SellerDashboard() {
             <form onSubmit={listingTypeForm.handleSubmit(onSelectListingType)} className="space-y-6">
               <div className="grid grid-cols-1 gap-4">
                 <div className="flex flex-col space-y-4">
-                  <div 
-                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                      listingTypeForm.watch("listingType") === "fixed" 
-                        ? "border-gold bg-gold/10 text-black" 
-                        : "border-gray-200 hover:border-gold/50 text-gray-800"
-                    }`}
-                    onClick={() => listingTypeForm.setValue("listingType", "fixed")}
-                  >
-                    <div className="flex items-center">
-                      <div className={`w-5 h-5 rounded-full border mr-3 flex items-center justify-center ${
-                        listingTypeForm.watch("listingType") === "fixed" 
-                          ? "border-gold" 
-                          : "border-gray-500"
-                      }`}>
-                        {listingTypeForm.watch("listingType") === "fixed" && (
-                          <div className="w-3 h-3 rounded-full bg-gold" />
-                        )}
+                  {/* Fixed Price Option */}
+                  <FormField
+                    control={listingTypeForm.control}
+                    name="listingType"
+                    render={({ field }) => (
+                      <div className="space-y-4">
+                        <div 
+                          className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                            field.value === "fixed" 
+                              ? "border-gold bg-gold/10 text-black" 
+                              : "border-gray-200 hover:border-gold/50 text-gray-800"
+                          }`}
+                          onClick={() => field.onChange("fixed")}
+                        >
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <input
+                                type="radio"
+                                checked={field.value === "fixed"}
+                                onChange={() => field.onChange("fixed")}
+                                className="h-5 w-5 text-gold cursor-pointer accent-gold"
+                                id="fixed-price-option"
+                              />
+                            </FormControl>
+                            <div className="flex-1">
+                              <FormLabel 
+                                htmlFor="fixed-price-option"
+                                className="font-medium cursor-pointer flex items-center text-base"
+                              >
+                                <Tag className="mr-2 h-5 w-5" /> 
+                                Fixed Price
+                              </FormLabel>
+                              <p className="text-sm text-gray-600 mt-1">
+                                Set a specific price for immediate purchase
+                              </p>
+                            </div>
+                          </FormItem>
+                        </div>
+                        
+                        {/* Auction Option */}
+                        <div 
+                          className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                            field.value === "auction" 
+                              ? "border-gold bg-gold/10 text-black" 
+                              : "border-gray-200 hover:border-gold/50 text-gray-800"
+                          }`}
+                          onClick={() => field.onChange("auction")}
+                        >
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <input
+                                type="radio"
+                                checked={field.value === "auction"}
+                                onChange={() => field.onChange("auction")}
+                                className="h-5 w-5 text-gold cursor-pointer accent-gold"
+                                id="auction-option"
+                              />
+                            </FormControl>
+                            <div className="flex-1">
+                              <FormLabel 
+                                htmlFor="auction-option"
+                                className="font-medium cursor-pointer flex items-center text-base"
+                              >
+                                <Timer className="mr-2 h-5 w-5" /> 
+                                Auction
+                              </FormLabel>
+                              <p className="text-sm text-gray-600 mt-1">
+                                Allow buyers to bid, potentially increasing final price
+                              </p>
+                            </div>
+                          </FormItem>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium flex items-center">
-                          <Tag className="mr-2 h-5 w-5" /> 
-                          Fixed Price
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Set a specific price for immediate purchase
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                      listingTypeForm.watch("listingType") === "auction" 
-                        ? "border-gold bg-gold/10 text-black" 
-                        : "border-gray-200 hover:border-gold/50 text-gray-800"
-                    }`}
-                    onClick={() => listingTypeForm.setValue("listingType", "auction")}
-                  >
-                    <div className="flex items-center">
-                      <div className={`w-5 h-5 rounded-full border mr-3 flex items-center justify-center ${
-                        listingTypeForm.watch("listingType") === "auction" 
-                          ? "border-gold" 
-                          : "border-gray-500"
-                      }`}>
-                        {listingTypeForm.watch("listingType") === "auction" && (
-                          <div className="w-3 h-3 rounded-full bg-gold" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium flex items-center">
-                          <Timer className="mr-2 h-5 w-5" /> 
-                          Auction
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Allow buyers to bid, potentially increasing final price
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                    )}
+                  />
                 </div>
               </div>
               
