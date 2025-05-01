@@ -14,7 +14,17 @@ import { ProductCard } from "@/components/ui/product-card";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Input } from "@/components/ui/input";
-import { Loader2, Star, StarHalf, Diamond, MapPin, Flame, RefreshCw, Lock } from "lucide-react";
+import {
+  Loader2,
+  Star,
+  StarHalf,
+  Diamond,
+  MapPin,
+  Flame,
+  RefreshCw,
+  Search,
+  Lock,
+} from "lucide-react";
 import { FeaturedProductCarousel } from "@/components/ui/featured-product-carousel";
 
 export default function HomePage() {
@@ -264,7 +274,7 @@ export default function HomePage() {
             {/* Step 3 */}
             <div className="bg-white p-6 rounded-lg shadow-sm text-center">
               <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="h-8 w-8" />
+                <Search className="h-8 w-8" />
               </div>
               <h3 className="text-xl font-bold mb-3">Authentication Guide</h3>
               <p className="text-gray-600">
