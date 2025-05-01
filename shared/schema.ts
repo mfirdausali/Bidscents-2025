@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -105,6 +105,33 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Auctions table
+export const auctions = pgTable("auctions", {
+  id: bigint("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  productId: bigint("product_id", { mode: "number" }).references(() => products.id, { onDelete: "cascade" }).notNull(),
+  startingPrice: doublePrecision("starting_price").notNull(),
+  reservePrice: doublePrecision("reserve_price"),
+  buyNowPrice: doublePrecision("buy_now_price"),
+  currentBid: doublePrecision("current_bid"),
+  currentBidderId: bigint("current_bidder_id", { mode: "number" }).references(() => users.id),
+  bidIncrement: doublePrecision("bid_increment").default(5.0).notNull(),
+  startsAt: timestamp("starts_at").defaultNow().notNull(),
+  endsAt: timestamp("ends_at").notNull(),
+  status: text("status").default("active").notNull(), // 'active', 'pending', 'completed', 'cancelled', 'reserve_not_met'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Bids table
+export const bids = pgTable("bids", {
+  id: bigint("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  auctionId: bigint("auction_id", { mode: "number" }).references(() => auctions.id, { onDelete: "cascade" }).notNull(),
+  bidderId: bigint("bidder_id", { mode: "number" }).references(() => users.id).notNull(),
+  amount: doublePrecision("amount").notNull(),
+  placedAt: timestamp("placed_at").defaultNow().notNull(),
+  isWinning: boolean("is_winning").default(false),
+});
+
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -186,6 +213,24 @@ export const insertMessageSchema = createInsertSchema(messages).pick({
   content: true,
   productId: true,
   isRead: true,
+});
+
+export const insertAuctionSchema = createInsertSchema(auctions).pick({
+  productId: true,
+  startingPrice: true,
+  reservePrice: true,
+  buyNowPrice: true,
+  bidIncrement: true,
+  startsAt: true,
+  endsAt: true,
+  status: true,
+});
+
+export const insertBidSchema = createInsertSchema(bids).pick({
+  auctionId: true,
+  bidderId: true,
+  amount: true,
+  isWinning: true,
 });
 
 // Types for TypeScript
