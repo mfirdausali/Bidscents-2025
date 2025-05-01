@@ -103,7 +103,7 @@ const auctionSchema = z.object({
   buyNowPrice: z.number().optional(),
   bidIncrement: z.number().min(1, { message: "Bid increment must be at least 1" }).default(5),
   auctionEndDate: z.date().min(new Date(), { message: "End date must be in the future" }),
-  imageUrl: z.string().url({ message: "Please enter a valid image URL" }),
+  imageUrl: z.string().url({ message: "Please enter a valid image URL" }).optional(),
   imageFiles: z.any().optional(),
   stockQuantity: z.number().int().min(1, { message: "Stock quantity must be at least 1" }).default(1),
   categoryId: z.number().int().positive({ message: "Please select a category" }),
@@ -590,7 +590,8 @@ export default function SellerDashboard() {
       sellerId: user?.id || 0,
     };
     
-    const auctionData: InsertAuction = {
+    // Create auction data with proper type handling
+    const auctionData = {
       productId: 0, // Will be replaced with actual product ID after product creation
       startingPrice: data.startingPrice,
       reservePrice: data.reservePrice,
@@ -598,7 +599,7 @@ export default function SellerDashboard() {
       bidIncrement: data.bidIncrement,
       endsAt: data.auctionEndDate instanceof Date ? data.auctionEndDate.toISOString() : new Date(data.auctionEndDate).toISOString(),
       status: "active"
-    };
+    } as InsertAuction;
     
     try {
       // Create product and auction
