@@ -1097,7 +1097,8 @@ export class SupabaseStorage implements IStorage {
       current_bid: auction.currentBid,
       current_bidder_id: auction.currentBidderId,
       bid_increment: auction.bidIncrement,
-      starts_at: auction.startsAt,
+      // Always set starts_at to current timestamp if not provided
+      starts_at: auction.startsAt || new Date().toISOString(),
       ends_at: auction.endsAt, // Should be in 'YYYY-MM-DD HH:MM:SS' format
       status: auction.status || 'active',
     };
