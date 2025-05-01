@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ProductWithDetails, InsertProduct, Category } from "@shared/schema";
+import { ProductWithDetails, InsertProduct, Category, InsertAuction } from "@shared/schema";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,9 @@ import {
   DollarSign,
   Star,
   Upload,
-  X
+  X,
+  Timer,
+  Tag
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -63,7 +65,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-// Define product form schema
+// Define listing type selection schema
+const listingTypeSchema = z.object({
+  listingType: z.enum(["fixed", "auction"])
+});
+
+type ListingTypeFormValues = z.infer<typeof listingTypeSchema>;
+
+// Define product form schema (for fixed price listings)
 const productSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters" }),
   brand: z.string().min(2, { message: "Brand must be at least 2 characters" }),
@@ -80,11 +89,36 @@ const productSchema = z.object({
   batchCode: z.string().optional(),
   purchaseYear: z.number().int().min(1970).max(new Date().getFullYear()).optional(),
   boxCondition: z.enum(["Good", "Damaged", "No Box"]).default("Good"),
-  listingType: z.enum(["fixed", "negotiable", "auction"]).default("fixed"),
+  listingType: z.enum(["fixed", "negotiable"]).default("fixed"),
+  volume: z.number().int().min(1, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }),
+});
+
+// Define auction form schema
+const auctionSchema = z.object({
+  name: z.string().min(3, { message: "Name must be at least 3 characters" }),
+  brand: z.string().min(2, { message: "Brand must be at least 2 characters" }),
+  description: z.string().min(10, { message: "Description must be at least 10 characters" }),
+  startingPrice: z.number().min(0.01, { message: "Starting price must be greater than 0" }),
+  reservePrice: z.number().optional(),
+  buyNowPrice: z.number().optional(),
+  bidIncrement: z.number().min(1, { message: "Bid increment must be at least 1" }).default(5),
+  auctionEndDate: z.date().min(new Date(), { message: "End date must be in the future" }),
+  imageUrl: z.string().url({ message: "Please enter a valid image URL" }),
+  imageFiles: z.any().optional(),
+  stockQuantity: z.number().int().min(1, { message: "Stock quantity must be at least 1" }).default(1),
+  categoryId: z.number().int().positive({ message: "Please select a category" }),
+  isNew: z.boolean().default(false),
+  isFeatured: z.boolean().default(false),
+  // Secondhand perfume specific fields
+  remainingPercentage: z.number().int().min(1).max(100).default(100),
+  batchCode: z.string().optional(),
+  purchaseYear: z.number().int().min(1970).max(new Date().getFullYear()).optional(),
+  boxCondition: z.enum(["Good", "Damaged", "No Box"]).default("Good"),
   volume: z.number().int().min(1, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
+type AuctionFormValues = z.infer<typeof auctionSchema>;
 
 export default function SellerDashboard() {
   const { user } = useAuth();
@@ -94,6 +128,9 @@ export default function SellerDashboard() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentProductId, setCurrentProductId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
+  const [selectedListingType, setSelectedListingType] = useState<"fixed" | "auction">("fixed");
+  const [isAuctionForm, setIsAuctionForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
@@ -124,7 +161,15 @@ export default function SellerDashboard() {
     queryKey: ["/api/categories"],
   });
 
-  // Product form
+  // Listing type selection form
+  const listingTypeForm = useForm<ListingTypeFormValues>({
+    resolver: zodResolver(listingTypeSchema),
+    defaultValues: {
+      listingType: "fixed"
+    }
+  });
+  
+  // Product form for fixed price listings
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -143,6 +188,32 @@ export default function SellerDashboard() {
       purchaseYear: new Date().getFullYear(),
       boxCondition: "Good",
       listingType: "fixed",
+      volume: 100,
+    },
+  });
+
+  // Auction form
+  const auctionForm = useForm<AuctionFormValues>({
+    resolver: zodResolver(auctionSchema),
+    defaultValues: {
+      name: "",
+      brand: "",
+      description: "",
+      startingPrice: 0,
+      reservePrice: undefined,
+      buyNowPrice: undefined, 
+      bidIncrement: 5,
+      auctionEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      imageUrl: "",
+      stockQuantity: 1,
+      categoryId: 0,
+      isNew: false,
+      isFeatured: false,
+      // Secondhand perfume specific fields
+      remainingPercentage: 100,
+      batchCode: "",
+      purchaseYear: new Date().getFullYear(),
+      boxCondition: "Good",
       volume: 100,
     },
   });
@@ -363,24 +434,31 @@ export default function SellerDashboard() {
       setImagePreviewUrls([`/api/images/${product.imageUrl}`]);
     }
     
-    form.reset({
-      name: product.name,
-      brand: product.brand,
-      description: product.description || "",
-      price: product.price,
-      imageUrl: product.imageUrl || "",
-      stockQuantity: product.stockQuantity,
-      categoryId: product.categoryId || 1,
-      isNew: product.isNew === null ? false : product.isNew,
-      isFeatured: product.isFeatured === null ? false : product.isFeatured,
-      // Secondhand perfume specific fields
-      remainingPercentage: product.remainingPercentage || 100,
-      batchCode: product.batchCode || "",
-      purchaseYear: product.purchaseYear || new Date().getFullYear(),
-      boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
-      listingType: (product.listingType as "fixed" | "negotiable" | "auction") || "fixed",
-      volume: product.volume || 100,
-    });
+    // Check if this is an auction listing
+    if (product.listingType === "auction") {
+      setIsAuctionForm(true);
+      // Would need to load auction data here if editing an auction
+    } else {
+      setIsAuctionForm(false);
+      form.reset({
+        name: product.name,
+        brand: product.brand,
+        description: product.description || "",
+        price: product.price,
+        imageUrl: product.imageUrl || "",
+        stockQuantity: product.stockQuantity,
+        categoryId: product.categoryId || 1,
+        isNew: product.isNew === null ? false : product.isNew,
+        isFeatured: product.isFeatured === null ? false : product.isFeatured,
+        // Secondhand perfume specific fields
+        remainingPercentage: product.remainingPercentage || 100,
+        batchCode: product.batchCode || "",
+        purchaseYear: product.purchaseYear || new Date().getFullYear(),
+        boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
+        listingType: (product.listingType as "fixed" | "negotiable") || "fixed",
+        volume: product.volume || 100,
+      });
+    }
     
     setIsDialogOpen(true);
   };
