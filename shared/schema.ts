@@ -105,33 +105,6 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Auctions table
-export const auctions = pgTable("auctions", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-  startingPrice: doublePrecision("starting_price").notNull(),
-  reservePrice: doublePrecision("reserve_price"),
-  buyNowPrice: doublePrecision("buy_now_price"),
-  currentBid: doublePrecision("current_bid"),
-  currentBidderId: integer("current_bidder_id").references(() => users.id),
-  bidIncrement: doublePrecision("bid_increment").default(5.0).notNull(),
-  startsAt: timestamp("starts_at").defaultNow().notNull(),
-  endsAt: timestamp("ends_at").notNull(),
-  status: text("status").default("active").notNull(), // 'active', 'pending', 'completed', 'cancelled', 'reserve_not_met'
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Bids table
-export const bids = pgTable("bids", {
-  id: serial("id").primaryKey(),
-  auctionId: integer("auction_id").references(() => auctions.id, { onDelete: "cascade" }).notNull(),
-  bidderId: integer("bidder_id").references(() => users.id).notNull(),
-  amount: doublePrecision("amount").notNull(),
-  placedAt: timestamp("placed_at").defaultNow().notNull(),
-  isWinning: boolean("is_winning").default(false),
-});
-
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -215,24 +188,6 @@ export const insertMessageSchema = createInsertSchema(messages).pick({
   isRead: true,
 });
 
-export const insertAuctionSchema = createInsertSchema(auctions).pick({
-  productId: true,
-  startingPrice: true,
-  reservePrice: true,
-  buyNowPrice: true,
-  bidIncrement: true,
-  startsAt: true,
-  endsAt: true,
-  status: true,
-});
-
-export const insertBidSchema = createInsertSchema(bids).pick({
-  auctionId: true,
-  bidderId: true,
-  amount: true,
-  isWinning: true,
-});
-
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -258,12 +213,6 @@ export type InsertProductImage = z.infer<typeof insertProductImageSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 
-export type Auction = typeof auctions.$inferSelect;
-export type InsertAuction = z.infer<typeof insertAuctionSchema>;
-
-export type Bid = typeof bids.$inferSelect;
-export type InsertBid = z.infer<typeof insertBidSchema>;
-
 // Extended types
 export type ProductWithDetails = Product & {
   category?: Category;
@@ -282,17 +231,6 @@ export type MessageWithDetails = Message & {
   sender?: User;
   receiver?: User;
   product?: ProductWithDetails;
-};
-
-export type AuctionWithDetails = Auction & {
-  product: ProductWithDetails;
-  currentBidder?: User;
-  bids?: Bid[];
-};
-
-export type BidWithDetails = Bid & {
-  bidder: User;
-  auction: Auction;
 };
 
 // Note: Relations are handled through joins in the DatabaseStorage implementation
