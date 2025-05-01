@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -107,13 +107,13 @@ export const messages = pgTable("messages", {
 
 // Auctions table
 export const auctions = pgTable("auctions", {
-  id: bigint("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  productId: bigint("product_id", { mode: "number" }).references(() => products.id, { onDelete: "cascade" }).notNull(),
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
   startingPrice: doublePrecision("starting_price").notNull(),
   reservePrice: doublePrecision("reserve_price"),
   buyNowPrice: doublePrecision("buy_now_price"),
   currentBid: doublePrecision("current_bid"),
-  currentBidderId: bigint("current_bidder_id", { mode: "number" }).references(() => users.id),
+  currentBidderId: integer("current_bidder_id").references(() => users.id),
   bidIncrement: doublePrecision("bid_increment").default(5.0).notNull(),
   startsAt: timestamp("starts_at").defaultNow().notNull(),
   endsAt: timestamp("ends_at").notNull(),
@@ -124,9 +124,9 @@ export const auctions = pgTable("auctions", {
 
 // Bids table
 export const bids = pgTable("bids", {
-  id: bigint("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  auctionId: bigint("auction_id", { mode: "number" }).references(() => auctions.id, { onDelete: "cascade" }).notNull(),
-  bidderId: bigint("bidder_id", { mode: "number" }).references(() => users.id).notNull(),
+  id: serial("id").primaryKey(),
+  auctionId: integer("auction_id").references(() => auctions.id, { onDelete: "cascade" }).notNull(),
+  bidderId: integer("bidder_id").references(() => users.id).notNull(),
   amount: doublePrecision("amount").notNull(),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
   isWinning: boolean("is_winning").default(false),
@@ -258,6 +258,12 @@ export type InsertProductImage = z.infer<typeof insertProductImageSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 
+export type Auction = typeof auctions.$inferSelect;
+export type InsertAuction = z.infer<typeof insertAuctionSchema>;
+
+export type Bid = typeof bids.$inferSelect;
+export type InsertBid = z.infer<typeof insertBidSchema>;
+
 // Extended types
 export type ProductWithDetails = Product & {
   category?: Category;
@@ -276,6 +282,17 @@ export type MessageWithDetails = Message & {
   sender?: User;
   receiver?: User;
   product?: ProductWithDetails;
+};
+
+export type AuctionWithDetails = Auction & {
+  product: ProductWithDetails;
+  currentBidder?: User;
+  bids?: Bid[];
+};
+
+export type BidWithDetails = Bid & {
+  bidder: User;
+  auction: Auction;
 };
 
 // Note: Relations are handled through joins in the DatabaseStorage implementation
