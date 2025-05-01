@@ -534,21 +534,45 @@ export default function SellerDashboard() {
   // Create auction mutation
   const createAuctionMutation = useMutation({
     mutationFn: async (data: { product: InsertProduct, auction: InsertAuction }) => {
-      // First create the product
-      const productRes = await apiRequest("POST", "/api/products", data.product);
-      const product = await productRes.json();
+      console.log("Starting auction creation process with:", data);
       
-      // Then create the auction with the product id
-      const auctionData = {
-        ...data.auction,
-        productId: product.id
-      };
-      
-      const auctionRes = await apiRequest("POST", "/api/auctions", auctionData);
-      return {
-        product,
-        auction: await auctionRes.json()
-      };
+      try {
+        // First create the product
+        console.log("Creating product with data:", data.product);
+        const productRes = await apiRequest("POST", "/api/products", data.product);
+        const product = await productRes.json();
+        console.log("Product created successfully:", product);
+        
+        // Then create the auction with the product id
+        const auctionData = {
+          ...data.auction,
+          productId: product.id
+        };
+        
+        console.log("Creating auction with data:", auctionData);
+        console.log("Auction end date format:", auctionData.endsAt);
+        
+        const auctionRes = await apiRequest("POST", "/api/auctions", auctionData);
+        console.log("Auction API response status:", auctionRes.status);
+        
+        let auctionResult;
+        try {
+          auctionResult = await auctionRes.json();
+          console.log("Auction created successfully:", auctionResult);
+        } catch (jsonError) {
+          console.error("Error parsing auction response:", jsonError);
+          console.log("Raw auction response:", auctionRes);
+          auctionResult = { error: "Failed to parse response" };
+        }
+        
+        return {
+          product,
+          auction: auctionResult
+        };
+      } catch (error) {
+        console.error("Error in auction creation process:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       toast({
@@ -611,6 +635,7 @@ export default function SellerDashboard() {
     } as InsertAuction;
     
     try {
+      console.log(auctionData);
       // Create product and auction
       const result = await createAuctionMutation.mutateAsync({
         product: productData,
