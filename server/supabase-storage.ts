@@ -1,4 +1,4 @@
-import { users, products, categories, reviews, orders, orderItems, productImages, messages } from "@shared/schema";
+import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
@@ -6,7 +6,9 @@ import type {
   Review, InsertReview,
   Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
   ProductImage, InsertProductImage,
-  Message, InsertMessage, MessageWithDetails
+  Message, InsertMessage, MessageWithDetails,
+  Auction, InsertAuction,
+  Bid, InsertBid
 } from "@shared/schema";
 
 // Define cart types since they're removed from schema but still in interface

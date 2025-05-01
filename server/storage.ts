@@ -99,6 +99,19 @@ export interface IStorage {
   createProductImage(productImage: InsertProductImage): Promise<ProductImage>;
   deleteProductImage(id: number): Promise<void>;
   
+  // Auction methods
+  getAuctions(): Promise<Auction[]>;
+  getAuctionById(id: number): Promise<Auction | undefined>;
+  getProductAuctions(productId: number): Promise<Auction[]>;
+  createAuction(auction: InsertAuction): Promise<Auction>;
+  updateAuction(id: number, auction: Partial<InsertAuction>): Promise<Auction>;
+  deleteAuction(id: number): Promise<void>;
+  
+  // Bid methods
+  getBidsForAuction(auctionId: number): Promise<Bid[]>;
+  createBid(bid: InsertBid): Promise<Bid>;
+  updatePreviousBids(auctionId: number, newBidderId: number): Promise<void>;
+  
   // Message methods
   getUserMessages(userId: number): Promise<MessageWithDetails[]>;
   getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]>;
