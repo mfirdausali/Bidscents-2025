@@ -511,32 +511,164 @@ export default function SellerDashboard() {
     form.setValue('imageUrl', newPreviewUrls[0] || '');
   };
 
-  // Open dialog for new product
-  const handleAddNewProduct = () => {
-    setIsEditMode(false);
-    setCurrentProductId(null);
+  // Handle image upload for auction form
+  const handleAuctionImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    // Limit to 5 images
+    const newFiles: File[] = Array.from(files).slice(0, 5);
+    
+    // Create preview URLs
+    const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
+    
+    setUploadedImages(newFiles);
+    setImagePreviewUrls(newPreviewUrls);
+    
+    // Update auction form with first image URL as a placeholder
+    if (newFiles.length > 0) {
+      auctionForm.setValue('imageUrl', newPreviewUrls[0]);
+    }
+  };
+
+  // Create auction mutation
+  const createAuctionMutation = useMutation({
+    mutationFn: async (data: { product: InsertProduct, auction: InsertAuction }) => {
+      // First create the product
+      const productRes = await apiRequest("POST", "/api/products", data.product);
+      const product = await productRes.json();
+      
+      // Then create the auction with the product id
+      const auctionData = {
+        ...data.auction,
+        productId: product.id
+      };
+      
+      const auctionRes = await apiRequest("POST", "/api/auctions", auctionData);
+      return {
+        product,
+        auction: await auctionRes.json()
+      };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Auction created",
+        description: "Your auction listing has been created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/seller/products"] });
+      setIsDialogOpen(false);
+      auctionForm.reset();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error creating auction",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle auction form submission
+  const onSubmitAuction = async (data: AuctionFormValues) => {
+    // Include sellerId from the logged-in user
+    const productData: InsertProduct = {
+      name: data.name,
+      brand: data.brand,
+      description: data.description,
+      price: data.startingPrice, // Use starting price as the base price
+      imageUrl: data.imageUrl,
+      stockQuantity: data.stockQuantity,
+      categoryId: data.categoryId,
+      isNew: data.isNew,
+      isFeatured: data.isFeatured,
+      remainingPercentage: data.remainingPercentage,
+      batchCode: data.batchCode || undefined,
+      purchaseYear: data.purchaseYear,
+      boxCondition: data.boxCondition,
+      listingType: "auction", // Mark as auction listing
+      volume: data.volume,
+      sellerId: user?.id || 0,
+    };
+    
+    const auctionData: InsertAuction = {
+      productId: 0, // Will be replaced with actual product ID after product creation
+      startingPrice: data.startingPrice,
+      reservePrice: data.reservePrice,
+      buyNowPrice: data.buyNowPrice,
+      bidIncrement: data.bidIncrement,
+      endsAt: data.auctionEndDate instanceof Date ? data.auctionEndDate : new Date(data.auctionEndDate),
+      status: "active"
+    };
+    
+    try {
+      // Create product and auction
+      const result = await createAuctionMutation.mutateAsync({
+        product: productData,
+        auction: auctionData
+      });
+      
+      // After auction is created, register and upload images
+      if (uploadedImages.length > 0) {
+        await registerImagesMutation.mutateAsync({
+          productId: result.product.id,
+          images: uploadedImages
+        });
+      }
+      
+      // Close dialog after successful submission
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error in auction submission:', error);
+    }
+  };
+
+  // Select listing type and show appropriate form
+  const onSelectListingType = (data: ListingTypeFormValues) => {
+    setSelectedListingType(data.listingType);
+    setIsAuctionForm(data.listingType === "auction");
+    setIsTypeSelectionOpen(false);
+    
+    // Reset the appropriate form
+    if (data.listingType === "auction") {
+      auctionForm.reset();
+    } else {
+      form.reset({
+        name: "",
+        brand: "",
+        description: "",
+        price: 0,
+        imageUrl: "",
+        stockQuantity: 0,
+        categoryId: 0,
+        isNew: false,
+        isFeatured: false,
+        remainingPercentage: 100,
+        batchCode: "",
+        purchaseYear: new Date().getFullYear(),
+        boxCondition: "Good",
+        listingType: "fixed",
+        volume: 100,
+      });
+    }
+    
     // Clear image states
     setUploadedImages([]);
     setImagePreviewUrls([]);
-    form.reset({
-      name: "",
-      brand: "",
-      description: "",
-      price: 0,
-      imageUrl: "",
-      stockQuantity: 0,
-      categoryId: 0,
-      isNew: false,
-      isFeatured: false,
-      // Secondhand perfume specific fields
-      remainingPercentage: 100,
-      batchCode: "",
-      purchaseYear: new Date().getFullYear(),
-      boxCondition: "Good",
-      listingType: "fixed",
-      volume: 100,
-    });
+    
+    // Open the product form dialog
     setIsDialogOpen(true);
+  };
+
+  // Open dialog for new product (now opens listing type selection first)
+  const handleAddNewProduct = () => {
+    setIsEditMode(false);
+    setCurrentProductId(null);
+    setIsTypeSelectionOpen(true);
+    
+    // Reset listing type selection form
+    listingTypeForm.reset({
+      listingType: "fixed"
+    });
   };
 
   // Filter products by search query
@@ -979,20 +1111,552 @@ export default function SellerDashboard() {
         </div>
       </main>
       
+      {/* Listing Type Selection Dialog */}
+      <Dialog open={isTypeSelectionOpen} onOpenChange={setIsTypeSelectionOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Listing Type</DialogTitle>
+            <DialogDescription>
+              Choose how you want to list your perfume product
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...listingTypeForm}>
+            <form onSubmit={listingTypeForm.handleSubmit(onSelectListingType)} className="space-y-6">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="flex flex-col space-y-4">
+                  <div 
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      listingTypeForm.watch("listingType") === "fixed" 
+                        ? "border-gold bg-gold/10" 
+                        : "border-gray-200 hover:border-gold/50"
+                    }`}
+                    onClick={() => listingTypeForm.setValue("listingType", "fixed")}
+                  >
+                    <div className="flex items-center">
+                      <div className={`w-5 h-5 rounded-full border mr-3 flex items-center justify-center ${
+                        listingTypeForm.watch("listingType") === "fixed" 
+                          ? "border-gold" 
+                          : "border-gray-300"
+                      }`}>
+                        {listingTypeForm.watch("listingType") === "fixed" && (
+                          <div className="w-3 h-3 rounded-full bg-gold" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-medium flex items-center">
+                          <Tag className="mr-2 h-5 w-5" /> 
+                          Fixed Price
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Set a specific price for immediate purchase
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      listingTypeForm.watch("listingType") === "auction" 
+                        ? "border-gold bg-gold/10" 
+                        : "border-gray-200 hover:border-gold/50"
+                    }`}
+                    onClick={() => listingTypeForm.setValue("listingType", "auction")}
+                  >
+                    <div className="flex items-center">
+                      <div className={`w-5 h-5 rounded-full border mr-3 flex items-center justify-center ${
+                        listingTypeForm.watch("listingType") === "auction" 
+                          ? "border-gold" 
+                          : "border-gray-300"
+                      }`}>
+                        {listingTypeForm.watch("listingType") === "auction" && (
+                          <div className="w-3 h-3 rounded-full bg-gold" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-medium flex items-center">
+                          <Timer className="mr-2 h-5 w-5" /> 
+                          Auction
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Allow buyers to bid, potentially increasing final price
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsTypeSelectionOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit"
+                  className="bg-gold text-rich-black hover:bg-metallic-gold"
+                >
+                  Continue
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
       {/* Product Form Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isEditMode ? "Edit Product" : "Add New Product"}</DialogTitle>
+            <DialogTitle>
+              {isEditMode 
+                ? "Edit Product" 
+                : isAuctionForm 
+                  ? "Create Auction Listing" 
+                  : "Add Fixed Price Listing"
+              }
+            </DialogTitle>
             <DialogDescription>
               {isEditMode 
                 ? "Update your product information below" 
-                : "Fill in the details to add a new perfume product"}
+                : isAuctionForm
+                  ? "Set up your auction listing details below"
+                  : "Fill in the details to add a new perfume product"
+              }
             </DialogDescription>
           </DialogHeader>
           
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmitProduct)} className="space-y-6">
+          {isAuctionForm ? (
+            // Auction form
+            <Form {...auctionForm}>
+              <form onSubmit={auctionForm.handleSubmit(onSubmitAuction)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={auctionForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Product Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Midnight Rose" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={auctionForm.control}
+                    name="brand"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Brand</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Chanel" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={auctionForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Describe your product..." 
+                          className="min-h-24" 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={auctionForm.control}
+                    name="startingPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Starting Price (MYR)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0.01" 
+                            step="0.01"
+                            placeholder="99.99" 
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={auctionForm.control}
+                    name="reservePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Reserve Price (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0.01" 
+                            step="0.01"
+                            placeholder="Minimum acceptable price" 
+                            {...field}
+                            value={field.value || ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : parseFloat(e.target.value);
+                              field.onChange(value);
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={auctionForm.control}
+                    name="buyNowPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Buy Now Price (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0.01" 
+                            step="0.01"
+                            placeholder="Immediate purchase price" 
+                            {...field}
+                            value={field.value || ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : parseFloat(e.target.value);
+                              field.onChange(value);
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={auctionForm.control}
+                    name="bidIncrement"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bid Increment (MYR)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="1" 
+                            step="1"
+                            placeholder="5" 
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={auctionForm.control}
+                  name="auctionEndDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Auction End Date</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="datetime-local" 
+                          {...field}
+                          value={field.value instanceof Date ? field.value.toISOString().slice(0, 16) : ''}
+                          onChange={(e) => {
+                            const date = new Date(e.target.value);
+                            field.onChange(date);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={auctionForm.control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select 
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                        value={field.value ? field.value.toString() : undefined}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories?.map((category) => (
+                            <SelectItem 
+                              key={category.id} 
+                              value={category.id.toString()}
+                            >
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={auctionForm.control}
+                  name="imageUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Images (up to 5)</FormLabel>
+                      <div className="flex flex-col gap-2">
+                        <div className="border rounded-md p-4 bg-gray-50">
+                          <div className="flex items-center justify-center w-full">
+                            <label htmlFor="auction-images" className="cursor-pointer w-full">
+                              <div className="flex flex-col items-center justify-center py-4 border-2 border-dashed rounded-md border-gray-300 hover:border-gold transition-colors">
+                                <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                <p className="text-sm text-gray-500">Click to upload images</p>
+                                <p className="text-xs text-gray-400 mt-1">JPG, PNG, or GIF up to 5MB</p>
+                              </div>
+                              <input 
+                                id="auction-images" 
+                                type="file" 
+                                multiple 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={(e) => handleAuctionImageUpload(e)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                        
+                        {/* Preview area for uploaded images */}
+                        {imagePreviewUrls.length > 0 && (
+                          <div className="grid grid-cols-5 gap-2 mt-3">
+                            {imagePreviewUrls.map((url, index) => (
+                              <div key={index} className="relative group">
+                                <img 
+                                  src={url} 
+                                  alt={`Preview ${index + 1}`}
+                                  className="w-full h-16 object-cover rounded-md border border-gray-200"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(index)}
+                                  className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X className="h-3 w-3 text-gray-600" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex flex-wrap gap-4">
+                  <FormField
+                    control={auctionForm.control}
+                    name="isNew"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="m-0">Mark as New</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={auctionForm.control}
+                    name="isFeatured"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="m-0">Feature this product</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                {/* Secondhand perfume specific fields */}
+                <h3 className="text-lg font-medium mt-8 mb-4">Perfume Condition Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={auctionForm.control}
+                    name="volume"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bottle Size (ml)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={1} 
+                            placeholder="100"
+                            {...field}
+                            onChange={e => field.onChange(parseInt(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={auctionForm.control}
+                    name="remainingPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bottle Fullness (%)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={1} 
+                            max={100} 
+                            placeholder="100"
+                            {...field}
+                            onChange={e => field.onChange(parseInt(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={auctionForm.control}
+                    name="purchaseYear"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Purchase Year</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={1970} 
+                            max={new Date().getFullYear()}
+                            placeholder={new Date().getFullYear().toString()}
+                            {...field}
+                            onChange={e => field.onChange(parseInt(e.target.value) || new Date().getFullYear())}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={auctionForm.control}
+                    name="boxCondition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Box Condition</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select box condition" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Good">Good</SelectItem>
+                            <SelectItem value="Damaged">Damaged</SelectItem>
+                            <SelectItem value="No Box">No Box</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={auctionForm.control}
+                    name="batchCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Batch Code (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g., 8K01"
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <DialogFooter>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit"
+                    className="bg-gold text-rich-black hover:bg-metallic-gold"
+                    disabled={createAuctionMutation.isPending}
+                  >
+                    {createAuctionMutation.isPending ? (
+                      <span className="flex items-center">
+                        <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
+                        Creating...
+                      </span>
+                    ) : (
+                      "Create Auction"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          ) : (
+            // Fixed price product form
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmitProduct)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -1365,6 +2029,7 @@ export default function SellerDashboard() {
               </DialogFooter>
             </form>
           </Form>
+          )}
         </DialogContent>
       </Dialog>
       
