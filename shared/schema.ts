@@ -215,7 +215,8 @@ export const insertMessageSchema = createInsertSchema(messages).pick({
   isRead: true,
 });
 
-export const insertAuctionSchema = createInsertSchema(auctions).pick({
+// Create the base schema first
+const baseInsertAuctionSchema = createInsertSchema(auctions).pick({
   productId: true,
   startingPrice: true,
   reservePrice: true,
@@ -224,8 +225,12 @@ export const insertAuctionSchema = createInsertSchema(auctions).pick({
   currentBidderId: true,
   bidIncrement: true,
   startsAt: true,
-  endsAt: true,
   status: true,
+});
+
+// Create a modified schema with string for endsAt to match Supabase's expected format
+export const insertAuctionSchema = baseInsertAuctionSchema.extend({
+  endsAt: z.string(), // Override to expect ISO string format
 });
 
 export const insertBidSchema = createInsertSchema(bids).pick({
