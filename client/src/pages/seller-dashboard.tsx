@@ -596,7 +596,7 @@ export default function SellerDashboard() {
       reservePrice: data.reservePrice,
       buyNowPrice: data.buyNowPrice,
       bidIncrement: data.bidIncrement,
-      endsAt: data.auctionEndDate instanceof Date ? data.auctionEndDate : new Date(data.auctionEndDate),
+      endsAt: data.auctionEndDate instanceof Date ? data.auctionEndDate.toISOString() : new Date(data.auctionEndDate).toISOString(),
       status: "active"
     };
     
@@ -619,6 +619,11 @@ export default function SellerDashboard() {
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error in auction submission:', error);
+      toast({
+        title: "Error creating auction",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1128,8 +1133,8 @@ export default function SellerDashboard() {
                   <div 
                     className={`border rounded-lg p-4 cursor-pointer transition-all ${
                       listingTypeForm.watch("listingType") === "fixed" 
-                        ? "border-gold bg-gold/10" 
-                        : "border-gray-200 hover:border-gold/50"
+                        ? "border-gold bg-gold/10 text-black" 
+                        : "border-gray-200 hover:border-gold/50 text-gray-800"
                     }`}
                     onClick={() => listingTypeForm.setValue("listingType", "fixed")}
                   >
@@ -1137,7 +1142,7 @@ export default function SellerDashboard() {
                       <div className={`w-5 h-5 rounded-full border mr-3 flex items-center justify-center ${
                         listingTypeForm.watch("listingType") === "fixed" 
                           ? "border-gold" 
-                          : "border-gray-300"
+                          : "border-gray-500"
                       }`}>
                         {listingTypeForm.watch("listingType") === "fixed" && (
                           <div className="w-3 h-3 rounded-full bg-gold" />
@@ -1148,7 +1153,7 @@ export default function SellerDashboard() {
                           <Tag className="mr-2 h-5 w-5" /> 
                           Fixed Price
                         </h3>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-gray-600 mt-1">
                           Set a specific price for immediate purchase
                         </p>
                       </div>
@@ -1158,8 +1163,8 @@ export default function SellerDashboard() {
                   <div 
                     className={`border rounded-lg p-4 cursor-pointer transition-all ${
                       listingTypeForm.watch("listingType") === "auction" 
-                        ? "border-gold bg-gold/10" 
-                        : "border-gray-200 hover:border-gold/50"
+                        ? "border-gold bg-gold/10 text-black" 
+                        : "border-gray-200 hover:border-gold/50 text-gray-800"
                     }`}
                     onClick={() => listingTypeForm.setValue("listingType", "auction")}
                   >
@@ -1167,7 +1172,7 @@ export default function SellerDashboard() {
                       <div className={`w-5 h-5 rounded-full border mr-3 flex items-center justify-center ${
                         listingTypeForm.watch("listingType") === "auction" 
                           ? "border-gold" 
-                          : "border-gray-300"
+                          : "border-gray-500"
                       }`}>
                         {listingTypeForm.watch("listingType") === "auction" && (
                           <div className="w-3 h-3 rounded-full bg-gold" />
@@ -1178,7 +1183,7 @@ export default function SellerDashboard() {
                           <Timer className="mr-2 h-5 w-5" /> 
                           Auction
                         </h3>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-gray-600 mt-1">
                           Allow buyers to bid, potentially increasing final price
                         </p>
                       </div>
