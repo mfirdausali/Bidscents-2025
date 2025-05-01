@@ -520,6 +520,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // Auction endpoints
+  app.post("/api/auctions", async (req, res, next) => {
+    try {
+      console.log("POST /api/auctions called with body:", req.body);
+      
+      // Check authentication
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          console.log("User is not a seller:", req.user);
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+        console.log("Authenticated seller ID:", sellerId);
+      } else if (req.body.sellerId) {
+        // If not via session, check if sellerId was provided in the body
+        sellerId = parseInt(req.body.sellerId.toString());
+        console.log("Using sellerId from request body:", sellerId);
+        
+        // Verify this user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          console.log("User not found with ID:", sellerId);
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          console.log("User is not a seller:", userCheck);
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        console.log("No authentication or sellerId provided");
+        return res.status(403).json({ message: "Unauthorized: Must be a seller to create auctions" });
+      }
+      
+      // Get the product ID from the request body
+      const productId = parseInt(req.body.productId?.toString() || "0");
+      console.log("Product ID for auction:", productId);
+      
+      if (productId <= 0) {
+        console.log("Invalid product ID:", productId);
+        return res.status(400).json({ message: "Invalid product ID" });
+      }
+      
+      // Verify the product exists and belongs to this seller
+      const product = await storage.getProductById(productId);
+      if (!product) {
+        console.log("Product not found with ID:", productId);
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      if (product.sellerId !== sellerId) {
+        console.log(`Product seller ID (${product.sellerId}) doesn't match the authenticated seller ID (${sellerId})`);
+        return res.status(403).json({ message: "Unauthorized: You can only create auctions for your own products" });
+      }
+      
+      console.log("Validated auction data:", req.body);
+      console.log("End date format:", req.body.endsAt);
+      
+      // Parse the auction data
+      try {
+        // Create the auction
+        console.log("Creating auction in database...");
+        const auction = await storage.createAuction(req.body);
+        console.log("Auction created successfully:", auction);
+        return res.status(200).json(auction);
+      } catch (createError) {
+        console.error("Error creating auction:", createError);
+        throw createError;
+      }
+    } catch (error) {
+      console.error("Error processing auction creation:", error);
+      next(error);
+    }
+  });
+  
+  // Get all auctions
+  app.get("/api/auctions", async (req, res, next) => {
+    try {
+      console.log("Getting all auctions");
+      const auctions = await storage.getAuctions();
+      console.log(`Retrieved ${auctions?.length || 0} auctions`);
+      res.json(auctions || []);
+    } catch (error) {
+      console.error("Error fetching auctions:", error);
+      next(error);
+    }
+  });
+  
+  // Get auction by ID
+  app.get("/api/auctions/:id", async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log(`Getting auction with ID: ${id}`);
+      
+      const auction = await storage.getAuctionById(id);
+      if (!auction) {
+        console.log(`Auction not found with ID: ${id}`);
+        return res.status(404).json({ message: "Auction not found" });
+      }
+      
+      console.log("Retrieved auction:", auction);
+      res.json(auction);
+    } catch (error) {
+      console.error(`Error getting auction: ${error}`);
+      next(error);
+    }
+  });
 
   app.delete("/api/products/:id", async (req, res, next) => {
     try {
