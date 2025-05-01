@@ -230,6 +230,79 @@ export interface Database {
           price?: number
         }
       }
+      auctions: {
+        Row: {
+          id: number
+          product_id: number
+          starting_price: number
+          reserve_price: number | null
+          buy_now_price: number | null
+          current_bid: number | null
+          current_bidder_id: number | null
+          bid_increment: number
+          starts_at: string
+          ends_at: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          product_id: number
+          starting_price: number
+          reserve_price?: number | null
+          buy_now_price?: number | null
+          current_bid?: number | null
+          current_bidder_id?: number | null
+          bid_increment?: number
+          starts_at?: string
+          ends_at: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          product_id?: number
+          starting_price?: number
+          reserve_price?: number | null
+          buy_now_price?: number | null
+          current_bid?: number | null
+          current_bidder_id?: number | null
+          bid_increment?: number
+          starts_at?: string
+          ends_at?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      bids: {
+        Row: {
+          id: number
+          auction_id: number
+          bidder_id: number
+          amount: number
+          placed_at: string
+          is_winning: boolean
+        }
+        Insert: {
+          id?: number
+          auction_id: number
+          bidder_id: number
+          amount: number
+          placed_at?: string
+          is_winning?: boolean
+        }
+        Update: {
+          id?: number
+          auction_id?: number
+          bidder_id?: number
+          amount?: number
+          placed_at?: string
+          is_winning?: boolean
+        }
+      }
     }
     Views: {
       [_ in never]: never
