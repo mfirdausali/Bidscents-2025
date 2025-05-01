@@ -984,6 +984,327 @@ export class SupabaseStorage implements IStorage {
     }));
   }
   
+  // =========== AUCTION METHODS ===========
+
+  async getAuctions(): Promise<Auction[]> {
+    console.log('Getting all auctions from Supabase');
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('*');
+    
+    if (error) {
+      console.error('Error getting auctions:', error);
+      return [];
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuctions = (data || []).map(auction => ({
+      id: auction.id,
+      productId: auction.product_id,
+      startingPrice: auction.starting_price,
+      reservePrice: auction.reserve_price,
+      buyNowPrice: auction.buy_now_price,
+      currentBid: auction.current_bid,
+      currentBidderId: auction.current_bidder_id,
+      bidIncrement: auction.bid_increment,
+      startsAt: auction.starts_at,
+      endsAt: auction.ends_at,
+      status: auction.status,
+      createdAt: auction.created_at,
+      updatedAt: auction.updated_at,
+    }));
+    
+    console.log(`Retrieved ${mappedAuctions.length} auctions`);
+    return mappedAuctions as Auction[];
+  }
+
+  async getAuctionById(id: number): Promise<Auction | undefined> {
+    console.log(`Getting auction with ID: ${id}`);
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error || !data) {
+      console.error('Error getting auction:', error);
+      return undefined;
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuction = {
+      id: data.id,
+      productId: data.product_id,
+      startingPrice: data.starting_price,
+      reservePrice: data.reserve_price,
+      buyNowPrice: data.buy_now_price,
+      currentBid: data.current_bid,
+      currentBidderId: data.current_bidder_id,
+      bidIncrement: data.bid_increment,
+      startsAt: data.starts_at,
+      endsAt: data.ends_at,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+    
+    console.log(`Retrieved auction: ${JSON.stringify(mappedAuction)}`);
+    return mappedAuction as Auction;
+  }
+
+  async getProductAuctions(productId: number): Promise<Auction[]> {
+    console.log(`Getting auctions for product ID: ${productId}`);
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('product_id', productId);
+    
+    if (error) {
+      console.error('Error getting product auctions:', error);
+      return [];
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuctions = (data || []).map(auction => ({
+      id: auction.id,
+      productId: auction.product_id,
+      startingPrice: auction.starting_price,
+      reservePrice: auction.reserve_price,
+      buyNowPrice: auction.buy_now_price,
+      currentBid: auction.current_bid,
+      currentBidderId: auction.current_bidder_id,
+      bidIncrement: auction.bid_increment,
+      startsAt: auction.starts_at,
+      endsAt: auction.ends_at,
+      status: auction.status,
+      createdAt: auction.created_at,
+      updatedAt: auction.updated_at,
+    }));
+    
+    console.log(`Retrieved ${mappedAuctions.length} auctions for product ${productId}`);
+    return mappedAuctions as Auction[];
+  }
+
+  async createAuction(auction: InsertAuction): Promise<Auction> {
+    console.log(`Creating auction with data: ${JSON.stringify(auction)}`);
+    
+    // Convert camelCase to snake_case for DB
+    const dbAuction = {
+      product_id: auction.productId,
+      starting_price: auction.startingPrice,
+      reserve_price: auction.reservePrice,
+      buy_now_price: auction.buyNowPrice,
+      current_bid: auction.currentBid,
+      current_bidder_id: auction.currentBidderId,
+      bid_increment: auction.bidIncrement,
+      starts_at: auction.startsAt,
+      ends_at: auction.endsAt, // Should be in 'YYYY-MM-DD HH:MM:SS' format
+      status: auction.status || 'active',
+    };
+    
+    console.log(`Prepared DB auction data: ${JSON.stringify(dbAuction)}`);
+    const { data, error } = await supabase
+      .from('auctions')
+      .insert([dbAuction])
+      .select()
+      .single();
+    
+    if (error || !data) {
+      console.error('Error creating auction:', error);
+      throw new Error(`Failed to create auction: ${error?.message}`);
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuction = {
+      id: data.id,
+      productId: data.product_id,
+      startingPrice: data.starting_price,
+      reservePrice: data.reserve_price,
+      buyNowPrice: data.buy_now_price,
+      currentBid: data.current_bid,
+      currentBidderId: data.current_bidder_id,
+      bidIncrement: data.bid_increment,
+      startsAt: data.starts_at,
+      endsAt: data.ends_at,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+    
+    console.log(`Successfully created auction: ${JSON.stringify(mappedAuction)}`);
+    return mappedAuction as Auction;
+  }
+
+  async updateAuction(id: number, auctionData: Partial<InsertAuction>): Promise<Auction> {
+    console.log(`Updating auction ${id} with data: ${JSON.stringify(auctionData)}`);
+    
+    // Convert camelCase to snake_case for DB
+    const dbAuctionData: any = {};
+    
+    if (auctionData.productId !== undefined) dbAuctionData.product_id = auctionData.productId;
+    if (auctionData.startingPrice !== undefined) dbAuctionData.starting_price = auctionData.startingPrice;
+    if (auctionData.reservePrice !== undefined) dbAuctionData.reserve_price = auctionData.reservePrice;
+    if (auctionData.buyNowPrice !== undefined) dbAuctionData.buy_now_price = auctionData.buyNowPrice;
+    if (auctionData.currentBid !== undefined) dbAuctionData.current_bid = auctionData.currentBid;
+    if (auctionData.currentBidderId !== undefined) dbAuctionData.current_bidder_id = auctionData.currentBidderId;
+    if (auctionData.bidIncrement !== undefined) dbAuctionData.bid_increment = auctionData.bidIncrement;
+    if (auctionData.startsAt !== undefined) dbAuctionData.starts_at = auctionData.startsAt;
+    if (auctionData.endsAt !== undefined) dbAuctionData.ends_at = auctionData.endsAt;
+    if (auctionData.status !== undefined) dbAuctionData.status = auctionData.status;
+    
+    // Always update the updated_at timestamp
+    dbAuctionData.updated_at = new Date().toISOString();
+    
+    const { data, error } = await supabase
+      .from('auctions')
+      .update(dbAuctionData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error || !data) {
+      console.error('Error updating auction:', error);
+      throw new Error(`Failed to update auction: ${error?.message}`);
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuction = {
+      id: data.id,
+      productId: data.product_id,
+      startingPrice: data.starting_price,
+      reservePrice: data.reserve_price,
+      buyNowPrice: data.buy_now_price,
+      currentBid: data.current_bid,
+      currentBidderId: data.current_bidder_id,
+      bidIncrement: data.bid_increment,
+      startsAt: data.starts_at,
+      endsAt: data.ends_at,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+    
+    console.log(`Successfully updated auction: ${JSON.stringify(mappedAuction)}`);
+    return mappedAuction as Auction;
+  }
+
+  async deleteAuction(id: number): Promise<void> {
+    console.log(`Deleting auction with ID: ${id}`);
+    
+    // First delete all bids for this auction
+    try {
+      const { error: bidsError } = await supabase
+        .from('bids')
+        .delete()
+        .eq('auction_id', id);
+      
+      if (bidsError) {
+        console.error('Error deleting auction bids:', bidsError);
+        // Continue with auction deletion anyway
+      }
+    } catch (err) {
+      console.error('Exception deleting auction bids:', err);
+      // Continue with auction deletion anyway
+    }
+    
+    // Then delete the auction
+    const { error } = await supabase
+      .from('auctions')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting auction:', error);
+      throw new Error(`Failed to delete auction: ${error.message}`);
+    }
+    
+    console.log(`Successfully deleted auction ${id}`);
+  }
+
+  // =========== BID METHODS ===========
+
+  async getBidsForAuction(auctionId: number): Promise<Bid[]> {
+    console.log(`Getting bids for auction ID: ${auctionId}`);
+    
+    const { data, error } = await supabase
+      .from('bids')
+      .select('*')
+      .eq('auction_id', auctionId)
+      .order('placed_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting auction bids:', error);
+      return [];
+    }
+    
+    // Map snake_case to camelCase
+    const mappedBids = (data || []).map(bid => ({
+      id: bid.id,
+      auctionId: bid.auction_id,
+      bidderId: bid.bidder_id,
+      amount: bid.amount,
+      placedAt: bid.placed_at,
+      isWinning: bid.is_winning,
+    }));
+    
+    console.log(`Retrieved ${mappedBids.length} bids for auction ${auctionId}`);
+    return mappedBids as Bid[];
+  }
+
+  async createBid(bid: InsertBid): Promise<Bid> {
+    console.log(`Creating bid with data: ${JSON.stringify(bid)}`);
+    
+    // Convert camelCase to snake_case for DB
+    const dbBid = {
+      auction_id: bid.auctionId,
+      bidder_id: bid.bidderId,
+      amount: bid.amount,
+      is_winning: bid.isWinning === undefined ? true : bid.isWinning,
+    };
+    
+    const { data, error } = await supabase
+      .from('bids')
+      .insert([dbBid])
+      .select()
+      .single();
+    
+    if (error || !data) {
+      console.error('Error creating bid:', error);
+      throw new Error(`Failed to create bid: ${error?.message}`);
+    }
+    
+    // Map snake_case to camelCase
+    const mappedBid = {
+      id: data.id,
+      auctionId: data.auction_id,
+      bidderId: data.bidder_id,
+      amount: data.amount,
+      placedAt: data.placed_at,
+      isWinning: data.is_winning,
+    };
+    
+    console.log(`Successfully created bid: ${JSON.stringify(mappedBid)}`);
+    return mappedBid as Bid;
+  }
+
+  async updatePreviousBids(auctionId: number, newBidderId: number): Promise<void> {
+    console.log(`Updating previous bids for auction ${auctionId}, new bidder: ${newBidderId}`);
+    
+    // Mark all previous bids as not winning
+    const { error } = await supabase
+      .from('bids')
+      .update({ is_winning: false })
+      .eq('auction_id', auctionId)
+      .neq('bidder_id', newBidderId);
+    
+    if (error) {
+      console.error('Error updating previous bids:', error);
+      throw new Error(`Failed to update previous bids: ${error.message}`);
+    }
+    
+    console.log(`Successfully updated previous bids for auction ${auctionId}`);
+  }
+  
   // Message methods
   async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
     // First get all messages without trying to join users
