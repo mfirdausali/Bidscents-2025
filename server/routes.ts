@@ -580,6 +580,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Validated auction data:", req.body);
       console.log("End date format:", req.body.endsAt);
       
+      // Set starts_at to current date if not specified
+      if (!req.body.startsAt) {
+        req.body.startsAt = new Date().toISOString();
+        console.log("Setting starts_at to current time:", req.body.startsAt);
+      }
+      
       // Parse the auction data
       try {
         // Create the auction
