@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Clock, DollarSign, User, Users } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Bid {
   id: number;
@@ -43,9 +44,13 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [bidAmount, setBidAmount] = useState<string>("");
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   const [isActive, setIsActive] = useState<boolean>(true);
+  const [localBids, setLocalBids] = useState<Bid[]>([]);
+  const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const socket = useRef<WebSocket | null>(null);
   
   // Fetch auction details which includes product info
   const { 
@@ -61,6 +66,89 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     },
   });
   
+  // WebSocket connection for real-time bid updates
+  useEffect(() => {
+    if (!id) return;
+    
+    // Setup WebSocket connection
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    // Create WebSocket connection
+    socket.current = new WebSocket(wsUrl);
+    
+    socket.current.onopen = () => {
+      setWsConnected(true);
+      console.log("WebSocket connected");
+      
+      // Join auction room
+      if (socket.current?.readyState === WebSocket.OPEN) {
+        socket.current.send(JSON.stringify({
+          type: 'joinAuction',
+          auctionId: parseInt(id),
+          userId: user?.id || 0
+        }));
+      }
+    };
+    
+    socket.current.onclose = () => {
+      setWsConnected(false);
+      console.log("WebSocket disconnected");
+    };
+    
+    socket.current.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      toast({
+        title: "Connection Error",
+        description: "Could not connect to bid updates. Please refresh the page.",
+        variant: "destructive"
+      });
+    };
+    
+    socket.current.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'newBid' && data.auctionId === parseInt(id)) {
+          // Update bid list with new bid
+          const newBid: Bid = data.bid;
+          
+          // Update local bids state
+          setLocalBids(prev => [newBid, ...prev]);
+          
+          // Refresh auction data through React Query
+          queryClient.invalidateQueries({ queryKey: ['/api/auctions', id] });
+          
+          // Notification for new bids
+          if (user && newBid.bidderId !== user.id) {
+            toast({
+              title: "New Bid Placed",
+              description: `A new bid of ${formatCurrency(newBid.amount)} has been placed.`,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+      }
+    };
+    
+    // Cleanup function
+    return () => {
+      if (socket.current) {
+        // Leave auction room
+        if (socket.current.readyState === WebSocket.OPEN) {
+          socket.current.send(JSON.stringify({
+            type: 'leaveAuction',
+            auctionId: parseInt(id),
+            userId: user?.id || 0
+          }));
+        }
+        
+        socket.current.close();
+      }
+    };
+  }, [id, user?.id, toast]);
+
   // Calculate time remaining until auction ends
   useEffect(() => {
     if (!auctionData?.endsAt) return;
@@ -104,7 +192,19 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   const handleBidSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!auctionData) return;
+    if (!auctionData || !user) {
+      // If user is not logged in
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "You need to be logged in to place a bid.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      return;
+    }
     
     // Validate bid amount
     const bidValue = parseFloat(bidAmount);
@@ -127,11 +227,55 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
       return;
     }
     
-    // Placeholder for bid submission
-    toast({
-      title: "Bid Placed!",
-      description: `Your bid of ${formatCurrency(bidValue)} was placed successfully.`,
-    });
+    // Check if the WebSocket connection is active
+    if (!wsConnected || !socket.current || socket.current.readyState !== WebSocket.OPEN) {
+      toast({
+        title: "Connection Error",
+        description: "Unable to place bid due to connection issues. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Send bid via WebSocket
+    try {
+      const bidMessage = {
+        type: 'placeBid',
+        auctionId: parseInt(id),
+        userId: user.id,
+        amount: bidValue,
+        timestamp: new Date().toISOString()
+      };
+      
+      socket.current.send(JSON.stringify(bidMessage));
+      
+      // Add temporary bid to local state (will be confirmed by server)
+      const tempBid: Bid = {
+        id: Date.now(), // Temporary ID until confirmed
+        auctionId: parseInt(id),
+        bidderId: user.id,
+        amount: bidValue,
+        placedAt: new Date().toISOString(),
+        isWinning: true,
+        bidder: user.username
+      };
+      
+      setLocalBids(prev => [tempBid, ...prev]);
+      
+      // Optimistic UI update
+      toast({
+        title: "Bid Placed!",
+        description: `Your bid of ${formatCurrency(bidValue)} was placed successfully.`,
+      });
+      
+    } catch (error) {
+      console.error("Error sending bid:", error);
+      toast({
+        title: "Error",
+        description: "Failed to place bid. Please try again.",
+        variant: "destructive",
+      });
+    }
     
     // Clear bid amount
     setBidAmount("");
@@ -298,26 +442,68 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                 <CardTitle>Bid History</CardTitle>
               </CardHeader>
               <CardContent>
-                {auctionData.bids && auctionData.bids.length > 0 ? (
-                  <div className="space-y-4">
-                    {auctionData.bids.map((bid: Bid) => (
-                      <div key={bid.id} className="flex items-center justify-between border-b pb-3">
-                        <div className="flex items-center">
-                          <User className="w-5 h-5 mr-2 text-gray-500" />
-                          <span>{bid.bidder || `Bidder #${bid.bidderId}`}</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold">{formatCurrency(bid.amount)}</div>
-                          <div className="text-sm text-gray-500">
-                            {new Date(bid.placedAt).toLocaleString()}
+                {/* WebSocket connection status */}
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-gray-500">Real-time updates</span>
+                  <span className={`text-sm flex items-center ${wsConnected ? 'text-green-500' : 'text-red-500'}`}>
+                    <span className={`h-2 w-2 rounded-full mr-1 ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                    {wsConnected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
+                
+                {/* Scrollable bid history */}
+                <div className="h-80 overflow-y-auto border rounded-md p-4 bg-gray-50">
+                  {(auctionData.bids && auctionData.bids.length > 0) || localBids.length > 0 ? (
+                    <div className="space-y-4">
+                      {/* Show local bids first (from WebSocket) */}
+                      {localBids.map((bid: Bid) => (
+                        <div key={`local-${bid.id}`} className="flex items-center justify-between border-b pb-3 bg-green-50 p-2 rounded">
+                          <div className="flex items-center">
+                            <User className="w-5 h-5 mr-2 text-gray-500" />
+                            <span>{bid.bidder || `Bidder #${bid.bidderId}`}</span>
+                            {user && bid.bidderId === user.id && (
+                              <Badge className="ml-2 bg-purple-100 text-purple-800 text-xs">You</Badge>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">{formatCurrency(bid.amount)}</div>
+                            <div className="text-sm text-gray-500">
+                              {new Date(bid.placedAt).toLocaleString()}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center py-4 text-gray-500">No bids have been placed yet.</p>
-                )}
+                      ))}
+                      
+                      {/* Show bids from the database */}
+                      {auctionData.bids && auctionData.bids.map((bid: Bid) => {
+                        // Skip bids that are already shown in localBids
+                        if (localBids.some(localBid => localBid.id === bid.id)) {
+                          return null;
+                        }
+                        
+                        return (
+                          <div key={bid.id} className="flex items-center justify-between border-b pb-3">
+                            <div className="flex items-center">
+                              <User className="w-5 h-5 mr-2 text-gray-500" />
+                              <span>{bid.bidder || `Bidder #${bid.bidderId}`}</span>
+                              {user && bid.bidderId === user.id && (
+                                <Badge className="ml-2 bg-purple-100 text-purple-800 text-xs">You</Badge>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold">{formatCurrency(bid.amount)}</div>
+                              <div className="text-sm text-gray-500">
+                                {new Date(bid.placedAt).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-center py-4 text-gray-500">No bids have been placed yet.</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
