@@ -1768,7 +1768,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               auctionId: parseInt(auctionId),
               bidderId: userId,
               amount: parseFloat(amount),
-              placedAt: new Date().toISOString(),
               isWinning: true
             });
             
@@ -1887,10 +1886,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bids = await storage.getBidsForAuction(auction.id);
       
       // Get product details
-      const product = await storage.getProductById(auction.productId);
-      
-      if (!product) {
-        return res.status(404).json({ message: 'Product not found' });
+      console.log(`Looking up product ID ${auction.productId} for auction ${auctionId}`);
+      let product;
+      try {
+        product = await storage.getProductById(auction.productId);
+        
+        if (!product) {
+          console.log(`Product with ID ${auction.productId} not found for auction ${auctionId}`);
+          return res.status(404).json({ message: 'Product not found' });
+        }
+        
+        console.log(`Found product for auction ${auctionId}:`, product.name);
+      } catch (productError) {
+        console.error(`Error retrieving product ${auction.productId} for auction ${auctionId}:`, productError);
+        return res.status(404).json({ message: 'Error retrieving product details' });
       }
       
       // Combine auction with bid count and product details

@@ -60,7 +60,6 @@ export function AuctionCard({ product, images }: AuctionProps) {
     const calculateTimeRemaining = () => {
       const now = new Date();
       const endDate = new Date(product.auction.endsAt);
-      console.log("End Date:", endDate);
       
       // If auction has ended
       if (now > endDate) {
