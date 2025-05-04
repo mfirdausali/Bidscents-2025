@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -52,11 +52,11 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const socket = useRef<WebSocket | null>(null);
   
-  // Calculate the next minimum bid amount
-  const getNextBidAmount = (auctionData: Auction | undefined) => {
+  // Calculate the next minimum bid amount (memoized to avoid unnecessary rerenders)
+  const getNextBidAmount = useCallback((auctionData: Auction | undefined) => {
     if (!auctionData) return 0;
     return (auctionData.currentBid || auctionData.startingPrice) + auctionData.bidIncrement;
-  };
+  }, []);
 
   // Fetch auction details which includes product info
   const { 
@@ -414,17 +414,35 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     );
   }
   
-  // Extract product from auction data and calculate next bid amount
-  const product = auctionData.product;
-  const nextBidAmount = getNextBidAmount(auctionData);
-  
   // Set the default bid amount when auction data loads or changes
   useEffect(() => {
     if (auctionData) {
-      setBidAmount(nextBidAmount.toString());
+      const nextBid = getNextBidAmount(auctionData);
+      setBidAmount(nextBid.toString());
     }
-  }, [auctionData?.id, auctionData?.currentBid]);
+  }, [auctionData, getNextBidAmount]);
   
+  // Extract product from auction data and calculate next bid amount
+  const product = auctionData?.product;
+  const nextBidAmount = auctionData ? getNextBidAmount(auctionData) : 0;
+  
+  // Guard clause to ensure we have both auctionData and product
+  if (!auctionData || !product) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <div className="flex-grow container mx-auto p-6">
+          <div className="flex flex-col items-center justify-center gap-4 py-20">
+            <h1 className="text-2xl font-bold">Auction Data Unavailable</h1>
+            <p className="text-gray-500">We're having trouble loading this auction. Please try again later.</p>
+            <Button onClick={() => navigate("/")}>Return Home</Button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
