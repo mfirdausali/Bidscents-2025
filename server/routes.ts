@@ -1522,11 +1522,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               winningBidderId: auction.currentBidderId
             };
             
-            for (const client of auctionRoom) {
+            // Convert Set to Array before iteration to avoid TypeScript error
+            Array.from(auctionRoom).forEach(client => {
               if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify(notificationPayload));
               }
-            }
+            });
             
             console.log(`Notified ${auctionRoom.size} clients that auction #${auction.id} has ended`);
           }
@@ -1606,6 +1607,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               content: z.string().min(1),
               productId: z.number().optional(),
             });
+            
+            // Ensure userId is not null before using it
+            if (userId === null) {
+              throw new Error('User ID is required to send a message');
+            }
             
             const messageData = messageSchema.parse({
               senderId: userId, // Use authenticated user ID as sender
@@ -1693,6 +1699,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Mark a single message as read
               await storage.markMessageAsRead(data.messageId);
             } else if (data.senderId) {
+              // Ensure userId is not null before using it
+              if (userId === null) {
+                throw new Error('User ID is required to mark messages as read');
+              }
               // Mark all messages from a specific sender as read
               await storage.markAllMessagesAsRead(userId, data.senderId);
             }
