@@ -209,8 +209,8 @@ export default function HomePage() {
                       currentBid: product.auction.currentBid,
                       bidIncrement: product.auction.bidIncrement,
                       buyNowPrice: product.auction.buyNowPrice,
-                      endsAt: product.auction.endsAt,
-                      startsAt: product.auction.startsAt,
+                      endsAt: typeof product.auction.endsAt === 'string' ? product.auction.endsAt : product.auction.endsAt.toISOString(),
+                      startsAt: typeof product.auction.startsAt === 'string' ? product.auction.startsAt : product.auction.startsAt.toISOString(),
                       status: product.auction.status,
                       bidCount: product.auction.bidCount
                     } : {

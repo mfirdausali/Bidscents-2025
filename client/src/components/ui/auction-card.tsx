@@ -25,7 +25,11 @@ interface AuctionProps {
     sellerId: number;
     seller?: {
       username?: string;
-      profileImage?: string;
+      profileImage?: string | null;
+      id?: number;
+      email?: string;
+      firstName?: string | null;
+      lastName?: string | null;
     };
     auction: { // Make auction required
       id: number;
@@ -128,16 +132,13 @@ export function AuctionCard({ product, images }: AuctionProps) {
         <Link href={`/auction/${product.auction.id}`}>
           <img
             src={
-              // First, try to find an image with imageOrder=0
-              images?.find(img => img.imageOrder === 0)?.imageUrl 
-                ? `/api/images/${images.find(img => img.imageOrder === 0)?.imageUrl}`
-                // Then try any available image
-                : images?.[0]?.imageUrl
-                  ? `/api/images/${images[0].imageUrl}`
-                  // Fallback to the old imageUrl field if no images in the table
-                  : product.imageUrl
-                    ? `/api/images/${product.imageUrl}`
-                    : '/placeholder.jpg' // Default placeholder
+              // Use the first available image from the images array
+              images && images.length > 0
+                ? `/api/images/${images[0].imageUrl}`
+                // Fallback to the old imageUrl field if no images in the table
+                : product.imageUrl
+                  ? `/api/images/${product.imageUrl}`
+                  : '/placeholder.jpg' // Default placeholder
             }
             alt={product.name}
             className="w-full h-48 object-cover"
