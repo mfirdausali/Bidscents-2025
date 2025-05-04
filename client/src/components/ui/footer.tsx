@@ -101,12 +101,12 @@ export function Footer() {
             </h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <a
-                  href="#"
+                <Link
+                  href="/buying-guide"
                   className="text-gray-600 hover:text-purple-600 transition-colors"
                 >
                   Buying Guide
-                </a>
+                </Link>
               </li>
               <li>
                 <Link
