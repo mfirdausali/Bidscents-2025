@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Clock, DollarSign, User, Users } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
+import { Header } from "@/components/ui/header";
+import { Footer } from "@/components/ui/footer";
 
 interface AuctionDetailProps {}
 
@@ -150,31 +152,39 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   
   if (productLoading || auctionLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex flex-col gap-4">
-          <div className="h-8 bg-gray-200 animate-pulse rounded"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="aspect-square bg-gray-200 animate-pulse rounded"></div>
-            <div className="flex flex-col gap-4">
-              <div className="h-8 bg-gray-200 animate-pulse rounded"></div>
-              <div className="h-6 bg-gray-200 animate-pulse rounded"></div>
-              <div className="h-6 bg-gray-200 animate-pulse rounded"></div>
-              <div className="h-12 bg-gray-200 animate-pulse rounded mt-4"></div>
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <div className="flex-grow container mx-auto p-6">
+          <div className="flex flex-col gap-4">
+            <div className="h-8 bg-gray-200 animate-pulse rounded"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="aspect-square bg-gray-200 animate-pulse rounded"></div>
+              <div className="flex flex-col gap-4">
+                <div className="h-8 bg-gray-200 animate-pulse rounded"></div>
+                <div className="h-6 bg-gray-200 animate-pulse rounded"></div>
+                <div className="h-6 bg-gray-200 animate-pulse rounded"></div>
+                <div className="h-12 bg-gray-200 animate-pulse rounded mt-4"></div>
+              </div>
             </div>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
   
   if (productError || auctionError || !product || !auction) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex flex-col items-center justify-center gap-4 py-20">
-          <h1 className="text-2xl font-bold">Auction Not Found</h1>
-          <p className="text-gray-500">The auction you're looking for does not exist or has ended.</p>
-          <Button onClick={() => navigate("/")}>Return Home</Button>
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <div className="flex-grow container mx-auto p-6">
+          <div className="flex flex-col items-center justify-center gap-4 py-20">
+            <h1 className="text-2xl font-bold">Auction Not Found</h1>
+            <p className="text-gray-500">The auction you're looking for does not exist or has ended.</p>
+            <Button onClick={() => navigate("/")}>Return Home</Button>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -182,8 +192,10 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   const nextBidAmount = (auction.currentBid || auction.startingPrice) + auction.bidIncrement;
   
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">{product.name}</h1>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <div className="flex-grow container mx-auto p-6">
+        <h1 className="text-3xl font-bold mb-6">{product.name}</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         {/* Product Image */}
@@ -373,6 +385,8 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
+      <Footer />
     </div>
   );
 }
