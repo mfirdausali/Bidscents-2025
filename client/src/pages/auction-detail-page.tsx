@@ -158,8 +158,30 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
           // Update bid list with new bid
           const newBid: Bid = data.bid;
           
-          // Update local bids state
-          setLocalBids(prev => [newBid, ...prev]);
+          // Check if this bid is from the current user and matches our temporary bid
+          const isCurrentUserBid = user && newBid.bidderId === user.id;
+          
+          // For a user's own bid, replace the temporary bid with the confirmed one
+          setLocalBids(prev => {
+            // Look for a temporary bid from this user with matching amount
+            if (isCurrentUserBid) {
+              // Find any temp bids that match this user's bid amount (approximately)
+              const tempBidIndex = prev.findIndex(b => 
+                b.bidderId === newBid.bidderId && 
+                Math.abs(b.amount - newBid.amount) < 0.001
+              );
+              
+              // If we found a matching temp bid, replace it
+              if (tempBidIndex >= 0) {
+                const newBids = [...prev];
+                newBids[tempBidIndex] = newBid;
+                return newBids;
+              }
+            }
+            
+            // For other users' bids, just add to the list
+            return [newBid, ...prev];
+          });
           
           // Update auction data if provided in the message
           if (data.auction) {
@@ -592,12 +614,19 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                 <div className="h-80 overflow-y-auto border rounded-md p-4 bg-gray-50">
                   {(auctionData.bids && auctionData.bids.length > 0) || localBids.length > 0 ? (
                     <div className="space-y-4">
+                      {/* Highest bid indicator */}
+                      {localBids.length > 0 && (
+                        <div className="mb-2 text-sm text-gray-500">
+                          The highest bid is shown at the top
+                        </div>
+                      )}
+                      
                       {/* Show local bids first (from WebSocket) */}
-                      {localBids.map((bid: Bid) => (
+                      {localBids.map((bid: Bid, index) => (
                         <div 
                           key={`local-${bid.id}`} 
                           className={`flex items-center justify-between border-b pb-3 p-2 rounded ${
-                            bid.isWinning ? 'bg-green-50' : 'bg-gray-50'
+                            index === 0 ? 'bg-green-50' : 'bg-gray-50'
                           }`}
                         >
                           <div className="flex items-center">
@@ -606,8 +635,8 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                             {user && bid.bidderId === user.id && (
                               <Badge className="ml-2 bg-purple-100 text-purple-800 text-xs">You</Badge>
                             )}
-                            {bid.isWinning && (
-                              <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Winning</Badge>
+                            {index === 0 && (
+                              <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Highest</Badge>
                             )}
                           </div>
                           <div className="text-right">
@@ -620,7 +649,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                       ))}
                       
                       {/* Show bids from the database */}
-                      {auctionData.bids && auctionData.bids.map((bid: Bid) => {
+                      {auctionData.bids && auctionData.bids.map((bid: Bid, index) => {
                         // Skip bids that are already shown in localBids
                         if (localBids.some(localBid => localBid.id === bid.id)) {
                           return null;
@@ -630,7 +659,8 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                           <div 
                             key={bid.id} 
                             className={`flex items-center justify-between border-b pb-3 p-2 ${
-                              bid.isWinning ? 'bg-green-50 rounded' : ''
+                              // Only highlight the first bid if there are no local bids
+                              index === 0 && localBids.length === 0 ? 'bg-green-50 rounded' : ''
                             }`}
                           >
                             <div className="flex items-center">
@@ -639,8 +669,8 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                               {user && bid.bidderId === user.id && (
                                 <Badge className="ml-2 bg-purple-100 text-purple-800 text-xs">You</Badge>
                               )}
-                              {bid.isWinning && (
-                                <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Winning</Badge>
+                              {index === 0 && localBids.length === 0 && (
+                                <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Highest</Badge>
                               )}
                             </div>
                             <div className="text-right">

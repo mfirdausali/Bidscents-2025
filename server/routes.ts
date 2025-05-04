@@ -2030,6 +2030,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get bids for this auction
       const bids = await storage.getBidsForAuction(auction.id);
       
+      // Enhance bids with bidder usernames
+      const enhancedBids = await Promise.all(bids.map(async (bid) => {
+        try {
+          const bidder = await storage.getUser(bid.bidderId);
+          return {
+            ...bid,
+            bidder: bidder?.username || `User #${bid.bidderId}`
+          };
+        } catch (err) {
+          console.warn(`Could not fetch username for bidder ${bid.bidderId}:`, err);
+          return {
+            ...bid,
+            bidder: `User #${bid.bidderId}`
+          };
+        }
+      }));
+      
       // Get product details
       console.log(`Looking up product ID ${auction.productId} for auction ${auctionId}`);
       let product;
@@ -2054,7 +2071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(200).json({ 
               ...auction, 
               bidCount: bids.length,
-              bids,
+              bids: enhancedBids,
               message: 'Product not found'
             });
           }
@@ -2116,7 +2133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const auctionWithDetails = {
         ...auction,
         bidCount: bids.length,
-        bids,
+        bids: enhancedBids,  // Use enhanced bids with usernames
         product
       };
       
