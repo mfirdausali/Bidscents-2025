@@ -11,13 +11,13 @@ interface AuctionProps {
     name: string;
     price: number;
     brand: string;
-    imageUrl: string;
+    imageUrl: string; // This is now always a string (empty string if no image)
     category?: string;
     stockQuantity?: number;
     rating?: number;
     reviewCount?: number;
     listingType?: string;
-    auction?: {
+    auction: { // Make auction required
       id: number;
       startingPrice: number;
       currentBid: number | null;
@@ -37,11 +37,11 @@ export function AuctionCard({ product, images }: AuctionProps) {
   
   // Calculate time remaining until auction ends
   useEffect(() => {
-    if (!product.auction?.endsAt) return;
+    if (!product.auction.endsAt) return;
     
     const calculateTimeRemaining = () => {
       const now = new Date();
-      const endDate = new Date(product.auction!.endsAt);
+      const endDate = new Date(product.auction.endsAt);
       
       // If auction has ended
       if (now > endDate) {

@@ -192,12 +192,12 @@ export default function HomePage() {
                     price: product.price,
                     brand: product.brand,
                     imageUrl: product.imageUrl || '',
-                    category: product.category?.name,
-                    stockQuantity: product.stockQuantity,
+                    category: product.category?.name || '',
+                    stockQuantity: product.stockQuantity || 0,
                     rating: product.averageRating || 0,
                     reviewCount: product.reviews?.length || 0,
-                    listingType: product.listingType,
-                    auction: product.listingType === 'auction' ? {
+                    listingType: product.listingType || 'auction',
+                    auction: {
                       id: product.id, // This should be the auction id, but we'll use product id as a fallback
                       startingPrice: product.price,
                       currentBid: null,
@@ -206,7 +206,7 @@ export default function HomePage() {
                       endsAt: new Date(Date.now() + 86400000).toISOString(), // 1 day from now
                       startsAt: new Date().toISOString(),
                       status: 'active'
-                    } : undefined
+                    }
                   }}
                   images={product.images?.map(img => ({
                     id: img.id,
