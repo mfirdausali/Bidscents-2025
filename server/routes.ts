@@ -1731,10 +1731,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Handle placing a bid
         if (data.type === 'placeBid') {
           try {
+            // For placing bids, we must have a real authenticated user
+            // Not just guest access like for viewing
+            if (!userId) {
+              console.log('Bid attempt rejected: Not authenticated');
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: 'You must be logged in to place a bid' 
+              }));
+              return;
+            }
+            
+            console.log(`Processing bid from user ${userId}...`);
             const { auctionId, amount } = data;
             
             // Validate auction ID and bid amount
             if (isNaN(parseInt(auctionId)) || isNaN(parseFloat(amount))) {
+              console.log(`Bid validation failed: Invalid auction ID ${auctionId} or amount ${amount}`);
               ws.send(JSON.stringify({ 
                 type: 'error', 
                 message: 'Invalid auction ID or bid amount' 
@@ -1742,20 +1755,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return;
             }
             
+            console.log(`Fetching auction ${auctionId} for bid validation...`);
             // Get the auction
             const auction = await storage.getAuctionById(parseInt(auctionId));
             if (!auction) {
+              console.log(`Bid rejected: Auction ${auctionId} not found`);
               ws.send(JSON.stringify({ 
                 type: 'error', 
                 message: 'Auction not found' 
               }));
               return;
             }
+            console.log(`Found auction ${auctionId} for product ${auction.productId}`);
             
             // Check if auction is active
             const now = new Date();
             const endsAt = new Date(auction.endsAt);
             if (now > endsAt) {
+              console.log(`Bid rejected: Auction ${auctionId} has ended at ${endsAt}, current time is ${now}`);
               ws.send(JSON.stringify({ 
                 type: 'error', 
                 message: 'Auction has ended' 
@@ -1766,6 +1783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Check if the bid is high enough
             const minBid = (auction.currentBid || auction.startingPrice) + auction.bidIncrement;
             if (parseFloat(amount) < minBid) {
+              console.log(`Bid rejected: Amount ${amount} is less than minimum bid ${minBid}`);
               ws.send(JSON.stringify({ 
                 type: 'error', 
                 message: `Bid must be at least ${minBid}` 
@@ -1773,8 +1791,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return;
             }
             
+            console.log(`Bid validation successful. Processing bid of ${amount} on auction ${auctionId} by user ${userId}...`);
+            
             // Step 2: Set any previous winning bids to not winning
             try {
+              console.log(`Resetting previous winning bids for auction ${auctionId}...`);
               // This needs to be a direct database call since our storage interface doesn't have this method
               const { error: updateError } = await supabase
                 .from('bids')
@@ -1785,6 +1806,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (updateError) {
                 console.error('Error updating previous bids:', updateError);
                 // Continue with new bid placement anyway
+              } else {
+                console.log(`Successfully reset previous winning bids for auction ${auctionId}`);
               }
             } catch (err) {
               console.error('Exception updating previous bids:', err);
@@ -1792,54 +1815,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Step 3: Create the bid in the database
-            const bid = await storage.createBid({
-              auctionId: parseInt(auctionId),
-              bidderId: userId,
-              amount: parseFloat(amount),
-              isWinning: true // This new bid becomes the winning bid
-            });
+            console.log(`Creating new bid record for auction ${auctionId} by user ${userId} with amount ${amount}...`);
             
-            // Step 4: Update the auction's current bid and bidder
-            await storage.updateAuction(parseInt(auctionId), {
-              currentBid: parseFloat(amount),
-              currentBidderId: userId
-            });
-            
-            // Get bidder information
-            const bidder = await storage.getUser(userId);
-            
-            // Add bidder name to bid
-            const bidWithDetails = {
-              ...bid,
-              bidder: bidder?.username || `User #${userId}`
-            };
-            
-            // Step 5: Notify all users in the auction room
-            const room = auctionRooms.get(parseInt(auctionId));
-            if (room) {
-              // Get updated auction data to include in the notification
-              const updatedAuction = await storage.getAuctionById(parseInt(auctionId));
-              
-              Array.from(room).forEach(connection => {
-                if (connection.readyState === WebSocket.OPEN) {
-                  connection.send(JSON.stringify({
-                    type: 'newBid',
-                    auctionId: parseInt(auctionId),
-                    bid: bidWithDetails,
-                    auction: updatedAuction // Include updated auction data
-                  }));
-                }
+            try {
+              // Step 3: Create the new bid
+              const bid = await storage.createBid({
+                auctionId: parseInt(auctionId),
+                bidderId: userId,
+                amount: parseFloat(amount),
+                isWinning: true // This new bid becomes the winning bid
               });
+              console.log(`Successfully created bid with ID ${bid.id}`);
+              
+              // Step 4: Update the auction's current bid and bidder
+              console.log(`Updating auction ${auctionId} with new current bid ${amount} and bidder ${userId}...`);
+              await storage.updateAuction(parseInt(auctionId), {
+                currentBid: parseFloat(amount),
+                currentBidderId: userId
+              });
+              console.log(`Successfully updated auction ${auctionId}`);
+              
+              // Get bidder information
+              console.log(`Fetching bidder details for user ${userId}...`);
+              const bidder = await storage.getUser(userId);
+              console.log(`Bidder details: ${bidder ? 'Found' : 'Not found'}`);
+              
+              // Add bidder name to bid
+              const bidWithDetails = {
+                ...bid,
+                bidder: bidder?.username || `User #${userId}`
+              };
+              console.log(`Enhanced bid with bidder name: ${bidWithDetails.bidder}`);
+              
+              // Step 5: Notify all users in the auction room
+              console.log(`Preparing to notify all users in auction room ${auctionId} about the new bid...`);
+              const room = auctionRooms.get(parseInt(auctionId));
+              
+              if (room) {
+                // Get updated auction data to include in the notification
+                console.log(`Fetching updated auction data for notification...`);
+                const updatedAuction = await storage.getAuctionById(parseInt(auctionId));
+                
+                if (!updatedAuction) {
+                  console.error(`Could not fetch updated auction data for ID ${auctionId}`);
+                  // Continue with notification using just the bid information
+                } else {
+                  console.log(`Updated auction data retrieved. Current bid: ${updatedAuction.currentBid}, current bidder: ${updatedAuction.currentBidderId}`);
+                }
+                
+                console.log(`Broadcasting bid update to ${room.size} connected clients in room...`);
+                let notifiedCount = 0;
+                
+                Array.from(room).forEach(connection => {
+                  if (connection.readyState === WebSocket.OPEN) {
+                    // Create the message payload
+                    const payload: any = {
+                      type: 'newBid',
+                      auctionId: parseInt(auctionId),
+                      bid: bidWithDetails
+                    };
+                    
+                    // Only include auction data if we successfully retrieved it
+                    if (updatedAuction) {
+                      payload.auction = updatedAuction;
+                    }
+                    
+                    connection.send(JSON.stringify(payload));
+                    notifiedCount++;
+                  }
+                });
+                
+                console.log(`Successfully notified ${notifiedCount} clients about the new bid`);
+              } else {
+                console.log(`No auction room found for auctionId ${auctionId}, skipping notification`);
+              }
+              
+              // Send success response to the bidder
+              console.log(`Sending bid acceptance confirmation to bidder...`);
+              ws.send(JSON.stringify({
+                type: 'bidAccepted',
+                bid: bidWithDetails,
+                message: `Your bid of $${parseFloat(amount).toFixed(2)} was accepted`
+              }));
+              
+              console.log(`✅ Successfully completed bid process: User ${userId} placed bid of ${amount} on auction ${auctionId}`);
+            } catch (err) {
+              console.error(`Error in bid creation process:`, err);
+              throw err;
             }
-            
-            // Send success response to the bidder
-            ws.send(JSON.stringify({
-              type: 'bidAccepted',
-              bid: bidWithDetails,
-              message: `Your bid of $${parseFloat(amount).toFixed(2)} was accepted`
-            }));
-            
-            console.log(`User ${userId} placed bid of ${amount} on auction ${auctionId}`);
             return;
           } catch (error: any) {
             console.error('Error placing bid:', error);
