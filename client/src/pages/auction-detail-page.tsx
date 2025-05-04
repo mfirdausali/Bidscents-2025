@@ -62,14 +62,37 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     queryFn: async () => {
       console.log("Fetching auction data for ID:", id);
       const res = await fetch(`/api/auctions/${id}`);
+      
+      // Handle HTTP errors
       if (!res.ok) {
         console.error("Failed to fetch auction with status:", res.status);
-        throw new Error('Failed to fetch auction');
+        throw new Error(`Failed to fetch auction: ${res.status}`);
       }
+      
       const data = await res.json();
       console.log("Received auction data:", data);
+      
+      // Check if the response contains an error message about product not found
+      if (data.message === 'Product not found') {
+        // Create a manually wrapped response that includes both auction and dummy product
+        // This is a temporary fix to allow viewing the auction without the associated product
+        console.warn("Product not found for auction, using placeholder data");
+        const basicAuctionData = {
+          ...data,
+          product: {
+            id: data.productId || 0,
+            name: "Product Unavailable",
+            description: "This product information is not available.",
+            brand: "Unknown",
+            imageUrl: null
+          }
+        };
+        return basicAuctionData;
+      }
+      
       return data;
     },
+    retry: 2,
   });
   
   // WebSocket connection for real-time bid updates
