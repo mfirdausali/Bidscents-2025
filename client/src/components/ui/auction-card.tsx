@@ -73,7 +73,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
     const interval = setInterval(calculateTimeRemaining, 60000);
     
     return () => clearInterval(interval);
-  }, [product.auction?.endsAt]);
+  }, [product.auction.endsAt]);
   
   // Determine the best image to show
   const imageUrl = images && images.length > 0 
@@ -89,7 +89,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
   };
   
   // Get current bid or starting price
-  const currentPrice = product.auction?.currentBid || product.auction?.startingPrice || product.price;
+  const currentPrice = product.auction.currentBid || product.auction.startingPrice || product.price;
   
   // Estimate number of bids (placeholder - would be fetched from API in a real implementation)
   const estimatedBids = Math.floor(Math.random() * 10); // This is just a placeholder
@@ -122,7 +122,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
           <span className="text-green-600">Current Bid: {formatCurrency(currentPrice)}</span>
         </div>
         
-        {product.auction?.buyNowPrice && (
+        {product.auction.buyNowPrice && (
           <div className="text-sm mt-1">
             <span className="text-muted-foreground">Buy Now: {formatCurrency(product.auction.buyNowPrice)}</span>
           </div>
