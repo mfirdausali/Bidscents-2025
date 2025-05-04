@@ -1092,6 +1092,39 @@ export class SupabaseStorage implements IStorage {
     console.log(`Retrieved ${mappedAuctions.length} auctions`);
     return mappedAuctions as Auction[];
   }
+  
+  async getActiveAuctions(): Promise<Auction[]> {
+    console.log('Getting active auctions from Supabase');
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('status', 'active');
+    
+    if (error) {
+      console.error('Error getting active auctions:', error);
+      return [];
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuctions = (data || []).map(auction => ({
+      id: auction.id,
+      productId: auction.product_id,
+      startingPrice: auction.starting_price,
+      reservePrice: auction.reserve_price,
+      buyNowPrice: auction.buy_now_price,
+      currentBid: auction.current_bid,
+      currentBidderId: auction.current_bidder_id,
+      bidIncrement: auction.bid_increment,
+      startsAt: auction.starts_at,
+      endsAt: auction.ends_at,
+      status: auction.status,
+      createdAt: auction.created_at,
+      updatedAt: auction.updated_at,
+    }));
+    
+    console.log(`Retrieved ${mappedAuctions.length} active auctions`);
+    return mappedAuctions as Auction[];
+  }
 
   async getAuctionById(id: number): Promise<Auction | undefined> {
     console.log(`Getting auction with ID: ${id}`);
