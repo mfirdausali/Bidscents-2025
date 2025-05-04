@@ -1929,14 +1929,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isNew: productData.is_new,
             isFeatured: productData.is_featured,
             createdAt: productData.created_at,
-            remainingPercentage: productData.remaining_percentage,
-            batchCode: productData.batch_code,
-            purchaseYear: productData.purchase_year,
-            boxCondition: productData.box_condition,
-            listingType: productData.listing_type,
-            volume: productData.volume,
-            seller: null, // We'll set these to null since we don't have them
-            category: null,
+            // Include default values for product details that might be missing
+            remainingPercentage: productData.remaining_percentage || 100,
+            batchCode: productData.batch_code || 'Unknown',
+            purchaseYear: productData.purchase_year || new Date().getFullYear(),
+            boxCondition: productData.box_condition || 'Good',
+            listingType: productData.listing_type || 'auction',
+            volume: productData.volume || 100,
+            // Add seller information
+            seller: {
+              id: productData.seller_id,
+              username: 'Seller',
+              isSeller: true,
+              isVerified: true
+            },
+            // Add category information
+            category: {
+              id: productData.category_id || 1,
+              name: 'Fragrance'
+            },
             images: [],
             reviews: [],
             averageRating: undefined
