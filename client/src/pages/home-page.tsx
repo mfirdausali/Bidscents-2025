@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProductCard } from "@/components/ui/product-card";
+import { AuctionCard } from "@/components/ui/auction-card";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Input } from "@/components/ui/input";
@@ -183,7 +184,7 @@ export default function HomePage() {
               })
               .slice(0, 3)
               .map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <AuctionCard key={product.id} product={product} />
               ))}
           </div>
         ) : (

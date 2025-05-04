@@ -12,10 +12,11 @@ interface AuctionProps {
     price: number;
     brand: string;
     imageUrl: string;
-    rating: number;
-    reviewCount: number;
-    category: string;
-    stockQuantity: number;
+    category?: string;
+    stockQuantity?: number;
+    rating?: number;
+    reviewCount?: number;
+    listingType?: string;
     auction?: {
       id: number;
       startingPrice: number;
