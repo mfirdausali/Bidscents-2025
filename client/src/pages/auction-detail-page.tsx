@@ -52,6 +52,12 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const socket = useRef<WebSocket | null>(null);
   
+  // Calculate the next minimum bid amount
+  const getNextBidAmount = (auctionData: Auction | undefined) => {
+    if (!auctionData) return 0;
+    return (auctionData.currentBid || auctionData.startingPrice) + auctionData.bidIncrement;
+  };
+
   // Fetch auction details which includes product info
   const { 
     data: auctionData, 
@@ -371,7 +377,14 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   
   // Extract product from auction data and calculate next bid amount
   const product = auctionData.product;
-  const nextBidAmount = (auctionData.currentBid || auctionData.startingPrice) + auctionData.bidIncrement;
+  const nextBidAmount = getNextBidAmount(auctionData);
+  
+  // Set the default bid amount when auction data loads or changes
+  useEffect(() => {
+    if (auctionData) {
+      setBidAmount(nextBidAmount.toString());
+    }
+  }, [auctionData?.id, auctionData?.currentBid]);
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -441,7 +454,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                     placeholder={`Min bid: ${formatCurrency(nextBidAmount)}`}
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
-                    step="0.01"
+                    step={auctionData.bidIncrement.toString()}
                     min={nextBidAmount}
                     className="flex-grow"
                   />
