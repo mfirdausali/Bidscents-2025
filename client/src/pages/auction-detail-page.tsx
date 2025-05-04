@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Clock, DollarSign, User, Users } from "lucide-react";
+import { Clock, DollarSign, User, Users, CheckCircle } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
@@ -381,11 +381,15 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           {/* Product Image */}
-          <div className="aspect-square rounded-lg overflow-hidden">
+          <div className="aspect-square rounded-lg overflow-hidden bg-gray-50">
             <img 
-              src={product.imageUrl ? `/api/images/${product.imageUrl}` : '/placeholder.jpg'} 
+              src={product.images && product.images.length > 0 
+                ? `/api/images/${product.images[0]?.imageUrl}` 
+                : product.imageUrl 
+                  ? `/api/images/${product.imageUrl}` 
+                  : '/placeholder.jpg'} 
               alt={product.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover max-h-[500px]"
             />
           </div>
           
@@ -583,7 +587,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                   )}
                   <div className="flex justify-between">
                     <span className="font-medium">Category:</span>
-                    <span>{product.category || 'Uncategorized'}</span>
+                    <span>{product.category?.name || 'Uncategorized'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="font-medium">Brand:</span>
@@ -600,13 +604,46 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                 <CardTitle>Seller Information</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-4">
-                  <Button asChild variant="outline">
-                    <Link href={`/seller/${product.sellerId}`}>
-                      View Seller Profile
-                    </Link>
-                  </Button>
-                </div>
+                {product.seller ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center space-x-2 mb-4">
+                      <div className="h-16 w-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                        {product.seller.profileImage ? (
+                          <img 
+                            src={`/api/images/${product.seller.profileImage}`} 
+                            alt={product.seller.username || 'Seller'} 
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <User className="h-8 w-8 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-lg font-medium">{product.seller.username || 'Seller'}</h3>
+                        <div className="flex items-center space-x-1 text-sm text-gray-500">
+                          {product.seller.isVerified && (
+                            <span className="flex items-center text-blue-500">
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Verified
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-center py-2">
+                      <Button asChild variant="outline">
+                        <Link href={`/seller/${product.sellerId}`}>
+                          View Seller Profile
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    <p>Seller information is not available</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
