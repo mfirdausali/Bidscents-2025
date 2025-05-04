@@ -616,11 +616,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Get auction by ID
-  app.get("/api/auctions/:id", async (req, res, next) => {
+  // Basic auction details (deprecated, use the complete route below instead)
+  // This route is kept for backward compatibility
+  app.get("/api/auctions/:id/basic", async (req, res, next) => {
     try {
       const id = parseInt(req.params.id);
-      console.log(`Getting auction with ID: ${id}`);
+      console.log(`Getting basic auction with ID: ${id}`);
       
       const auction = await storage.getAuctionById(id);
       if (!auction) {
@@ -628,10 +629,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Auction not found" });
       }
       
-      console.log("Retrieved auction:", auction);
+      console.log("Retrieved basic auction:", auction);
       res.json(auction);
     } catch (error) {
-      console.error(`Error getting auction: ${error}`);
+      console.error(`Error getting basic auction: ${error}`);
       next(error);
     }
   });
@@ -1889,20 +1890,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Looking up product ID ${auction.productId} for auction ${auctionId}`);
       let product;
       try {
+        // Try standard product lookup first
         product = await storage.getProductById(auction.productId);
         
+        // If that fails, try direct database lookup
         if (!product) {
-          console.log(`Product with ID ${auction.productId} not found for auction ${auctionId}`);
-          // Return auction without product, with special message that client can handle
-          return res.status(200).json({ 
-            ...auction, 
-            bidCount: bids.length,
-            bids,
-            message: 'Product not found'
-          });
+          console.log(`Standard product lookup failed for ID ${auction.productId}, trying direct database lookup`);
+          
+          // Make a direct database query to get the product
+          const { data: productData, error: productError } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', auction.productId)
+            .single();
+          
+          if (productError || !productData) {
+            console.error(`Direct product lookup failed for ID ${auction.productId}:`, productError);
+            // Return auction without product, with special message that client can handle
+            return res.status(200).json({ 
+              ...auction, 
+              bidCount: bids.length,
+              bids,
+              message: 'Product not found'
+            });
+          }
+          
+          // Map the product from snake_case to camelCase
+          product = {
+            id: productData.id,
+            name: productData.name,
+            brand: productData.brand,
+            description: productData.description,
+            price: productData.price,
+            imageUrl: productData.image_url,
+            stockQuantity: productData.stock_quantity,
+            categoryId: productData.category_id,
+            sellerId: productData.seller_id,
+            isNew: productData.is_new,
+            isFeatured: productData.is_featured,
+            createdAt: productData.created_at,
+            remainingPercentage: productData.remaining_percentage,
+            batchCode: productData.batch_code,
+            purchaseYear: productData.purchase_year,
+            boxCondition: productData.box_condition,
+            listingType: productData.listing_type,
+            volume: productData.volume,
+            seller: null, // We'll set these to null since we don't have them
+            category: null,
+            images: [],
+            reviews: [],
+            averageRating: undefined
+          };
+          
+          console.log(`Found product through direct lookup for auction ${auctionId}:`, product.name);
+        } else {
+          console.log(`Found product through standard lookup for auction ${auctionId}:`, product.name);
         }
-        
-        console.log(`Found product for auction ${auctionId}:`, product.name);
       } catch (productError) {
         console.error(`Error retrieving product ${auction.productId} for auction ${auctionId}:`, productError);
         // Return auction without product, with special message that client can handle
