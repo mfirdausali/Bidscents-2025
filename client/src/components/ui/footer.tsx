@@ -113,7 +113,7 @@ export function Footer() {
                   href="/seller/dashboard"
                   className="text-gray-600 hover:text-purple-600 transition-colors"
                 >
-                  Seller Dashboard
+                  Seller Guide
                 </Link>
               </li>
               <li>
@@ -121,7 +121,7 @@ export function Footer() {
                   href="#"
                   className="text-gray-600 hover:text-purple-600 transition-colors"
                 >
-                  Authentication Process
+                  Authentication Guide
                 </a>
               </li>
               <li>
