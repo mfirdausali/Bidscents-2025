@@ -1764,12 +1764,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return;
             }
             
-            // Create the bid in the database
+            // Step 2: Set any previous winning bids to not winning
+            try {
+              // This needs to be a direct database call since our storage interface doesn't have this method
+              const { error: updateError } = await supabase
+                .from('bids')
+                .update({ is_winning: false })
+                .eq('auction_id', auctionId)
+                .eq('is_winning', true);
+                
+              if (updateError) {
+                console.error('Error updating previous bids:', updateError);
+                // Continue with new bid placement anyway
+              }
+            } catch (err) {
+              console.error('Exception updating previous bids:', err);
+              // Continue with new bid placement anyway
+            }
+            
+            // Step 3: Create the bid in the database
             const bid = await storage.createBid({
               auctionId: parseInt(auctionId),
               bidderId: userId,
               amount: parseFloat(amount),
-              isWinning: true
+              isWinning: true // This new bid becomes the winning bid
+            });
+            
+            // Step 4: Update the auction's current bid and bidder
+            await storage.updateAuction(parseInt(auctionId), {
+              currentBid: parseFloat(amount),
+              currentBidderId: userId
             });
             
             // Get bidder information
@@ -1781,23 +1805,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
               bidder: bidder?.username || `User #${userId}`
             };
             
-            // Update the auction's current bid and bidder
-            // Note: In a real implementation, this should be a transaction
-            // to ensure bid placement and auction update happen atomically
-            
-            // Notify all users in the auction room
+            // Step 5: Notify all users in the auction room
             const room = auctionRooms.get(parseInt(auctionId));
             if (room) {
+              // Get updated auction data to include in the notification
+              const updatedAuction = await storage.getAuctionById(parseInt(auctionId));
+              
               Array.from(room).forEach(connection => {
                 if (connection.readyState === WebSocket.OPEN) {
                   connection.send(JSON.stringify({
                     type: 'newBid',
                     auctionId: parseInt(auctionId),
-                    bid: bidWithDetails
+                    bid: bidWithDetails,
+                    auction: updatedAuction // Include updated auction data
                   }));
                 }
               });
             }
+            
+            // Send success response to the bidder
+            ws.send(JSON.stringify({
+              type: 'bidAccepted',
+              bid: bidWithDetails,
+              message: `Your bid of $${parseFloat(amount).toFixed(2)} was accepted`
+            }));
             
             console.log(`User ${userId} placed bid of ${amount} on auction ${auctionId}`);
             return;
