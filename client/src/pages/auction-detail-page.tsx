@@ -60,9 +60,15 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   } = useQuery<Auction>({
     queryKey: ['/api/auctions', id],
     queryFn: async () => {
+      console.log("Fetching auction data for ID:", id);
       const res = await fetch(`/api/auctions/${id}`);
-      if (!res.ok) throw new Error('Failed to fetch auction');
-      return res.json();
+      if (!res.ok) {
+        console.error("Failed to fetch auction with status:", res.status);
+        throw new Error('Failed to fetch auction');
+      }
+      const data = await res.json();
+      console.log("Received auction data:", data);
+      return data;
     },
   });
   
@@ -318,6 +324,12 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   }
   
   if (auctionError || !auctionData || !auctionData.product) {
+    console.error("Auction detail error condition triggered:", { 
+      auctionError, 
+      auctionData: auctionData || "No auction data", 
+      hasProduct: auctionData ? Boolean(auctionData.product) : false 
+    });
+    
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -325,6 +337,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
           <div className="flex flex-col items-center justify-center gap-4 py-20">
             <h1 className="text-2xl font-bold">Auction Not Found</h1>
             <p className="text-gray-500">The auction you're looking for does not exist or has ended.</p>
+            {auctionData && <p className="text-red-500">Debug: Product missing from auction {auctionData.id}</p>}
             <Button onClick={() => navigate("/")}>Return Home</Button>
           </div>
         </div>
