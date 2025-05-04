@@ -294,7 +294,35 @@ export default function ProductsPage() {
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
                     {sortedProducts().map((product) => (
                       product.listingType === "auction" ? (
-                        <AuctionCard key={product.id} product={product} />
+                        <AuctionCard 
+                          key={product.id} 
+                          product={{
+                            id: product.id,
+                            name: product.name,
+                            price: product.price,
+                            brand: product.brand,
+                            imageUrl: product.imageUrl || '',
+                            category: product.category?.name,
+                            stockQuantity: product.stockQuantity,
+                            rating: product.averageRating || 0,
+                            reviewCount: product.reviews?.length || 0,
+                            listingType: product.listingType,
+                            auction: product.listingType === 'auction' ? {
+                              id: product.id, // This should be the auction id, but we'll use product id as a fallback
+                              startingPrice: product.price,
+                              currentBid: null,
+                              bidIncrement: 5,
+                              buyNowPrice: null,
+                              endsAt: new Date(Date.now() + 86400000).toISOString(), // 1 day from now
+                              startsAt: new Date().toISOString(),
+                              status: 'active'
+                            } : undefined
+                          }}
+                          images={product.images?.map(img => ({
+                            id: img.id,
+                            imageUrl: img.imageUrl
+                          }))}
+                        />
                       ) : (
                         <ProductCard key={product.id} product={product} />
                       )
