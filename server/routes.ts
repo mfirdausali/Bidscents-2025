@@ -1459,17 +1459,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get all active auctions
       const auctions = await storage.getAuctions();
+      // Get current time and add 1 hour to match BST timezone used by the database
       const now = new Date();
+      now.setHours(now.getHours() + 1); // Add 1 hour to match BST
       
       console.log(`Retrieved ${auctions.length} auctions`);
+      console.log(`Current server time: ${new Date().toISOString()}`);
+      console.log(`Adjusted time for BST: ${now.toISOString()}`);
       
       // Filter for active auctions that have passed their end time
       const expiredAuctions = auctions.filter(auction => {
         const auctionEndDate = new Date(auction.endsAt);
-        // Compare the dates directly in UTC time to avoid timezone issues
+        // Compare the dates directly using the BST-adjusted current time
         const isExpired = auction.status === 'active' && auctionEndDate.getTime() < now.getTime();
         
-        console.log(`Auction #${auction.id}: endsAt=${auctionEndDate.toISOString()}, current=${now.toISOString()}, expired=${isExpired}`);
+        console.log(`Auction #${auction.id}: endsAt=${auctionEndDate.toISOString()}, BST-adjusted current=${now.toISOString()}, expired=${isExpired}`);
         
         return isExpired;
       });
@@ -1586,8 +1590,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productId,
         startingPrice: 10,
         bidIncrement: 5,
-        endsAt,
-        startsAt: now,
+        endsAt: endsAt.toISOString(),
+        startsAt: now.toISOString(),
         status: 'active'
       });
       
