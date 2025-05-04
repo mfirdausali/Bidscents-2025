@@ -312,6 +312,16 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
       return;
     }
     
+    // Prevent sellers from bidding on their own auctions
+    if (auctionData.product?.seller && user.id === auctionData.product.seller.id) {
+      toast({
+        title: "Cannot Bid on Your Own Listing",
+        description: "You are not allowed to bid on your own listings.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Validate bid amount
     const bidValue = parseFloat(bidAmount);
     if (isNaN(bidValue)) {
@@ -387,17 +397,60 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     setBidAmount("");
   };
   
-  // Handle Buy Now
+  // Handle Buy Now - direct to seller messaging with template
   const handleBuyNow = () => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'You need to log in to purchase items.',
+        variant: 'default',
+      });
+      navigate('/auth');
+      return;
+    }
+
+    if (!auctionData?.product?.seller) {
+      toast({
+        title: 'Error',
+        description: 'Could not find seller information.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const seller = auctionData.product.seller;
+    const productName = auctionData.product.name;
+
+    // Don't allow messaging yourself
+    if (user.id === seller.id) {
+      toast({
+        title: 'Cannot Purchase Your Own Item',
+        description: 'This is your own auction listing.',
+        variant: 'default',
+      });
+      return;
+    }
+
     toast({
-      title: "Purchase Successful!",
-      description: "You have purchased this item at the Buy Now price.",
+      title: "Contacting Seller",
+      description: "Redirecting you to message the seller about this purchase.",
     });
     
-    // Would redirect to checkout in a real implementation
-    setTimeout(() => {
-      navigate("/");
-    }, 2000);
+    // Create a template message for Buy Now
+    const templateMessage = `Hi ${seller.username}, I would like to buy "${productName}" at the Buy Now price of ${formatCurrency(auctionData.buyNowPrice)}.`;
+    
+    // Store the selected seller information and template message in sessionStorage
+    sessionStorage.setItem('selectedConversation', JSON.stringify({
+      userId: seller.id,
+      username: seller.username,
+      profileImage: seller.avatar_url || null,
+      productId: auctionData.productId,
+      productName,
+      templateMessage
+    }));
+    
+    // Navigate to messages page
+    navigate('/messages');
   };
   
   // Calculate next bid amount (only if we have auction data)
