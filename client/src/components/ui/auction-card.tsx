@@ -177,7 +177,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
       
       <div className="p-4 flex flex-col flex-grow">
         {/* Product name */}
-        <Link href={`/auction/${product.auction.id}`}>
+        <Link href={`/auctions/${product.auction.id}`}>
           <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-1 mb-1">
             {product.name}
           </h3>
@@ -230,7 +230,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
           disabled={!isActive}
           className="bg-amber-500 hover:bg-amber-600 text-white text-xs py-2 w-full rounded-md"
         >
-          <Link href={`/auction/${product.auction.id}`}>
+          <Link href={`/auctions/${product.auction.id}`}>
             {isActive ? "Place Bid" : "Auction Ended"}
           </Link>
         </Button>

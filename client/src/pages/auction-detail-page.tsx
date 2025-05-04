@@ -121,7 +121,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
         socket.current.send(JSON.stringify({
           type: 'joinAuction',
           auctionId: parseInt(id),
-          userId: user?.id || 0
+          userId: user?.id || 'guest' // Use 'guest' for non-authenticated users
         }));
       }
     };
@@ -214,7 +214,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
           socket.current.send(JSON.stringify({
             type: 'leaveAuction',
             auctionId: parseInt(id),
-            userId: user?.id || 0
+            userId: user?.id || 'guest'
           }));
         }
         
@@ -509,29 +509,42 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
             
             {isActive ? (
               <div className="space-y-4">
-                <form onSubmit={handleBidSubmit} className="flex gap-2">
-                  <Input 
-                    type="number" 
-                    placeholder={`Min bid: ${formatCurrency(nextBidAmount)}`}
-                    value={bidAmount}
-                    onChange={(e) => setBidAmount(e.target.value)}
-                    step={auctionData.bidIncrement.toString()}
-                    min={nextBidAmount}
-                    className="flex-grow"
-                  />
-                  <Button type="submit" className="bg-amber-500 hover:bg-amber-600">
-                    Place Bid
-                  </Button>
-                </form>
-                
-                {auctionData.buyNowPrice && (
-                  <Button 
-                    onClick={handleBuyNow} 
-                    variant="outline" 
-                    className="w-full border-green-600 text-green-600 hover:bg-green-50"
-                  >
-                    Buy Now for {formatCurrency(auctionData.buyNowPrice)}
-                  </Button>
+                {user ? (
+                  <>
+                    <form onSubmit={handleBidSubmit} className="flex gap-2">
+                      <Input 
+                        type="number" 
+                        placeholder={`Min bid: ${formatCurrency(nextBidAmount)}`}
+                        value={bidAmount}
+                        onChange={(e) => setBidAmount(e.target.value)}
+                        step={auctionData.bidIncrement.toString()}
+                        min={nextBidAmount}
+                        className="flex-grow"
+                      />
+                      <Button type="submit" className="bg-amber-500 hover:bg-amber-600">
+                        Place Bid
+                      </Button>
+                    </form>
+                    
+                    {auctionData.buyNowPrice && (
+                      <Button 
+                        onClick={handleBuyNow} 
+                        variant="outline" 
+                        className="w-full border-green-600 text-green-600 hover:bg-green-50"
+                      >
+                        Buy Now for {formatCurrency(auctionData.buyNowPrice)}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <div className="border border-amber-200 bg-amber-50 p-4 rounded-lg text-center">
+                    <p className="text-amber-800 mb-3">Sign in to participate in this auction</p>
+                    <Button asChild className="bg-purple-600 hover:bg-purple-700">
+                      <Link href={`/login?redirect=/auctions/${id}`}>
+                        Sign In to Bid
+                      </Link>
+                    </Button>
+                  </div>
                 )}
               </div>
             ) : (
