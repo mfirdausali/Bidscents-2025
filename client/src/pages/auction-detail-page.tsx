@@ -116,15 +116,12 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
       setWsConnected(true);
       console.log("WebSocket connected");
       
-      // Join auction room - Check if user exists before adding user ID
-      // This fixes the authentication error when not logged in
-      const userId = user?.id || null;
-      
+      // Join auction room
       if (socket.current?.readyState === WebSocket.OPEN) {
         socket.current.send(JSON.stringify({
           type: 'joinAuction',
           auctionId: parseInt(id),
-          userId: userId
+          userId: user?.id || 0
         }));
       }
     };
@@ -214,12 +211,10 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
       if (socket.current) {
         // Leave auction room
         if (socket.current.readyState === WebSocket.OPEN) {
-          const userId = user?.id || null;
-          
           socket.current.send(JSON.stringify({
             type: 'leaveAuction',
             auctionId: parseInt(id),
-            userId: userId
+            userId: user?.id || 0
           }));
         }
         
