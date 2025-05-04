@@ -965,6 +965,48 @@ export class SupabaseStorage implements IStorage {
       // Get product images
       const images = await this.getProductImages(product.id);
       
+      // Get auction data if the product is an auction
+      let auction = undefined;
+      if (product.listingType === 'auction') {
+        // First get the auction details
+        const { data: auctionData, error: auctionError } = await supabase
+          .from('auctions')
+          .select('*')
+          .eq('product_id', product.id)
+          .single();
+          
+        if (!auctionError && auctionData) {
+          // Convert snake_case to camelCase
+          const mappedAuction = {
+            id: auctionData.id,
+            productId: auctionData.product_id,
+            startingPrice: auctionData.starting_price,
+            reservePrice: auctionData.reserve_price,
+            buyNowPrice: auctionData.buy_now_price,
+            currentBid: auctionData.current_bid,
+            currentBidderId: auctionData.current_bidder_id,
+            bidIncrement: auctionData.bid_increment,
+            startsAt: auctionData.starts_at,
+            endsAt: auctionData.ends_at,
+            status: auctionData.status,
+            createdAt: auctionData.created_at,
+            updatedAt: auctionData.updated_at
+          };
+          
+          // Then get the bid count
+          const { count: bidCount, error: bidCountError } = await supabase
+            .from('bids')
+            .select('*', { count: 'exact', head: true })
+            .eq('auction_id', mappedAuction.id);
+            
+          // Add the bid count to the auction object
+          auction = {
+            ...mappedAuction,
+            bidCount: bidCount || 0
+          };
+        }
+      }
+      
       // Calculate average rating
       let averageRating: number | undefined = undefined;
       const reviews = reviewsResult || [];
@@ -980,6 +1022,7 @@ export class SupabaseStorage implements IStorage {
         reviews: reviews as Review[],
         averageRating,
         images,
+        auction,
       };
     }));
   }
