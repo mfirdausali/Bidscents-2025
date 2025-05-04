@@ -32,35 +32,14 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     },
   });
   
-  // Query auction details by product ID
-  const { data: auction, isLoading: auctionLoading, error: auctionError } = useQuery({
-    queryKey: ['/api/auctions', product?.id],
+  // Query auction details by ID
+  const { data: auctionData, isLoading: auctionLoading, error: auctionError } = useQuery({
+    queryKey: ['/api/auctions', id],
     queryFn: async () => {
-      // This would be replaced with a real API call to get auction details by product ID
-      // For now, this is a placeholder until we implement the proper endpoint
-      const res = await fetch(`/api/products/${id}`);
+      const res = await fetch(`/api/auctions/${id}`);
       if (!res.ok) throw new Error('Failed to fetch auction');
-      const product = await res.json();
-      
-      // Placeholder auction data
-      return {
-        id: 1,
-        productId: product.id,
-        startingPrice: product.price * 0.8,
-        currentBid: product.price,
-        bidIncrement: 5,
-        buyNowPrice: product.price * 1.5,
-        startsAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-        endsAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(), // 3 days from now
-        status: 'active',
-        bids: [
-          { id: 1, bidder: 'User123', amount: product.price * 0.8, time: '1 day ago' },
-          { id: 2, bidder: 'User456', amount: product.price * 0.9, time: '12 hours ago' },
-          { id: 3, bidder: 'User789', amount: product.price, time: '6 hours ago' },
-        ]
-      };
+      return res.json();
     },
-    enabled: !!product?.id, // Only run this query once we have the product ID
   });
   
   // Calculate time remaining until auction ends
