@@ -1488,14 +1488,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
         
-        // All other message types require authentication
-        if (!userId) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
-          return;
-        }
+        // Most message types require authentication, except for joining auction rooms
+        // We'll check authentication requirements per message type
+        // Auction viewing doesn't require authentication
         
         // Handle sending a new message
         if (data.type === 'send_message') {
+          // This message type requires authentication
+          if (!userId) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
+            return;
+          }
+            
           try {
             // Validate message data
             const messageSchema = z.object({
@@ -1586,13 +1590,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Handle marking messages as read
         if (data.type === 'mark_read') {
+          // This message type requires authentication
+          if (!userId) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
+            return;
+          }
+          
           try {
             if (data.messageId) {
               // Mark a single message as read
               await storage.markMessageAsRead(data.messageId);
             } else if (data.senderId) {
               // Mark all messages from a specific sender as read
-              await storage.markAllMessagesAsRead(userId, data.senderId);
+              await storage.markAllMessagesAsRead(userId as number, data.senderId);
             }
             
             // Send confirmation
@@ -1721,6 +1731,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Handle placing a bid
         if (data.type === 'placeBid') {
+          // This message type requires authentication
+          if (!userId) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Authentication required to place bids' }));
+            return;
+          }
+          
           try {
             const { auctionId, amount } = data;
             
@@ -1785,7 +1801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Step 3: Create the bid in the database
             const bid = await storage.createBid({
               auctionId: parseInt(auctionId),
-              bidderId: userId,
+              bidderId: userId as number, // We already checked that userId is not null
               amount: parseFloat(amount),
               isWinning: true // This new bid becomes the winning bid
             });
@@ -1793,7 +1809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Step 4: Update the auction's current bid and bidder
             await storage.updateAuction(parseInt(auctionId), {
               currentBid: parseFloat(amount),
-              currentBidderId: userId
+              currentBidderId: userId as number
             });
             
             // Get bidder information
