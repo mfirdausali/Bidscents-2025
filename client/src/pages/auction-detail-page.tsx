@@ -256,11 +256,11 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     return () => clearInterval(interval);
   }, [auctionData?.endsAt]);
   
-  // Format currency
-  const formatCurrency = (amount: number | null | undefined) => {
+  // Format currency (memoized)
+  const formatCurrency = useCallback((amount: number | null | undefined) => {
     if (amount === null || amount === undefined) return 'N/A';
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
+  }, []);
   
   // Handle bid submission
   const handleBidSubmit = (e: React.FormEvent) => {
@@ -368,6 +368,21 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     }, 2000);
   };
   
+  // Calculate next bid amount (only if we have auction data)
+  const nextBidAmount = auctionData ? getNextBidAmount(auctionData) : 0;
+  
+  // Extract product from auction data (safely)
+  const product = auctionData?.product;
+  
+  // Set the default bid amount when auction data loads or changes
+  useEffect(() => {
+    if (auctionData) {
+      const nextBid = getNextBidAmount(auctionData);
+      setBidAmount(nextBid.toString());
+    }
+  }, [auctionData, getNextBidAmount]);
+
+  // LOADING STATE
   if (auctionLoading) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -391,11 +406,11 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     );
   }
   
-  if (auctionError || !auctionData || !auctionData.product) {
+  // ERROR STATE
+  if (auctionError || !auctionData) {
     console.error("Auction detail error condition triggered:", { 
       auctionError, 
-      auctionData: auctionData || "No auction data", 
-      hasProduct: auctionData ? Boolean(auctionData.product) : false 
+      auctionData: auctionData || "No auction data"
     });
     
     return (
@@ -405,7 +420,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
           <div className="flex flex-col items-center justify-center gap-4 py-20">
             <h1 className="text-2xl font-bold">Auction Not Found</h1>
             <p className="text-gray-500">The auction you're looking for does not exist or has ended.</p>
-            {auctionData && <p className="text-red-500">Debug: Product missing from auction {auctionData.id}</p>}
+            {auctionData && <p className="text-red-500">Debug: Auction ID {auctionData.id} has issues</p>}
             <Button onClick={() => navigate("/")}>Return Home</Button>
           </div>
         </div>
@@ -414,27 +429,16 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     );
   }
   
-  // Set the default bid amount when auction data loads or changes
-  useEffect(() => {
-    if (auctionData) {
-      const nextBid = getNextBidAmount(auctionData);
-      setBidAmount(nextBid.toString());
-    }
-  }, [auctionData, getNextBidAmount]);
-  
-  // Extract product from auction data and calculate next bid amount
-  const product = auctionData?.product;
-  const nextBidAmount = auctionData ? getNextBidAmount(auctionData) : 0;
-  
-  // Guard clause to ensure we have both auctionData and product
-  if (!auctionData || !product) {
+  // MISSING PRODUCT STATE
+  if (!product) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
         <div className="flex-grow container mx-auto p-6">
           <div className="flex flex-col items-center justify-center gap-4 py-20">
-            <h1 className="text-2xl font-bold">Auction Data Unavailable</h1>
-            <p className="text-gray-500">We're having trouble loading this auction. Please try again later.</p>
+            <h1 className="text-2xl font-bold">Product Information Unavailable</h1>
+            <p className="text-gray-500">We're having trouble loading the product details for this auction.</p>
+            <p className="text-gray-500">Auction ID: {auctionData.id}</p>
             <Button onClick={() => navigate("/")}>Return Home</Button>
           </div>
         </div>

@@ -34,6 +34,7 @@ function Router() {
       <Route path="/products" component={ProductsPage} />
       <Route path="/products/:id" component={ProductDetailPage} />
       <Route path="/auction/:id" component={AuctionDetailPage} />
+      <Route path="/auctions/:id" component={AuctionDetailPage} />
       <Route path="/sellers/:id" component={SellerProfilePage} />
       <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute path="/messages" component={MessagesPage} />
