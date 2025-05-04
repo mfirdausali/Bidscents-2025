@@ -1371,7 +1371,6 @@ export default function SellerDashboard() {
                     render={({ field }) => (
                       <FormItem>
                         <div className="flex items-center gap-2">
-                          <FormLabel>Reserve Price (Optional)</FormLabel>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -1382,6 +1381,7 @@ export default function SellerDashboard() {
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
+                          <FormLabel>Reserve Price (Optional)</FormLabel>
                         </div>
                         <FormControl>
                           <Input 
@@ -1417,7 +1417,7 @@ export default function SellerDashboard() {
                                 <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-primary text-xs font-semibold cursor-help">i</span>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
-                                <p>The price at which a buyer can immediately purchase this item and end the auction. When a buyer uses this option, they'll be redirected to contact you to complete the purchase.</p>
+                                <p>The price at which a buyer can immediately purchase this item and end the auction.</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
