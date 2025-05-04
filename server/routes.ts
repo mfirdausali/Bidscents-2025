@@ -1452,6 +1452,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
   
+  // Function to check for expired auctions and handle them
+  async function checkAndProcessExpiredAuctions() {
+    console.log('Checking for expired auctions...');
+    try {
+      // Get all active auctions
+      const auctions = await storage.getAuctions();
+      const now = new Date();
+      
+      // Filter for active auctions that have passed their end time
+      const expiredAuctions = auctions.filter(auction => 
+        auction.status === 'active' && 
+        new Date(auction.endsAt) < now
+      );
+      
+      console.log(`Found ${expiredAuctions.length} expired auctions to process`);
+      
+      // Process each expired auction
+      for (const auction of expiredAuctions) {
+        console.log(`Processing expired auction #${auction.id}`);
+        
+        try {
+          // 1. Update auction status to 'pending'
+          await storage.updateAuction(auction.id, { status: 'pending' });
+          console.log(`Updated auction #${auction.id} status to 'pending'`);
+          
+          // 2. Get product details and user information
+          if (!auction.currentBidderId) {
+            console.log(`Auction #${auction.id} has no winning bidder, skipping messaging`);
+            continue;
+          }
+          
+          const product = await storage.getProductById(auction.productId);
+          if (!product) {
+            console.log(`Could not find product #${auction.productId} for auction #${auction.id}`);
+            continue;
+          }
+          
+          // Get information about the seller and winning bidder
+          const seller = await storage.getUser(product.sellerId);
+          const highestBidder = await storage.getUser(auction.currentBidderId);
+          
+          if (!seller || !highestBidder) {
+            console.log(`Missing seller or bidder information for auction #${auction.id}`);
+            continue;
+          }
+          
+          // 3. Send automated message from seller to highest bidder
+          const messageContent = `Congratulations! You've won the auction for "${product.name}" with a winning bid of ${auction.currentBid}. Please proceed with payment to complete the purchase. Thank you for participating!`;
+          
+          await storage.sendMessage({
+            senderId: seller.id,
+            receiverId: highestBidder.id,
+            content: messageContent,
+            productId: product.id,
+            isRead: false
+          });
+          
+          console.log(`Sent automated message from seller #${seller.id} to winning bidder #${highestBidder.id}`);
+          
+          // 4. Notify auction room via WebSocket if there are any connected clients
+          const auctionRoom = auctionRooms.get(auction.id);
+          if (auctionRoom && auctionRoom.size > 0) {
+            const notificationPayload = {
+              type: 'auctionEnded',
+              auctionId: auction.id,
+              productId: product.id,
+              winningBid: auction.currentBid,
+              winningBidderId: auction.currentBidderId
+            };
+            
+            for (const client of auctionRoom) {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(notificationPayload));
+              }
+            }
+            
+            console.log(`Notified ${auctionRoom.size} clients that auction #${auction.id} has ended`);
+          }
+        } catch (error) {
+          console.error(`Error processing expired auction #${auction.id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for expired auctions:', error);
+    }
+    
+    // Schedule the next check
+    setTimeout(checkAndProcessExpiredAuctions, 60000); // Check every minute
+  }
+  
   // Create WebSocket server for real-time messaging and auction updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
@@ -1460,6 +1550,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Map of auction rooms: auctionId -> Set of WebSocket connections
   const auctionRooms = new Map<number, Set<WebSocket>>();
+  
+  // Start the auction expiry check process
+  checkAndProcessExpiredAuctions();
   
   // WebSocket connection handler
   wss.on('connection', (ws: WebSocket) => {
