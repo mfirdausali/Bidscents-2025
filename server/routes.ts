@@ -1451,11 +1451,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
   
-  // Create WebSocket server for real-time messaging
+  // Create WebSocket server for real-time messaging and auction updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
   // Map of connected users: userId -> WebSocket connection
   const connectedUsers = new Map<number, WebSocket>();
+  
+  // Map of auction rooms: auctionId -> Set of WebSocket connections
+  const auctionRooms = new Map<number, Set<WebSocket>>();
   
   // WebSocket connection handler
   wss.on('connection', (ws: WebSocket) => {
@@ -1626,12 +1629,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
     
+    // Keep track of joined auction rooms for this connection
+    const joinedAuctions = new Set<number>();
+    
     // Handle disconnection
     ws.on('close', () => {
+      // Clean up user connection
       if (userId) {
         console.log(`User ${userId} disconnected from WebSocket`);
         connectedUsers.delete(userId);
       }
+      
+      // Clean up auction room memberships
+      joinedAuctions.forEach(auctionId => {
+        const room = auctionRooms.get(auctionId);
+        if (room) {
+          room.delete(ws);
+          
+          // If the room is empty, delete it
+          if (room.size === 0) {
+            auctionRooms.delete(auctionId);
+          }
+        }
+      });
     });
     
     // Send initial connection message
