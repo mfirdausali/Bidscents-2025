@@ -7,6 +7,7 @@ import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
 import ProductsPage from "@/pages/products-page";
 import ProductDetailPage from "@/pages/product-detail-page";
+import AuctionDetailPage from "@/pages/auction-detail-page";
 import SellerDashboard from "@/pages/seller-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import ProfilePage from "@/pages/profile-page";
@@ -18,7 +19,7 @@ import AuthCallback from "@/pages/auth-callback";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import TermsOfServicePage from "./pages/terms-of-service";
-import PrivacyPolicyPage from "./pages/privacy-policy"; // Added import
+import PrivacyPolicyPage from "./pages/privacy-policy";
 
 function Router() {
   return (
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/auth-callback" component={AuthCallback} />
       <Route path="/products" component={ProductsPage} />
       <Route path="/products/:id" component={ProductDetailPage} />
+      <Route path="/auction/:id" component={AuctionDetailPage} />
       <Route path="/sellers/:id" component={SellerProfilePage} />
       <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute path="/messages" component={MessagesPage} />
