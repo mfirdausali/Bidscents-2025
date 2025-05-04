@@ -72,8 +72,8 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
       const data = await res.json();
       console.log("Received auction data:", data);
       
-      // Check if the response contains an error message about product not found
-      if (data.message === 'Product not found') {
+      // Handle cases where product is missing or has an error message
+      if (!data.product || data.message === 'Product not found' || data.message === 'Error retrieving product details') {
         // Create a manually wrapped response that includes both auction and dummy product
         // This is a temporary fix to allow viewing the auction without the associated product
         console.warn("Product not found for auction, using placeholder data");
