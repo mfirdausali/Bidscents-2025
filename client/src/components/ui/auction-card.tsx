@@ -26,6 +26,7 @@ interface AuctionProps {
       endsAt: string;
       startsAt: string;
       status: string;
+      bidCount?: number;
     };
   };
   images?: Array<{ id: number; imageUrl: string }>;
@@ -92,8 +93,8 @@ export function AuctionCard({ product, images }: AuctionProps) {
   // Get current bid or starting price
   const currentPrice = product.auction.currentBid || product.auction.startingPrice || product.price;
   
-  // Estimate number of bids (placeholder - would be fetched from API in a real implementation)
-  const estimatedBids = Math.floor(Math.random() * 10); // This is just a placeholder
+  // Get bid count from auction data
+  const bidCount = product.auction.bidCount || 0;
   
   return (
     <Card className="h-full flex flex-col overflow-hidden transition-shadow hover:shadow-md">
@@ -135,7 +136,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
           
           <div className="flex items-center text-xs text-muted-foreground">
             <Users className="w-3 h-3 mr-1" />
-            <span>{estimatedBids} bid{estimatedBids !== 1 ? 's' : ''}</span>
+            <span>{bidCount} bid{bidCount !== 1 ? 's' : ''}</span>
           </div>
         </div>
         
