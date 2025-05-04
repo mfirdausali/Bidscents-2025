@@ -2124,7 +2124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ 
           ...auction, 
           bidCount: bids.length,
-          bids,
+          bids: enhancedBids,
           message: 'Error retrieving product details'
         });
       }
