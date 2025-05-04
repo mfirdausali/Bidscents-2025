@@ -151,8 +151,24 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
           // Update local bids state
           setLocalBids(prev => [newBid, ...prev]);
           
-          // Refresh auction data through React Query
-          queryClient.invalidateQueries({ queryKey: ['/api/auctions', id] });
+          // Update auction data if provided in the message
+          if (data.auction) {
+            // Create optimistic update for auction data
+            queryClient.setQueryData(['/api/auctions', id], (oldData: any) => {
+              if (!oldData) return null;
+              
+              // Update the auction data while preserving other properties
+              return {
+                ...oldData,
+                currentBid: data.auction.currentBid,
+                currentBidderId: data.auction.currentBidderId,
+                bidCount: (oldData.bidCount || 0) + 1
+              };
+            });
+          } else {
+            // If auction data not provided, invalidate to get fresh data
+            queryClient.invalidateQueries({ queryKey: ['/api/auctions', id] });
+          }
           
           // Notification for new bids
           if (user && newBid.bidderId !== user.id) {
@@ -160,7 +176,30 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
               title: "New Bid Placed",
               description: `A new bid of ${formatCurrency(newBid.amount)} has been placed.`,
             });
+            
+            // Update minimum bid amount after someone else bids
+            if (auctionData) {
+              const nextBid = newBid.amount + auctionData.bidIncrement;
+              setBidAmount(nextBid.toString());
+            }
           }
+        }
+        
+        // Handle bid accepted message
+        if (data.type === 'bidAccepted') {
+          toast({
+            title: "Bid Accepted",
+            description: data.message,
+          });
+        }
+        
+        // Handle error messages
+        if (data.type === 'error') {
+          toast({
+            title: "Error",
+            description: data.message,
+            variant: "destructive"
+          });
         }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
@@ -510,12 +549,20 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                     <div className="space-y-4">
                       {/* Show local bids first (from WebSocket) */}
                       {localBids.map((bid: Bid) => (
-                        <div key={`local-${bid.id}`} className="flex items-center justify-between border-b pb-3 bg-green-50 p-2 rounded">
+                        <div 
+                          key={`local-${bid.id}`} 
+                          className={`flex items-center justify-between border-b pb-3 p-2 rounded ${
+                            bid.isWinning ? 'bg-green-50' : 'bg-gray-50'
+                          }`}
+                        >
                           <div className="flex items-center">
                             <User className="w-5 h-5 mr-2 text-gray-500" />
                             <span>{bid.bidder || `Bidder #${bid.bidderId}`}</span>
                             {user && bid.bidderId === user.id && (
                               <Badge className="ml-2 bg-purple-100 text-purple-800 text-xs">You</Badge>
+                            )}
+                            {bid.isWinning && (
+                              <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Winning</Badge>
                             )}
                           </div>
                           <div className="text-right">
@@ -535,12 +582,20 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                         }
                         
                         return (
-                          <div key={bid.id} className="flex items-center justify-between border-b pb-3">
+                          <div 
+                            key={bid.id} 
+                            className={`flex items-center justify-between border-b pb-3 p-2 ${
+                              bid.isWinning ? 'bg-green-50 rounded' : ''
+                            }`}
+                          >
                             <div className="flex items-center">
                               <User className="w-5 h-5 mr-2 text-gray-500" />
                               <span>{bid.bidder || `Bidder #${bid.bidderId}`}</span>
                               {user && bid.bidderId === user.id && (
                                 <Badge className="ml-2 bg-purple-100 text-purple-800 text-xs">You</Badge>
+                              )}
+                              {bid.isWinning && (
+                                <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Winning</Badge>
                               )}
                             </div>
                             <div className="text-right">
