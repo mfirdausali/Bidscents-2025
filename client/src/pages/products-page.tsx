@@ -5,6 +5,7 @@ import { ProductWithDetails, Category } from "@shared/schema";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { ProductCard } from "@/components/ui/product-card";
+import { AuctionCard } from "@/components/ui/auction-card";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -292,7 +293,11 @@ export default function ProductsPage() {
                 ) : products && products.length > 0 ? (
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
                     {sortedProducts().map((product) => (
-                      <ProductCard key={product.id} product={product} />
+                      product.listingType === "auction" ? (
+                        <AuctionCard key={product.id} product={product} />
+                      ) : (
+                        <ProductCard key={product.id} product={product} />
+                      )
                     ))}
                   </div>
                 ) : (
