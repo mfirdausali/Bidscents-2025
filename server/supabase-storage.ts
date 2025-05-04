@@ -357,16 +357,48 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getProductById(id: number): Promise<ProductWithDetails | undefined> {
+    console.log(`Looking up product with ID: ${id}`);
+    
+    // Debug - directly query database to see if product exists
+    try {
+      const { count, error: countError } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('id', id);
+        
+      console.log(`Product ID ${id} existence check: ${count} products found`);
+      
+      if (countError) {
+        console.error(`Error checking if product ${id} exists:`, countError);
+      }
+    } catch (err) {
+      console.error(`Error in count query for product ${id}:`, err);
+    }
+    
+    // Main product query
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('id', id)
       .single();
     
-    if (error || !data) {
-      console.error('Error getting product:', error);
+    if (error) {
+      console.error(`Error getting product ${id}:`, error);
+      
+      // Special handling for "No rows found" error - this is common
+      if (error.message.includes('No rows found')) {
+        console.log(`Product ${id} not found in database`);
+      }
+      
       return undefined;
     }
+    
+    if (!data) {
+      console.error(`No data returned for product ${id} but no error was thrown`);
+      return undefined;
+    }
+    
+    console.log(`Found product ${id}: ${data.name}`);
     
     // Convert snake_case to camelCase
     const mappedProduct = this.mapSnakeToCamelCase(data);
