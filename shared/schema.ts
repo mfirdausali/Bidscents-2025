@@ -278,6 +278,7 @@ export type ProductWithDetails = Product & {
   reviews?: Review[];
   averageRating?: number;
   images?: ProductImage[]; // Added images array
+  auction?: Auction & { bidCount?: number }; // Added auction data with optional bid count
 };
 
 export type OrderWithItems = Order & {

@@ -196,14 +196,26 @@ export default function HomePage() {
                     stockQuantity: product.stockQuantity || 0,
                     rating: product.averageRating || 0,
                     reviewCount: product.reviews?.length || 0,
-                    listingType: product.listingType || 'auction',
-                    auction: {
-                      id: product.id, // This should be the auction id, but we'll use product id as a fallback
+                    listingType: 'auction',
+                    auction: product.auction ? {
+                      // Use actual auction data from the database if available
+                      id: product.auction.id,
+                      startingPrice: product.auction.startingPrice,
+                      currentBid: product.auction.currentBid,
+                      bidIncrement: product.auction.bidIncrement,
+                      buyNowPrice: product.auction.buyNowPrice,
+                      endsAt: product.auction.endsAt,
+                      startsAt: product.auction.startsAt,
+                      status: product.auction.status,
+                      bidCount: product.auction.bidCount
+                    } : {
+                      // Fallback for backward compatibility
+                      id: product.id,
                       startingPrice: product.price,
                       currentBid: null,
                       bidIncrement: 5,
                       buyNowPrice: null,
-                      endsAt: new Date(Date.now() + 86400000).toISOString(), // 1 day from now
+                      endsAt: new Date(Date.now() + 86400000).toISOString(),
                       startsAt: new Date().toISOString(),
                       status: 'active'
                     }
