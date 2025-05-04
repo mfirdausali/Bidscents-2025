@@ -1638,5 +1638,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.send(JSON.stringify({ type: 'connected', message: 'Connected to BidScents messaging server' }));
   });
   
+  // GET /api/auctions - Get all auctions
+  app.get('/api/auctions', async (req, res) => {
+    try {
+      const auctions = await storage.getAuctions();
+      
+      // Enhance auctions with bid counts
+      const enhancedAuctions = await Promise.all(auctions.map(async (auction) => {
+        const bids = await storage.getBidsForAuction(auction.id);
+        return {
+          ...auction,
+          bidCount: bids.length
+        };
+      }));
+      
+      res.json(enhancedAuctions);
+    } catch (error) {
+      console.error('Error getting auctions:', error);
+      res.status(500).json({ message: 'Error retrieving auctions' });
+    }
+  });
+  
+  // GET /api/auctions/:id - Get auction by ID
+  app.get('/api/auctions/:id', async (req, res) => {
+    try {
+      const auctionId = parseInt(req.params.id);
+      const auction = await storage.getAuctionById(auctionId);
+      
+      if (!auction) {
+        return res.status(404).json({ message: 'Auction not found' });
+      }
+      
+      // Get bids for this auction
+      const bids = await storage.getBidsForAuction(auction.id);
+      
+      // Get product details
+      const product = await storage.getProductById(auction.productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      
+      // Combine auction with bid count and product details
+      const auctionWithDetails = {
+        ...auction,
+        bidCount: bids.length,
+        bids,
+        product
+      };
+      
+      res.json(auctionWithDetails);
+    } catch (error) {
+      console.error('Error getting auction details:', error);
+      res.status(500).json({ message: 'Error retrieving auction details' });
+    }
+  });
+  
+  // GET /api/products/:id/auctions - Get auctions for a product
+  app.get('/api/products/:id/auctions', async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const auctions = await storage.getProductAuctions(productId);
+      
+      // Enhance auctions with bid counts
+      const enhancedAuctions = await Promise.all(auctions.map(async (auction) => {
+        const bids = await storage.getBidsForAuction(auction.id);
+        return {
+          ...auction,
+          bidCount: bids.length
+        };
+      }));
+      
+      res.json(enhancedAuctions);
+    } catch (error) {
+      console.error('Error getting product auctions:', error);
+      res.status(500).json({ message: 'Error retrieving product auctions' });
+    }
+  });
+  
   return httpServer;
 }

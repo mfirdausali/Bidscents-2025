@@ -42,6 +42,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
     const calculateTimeRemaining = () => {
       const now = new Date();
       const endDate = new Date(product.auction.endsAt);
+      console.log("End Date:", endDate);
       
       // If auction has ended
       if (now > endDate) {
@@ -95,14 +96,16 @@ export function AuctionCard({ product, images }: AuctionProps) {
   const estimatedBids = Math.floor(Math.random() * 10); // This is just a placeholder
   
   return (
-    <Card className="h-full flex flex-col overflow-hidden group">
-      <CardHeader className="p-0 aspect-square overflow-hidden">
-        <Link href={`/auction/${product.id}`} className="block w-full h-full">
-          <img 
-            src={imageUrl} 
-            alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
+    <Card className="h-full flex flex-col overflow-hidden transition-shadow hover:shadow-md">
+      <div className="relative">
+        <Link href={`/auction/${product.auction.id}`}>
+          <div className="aspect-square overflow-hidden bg-gray-100">
+            <img 
+              src={imageUrl} 
+              alt={product.name}
+              className="w-full h-full object-cover transition-all hover:scale-105"
+            />
+          </div>
           <Badge 
             className="absolute top-2 right-2 bg-amber-500 hover:bg-amber-600"
             variant="secondary"
@@ -110,47 +113,43 @@ export function AuctionCard({ product, images }: AuctionProps) {
             Auction
           </Badge>
         </Link>
-      </CardHeader>
-      <CardContent className="flex-grow p-4">
-        <Link href={`/auction/${product.id}`} className="hover:underline">
-          <h3 className="font-semibold text-lg mb-1 line-clamp-2">{product.name}</h3>
-        </Link>
-        <p className="text-sm text-muted-foreground mb-1">{product.brand}</p>
-        
-        <div className="flex items-center mt-3 text-sm font-medium">
-          <DollarSign className="w-4 h-4 mr-1 text-green-600" />
-          <span className="text-green-600">Current Bid: {formatCurrency(currentPrice)}</span>
+      </div>
+      <div className="p-3 flex-grow flex flex-col">
+        <div className="mb-auto">
+          <Link href={`/auction/${product.auction.id}`}>
+            <h3 className="font-medium line-clamp-2 hover:underline">{product.name}</h3>
+          </Link>
+          <p className="text-xs text-muted-foreground">{product.brand}</p>
+          
+          <div className="flex items-center mt-2 text-sm">
+            <DollarSign className="w-3 h-3 mr-1 text-green-600" />
+            <span className="text-green-600 text-sm font-medium">{formatCurrency(currentPrice)}</span>
+          </div>
         </div>
         
-        {product.auction.buyNowPrice && (
-          <div className="text-sm mt-1">
-            <span className="text-muted-foreground">Buy Now: {formatCurrency(product.auction.buyNowPrice)}</span>
-          </div>
-        )}
-        
-        <div className="flex justify-between mt-3">
-          <div className="flex items-center text-sm">
-            <Clock className="w-4 h-4 mr-1 text-orange-500" />
+        <div className="flex justify-between items-center mt-2 mb-1">
+          <div className="flex items-center text-xs">
+            <Clock className="w-3 h-3 mr-1 text-orange-500" />
             <span className={isActive ? "text-orange-500" : "text-gray-500"}>{timeRemaining}</span>
           </div>
           
-          <div className="flex items-center text-sm text-muted-foreground">
-            <Users className="w-4 h-4 mr-1" />
+          <div className="flex items-center text-xs text-muted-foreground">
+            <Users className="w-3 h-3 mr-1" />
             <span>{estimatedBids} bid{estimatedBids !== 1 ? 's' : ''}</span>
           </div>
         </div>
-      </CardContent>
-      <CardFooter className="pt-0 pb-4 px-4">
+        
         <Button 
-          className="w-full bg-amber-500 hover:bg-amber-600"
+          size="sm"
+          className="mt-2 w-full bg-amber-500 hover:bg-amber-600 text-xs font-medium px-2 py-1 h-8"
           disabled={!isActive}
           asChild
         >
-          <Link href={`/auction/${product.id}`}>
+          <Link href={`/auction/${product.auction.id}`}>
             Place Bid
           </Link>
         </Button>
-      </CardFooter>
+      </div>
     </Card>
   );
 }
