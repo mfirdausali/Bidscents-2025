@@ -1893,13 +1893,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!product) {
           console.log(`Product with ID ${auction.productId} not found for auction ${auctionId}`);
-          return res.status(404).json({ message: 'Product not found' });
+          // Return auction without product, with special message that client can handle
+          return res.status(200).json({ 
+            ...auction, 
+            bidCount: bids.length,
+            bids,
+            message: 'Product not found'
+          });
         }
         
         console.log(`Found product for auction ${auctionId}:`, product.name);
       } catch (productError) {
         console.error(`Error retrieving product ${auction.productId} for auction ${auctionId}:`, productError);
-        return res.status(404).json({ message: 'Error retrieving product details' });
+        // Return auction without product, with special message that client can handle
+        return res.status(200).json({ 
+          ...auction, 
+          bidCount: bids.length,
+          bids,
+          message: 'Error retrieving product details'
+        });
       }
       
       // Combine auction with bid count and product details
