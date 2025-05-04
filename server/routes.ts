@@ -1488,10 +1488,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
         
-        // All other message types require authentication
-        if (!userId) {
+        // Most message types require authentication, except for auction viewing
+        if (!userId && data.type !== 'joinAuction' && data.type !== 'leaveAuction') {
           ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
           return;
+        }
+        
+        // For auction room messages, use guest mode if no user ID
+        if (data.type === 'joinAuction' || data.type === 'leaveAuction') {
+          // Allow guest access, but don't reset userId if it's already set
+          if (!userId && data.userId && data.userId === 'guest') {
+            console.log('Guest user joining auction room');
+            // We're not setting a numeric userId so the user stays in guest mode
+          }
         }
         
         // Handle sending a new message
@@ -1639,7 +1648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             room.add(ws);
             joinedAuctions.add(auctionId);
             
-            console.log(`User ${userId} joined auction room ${auctionId}`);
+            console.log(`User ${userId || 'guest'} joined auction room ${auctionId}`);
             ws.send(JSON.stringify({ 
               type: 'joinedAuction', 
               auctionId, 
@@ -1700,7 +1709,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
               }
               
-              console.log(`User ${userId} left auction room ${auctionId}`);
+              console.log(`User ${userId || 'guest'} left auction room ${auctionId}`);
               ws.send(JSON.stringify({ 
                 type: 'leftAuction', 
                 auctionId,
