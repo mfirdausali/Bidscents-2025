@@ -294,7 +294,7 @@ export default function ProductsPage() {
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
                     {sortedProducts().map((product) => {
                       // For auction listings, use AuctionCard
-                      if (product.listingType === "auction") {
+                      if (product.listingType === "auction" && product.auction) {
                         return (
                           <AuctionCard 
                             key={product.id} 
@@ -310,14 +310,16 @@ export default function ProductsPage() {
                               reviewCount: product.reviews?.length || 0,
                               listingType: "auction",
                               auction: {
-                                id: product.id, // This should be the auction id, but we'll use product id as a fallback
-                                startingPrice: product.price,
-                                currentBid: null,
-                                bidIncrement: 5,
-                                buyNowPrice: null,
-                                endsAt: new Date(Date.now() + 86400000).toISOString(), // 1 day from now
-                                startsAt: new Date().toISOString(),
-                                status: 'active'
+                                // Use actual auction data from the database
+                                id: product.auction.id,
+                                startingPrice: product.auction.startingPrice,
+                                currentBid: product.auction.currentBid,
+                                bidIncrement: product.auction.bidIncrement,
+                                buyNowPrice: product.auction.buyNowPrice,
+                                endsAt: product.auction.endsAt,
+                                startsAt: product.auction.startsAt,
+                                status: product.auction.status,
+                                bidCount: product.auction.bidCount
                               }
                             }}
                             images={product.images?.map(img => ({
