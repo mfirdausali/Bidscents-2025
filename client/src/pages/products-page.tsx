@@ -308,6 +308,11 @@ export default function ProductsPage() {
                               stockQuantity: product.stockQuantity || 0,
                               rating: product.averageRating || 0,
                               reviewCount: product.reviews?.length || 0,
+                              remainingPercentage: product.remainingPercentage,
+                              volume: product.volume,
+                              batchCode: product.batchCode,
+                              sellerId: product.sellerId,
+                              seller: product.seller,
                               listingType: "auction",
                               auction: {
                                 // Use actual auction data from the database
@@ -316,8 +321,8 @@ export default function ProductsPage() {
                                 currentBid: product.auction.currentBid,
                                 bidIncrement: product.auction.bidIncrement,
                                 buyNowPrice: product.auction.buyNowPrice,
-                                endsAt: product.auction.endsAt,
-                                startsAt: product.auction.startsAt,
+                                endsAt: typeof product.auction.endsAt === 'string' ? product.auction.endsAt : product.auction.endsAt.toISOString(),
+                                startsAt: typeof product.auction.startsAt === 'string' ? product.auction.startsAt : product.auction.startsAt.toISOString(),
                                 status: product.auction.status,
                                 bidCount: product.auction.bidCount
                               }

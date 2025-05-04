@@ -196,6 +196,11 @@ export default function HomePage() {
                     stockQuantity: product.stockQuantity || 0,
                     rating: product.averageRating || 0,
                     reviewCount: product.reviews?.length || 0,
+                    remainingPercentage: product.remainingPercentage,
+                    volume: product.volume,
+                    batchCode: product.batchCode,
+                    sellerId: product.sellerId,
+                    seller: product.seller,
                     listingType: 'auction',
                     auction: product.auction ? {
                       // Use actual auction data from the database if available
