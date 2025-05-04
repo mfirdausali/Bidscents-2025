@@ -16,6 +16,12 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -1364,7 +1370,19 @@ export default function SellerDashboard() {
                     name="reservePrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Reserve Price (Optional)</FormLabel>
+                        <div className="flex items-center gap-2">
+                          <FormLabel>Reserve Price (Optional)</FormLabel>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-primary text-xs font-semibold cursor-help">i</span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p>The minimum price you are willing to accept for this item. If the auction ends without meeting this price, it will be marked as "reserve not met" and you'll be notified.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
                         <FormControl>
                           <Input 
                             type="number" 
@@ -1391,7 +1409,19 @@ export default function SellerDashboard() {
                     name="buyNowPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Buy Now Price (Optional)</FormLabel>
+                        <div className="flex items-center gap-2">
+                          <FormLabel>Buy Now Price (Optional)</FormLabel>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-primary text-xs font-semibold cursor-help">i</span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p>The price at which a buyer can immediately purchase this item and end the auction. When a buyer uses this option, they'll be redirected to contact you to complete the purchase.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
                         <FormControl>
                           <Input 
                             type="number" 
