@@ -1457,13 +1457,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] Checking for expired auctions...`);
     try {
-      // Get all active auctions
-      const auctions = await storage.getAuctions();
+      // Get only active auctions - more efficient
+      const auctions = await storage.getActiveAuctions();
       // Get current time and add 1 hour to match BST timezone used by the database
       const now = new Date();
       now.setHours(now.getHours() + 1); // Add 1 hour to match BST
       
-      console.log(`Retrieved ${auctions.length} auctions`);
       console.log(`Current server time: ${new Date().toISOString()}`);
       console.log(`Adjusted time for BST: ${now.toISOString()}`);
       
@@ -1471,7 +1470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiredAuctions = auctions.filter(auction => {
         const auctionEndDate = new Date(auction.endsAt);
         // Compare the dates directly using the BST-adjusted current time
-        const isExpired = auction.status === 'active' && auctionEndDate.getTime() < now.getTime();
+        const isExpired = auctionEndDate.getTime() < now.getTime();
         
         console.log(`Auction #${auction.id}: endsAt=${auctionEndDate.toISOString()}, BST-adjusted current=${now.toISOString()}, expired=${isExpired}`);
         
@@ -1482,71 +1481,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // We already logged the auction details in the filter above, no need to do it again
       
+      // Admin user ID for system messages
+      const ADMIN_USER_ID = 32;
+      
       // Process each expired auction
       for (const auction of expiredAuctions) {
         console.log(`Processing expired auction #${auction.id}`);
         
         try {
-          // 1. Update auction status to 'pending'
-          await storage.updateAuction(auction.id, { status: 'pending' });
-          console.log(`Updated auction #${auction.id} status to 'pending'`);
-          
-          // 2. Get product details and user information
-          if (!auction.currentBidderId) {
-            console.log(`Auction #${auction.id} has no winning bidder, skipping messaging`);
-            continue;
-          }
-          
-          const product = await storage.getProductById(auction.productId);
-          if (!product) {
-            console.log(`Could not find product #${auction.productId} for auction #${auction.id}`);
-            continue;
-          }
-          
-          // Get information about the seller and winning bidder
-          const seller = await storage.getUser(product.sellerId);
-          const highestBidder = await storage.getUser(auction.currentBidderId);
-          
-          if (!seller || !highestBidder) {
-            console.log(`Missing seller or bidder information for auction #${auction.id}`);
-            continue;
-          }
-          
-          // 3. Send automated message from seller to highest bidder
-          const messageContent = `Congratulations! You've won the auction for "${product.name}" with a winning bid of ${auction.currentBid}. Please proceed with payment to complete the purchase. Thank you for participating!`;
-          
-          await storage.sendMessage({
-            senderId: seller.id,
-            receiverId: highestBidder.id,
-            content: messageContent,
-            productId: product.id,
-            isRead: false
-          });
-          
-          console.log(`Sent automated message from seller #${seller.id} to winning bidder #${highestBidder.id}`);
-          
-          // 4. Notify auction room via WebSocket if there are any connected clients
-          const auctionRoom = auctionRooms.get(auction.id);
-          if (auctionRoom && auctionRoom.size > 0) {
-            const notificationPayload = {
-              type: 'auctionEnded',
-              auctionId: auction.id,
-              productId: product.id,
-              winningBid: auction.currentBid,
-              winningBidderId: auction.currentBidderId
-            };
+          // Check for reserve price
+          const hasReservePrice = auction.reservePrice !== null && auction.reservePrice > 0;
+          const reserveNotMet = hasReservePrice && 
+            (auction.currentBid === null || auction.currentBid < auction.reservePrice);
             
-            // Convert Set to Array before iteration to avoid TypeScript error
-            Array.from(auctionRoom).forEach(client => {
-              if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(notificationPayload));
-              }
+          if (reserveNotMet) {
+            // Reserve price wasn't met, update status to 'reserve_not_met'
+            await storage.updateAuction(auction.id, { status: 'reserve_not_met' });
+            console.log(`Updated auction #${auction.id} status to 'reserve_not_met'. Reserve price: ${auction.reservePrice}, Current bid: ${auction.currentBid || 'none'}`);
+            
+            // Get the product and seller details
+            const product = await storage.getProductById(auction.productId);
+            if (!product) {
+              console.log(`Could not find product #${auction.productId} for auction #${auction.id}`);
+              continue;
+            }
+            
+            // Get seller information
+            const seller = await storage.getUser(product.sellerId);
+            if (!seller) {
+              console.log(`Missing seller information for auction #${auction.id}`);
+              continue;
+            }
+            
+            // Send message from admin to seller that reserve wasn't met
+            const messageContent = `The auction for "${product.name}" has ended, but the reserve price of ${auction.reservePrice} was not met. The highest bid was ${auction.currentBid || 'none'}. You can either contact the highest bidder directly or relist the item.`;
+            
+            await storage.sendMessage({
+              senderId: ADMIN_USER_ID,
+              receiverId: seller.id,
+              content: messageContent,
+              productId: product.id,
+              isRead: false
             });
             
-            console.log(`Notified ${auctionRoom.size} clients that auction #${auction.id} has ended`);
+            console.log(`Sent reserve_not_met message from admin #${ADMIN_USER_ID} to seller #${seller.id}`);
+            
+            // Notify auction room if there are any connected clients
+            notifyAuctionRoom(auction.id, product.id, 'reserveNotMet', auction.currentBid, auction.currentBidderId);
+            
+          } else {
+            // Regular auction completion flow
+            await storage.updateAuction(auction.id, { status: 'pending' });
+            console.log(`Updated auction #${auction.id} status to 'pending'`);
+            
+            // If no bids were placed, just end the auction
+            if (!auction.currentBidderId) {
+              console.log(`Auction #${auction.id} has no winning bidder, skipping messaging`);
+              continue;
+            }
+            
+            const product = await storage.getProductById(auction.productId);
+            if (!product) {
+              console.log(`Could not find product #${auction.productId} for auction #${auction.id}`);
+              continue;
+            }
+            
+            // Get information about the seller and winning bidder
+            const seller = await storage.getUser(product.sellerId);
+            const highestBidder = await storage.getUser(auction.currentBidderId);
+            
+            if (!seller || !highestBidder) {
+              console.log(`Missing seller or bidder information for auction #${auction.id}`);
+              continue;
+            }
+            
+            // Send automated message from seller to highest bidder
+            const messageContent = `Congratulations! You've won the auction for "${product.name}" with a winning bid of ${auction.currentBid}. Please proceed with payment to complete the purchase. Thank you for participating!`;
+            
+            await storage.sendMessage({
+              senderId: seller.id,
+              receiverId: highestBidder.id,
+              content: messageContent,
+              productId: product.id,
+              isRead: false
+            });
+            
+            console.log(`Sent automated message from seller #${seller.id} to winning bidder #${highestBidder.id}`);
+            
+            // Notify auction room
+            notifyAuctionRoom(auction.id, product.id, 'auctionEnded', auction.currentBid, auction.currentBidderId);
           }
         } catch (error) {
           console.error(`Error processing expired auction #${auction.id}:`, error);
+        }
+      }
+      
+      // Helper function to notify auction room via WebSocket
+      function notifyAuctionRoom(auctionId: number, productId: number, eventType: string, currentBid: number | null, bidderId: number | null) {
+        const auctionRoom = auctionRooms.get(auctionId);
+        if (auctionRoom && auctionRoom.size > 0) {
+          const notificationPayload = {
+            type: eventType,
+            auctionId,
+            productId,
+            winningBid: currentBid,
+            winningBidderId: bidderId
+          };
+          
+          // Convert Set to Array before iteration to avoid TypeScript error
+          Array.from(auctionRoom).forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify(notificationPayload));
+            }
+          });
+          
+          console.log(`Notified ${auctionRoom.size} clients that auction #${auctionId} has ${eventType}`);
         }
       }
     } catch (error) {
@@ -1578,18 +1627,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auctions/create-test-expiring", async (req, res) => {
     try {
       const productId = parseInt(req.body.productId?.toString() || "101");
+      const hasReserve = req.body.hasReserve === 'true';
       
       // Create an auction that expires 30 seconds from now
       const now = new Date();
       const endsAt = new Date(now.getTime() + 30000); // 30 seconds
       
-      console.log(`Creating test auction that expires at ${endsAt.toISOString()}`);
+      console.log(`Creating test auction that expires at ${endsAt.toISOString()}, with reserve: ${hasReserve}`);
       
       // Create the auction
       const auction = await storage.createAuction({
         productId,
         startingPrice: 10,
         bidIncrement: 5,
+        reservePrice: hasReserve ? 50 : null, // Set a reserve price if requested
+        currentBid: hasReserve ? 20 : null,   // Set a current bid that's below reserve
+        currentBidderId: hasReserve ? 42 : null, // Assume user 42 is a test bidder
         endsAt: endsAt.toISOString(),
         startsAt: now.toISOString(),
         status: 'active'
@@ -1597,10 +1650,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         ...auction,
-        message: `Test auction created with ID ${auction.id}. Will expire at ${endsAt.toISOString()}, UTC time: ${now.toISOString()}`
+        message: `Test auction created with ID ${auction.id}. Will expire at ${endsAt.toISOString()}, UTC time: ${now.toISOString()}, with${hasReserve ? '' : 'out'} reserve price.`
       });
     } catch (error) {
       console.error('Error creating test expiring auction:', error);
+      res.status(500).json({ error: 'Failed to create test auction' });
+    }
+  });
+  
+  // Create a test auction with reserve price met
+  app.post("/api/auctions/create-test-reserve-met", async (req, res) => {
+    try {
+      const productId = parseInt(req.body.productId?.toString() || "101");
+      
+      // Create an auction that expires 30 seconds from now
+      const now = new Date();
+      const endsAt = new Date(now.getTime() + 30000); // 30 seconds
+      
+      console.log(`Creating test auction with met reserve price that expires at ${endsAt.toISOString()}`);
+      
+      // Create the auction
+      const auction = await storage.createAuction({
+        productId,
+        startingPrice: 10,
+        bidIncrement: 5,
+        reservePrice: 50, // Set a reserve price
+        currentBid: 55,   // Set a current bid that meets the reserve
+        currentBidderId: 42, // Assume user 42 is a test bidder
+        endsAt: endsAt.toISOString(),
+        startsAt: now.toISOString(),
+        status: 'active'
+      });
+      
+      res.json({
+        ...auction,
+        message: `Test auction created with ID ${auction.id}. Will expire at ${endsAt.toISOString()}, with reserve price MET.`
+      });
+    } catch (error) {
+      console.error('Error creating test reserve met auction:', error);
       res.status(500).json({ error: 'Failed to create test auction' });
     }
   });
