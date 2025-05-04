@@ -57,11 +57,18 @@ export function AuctionCard({ product, images }: AuctionProps) {
   useEffect(() => {
     if (!product.auction.endsAt) return;
     
+    // Check if auction is active based on status
+    if (product.auction.status !== 'active') {
+      setIsActive(false);
+      setTimeRemaining("Ended");
+      return;
+    }
+    
     const calculateTimeRemaining = () => {
       const now = new Date();
       const endDate = new Date(product.auction.endsAt);
       
-      // If auction has ended
+      // If auction has ended by time
       if (now > endDate) {
         setIsActive(false);
         setTimeRemaining("Ended");
@@ -91,7 +98,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
     const interval = setInterval(calculateTimeRemaining, 60000);
     
     return () => clearInterval(interval);
-  }, [product.auction.endsAt]);
+  }, [product.auction.endsAt, product.auction.status]);
   
   // Function to render star ratings
   const renderStars = (rating: number | undefined) => {

@@ -169,9 +169,13 @@ export default function HomePage() {
           allProducts.length > 0 &&
           allProducts.some((product) => product.listingType === "auction") ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-            {/* Display the 3 auction products */}
+            {/* Display the 3 active auction products */}
             {[...allProducts]
-              .filter((product) => product.listingType === "auction")
+              .filter((product) => 
+                product.listingType === "auction" && 
+                product.auction?.status === 'active' && 
+                new Date(product.auction.endsAt) > new Date() // Only show auctions that haven't ended
+              )
               .sort((a, b) => {
                 // If createdAt exists, use it for sorting; otherwise, use id
                 if (a.createdAt && b.createdAt) {
