@@ -1454,11 +1454,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Function to check for expired auctions and handle them
   async function checkAndProcessExpiredAuctions() {
-    console.log('Checking for expired auctions...');
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Checking for expired auctions...`);
     try {
       // Get all active auctions
       const auctions = await storage.getAuctions();
       const now = new Date();
+      
+      console.log(`Retrieved ${auctions.length} auctions`);
       
       // Filter for active auctions that have passed their end time
       const expiredAuctions = auctions.filter(auction => 
@@ -1466,7 +1469,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         new Date(auction.endsAt) < now
       );
       
-      console.log(`Found ${expiredAuctions.length} expired auctions to process`);
+      console.log(`[${timestamp}] Found ${expiredAuctions.length} expired auctions to process`);
+      
+      // Log some details about the auctions to help with debugging
+      auctions.forEach(auction => {
+        const endsAt = new Date(auction.endsAt);
+        const isExpired = endsAt < now;
+        console.log(`Auction #${auction.id}: status=${auction.status}, endsAt=${endsAt.toISOString()}, expired=${isExpired}`);
+      });
       
       // Process each expired auction
       for (const auction of expiredAuctions) {
@@ -1539,8 +1549,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Error checking for expired auctions:', error);
     }
     
-    // Schedule the next check
-    setTimeout(checkAndProcessExpiredAuctions, 60000); // Check every minute
+    // We'll use setInterval outside this function instead of setTimeout here
+    // This ensures the next check runs even if there was an error in this execution
   }
   
   // Create WebSocket server for real-time messaging and auction updates
@@ -1552,8 +1562,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Map of auction rooms: auctionId -> Set of WebSocket connections
   const auctionRooms = new Map<number, Set<WebSocket>>();
   
-  // Start the auction expiry check process
+  // Start the auction expiry check process - initial call
   checkAndProcessExpiredAuctions();
+  
+  // Set up a proper interval to check expired auctions every minute
+  // This ensures the check runs even if there are errors in previous executions
+  console.log('Setting up recurring auction expiry check (every 60 seconds)');
+  setInterval(checkAndProcessExpiredAuctions, 60000);
   
   // WebSocket connection handler
   wss.on('connection', (ws: WebSocket) => {
