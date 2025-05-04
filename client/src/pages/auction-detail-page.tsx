@@ -196,195 +196,195 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
       <Header />
       <div className="flex-grow container mx-auto p-6">
         <h1 className="text-3xl font-bold mb-6">{product.name}</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        {/* Product Image */}
-        <div className="aspect-square rounded-lg overflow-hidden">
-          <img 
-            src={product.imageUrl ? `/api/images/${product.imageUrl}` : '/placeholder.jpg'} 
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
-        </div>
         
-        {/* Auction Details */}
-        <div className="flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <Badge className="bg-amber-500 hover:bg-amber-600 text-md py-1 px-3">
-              Auction
-            </Badge>
-            <div className="flex items-center text-orange-500 font-semibold">
-              <Clock className="w-5 h-5 mr-2" />
-              {timeRemaining}
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          {/* Product Image */}
+          <div className="aspect-square rounded-lg overflow-hidden">
+            <img 
+              src={product.imageUrl ? `/api/images/${product.imageUrl}` : '/placeholder.jpg'} 
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
           </div>
           
-          <h2 className="text-2xl font-semibold mb-2">{product.brand} {product.name}</h2>
-          <p className="text-gray-600 mb-4">{product.description}</p>
-          
-          <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-600">Starting Price:</span>
-              <span>{formatCurrency(auction.startingPrice)}</span>
+          {/* Auction Details */}
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <Badge className="bg-amber-500 hover:bg-amber-600 text-md py-1 px-3">
+                Auction
+              </Badge>
+              <div className="flex items-center text-orange-500 font-semibold">
+                <Clock className="w-5 h-5 mr-2" />
+                {timeRemaining}
+              </div>
             </div>
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-600">Current Bid:</span>
-              <span className="font-bold text-green-600">{formatCurrency(auction.currentBid || auction.startingPrice)}</span>
-            </div>
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-600">Bid Increment:</span>
-              <span>{formatCurrency(auction.bidIncrement)}</span>
-            </div>
-            {auction.buyNowPrice && (
+            
+            <h2 className="text-2xl font-semibold mb-2">{product.brand} {product.name}</h2>
+            <p className="text-gray-600 mb-4">{product.description}</p>
+            
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
               <div className="flex justify-between mb-2">
-                <span className="text-gray-600">Buy Now Price:</span>
-                <span className="font-bold">{formatCurrency(auction.buyNowPrice)}</span>
+                <span className="text-gray-600">Starting Price:</span>
+                <span>{formatCurrency(auction.startingPrice)}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-600">Current Bid:</span>
+                <span className="font-bold text-green-600">{formatCurrency(auction.currentBid || auction.startingPrice)}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-600">Bid Increment:</span>
+                <span>{formatCurrency(auction.bidIncrement)}</span>
+              </div>
+              {auction.buyNowPrice && (
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-600">Buy Now Price:</span>
+                  <span className="font-bold">{formatCurrency(auction.buyNowPrice)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total Bids:</span>
+                <span>{auction.bids?.length || 0}</span>
+              </div>
+            </div>
+            
+            {isActive ? (
+              <div className="space-y-4">
+                <form onSubmit={handleBidSubmit} className="flex gap-2">
+                  <Input 
+                    type="number" 
+                    placeholder={`Min bid: ${formatCurrency(nextBidAmount)}`}
+                    value={bidAmount}
+                    onChange={(e) => setBidAmount(e.target.value)}
+                    step="0.01"
+                    min={nextBidAmount}
+                    className="flex-grow"
+                  />
+                  <Button type="submit" className="bg-amber-500 hover:bg-amber-600">
+                    Place Bid
+                  </Button>
+                </form>
+                
+                {auction.buyNowPrice && (
+                  <Button 
+                    onClick={handleBuyNow} 
+                    variant="outline" 
+                    className="w-full border-green-600 text-green-600 hover:bg-green-50"
+                  >
+                    Buy Now for {formatCurrency(auction.buyNowPrice)}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="bg-red-50 p-4 rounded-lg text-center">
+                <p className="text-red-600 font-semibold">This auction has ended</p>
               </div>
             )}
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total Bids:</span>
-              <span>{auction.bids?.length || 0}</span>
-            </div>
           </div>
-          
-          {isActive ? (
-            <div className="space-y-4">
-              <form onSubmit={handleBidSubmit} className="flex gap-2">
-                <Input 
-                  type="number" 
-                  placeholder={`Min bid: ${formatCurrency(nextBidAmount)}`}
-                  value={bidAmount}
-                  onChange={(e) => setBidAmount(e.target.value)}
-                  step="0.01"
-                  min={nextBidAmount}
-                  className="flex-grow"
-                />
-                <Button type="submit" className="bg-amber-500 hover:bg-amber-600">
-                  Place Bid
-                </Button>
-              </form>
-              
-              {auction.buyNowPrice && (
-                <Button 
-                  onClick={handleBuyNow} 
-                  variant="outline" 
-                  className="w-full border-green-600 text-green-600 hover:bg-green-50"
-                >
-                  Buy Now for {formatCurrency(auction.buyNowPrice)}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="bg-red-50 p-4 rounded-lg text-center">
-              <p className="text-red-600 font-semibold">This auction has ended</p>
-            </div>
-          )}
         </div>
-      </div>
-      
-      {/* Tabs for additional information */}
-      <Tabs defaultValue="bidHistory" className="mt-8">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="bidHistory">Bid History</TabsTrigger>
-          <TabsTrigger value="details">Product Details</TabsTrigger>
-          <TabsTrigger value="seller">Seller Information</TabsTrigger>
-        </TabsList>
         
-        <TabsContent value="bidHistory" className="p-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Bid History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {auction.bids && auction.bids.length > 0 ? (
-                <div className="space-y-4">
-                  {auction.bids.map((bid) => (
-                    <div key={bid.id} className="flex items-center justify-between border-b pb-3">
-                      <div className="flex items-center">
-                        <User className="w-5 h-5 mr-2 text-gray-500" />
-                        <span>{bid.bidder}</span>
+        {/* Tabs for additional information */}
+        <Tabs defaultValue="bidHistory" className="mt-8">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="bidHistory">Bid History</TabsTrigger>
+            <TabsTrigger value="details">Product Details</TabsTrigger>
+            <TabsTrigger value="seller">Seller Information</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="bidHistory" className="p-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Bid History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {auction.bids && auction.bids.length > 0 ? (
+                  <div className="space-y-4">
+                    {auction.bids.map((bid) => (
+                      <div key={bid.id} className="flex items-center justify-between border-b pb-3">
+                        <div className="flex items-center">
+                          <User className="w-5 h-5 mr-2 text-gray-500" />
+                          <span>{bid.bidder}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold">{formatCurrency(bid.amount)}</div>
+                          <div className="text-sm text-gray-500">{bid.time}</div>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-semibold">{formatCurrency(bid.amount)}</div>
-                        <div className="text-sm text-gray-500">{bid.time}</div>
-                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center py-4 text-gray-500">No bids have been placed yet.</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="details" className="p-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Product Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {product.remainingPercentage && (
+                    <div className="flex justify-between">
+                      <span className="font-medium">Remaining:</span>
+                      <span>{product.remainingPercentage}%</span>
                     </div>
-                  ))}
+                  )}
+                  {product.batchCode && (
+                    <div className="flex justify-between">
+                      <span className="font-medium">Batch Code:</span>
+                      <span>{product.batchCode}</span>
+                    </div>
+                  )}
+                  {product.purchaseYear && (
+                    <div className="flex justify-between">
+                      <span className="font-medium">Purchase Year:</span>
+                      <span>{product.purchaseYear}</span>
+                    </div>
+                  )}
+                  {product.boxCondition && (
+                    <div className="flex justify-between">
+                      <span className="font-medium">Box Condition:</span>
+                      <span>{product.boxCondition}</span>
+                    </div>
+                  )}
+                  {product.volume && (
+                    <div className="flex justify-between">
+                      <span className="font-medium">Volume:</span>
+                      <span>{product.volume} ml</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="font-medium">Category:</span>
+                    <span>{product.category || 'Uncategorized'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Brand:</span>
+                    <span>{product.brand}</span>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-center py-4 text-gray-500">No bids have been placed yet.</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="details" className="p-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {product.remainingPercentage && (
-                  <div className="flex justify-between">
-                    <span className="font-medium">Remaining:</span>
-                    <span>{product.remainingPercentage}%</span>
-                  </div>
-                )}
-                {product.batchCode && (
-                  <div className="flex justify-between">
-                    <span className="font-medium">Batch Code:</span>
-                    <span>{product.batchCode}</span>
-                  </div>
-                )}
-                {product.purchaseYear && (
-                  <div className="flex justify-between">
-                    <span className="font-medium">Purchase Year:</span>
-                    <span>{product.purchaseYear}</span>
-                  </div>
-                )}
-                {product.boxCondition && (
-                  <div className="flex justify-between">
-                    <span className="font-medium">Box Condition:</span>
-                    <span>{product.boxCondition}</span>
-                  </div>
-                )}
-                {product.volume && (
-                  <div className="flex justify-between">
-                    <span className="font-medium">Volume:</span>
-                    <span>{product.volume} ml</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="font-medium">Category:</span>
-                  <span>{product.category || 'Uncategorized'}</span>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="seller" className="p-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Seller Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-4">
+                  <Button asChild variant="outline">
+                    <Link href={`/seller/${product.sellerId}`}>
+                      View Seller Profile
+                    </Link>
+                  </Button>
                 </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Brand:</span>
-                  <span>{product.brand}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="seller" className="p-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Seller Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-4">
-                <Button asChild variant="outline">
-                  <Link href={`/seller/${product.sellerId}`}>
-                    View Seller Profile
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
       <Footer />
     </div>
