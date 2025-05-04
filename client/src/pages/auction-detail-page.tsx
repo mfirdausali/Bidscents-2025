@@ -12,6 +12,31 @@ import { queryClient } from "@/lib/queryClient";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 
+interface Bid {
+  id: number;
+  auctionId: number;
+  bidderId: number;
+  amount: number;
+  placedAt: string;
+  isWinning: boolean;
+  bidder?: string; // Display name for bidder
+}
+
+interface Auction {
+  id: number;
+  productId: number;
+  startingPrice: number;
+  currentBid: number | null;
+  bidIncrement: number;
+  buyNowPrice: number | null;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  bidCount?: number;
+  bids?: Bid[];
+  product?: any; // Product details included in API response
+}
+
 interface AuctionDetailProps {}
 
 export default function AuctionDetailPage({}: AuctionDetailProps) {
@@ -22,18 +47,12 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   const [isActive, setIsActive] = useState<boolean>(true);
   
-  // Query product details by ID
-  const { data: product, isLoading: productLoading, error: productError } = useQuery({
-    queryKey: ['/api/products', Number(id)],
-    queryFn: async () => {
-      const res = await fetch(`/api/products/${id}`);
-      if (!res.ok) throw new Error('Failed to fetch product');
-      return res.json();
-    },
-  });
-  
-  // Query auction details by ID
-  const { data: auctionData, isLoading: auctionLoading, error: auctionError } = useQuery({
+  // Fetch auction details which includes product info
+  const { 
+    data: auctionData, 
+    isLoading: auctionLoading, 
+    error: auctionError 
+  } = useQuery<Auction>({
     queryKey: ['/api/auctions', id],
     queryFn: async () => {
       const res = await fetch(`/api/auctions/${id}`);
@@ -44,11 +63,11 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   
   // Calculate time remaining until auction ends
   useEffect(() => {
-    if (!auction?.endsAt) return;
+    if (!auctionData?.endsAt) return;
     
     const calculateTimeRemaining = () => {
       const now = new Date();
-      const endDate = new Date(auction.endsAt);
+      const endDate = new Date(auctionData.endsAt);
       
       // If auction has ended
       if (now > endDate) {
@@ -73,7 +92,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     const interval = setInterval(calculateTimeRemaining, 1000);
     
     return () => clearInterval(interval);
-  }, [auction?.endsAt]);
+  }, [auctionData?.endsAt]);
   
   // Format currency
   const formatCurrency = (amount: number | null | undefined) => {
@@ -84,6 +103,8 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   // Handle bid submission
   const handleBidSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!auctionData) return;
     
     // Validate bid amount
     const bidValue = parseFloat(bidAmount);
@@ -96,7 +117,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
       return;
     }
     
-    const minBid = (auction?.currentBid || auction?.startingPrice || 0) + (auction?.bidIncrement || 1);
+    const minBid = (auctionData.currentBid || auctionData.startingPrice) + auctionData.bidIncrement;
     if (bidValue < minBid) {
       toast({
         title: "Bid Too Low",
@@ -129,7 +150,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     }, 2000);
   };
   
-  if (productLoading || auctionLoading) {
+  if (auctionLoading) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -152,7 +173,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     );
   }
   
-  if (productError || auctionError || !product || !auction) {
+  if (auctionError || !auctionData || !auctionData.product) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -168,7 +189,9 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     );
   }
   
-  const nextBidAmount = (auction.currentBid || auction.startingPrice) + auction.bidIncrement;
+  // Extract product from auction data and calculate next bid amount
+  const product = auctionData.product;
+  const nextBidAmount = (auctionData.currentBid || auctionData.startingPrice) + auctionData.bidIncrement;
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -204,25 +227,25 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
             <div className="bg-gray-50 p-4 rounded-lg mb-6">
               <div className="flex justify-between mb-2">
                 <span className="text-gray-600">Starting Price:</span>
-                <span>{formatCurrency(auction.startingPrice)}</span>
+                <span>{formatCurrency(auctionData.startingPrice)}</span>
               </div>
               <div className="flex justify-between mb-2">
                 <span className="text-gray-600">Current Bid:</span>
-                <span className="font-bold text-green-600">{formatCurrency(auction.currentBid || auction.startingPrice)}</span>
+                <span className="font-bold text-green-600">{formatCurrency(auctionData.currentBid || auctionData.startingPrice)}</span>
               </div>
               <div className="flex justify-between mb-2">
                 <span className="text-gray-600">Bid Increment:</span>
-                <span>{formatCurrency(auction.bidIncrement)}</span>
+                <span>{formatCurrency(auctionData.bidIncrement)}</span>
               </div>
-              {auction.buyNowPrice && (
+              {auctionData.buyNowPrice && (
                 <div className="flex justify-between mb-2">
                   <span className="text-gray-600">Buy Now Price:</span>
-                  <span className="font-bold">{formatCurrency(auction.buyNowPrice)}</span>
+                  <span className="font-bold">{formatCurrency(auctionData.buyNowPrice)}</span>
                 </div>
               )}
               <div className="flex justify-between">
                 <span className="text-gray-600">Total Bids:</span>
-                <span>{auction.bids?.length || 0}</span>
+                <span>{auctionData.bidCount || auctionData.bids?.length || 0}</span>
               </div>
             </div>
             
@@ -243,13 +266,13 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                   </Button>
                 </form>
                 
-                {auction.buyNowPrice && (
+                {auctionData.buyNowPrice && (
                   <Button 
                     onClick={handleBuyNow} 
                     variant="outline" 
                     className="w-full border-green-600 text-green-600 hover:bg-green-50"
                   >
-                    Buy Now for {formatCurrency(auction.buyNowPrice)}
+                    Buy Now for {formatCurrency(auctionData.buyNowPrice)}
                   </Button>
                 )}
               </div>
@@ -275,17 +298,19 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                 <CardTitle>Bid History</CardTitle>
               </CardHeader>
               <CardContent>
-                {auction.bids && auction.bids.length > 0 ? (
+                {auctionData.bids && auctionData.bids.length > 0 ? (
                   <div className="space-y-4">
-                    {auction.bids.map((bid) => (
+                    {auctionData.bids.map((bid: Bid) => (
                       <div key={bid.id} className="flex items-center justify-between border-b pb-3">
                         <div className="flex items-center">
                           <User className="w-5 h-5 mr-2 text-gray-500" />
-                          <span>{bid.bidder}</span>
+                          <span>{bid.bidder || `Bidder #${bid.bidderId}`}</span>
                         </div>
                         <div className="text-right">
                           <div className="font-semibold">{formatCurrency(bid.amount)}</div>
-                          <div className="text-sm text-gray-500">{bid.time}</div>
+                          <div className="text-sm text-gray-500">
+                            {new Date(bid.placedAt).toLocaleString()}
+                          </div>
                         </div>
                       </div>
                     ))}
