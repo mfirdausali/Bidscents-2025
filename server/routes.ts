@@ -1731,15 +1731,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Handle placing a bid
         if (data.type === 'placeBid') {
           try {
-            // For placing bids, we must have a real authenticated user
-            // Not just guest access like for viewing
+            // For placing bids, we need to verify the user is actually logged in
+            // First check if the WebSocket has been authenticated
             if (!userId) {
-              console.log('Bid attempt rejected: Not authenticated');
-              ws.send(JSON.stringify({ 
-                type: 'error', 
-                message: 'You must be logged in to place a bid' 
-              }));
-              return;
+              console.log('Bid attempt rejected: WebSocket not authenticated');
+              
+              // Try to get the user ID from the message data
+              if (data.userId) {
+                // Check if this user exists in our database
+                try {
+                  console.log(`Verifying user ${data.userId} for bid...`);
+                  const user = await storage.getUser(data.userId);
+                  
+                  if (user) {
+                    console.log(`User ${data.userId} verified for bid through lookup`);
+                    // Use the verified user ID
+                    userId = data.userId;
+                  } else {
+                    console.log(`User ${data.userId} not found in database`);
+                    ws.send(JSON.stringify({ 
+                      type: 'error', 
+                      message: 'You must be logged in to place a bid' 
+                    }));
+                    return;
+                  }
+                } catch (err) {
+                  console.error(`Error verifying user ${data.userId}:`, err);
+                  ws.send(JSON.stringify({ 
+                    type: 'error', 
+                    message: 'Authentication error. Please try logging in again.' 
+                  }));
+                  return;
+                }
+              } else {
+                console.log('Bid attempt rejected: No user ID provided');
+                ws.send(JSON.stringify({ 
+                  type: 'error', 
+                  message: 'You must be logged in to place a bid' 
+                }));
+                return;
+              }
             }
             
             console.log(`Processing bid from user ${userId}...`);
@@ -1819,6 +1850,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             try {
               // Step 3: Create the new bid
+              // At this point, userId should be a valid number from our earlier checks
+              if (userId === null) {
+                throw new Error('User ID is missing but should have been validated earlier');
+              }
+              
               const bid = await storage.createBid({
                 auctionId: parseInt(auctionId),
                 bidderId: userId,
@@ -1836,6 +1872,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Successfully updated auction ${auctionId}`);
               
               // Get bidder information
+              // We've already verified userId is not null above
+              if (userId === null) {
+                throw new Error('User ID is null when it should not be');
+              }
+              
               console.log(`Fetching bidder details for user ${userId}...`);
               const bidder = await storage.getUser(userId);
               console.log(`Bidder details: ${bidder ? 'Found' : 'Not found'}`);

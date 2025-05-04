@@ -116,8 +116,18 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
       setWsConnected(true);
       console.log("WebSocket connected");
       
-      // Join auction room
+      // First authenticate if the user is logged in
+      if (user?.id && socket.current?.readyState === WebSocket.OPEN) {
+        console.log("Authenticating WebSocket with user ID:", user.id);
+        socket.current.send(JSON.stringify({
+          type: 'auth',
+          userId: user.id
+        }));
+      }
+      
+      // Then join auction room (regardless of authentication status)
       if (socket.current?.readyState === WebSocket.OPEN) {
+        console.log(`Joining auction room ${id} as ${user?.id || 'guest'}`);
         socket.current.send(JSON.stringify({
           type: 'joinAuction',
           auctionId: parseInt(id),
