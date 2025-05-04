@@ -1617,6 +1617,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
         
+        // Handle joining an auction room
+        if (data.type === 'joinAuction') {
+          try {
+            // Validate auction ID
+            const auctionId = parseInt(data.auctionId);
+            if (isNaN(auctionId)) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Invalid auction ID' }));
+              return;
+            }
+            
+            // Get the auction room, create if it doesn't exist
+            let room = auctionRooms.get(auctionId);
+            if (!room) {
+              room = new Set<WebSocket>();
+              auctionRooms.set(auctionId, room);
+            }
+            
+            // Add this connection to the room
+            room.add(ws);
+            joinedAuctions.add(auctionId);
+            
+            console.log(`User ${userId} joined auction room ${auctionId}`);
+            ws.send(JSON.stringify({ 
+              type: 'joinedAuction', 
+              auctionId, 
+              message: `Joined auction room ${auctionId}` 
+            }));
+            
+            // Notify about active viewers (optional)
+            const viewerCount = room.size;
+            Array.from(room).forEach(connection => {
+              if (connection.readyState === WebSocket.OPEN) {
+                connection.send(JSON.stringify({
+                  type: 'auctionViewers',
+                  auctionId,
+                  count: viewerCount
+                }));
+              }
+            });
+            
+            return;
+          } catch (error: any) {
+            console.error('Error joining auction room:', error);
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              message: 'Failed to join auction room: ' + (error.message || 'Unknown error')
+            }));
+            return;
+          }
+        }
+        
+        // Handle leaving an auction room
+        if (data.type === 'leaveAuction') {
+          try {
+            const auctionId = parseInt(data.auctionId);
+            if (isNaN(auctionId)) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Invalid auction ID' }));
+              return;
+            }
+            
+            // Remove connection from the room
+            const room = auctionRooms.get(auctionId);
+            if (room) {
+              room.delete(ws);
+              joinedAuctions.delete(auctionId);
+              
+              // If room is empty, delete it
+              if (room.size === 0) {
+                auctionRooms.delete(auctionId);
+              } else {
+                // Notify remaining users about viewer count
+                Array.from(room).forEach(connection => {
+                  if (connection.readyState === WebSocket.OPEN) {
+                    connection.send(JSON.stringify({
+                      type: 'auctionViewers',
+                      auctionId,
+                      count: room.size
+                    }));
+                  }
+                });
+              }
+              
+              console.log(`User ${userId} left auction room ${auctionId}`);
+              ws.send(JSON.stringify({ 
+                type: 'leftAuction', 
+                auctionId,
+                message: `Left auction room ${auctionId}` 
+              }));
+            }
+            
+            return;
+          } catch (error: any) {
+            console.error('Error leaving auction room:', error);
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              message: 'Failed to leave auction room: ' + (error.message || 'Unknown error')
+            }));
+            return;
+          }
+        }
+        
+        // Handle placing a bid
+        if (data.type === 'placeBid') {
+          try {
+            const { auctionId, amount } = data;
+            
+            // Validate auction ID and bid amount
+            if (isNaN(parseInt(auctionId)) || isNaN(parseFloat(amount))) {
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: 'Invalid auction ID or bid amount' 
+              }));
+              return;
+            }
+            
+            // Get the auction
+            const auction = await storage.getAuctionById(parseInt(auctionId));
+            if (!auction) {
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: 'Auction not found' 
+              }));
+              return;
+            }
+            
+            // Check if auction is active
+            const now = new Date();
+            const endsAt = new Date(auction.endsAt);
+            if (now > endsAt) {
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: 'Auction has ended' 
+              }));
+              return;
+            }
+            
+            // Check if the bid is high enough
+            const minBid = (auction.currentBid || auction.startingPrice) + auction.bidIncrement;
+            if (parseFloat(amount) < minBid) {
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: `Bid must be at least ${minBid}` 
+              }));
+              return;
+            }
+            
+            // Create the bid in the database
+            const bid = await storage.createBid({
+              auctionId: parseInt(auctionId),
+              bidderId: userId,
+              amount: parseFloat(amount),
+              placedAt: new Date().toISOString(),
+              isWinning: true
+            });
+            
+            // Get bidder information
+            const bidder = await storage.getUser(userId);
+            
+            // Add bidder name to bid
+            const bidWithDetails = {
+              ...bid,
+              bidder: bidder?.username || `User #${userId}`
+            };
+            
+            // Update the auction's current bid and bidder
+            // Note: In a real implementation, this should be a transaction
+            // to ensure bid placement and auction update happen atomically
+            
+            // Notify all users in the auction room
+            const room = auctionRooms.get(parseInt(auctionId));
+            if (room) {
+              Array.from(room).forEach(connection => {
+                if (connection.readyState === WebSocket.OPEN) {
+                  connection.send(JSON.stringify({
+                    type: 'newBid',
+                    auctionId: parseInt(auctionId),
+                    bid: bidWithDetails
+                  }));
+                }
+              });
+            }
+            
+            console.log(`User ${userId} placed bid of ${amount} on auction ${auctionId}`);
+            return;
+          } catch (error: any) {
+            console.error('Error placing bid:', error);
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              message: 'Failed to place bid: ' + (error.message || 'Unknown error')
+            }));
+            return;
+          }
+        }
+        
         // Unknown message type
         ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
         
