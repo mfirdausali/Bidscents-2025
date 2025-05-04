@@ -1464,19 +1464,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Retrieved ${auctions.length} auctions`);
       
       // Filter for active auctions that have passed their end time
-      const expiredAuctions = auctions.filter(auction => 
-        auction.status === 'active' && 
-        new Date(auction.endsAt) < now
-      );
+      const expiredAuctions = auctions.filter(auction => {
+        const auctionEndDate = new Date(auction.endsAt);
+        // Compare the dates directly in UTC time to avoid timezone issues
+        const isExpired = auction.status === 'active' && auctionEndDate.getTime() < now.getTime();
+        
+        console.log(`Auction #${auction.id}: endsAt=${auctionEndDate.toISOString()}, current=${now.toISOString()}, expired=${isExpired}`);
+        
+        return isExpired;
+      });
       
       console.log(`[${timestamp}] Found ${expiredAuctions.length} expired auctions to process`);
       
-      // Log some details about the auctions to help with debugging
-      auctions.forEach(auction => {
-        const endsAt = new Date(auction.endsAt);
-        const isExpired = endsAt < now;
-        console.log(`Auction #${auction.id}: status=${auction.status}, endsAt=${endsAt.toISOString()}, expired=${isExpired}`);
-      });
+      // We already logged the auction details in the filter above, no need to do it again
       
       // Process each expired auction
       for (const auction of expiredAuctions) {
@@ -1569,6 +1569,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This ensures the check runs even if there are errors in previous executions
   console.log('Setting up recurring auction expiry check (every 60 seconds)');
   setInterval(checkAndProcessExpiredAuctions, 60000);
+  
+  // Create a test auction endpoint that expires in 30 seconds
+  app.post("/api/auctions/create-test-expiring", async (req, res) => {
+    try {
+      const productId = parseInt(req.body.productId?.toString() || "101");
+      
+      // Create an auction that expires 30 seconds from now
+      const now = new Date();
+      const endsAt = new Date(now.getTime() + 30000); // 30 seconds
+      
+      console.log(`Creating test auction that expires at ${endsAt.toISOString()}`);
+      
+      // Create the auction
+      const auction = await storage.createAuction({
+        productId,
+        startingPrice: 10,
+        bidIncrement: 5,
+        endsAt,
+        startsAt: now,
+        status: 'active'
+      });
+      
+      res.json({
+        ...auction,
+        message: `Test auction created with ID ${auction.id}. Will expire at ${endsAt.toISOString()}, UTC time: ${now.toISOString()}`
+      });
+    } catch (error) {
+      console.error('Error creating test expiring auction:', error);
+      res.status(500).json({ error: 'Failed to create test auction' });
+    }
+  });
   
   // WebSocket connection handler
   wss.on('connection', (ws: WebSocket) => {
