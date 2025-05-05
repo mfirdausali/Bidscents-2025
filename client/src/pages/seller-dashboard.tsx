@@ -788,7 +788,7 @@ export default function SellerDashboard() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Average Price</p>
-                    <h3 className="text-2xl font-bold">${averagePrice.toFixed(2)}</h3>
+                    <h3 className="text-2xl font-bold">RM{averagePrice.toFixed(2)}</h3>
                   </div>
                 </div>
               </CardContent>
@@ -871,7 +871,7 @@ export default function SellerDashboard() {
                               <TableCell className="font-medium">{product.name}</TableCell>
                               <TableCell>{product.brand}</TableCell>
                               <TableCell>{product.category?.name || "Uncategorized"}</TableCell>
-                              <TableCell>${product.price.toFixed(2)}</TableCell>
+                              <TableCell>RM{product.price.toFixed(2)}</TableCell>
                               <TableCell>{product.stockQuantity}</TableCell>
                               <TableCell>
                                 {product.isNew && (
