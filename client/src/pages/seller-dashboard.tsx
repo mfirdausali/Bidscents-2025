@@ -1002,7 +1002,7 @@ export default function SellerDashboard() {
                                   id={`boost-${product.id}`}
                                   checked={boostedProducts.includes(product.id)}
                                   onCheckedChange={() => toggleBoostProduct(product.id)}
-                                  className="h-5 w-5 border-2 border-[#F5A623] data-[state=checked]:bg-[#F5A623] data-[state=checked]:text-white rounded-sm focus:ring-0 animate-[pulse_0.5s_ease-in-out] transition-all duration-300 ease-in-out"
+                                  className="h-5 w-5 border-2 border-[#F5A623] data-[state=checked]:bg-[#F5A623] data-[state=checked]:text-white rounded-sm focus:ring-0 animate-pulse transition-all duration-300 ease-in-out"
                                 />
                               </TableCell>
                               <TableCell>
@@ -1085,6 +1085,25 @@ export default function SellerDashboard() {
                           ))}
                         </TableBody>
                       </Table>
+                      
+                      {/* Total Price Summary for Boosted Products */}
+                      {boostedProducts.length > 0 && (
+                        <div className="mt-4 p-4 bg-[#FFF9E6] border border-[#F5A623] rounded-md">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="font-medium text-gray-700">Total Boost Cost:</span>
+                              <span className="ml-2 font-bold text-lg">RM{(boostedProducts.length * 10).toFixed(2)}</span>
+                              <span className="ml-2 text-sm text-gray-500">({boostedProducts.length} products × RM10.00)</span>
+                            </div>
+                            <Button 
+                              onClick={handleBoostCheckout}
+                              className="bg-[#F5A623] hover:bg-[#E59400] text-white"
+                            >
+                              Boost Now
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-12">
@@ -2406,7 +2425,7 @@ export default function SellerDashboard() {
 
       {/* Floating action button for boosting products */}
       {boostedProducts.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-[fadeIn_0.3s_ease-in-out]">
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-fadeIn">
           <Button 
             onClick={handleBoostCheckout}
             className="bg-gradient-to-r from-gold to-metallic-gold text-rich-black hover:from-metallic-gold hover:to-gold shadow-lg px-6 py-6 rounded-full flex items-center space-x-2 transition-all duration-300 ease-in-out"
