@@ -1,6 +1,11 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ProductWithDetails, InsertProduct, Category, InsertAuction } from "@shared/schema";
+import {
+  ProductWithDetails,
+  InsertProduct,
+  Category,
+  InsertAuction,
+} from "@shared/schema";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
@@ -8,12 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
   Tooltip,
@@ -47,12 +52,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Package, 
-  Plus, 
-  Edit, 
-  Trash, 
-  Search, 
+import {
+  Package,
+  Plus,
+  Edit,
+  Trash,
+  Search,
   Loader2,
   ShoppingBag,
   DollarSign,
@@ -60,7 +65,7 @@ import {
   Upload,
   X,
   Timer,
-  Tag
+  Tag,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -68,12 +73,19 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Define listing type selection schema
 const listingTypeSchema = z.object({
-  listingType: z.enum(["fixed", "auction"])
+  listingType: z.enum(["fixed", "auction"]),
 });
 
 type ListingTypeFormValues = z.infer<typeof listingTypeSchema>;
@@ -82,45 +94,88 @@ type ListingTypeFormValues = z.infer<typeof listingTypeSchema>;
 const productSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters" }),
   brand: z.string().min(2, { message: "Brand must be at least 2 characters" }),
-  description: z.string().min(10, { message: "Description must be at least 10 characters" }),
+  description: z
+    .string()
+    .min(10, { message: "Description must be at least 10 characters" }),
   price: z.number().min(0.01, { message: "Price must be greater than 0" }),
   imageUrl: z.string().url({ message: "Please enter a valid image URL" }), // Keep for compatibility, will be updated in backend
   imageFiles: z.any().optional(), // Will hold the actual file objects for upload
-  stockQuantity: z.number().int().min(0, { message: "Stock quantity must be 0 or greater" }),
-  categoryId: z.number().int().positive({ message: "Please select a category" }),
+  stockQuantity: z
+    .number()
+    .int()
+    .min(0, { message: "Stock quantity must be 0 or greater" }),
+  categoryId: z
+    .number()
+    .int()
+    .positive({ message: "Please select a category" }),
   isNew: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
   // Secondhand perfume specific fields
   remainingPercentage: z.number().int().min(1).max(100).default(100),
   batchCode: z.string().optional(),
-  purchaseYear: z.number().int().min(1970).max(new Date().getFullYear()).optional(),
+  purchaseYear: z
+    .number()
+    .int()
+    .min(1970)
+    .max(new Date().getFullYear())
+    .optional(),
   boxCondition: z.enum(["Good", "Damaged", "No Box"]).default("Good"),
   listingType: z.enum(["fixed", "negotiable"]).default("fixed"),
-  volume: z.number().int().min(1, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }),
+  volume: z
+    .number()
+    .int()
+    .min(1, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }),
 });
 
 // Define auction form schema
 const auctionSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters" }),
   brand: z.string().min(2, { message: "Brand must be at least 2 characters" }),
-  description: z.string().min(10, { message: "Description must be at least 10 characters" }),
-  startingPrice: z.number().min(0.01, { message: "Starting price must be greater than 0" }),
+  description: z
+    .string()
+    .min(10, { message: "Description must be at least 10 characters" }),
+  startingPrice: z
+    .number()
+    .min(0.01, { message: "Starting price must be greater than 0" }),
   reservePrice: z.number().optional(),
   buyNowPrice: z.number().optional(),
-  bidIncrement: z.number().min(1, { message: "Bid increment must be at least 1" }).default(5),
-  auctionEndDate: z.date().min(new Date(), { message: "End date must be in the future" }),
-  imageUrl: z.string().url({ message: "Please enter a valid image URL" }).optional(),
+  bidIncrement: z
+    .number()
+    .min(1, { message: "Bid increment must be at least 1" })
+    .default(5),
+  auctionEndDate: z
+    .date()
+    .min(new Date(), { message: "End date must be in the future" }),
+  imageUrl: z
+    .string()
+    .url({ message: "Please enter a valid image URL" })
+    .optional(),
   imageFiles: z.any().optional(),
-  stockQuantity: z.number().int().min(1, { message: "Stock quantity must be at least 1" }).default(1),
-  categoryId: z.number().int().positive({ message: "Please select a category" }),
+  stockQuantity: z
+    .number()
+    .int()
+    .min(1, { message: "Stock quantity must be at least 1" })
+    .default(1),
+  categoryId: z
+    .number()
+    .int()
+    .positive({ message: "Please select a category" }),
   isNew: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
   // Secondhand perfume specific fields
   remainingPercentage: z.number().int().min(1).max(100).default(100),
   batchCode: z.string().optional(),
-  purchaseYear: z.number().int().min(1970).max(new Date().getFullYear()).optional(),
+  purchaseYear: z
+    .number()
+    .int()
+    .min(1970)
+    .max(new Date().getFullYear())
+    .optional(),
   boxCondition: z.enum(["Good", "Damaged", "No Box"]).default("Good"),
-  volume: z.number().int().min(1, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }),
+  volume: z
+    .number()
+    .int()
+    .min(1, { message: "Please enter a valid volume (e.g. 50ml, 100ml)" }),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -129,13 +184,15 @@ type AuctionFormValues = z.infer<typeof auctionSchema>;
 export default function SellerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   const [activeTab, setActiveTab] = useState("products");
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentProductId, setCurrentProductId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
-  const [selectedListingType, setSelectedListingType] = useState<"fixed" | "auction">("fixed");
+  const [selectedListingType, setSelectedListingType] = useState<
+    "fixed" | "auction"
+  >("fixed");
   const [isAuctionForm, setIsAuctionForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
@@ -143,25 +200,27 @@ export default function SellerDashboard() {
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
 
   // Fetch seller's products
-  const { data: products, isLoading: isLoadingProducts } = useQuery<ProductWithDetails[]>({
+  const { data: products, isLoading: isLoadingProducts } = useQuery<
+    ProductWithDetails[]
+  >({
     queryKey: ["/api/seller/products", user?.id],
     queryFn: async ({ queryKey }) => {
       // Add the sellerId as a query parameter if we have the user
-      const endpoint = user?.id 
-        ? `/api/seller/products?sellerId=${user.id}` 
+      const endpoint = user?.id
+        ? `/api/seller/products?sellerId=${user.id}`
         : "/api/seller/products";
-      
+
       const res = await fetch(endpoint, { credentials: "include" });
-      
+
       if (!res.ok) {
-        throw new Error('Failed to fetch seller products');
+        throw new Error("Failed to fetch seller products");
       }
-      
+
       return await res.json();
     },
     enabled: !!user,
   });
-  
+
   // Fetch categories for the dropdown
   const { data: categories } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
@@ -171,10 +230,10 @@ export default function SellerDashboard() {
   const listingTypeForm = useForm<ListingTypeFormValues>({
     resolver: zodResolver(listingTypeSchema),
     defaultValues: {
-      listingType: "fixed"
-    }
+      listingType: "fixed",
+    },
   });
-  
+
   // Product form for fixed price listings
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -207,7 +266,7 @@ export default function SellerDashboard() {
       description: "",
       startingPrice: 0,
       reservePrice: undefined,
-      buyNowPrice: undefined, 
+      buyNowPrice: undefined,
       bidIncrement: 5,
       auctionEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
       imageUrl: "",
@@ -250,7 +309,13 @@ export default function SellerDashboard() {
 
   // Update product mutation
   const updateProductMutation = useMutation({
-    mutationFn: async ({ id, product }: { id: number; product: InsertProduct }) => {
+    mutationFn: async ({
+      id,
+      product,
+    }: {
+      id: number;
+      product: InsertProduct;
+    }) => {
       const res = await apiRequest("PUT", `/api/products/${id}`, product);
       return await res.json();
     },
@@ -278,14 +343,19 @@ export default function SellerDashboard() {
   const deleteProductMutation = useMutation({
     mutationFn: async (id: number) => {
       // Include the seller ID in the query parameter
-      await apiRequest("DELETE", `/api/products/${id}?sellerId=${user?.id || 0}`);
+      await apiRequest(
+        "DELETE",
+        `/api/products/${id}?sellerId=${user?.id || 0}`,
+      );
     },
     onSuccess: () => {
       toast({
         title: "Product deleted",
         description: "Your product has been deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/seller/products", user?.id] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/seller/products", user?.id],
+      });
       setIsDeleting(null);
     },
     onError: (error) => {
@@ -300,61 +370,75 @@ export default function SellerDashboard() {
 
   // Mutation for registering image IDs and uploading images
   const registerImagesMutation = useMutation({
-    mutationFn: async ({ productId, images }: { productId: number, images: File[] }) => {
+    mutationFn: async ({
+      productId,
+      images,
+    }: {
+      productId: number;
+      images: File[];
+    }) => {
       // Step 1: Create placeholder entries for each image in the database
       const registerPromises = images.map(async (file, index) => {
         // Generate a random UUID for the image - this will be used both in the database
         // and as the actual object storage key to ensure consistency
         const imageId = crypto.randomUUID();
         const imageUrl = `image-id-${imageId}`;
-        
-        console.log(`Creating product image with ID: ${imageUrl} for file: ${file.name}`);
-        
+
+        console.log(
+          `Creating product image with ID: ${imageUrl} for file: ${file.name}`,
+        );
+
         // Register the image metadata in the database
-        const registerResponse = await fetch('/api/product-images', {
-          method: 'POST',
+        const registerResponse = await fetch("/api/product-images", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             productId,
             imageUrl: imageUrl, // Use the same imageUrl that we'll use for storage
             imageOrder: index,
             imageName: file.name || `Image ${index + 1}`,
-            sellerId: user?.id || 0 // Include seller ID for authorization
+            sellerId: user?.id || 0, // Include seller ID for authorization
           }),
         });
-        
+
         if (!registerResponse.ok) {
           throw new Error(`Failed to register image ${index}`);
         }
-        
+
         // Get the registered image record with its ID
         const registeredImage = await registerResponse.json();
-        
+
         // Step 2: Upload the actual image file to object storage
         const formData = new FormData();
-        formData.append('image', file);
-        formData.append('sellerId', String(user?.id || 0)); // Include seller ID for authorization
-        
-        console.log('About to upload image to storage for product image id:', registeredImage.id);
-        const uploadResponse = await fetch(`/api/product-images/${registeredImage.id}/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-        console.log('Upload response status:', uploadResponse.status);
-        
+        formData.append("image", file);
+        formData.append("sellerId", String(user?.id || 0)); // Include seller ID for authorization
+
+        console.log(
+          "About to upload image to storage for product image id:",
+          registeredImage.id,
+        );
+        const uploadResponse = await fetch(
+          `/api/product-images/${registeredImage.id}/upload`,
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
+        console.log("Upload response status:", uploadResponse.status);
+
         if (!uploadResponse.ok) {
           throw new Error(`Failed to upload image ${index}`);
         }
-        
+
         return await uploadResponse.json();
       });
-      
+
       return Promise.all(registerPromises);
     },
     onSuccess: () => {
-      console.log('Images registered and uploaded successfully');
+      console.log("Images registered and uploaded successfully");
       // Clear the image upload state after successful upload
       setUploadedImages([]);
       setImagePreviewUrls([]);
@@ -375,45 +459,46 @@ export default function SellerDashboard() {
       ...data,
       sellerId: user?.id || 0,
     };
-    
+
     try {
       let productId: number;
-      
+
       if (isEditMode && currentProductId) {
-        const updatedProduct = await updateProductMutation.mutateAsync({ 
-          id: currentProductId, 
-          product: productWithSellerId 
+        const updatedProduct = await updateProductMutation.mutateAsync({
+          id: currentProductId,
+          product: productWithSellerId,
         });
         productId = updatedProduct.id;
       } else {
-        const newProduct = await createProductMutation.mutateAsync(productWithSellerId);
+        const newProduct =
+          await createProductMutation.mutateAsync(productWithSellerId);
         productId = newProduct.id;
       }
-      
+
       // After product is created/updated, register and upload images
       if (uploadedImages.length > 0) {
         await registerImagesMutation.mutateAsync({
           productId,
-          images: uploadedImages
+          images: uploadedImages,
         });
       }
-      
+
       // Close dialog after successful submission
       setIsDialogOpen(false);
     } catch (error) {
-      console.error('Error in product submission:', error);
+      console.error("Error in product submission:", error);
     }
   };
 
   // Query to fetch product images
   const { data: productImages } = useQuery({
-    queryKey: ['product-images', currentProductId],
+    queryKey: ["product-images", currentProductId],
     queryFn: async () => {
       if (!currentProductId) return [];
-      
+
       const response = await fetch(`/api/product-images/${currentProductId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch product images');
+        throw new Error("Failed to fetch product images");
       }
       return response.json();
     },
@@ -424,22 +509,24 @@ export default function SellerDashboard() {
   const handleEditProduct = (product: ProductWithDetails) => {
     setIsEditMode(true);
     setCurrentProductId(product.id);
-    
+
     // Clear existing image previews
     setUploadedImages([]);
-    imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
     setImagePreviewUrls([]);
-    
+
     // If the product has images in the product.images array, show them in the preview
     if (product.images && product.images.length > 0) {
-      const existingImageUrls = product.images.map(img => `/api/images/${img.imageUrl}`);
+      const existingImageUrls = product.images.map(
+        (img) => `/api/images/${img.imageUrl}`,
+      );
       setImagePreviewUrls(existingImageUrls);
     }
     // Fallback to the old imageUrl field if no images in the table
     else if (product.imageUrl) {
       setImagePreviewUrls([`/api/images/${product.imageUrl}`]);
     }
-    
+
     // Check if this is an auction listing
     if (product.listingType === "auction") {
       setIsAuctionForm(true);
@@ -460,12 +547,13 @@ export default function SellerDashboard() {
         remainingPercentage: product.remainingPercentage || 100,
         batchCode: product.batchCode || "",
         purchaseYear: product.purchaseYear || new Date().getFullYear(),
-        boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
+        boxCondition:
+          (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
         listingType: (product.listingType as "fixed" | "negotiable") || "fixed",
         volume: product.volume || 100,
       });
     }
-    
+
     setIsDialogOpen(true);
   };
 
@@ -482,85 +570,96 @@ export default function SellerDashboard() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    
+
     // Limit to 5 images
     const newFiles: File[] = Array.from(files).slice(0, 5);
-    
+
     // Create preview URLs
-    const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
-    
+    const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
+
     setUploadedImages(newFiles);
     setImagePreviewUrls(newPreviewUrls);
-    
+
     // Update form with first image URL as a placeholder
     // In a real implementation, we would properly handle multiple images
     if (newFiles.length > 0) {
-      form.setValue('imageUrl', newPreviewUrls[0]);
+      form.setValue("imageUrl", newPreviewUrls[0]);
     }
   };
-  
+
   // Remove image from preview
   const removeImage = (index: number) => {
     const newImages = [...uploadedImages];
     const newPreviewUrls = [...imagePreviewUrls];
-    
+
     // Revoke object URL to prevent memory leaks
     URL.revokeObjectURL(newPreviewUrls[index]);
-    
+
     newImages.splice(index, 1);
     newPreviewUrls.splice(index, 1);
-    
+
     setUploadedImages(newImages);
     setImagePreviewUrls(newPreviewUrls);
-    
+
     // Update form with first remaining image or empty string
-    form.setValue('imageUrl', newPreviewUrls[0] || '');
+    form.setValue("imageUrl", newPreviewUrls[0] || "");
   };
 
   // Handle image upload for auction form
   const handleAuctionImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    
+
     // Limit to 5 images
     const newFiles: File[] = Array.from(files).slice(0, 5);
-    
+
     // Create preview URLs
-    const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
-    
+    const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
+
     setUploadedImages(newFiles);
     setImagePreviewUrls(newPreviewUrls);
-    
+
     // Update auction form with first image URL as a placeholder
     if (newFiles.length > 0) {
-      auctionForm.setValue('imageUrl', newPreviewUrls[0]);
+      auctionForm.setValue("imageUrl", newPreviewUrls[0]);
     }
   };
 
   // Create auction mutation
   const createAuctionMutation = useMutation({
-    mutationFn: async (data: { product: InsertProduct, auction: InsertAuction }) => {
+    mutationFn: async (data: {
+      product: InsertProduct;
+      auction: InsertAuction;
+    }) => {
       console.log("Starting auction creation process with:", data);
-      
+
       try {
         // First create the product
         console.log("Creating product with data:", data.product);
-        const productRes = await apiRequest("POST", "/api/products", data.product);
+        const productRes = await apiRequest(
+          "POST",
+          "/api/products",
+          data.product,
+        );
         const product = await productRes.json();
         console.log("Product created successfully:", product);
-        
+
         // Then create the auction with the product id
         const auctionData = {
           ...data.auction,
-          productId: product.id
+          productId: product.id,
         };
-        
+
         console.log("Creating auction with data:", auctionData);
         console.log("Auction end date format:", auctionData.endsAt);
-        
-        const auctionRes = await apiRequest("POST", "/api/auctions", auctionData);
+
+        const auctionRes = await apiRequest(
+          "POST",
+          "/api/auctions",
+          auctionData,
+        );
         console.log("Auction API response status:", auctionRes.status);
-        
+
         let auctionResult;
         try {
           auctionResult = await auctionRes.json();
@@ -570,10 +669,10 @@ export default function SellerDashboard() {
           console.log("Raw auction response:", auctionRes);
           auctionResult = { error: "Failed to parse response" };
         }
-        
+
         return {
           product,
-          auction: auctionResult
+          auction: auctionResult,
         };
       } catch (error) {
         console.error("Error in auction creation process:", error);
@@ -619,17 +718,26 @@ export default function SellerDashboard() {
       volume: data.volume,
       sellerId: user?.id || 0,
     };
-    
+
     // Create auction data with proper type handling
     // Format the date as 'YYYY-MM-DD HH:MM:SS'
-    const date = data.auctionEndDate instanceof Date ? data.auctionEndDate : new Date(data.auctionEndDate);
-    const formattedDate = date.getFullYear() + '-' + 
-                         String(date.getMonth() + 1).padStart(2, '0') + '-' + 
-                         String(date.getDate()).padStart(2, '0') + ' ' + 
-                         String(date.getHours()).padStart(2, '0') + ':' + 
-                         String(date.getMinutes()).padStart(2, '0') + ':' + 
-                         String(date.getSeconds()).padStart(2, '0');
-    
+    const date =
+      data.auctionEndDate instanceof Date
+        ? data.auctionEndDate
+        : new Date(data.auctionEndDate);
+    const formattedDate =
+      date.getFullYear() +
+      "-" +
+      String(date.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(date.getDate()).padStart(2, "0") +
+      " " +
+      String(date.getHours()).padStart(2, "0") +
+      ":" +
+      String(date.getMinutes()).padStart(2, "0") +
+      ":" +
+      String(date.getSeconds()).padStart(2, "0");
+
     const auctionData = {
       productId: 0, // Will be replaced with actual product ID after product creation
       startingPrice: data.startingPrice,
@@ -637,32 +745,33 @@ export default function SellerDashboard() {
       buyNowPrice: data.buyNowPrice,
       bidIncrement: data.bidIncrement,
       endsAt: formattedDate,
-      status: "active"
+      status: "active",
     } as InsertAuction;
-    
+
     try {
       console.log(auctionData);
       // Create product and auction
       const result = await createAuctionMutation.mutateAsync({
         product: productData,
-        auction: auctionData
+        auction: auctionData,
       });
-      
+
       // After auction is created, register and upload images
       if (uploadedImages.length > 0) {
         await registerImagesMutation.mutateAsync({
           productId: result.product.id,
-          images: uploadedImages
+          images: uploadedImages,
         });
       }
-      
+
       // Close dialog after successful submission
       setIsDialogOpen(false);
     } catch (error) {
-      console.error('Error in auction submission:', error);
+      console.error("Error in auction submission:", error);
       toast({
         title: "Error creating auction",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        description:
+          error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     }
@@ -673,7 +782,7 @@ export default function SellerDashboard() {
     setSelectedListingType(data.listingType);
     setIsAuctionForm(data.listingType === "auction");
     setIsTypeSelectionOpen(false);
-    
+
     // Reset the appropriate form
     if (data.listingType === "auction") {
       auctionForm.reset();
@@ -696,11 +805,11 @@ export default function SellerDashboard() {
         volume: 100,
       });
     }
-    
+
     // Clear image states
     setUploadedImages([]);
     setImagePreviewUrls([]);
-    
+
     // Open the product form dialog
     setIsDialogOpen(true);
   };
@@ -710,38 +819,45 @@ export default function SellerDashboard() {
     setIsEditMode(false);
     setCurrentProductId(null);
     setIsTypeSelectionOpen(true);
-    
+
     // Reset listing type selection form
     listingTypeForm.reset({
-      listingType: "fixed"
+      listingType: "fixed",
     });
   };
 
   // Filter products by search query
-  const filteredProducts = products?.filter(product => 
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.brand.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredProducts = products?.filter(
+    (product) =>
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.brand.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   // Calculate dashboard statistics
   const totalProducts = products?.length || 0;
-  const totalStock = products?.reduce((sum, product) => sum + product.stockQuantity, 0) || 0;
-  const averagePrice = products?.length 
-    ? products.reduce((sum, product) => sum + product.price, 0) / products.length 
+  const totalStock =
+    products?.reduce((sum, product) => sum + product.stockQuantity, 0) || 0;
+  const averagePrice = products?.length
+    ? products.reduce((sum, product) => sum + product.price, 0) /
+      products.length
     : 0;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      
+
       <main className="flex-grow bg-gray-50">
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
             <div>
-              <h1 className="font-playfair text-3xl font-bold mb-2">Seller Dashboard</h1>
-              <p className="text-gray-600">Manage your perfume products and view insights</p>
+              <h1 className="font-playfair text-3xl font-bold mb-2">
+                Seller Dashboard
+              </h1>
+              <p className="text-gray-600">
+                Manage your perfume products and view insights
+              </p>
             </div>
-            <Button 
+            <Button
               onClick={handleAddNewProduct}
               className="mt-4 md:mt-0 bg-gold text-rich-black hover:bg-metallic-gold flex items-center"
             >
@@ -749,7 +865,7 @@ export default function SellerDashboard() {
               Add New Product
             </Button>
           </div>
-          
+
           {/* Dashboard summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <Card>
@@ -765,7 +881,7 @@ export default function SellerDashboard() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center">
@@ -779,7 +895,7 @@ export default function SellerDashboard() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center">
@@ -788,20 +904,22 @@ export default function SellerDashboard() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Average Price</p>
-                    <h3 className="text-2xl font-bold">${averagePrice.toFixed(2)}</h3>
+                    <h3 className="text-2xl font-bold">
+                      RM{averagePrice.toFixed(2)}
+                    </h3>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
-          
+
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-6">
               <TabsTrigger value="products">Products</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="products">
               <Card>
                 <CardHeader>
@@ -840,7 +958,9 @@ export default function SellerDashboard() {
                             <TableHead>Price</TableHead>
                             <TableHead>Stock</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="text-right">
+                              Actions
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -848,30 +968,41 @@ export default function SellerDashboard() {
                             <TableRow key={product.id}>
                               <TableCell>
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100">
-                                  <img 
+                                  <img
                                     src={
                                       // First, try to find an image with imageOrder=0
-                                      product.images && product.images.find(img => img.imageOrder === 0)
-                                        ? `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`
-                                        // Then try any available image
-                                        : product.images && product.images.length > 0
+                                      product.images &&
+                                      product.images.find(
+                                        (img) => img.imageOrder === 0,
+                                      )
+                                        ? `/api/images/${product.images.find((img) => img.imageOrder === 0)?.imageUrl}`
+                                        : // Then try any available image
+                                          product.images &&
+                                            product.images.length > 0
                                           ? `/api/images/${product.images[0].imageUrl}`
-                                          // Default placeholder if no images are available
-                                          : "/placeholder.jpg"
-                                    } 
+                                          : // Default placeholder if no images are available
+                                            "/placeholder.jpg"
+                                    }
                                     alt={product.name}
                                     onError={(e) => {
                                       // If image fails to load, use placeholder
-                                      (e.target as HTMLImageElement).src = "/placeholder.jpg";
+                                      (e.target as HTMLImageElement).src =
+                                        "/placeholder.jpg";
                                     }}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
                               </TableCell>
-                              <TableCell className="font-medium">{product.name}</TableCell>
+                              <TableCell className="font-medium">
+                                {product.name}
+                              </TableCell>
                               <TableCell>{product.brand}</TableCell>
-                              <TableCell>{product.category?.name || "Uncategorized"}</TableCell>
-                              <TableCell>${product.price.toFixed(2)}</TableCell>
+                              <TableCell>
+                                {product.category?.name || "Uncategorized"}
+                              </TableCell>
+                              <TableCell>
+                                RM{product.price.toFixed(2)}
+                              </TableCell>
                               <TableCell>{product.stockQuantity}</TableCell>
                               <TableCell>
                                 {product.isNew && (
@@ -887,18 +1018,20 @@ export default function SellerDashboard() {
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end space-x-2">
-                                  <Button 
-                                    variant="outline" 
+                                  <Button
+                                    variant="outline"
                                     size="icon"
                                     onClick={() => handleEditProduct(product)}
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
-                                  <Button 
-                                    variant="outline" 
+                                  <Button
+                                    variant="outline"
                                     size="icon"
                                     className="text-red-500 hover:text-red-700"
-                                    onClick={() => handleDeleteProduct(product.id)}
+                                    onClick={() =>
+                                      handleDeleteProduct(product.id)
+                                    }
                                     disabled={isDeleting === product.id}
                                   >
                                     {isDeleting === product.id ? (
@@ -917,16 +1050,23 @@ export default function SellerDashboard() {
                   ) : (
                     <div className="text-center py-12">
                       <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                      <h3 className="text-lg font-medium mb-2">No products found</h3>
+                      <h3 className="text-lg font-medium mb-2">
+                        No products found
+                      </h3>
                       <p className="text-gray-500 mb-6">
-                        {searchQuery ? "No products match your search criteria" : "You haven't added any products yet"}
+                        {searchQuery
+                          ? "No products match your search criteria"
+                          : "You haven't added any products yet"}
                       </p>
                       {searchQuery ? (
-                        <Button variant="outline" onClick={() => setSearchQuery("")}>
+                        <Button
+                          variant="outline"
+                          onClick={() => setSearchQuery("")}
+                        >
                           Clear Search
                         </Button>
                       ) : (
-                        <Button 
+                        <Button
                           className="bg-gold text-rich-black hover:bg-metallic-gold"
                           onClick={handleAddNewProduct}
                         >
@@ -938,7 +1078,7 @@ export default function SellerDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
-            
+
             <TabsContent value="analytics">
               <Card>
                 <CardHeader>
@@ -950,44 +1090,59 @@ export default function SellerDashboard() {
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="rounded-lg border p-6">
-                      <h3 className="text-lg font-medium mb-4">Top Rated Products</h3>
-                      
+                      <h3 className="text-lg font-medium mb-4">
+                        Top Rated Products
+                      </h3>
+
                       {products && products.length > 0 ? (
                         <div className="space-y-4">
                           {products
-                            .filter(p => p.averageRating)
-                            .sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0))
+                            .filter((p) => p.averageRating)
+                            .sort(
+                              (a, b) =>
+                                (b.averageRating || 0) - (a.averageRating || 0),
+                            )
                             .slice(0, 3)
-                            .map(product => (
-                              <div key={product.id} className="flex items-center">
+                            .map((product) => (
+                              <div
+                                key={product.id}
+                                className="flex items-center"
+                              >
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 mr-3">
-                                  <img 
+                                  <img
                                     src={
                                       // First, try to find an image with imageOrder=0
-                                      product.images && product.images.find(img => img.imageOrder === 0)
-                                        ? `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`
-                                        // Then try any available image
-                                        : product.images && product.images.length > 0
+                                      product.images &&
+                                      product.images.find(
+                                        (img) => img.imageOrder === 0,
+                                      )
+                                        ? `/api/images/${product.images.find((img) => img.imageOrder === 0)?.imageUrl}`
+                                        : // Then try any available image
+                                          product.images &&
+                                            product.images.length > 0
                                           ? `/api/images/${product.images[0].imageUrl}`
-                                          // Default placeholder if no images are available
-                                          : "/placeholder.jpg"
+                                          : // Default placeholder if no images are available
+                                            "/placeholder.jpg"
                                     }
                                     alt={product.name}
                                     onError={(e) => {
                                       // If image fails to load, use placeholder
-                                      (e.target as HTMLImageElement).src = "/placeholder.jpg";
+                                      (e.target as HTMLImageElement).src =
+                                        "/placeholder.jpg";
                                     }}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
                                 <div className="flex-grow">
-                                  <div className="font-medium">{product.name}</div>
+                                  <div className="font-medium">
+                                    {product.name}
+                                  </div>
                                   <div className="flex items-center">
                                     <div className="flex text-gold">
                                       {[...Array(5)].map((_, i) => (
-                                        <Star 
-                                          key={i} 
-                                          className={`h-3 w-3 ${i < Math.floor(product.averageRating || 0) ? 'fill-gold' : ''}`} 
+                                        <Star
+                                          key={i}
+                                          className={`h-3 w-3 ${i < Math.floor(product.averageRating || 0) ? "fill-gold" : ""}`}
                                         />
                                       ))}
                                     </div>
@@ -996,85 +1151,115 @@ export default function SellerDashboard() {
                                     </span>
                                   </div>
                                 </div>
-                                <div className="font-semibold">${product.price.toFixed(2)}</div>
+                                <div className="font-semibold">
+                                  ${product.price.toFixed(2)}
+                                </div>
                               </div>
-                            ))
-                          }
-                          
-                          {!products.some(p => p.averageRating) && (
-                            <p className="text-gray-500">No rated products yet</p>
+                            ))}
+
+                          {!products.some((p) => p.averageRating) && (
+                            <p className="text-gray-500">
+                              No rated products yet
+                            </p>
                           )}
                         </div>
                       ) : (
-                        <p className="text-gray-500">No product data available</p>
+                        <p className="text-gray-500">
+                          No product data available
+                        </p>
                       )}
                     </div>
-                    
+
                     <div className="rounded-lg border p-6">
-                      <h3 className="text-lg font-medium mb-4">Inventory Status</h3>
-                      
+                      <h3 className="text-lg font-medium mb-4">
+                        Inventory Status
+                      </h3>
+
                       {products && products.length > 0 ? (
                         <div>
                           <div className="mb-6">
                             <div className="flex justify-between mb-1">
-                              <span className="text-sm">Low Stock (≤ 5 units)</span>
+                              <span className="text-sm">
+                                Low Stock (≤ 5 units)
+                              </span>
                               <span className="text-sm font-medium">
-                                {products.filter(p => p.stockQuantity <= 5).length} products
+                                {
+                                  products.filter((p) => p.stockQuantity <= 5)
+                                    .length
+                                }{" "}
+                                products
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-red-500 h-2 rounded-full" 
-                                style={{ 
-                                  width: `${(products.filter(p => p.stockQuantity <= 5).length / products.length) * 100}%` 
+                              <div
+                                className="bg-red-500 h-2 rounded-full"
+                                style={{
+                                  width: `${(products.filter((p) => p.stockQuantity <= 5).length / products.length) * 100}%`,
                                 }}
                               ></div>
                             </div>
                           </div>
-                          
+
                           <div className="mb-6">
                             <div className="flex justify-between mb-1">
-                              <span className="text-sm">Medium Stock (6-20 units)</span>
+                              <span className="text-sm">
+                                Medium Stock (6-20 units)
+                              </span>
                               <span className="text-sm font-medium">
-                                {products.filter(p => p.stockQuantity > 5 && p.stockQuantity <= 20).length} products
+                                {
+                                  products.filter(
+                                    (p) =>
+                                      p.stockQuantity > 5 &&
+                                      p.stockQuantity <= 20,
+                                  ).length
+                                }{" "}
+                                products
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-yellow-500 h-2 rounded-full" 
-                                style={{ 
-                                  width: `${(products.filter(p => p.stockQuantity > 5 && p.stockQuantity <= 20).length / products.length) * 100}%` 
+                              <div
+                                className="bg-yellow-500 h-2 rounded-full"
+                                style={{
+                                  width: `${(products.filter((p) => p.stockQuantity > 5 && p.stockQuantity <= 20).length / products.length) * 100}%`,
                                 }}
                               ></div>
                             </div>
                           </div>
-                          
+
                           <div>
                             <div className="flex justify-between mb-1">
-                              <span className="text-sm">Good Stock ({'>'}{' '}20 units)</span>
+                              <span className="text-sm">
+                                Good Stock ({">"} 20 units)
+                              </span>
                               <span className="text-sm font-medium">
-                                {products.filter(p => p.stockQuantity > 20).length} products
+                                {
+                                  products.filter((p) => p.stockQuantity > 20)
+                                    .length
+                                }{" "}
+                                products
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-green-500 h-2 rounded-full" 
-                                style={{ 
-                                  width: `${(products.filter(p => p.stockQuantity > 20).length / products.length) * 100}%` 
+                              <div
+                                className="bg-green-500 h-2 rounded-full"
+                                style={{
+                                  width: `${(products.filter((p) => p.stockQuantity > 20).length / products.length) * 100}%`,
                                 }}
                               ></div>
                             </div>
                           </div>
                         </div>
                       ) : (
-                        <p className="text-gray-500">No inventory data available</p>
+                        <p className="text-gray-500">
+                          No inventory data available
+                        </p>
                       )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
-            
+
             <TabsContent value="settings">
               <Card>
                 <CardHeader>
@@ -1086,56 +1271,64 @@ export default function SellerDashboard() {
                 <CardContent>
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-lg font-medium mb-4">Account Information</h3>
+                      <h3 className="text-lg font-medium mb-4">
+                        Account Information
+                      </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="account-name">Name</Label>
-                          <Input 
-                            id="account-name" 
-                            value={`${user?.firstName || ''} ${user?.lastName || ''}`} 
-                            disabled 
+                          <Input
+                            id="account-name"
+                            value={`${user?.firstName || ""} ${user?.lastName || ""}`}
+                            disabled
                             className="mt-1"
                           />
                         </div>
                         <div>
                           <Label htmlFor="account-email">Email</Label>
-                          <Input 
-                            id="account-email" 
-                            value={user?.email || ''} 
-                            disabled 
+                          <Input
+                            id="account-email"
+                            value={user?.email || ""}
+                            disabled
                             className="mt-1"
                           />
                         </div>
                         <div>
                           <Label htmlFor="account-username">Username</Label>
-                          <Input 
-                            id="account-username" 
-                            value={user?.username || ''} 
-                            disabled 
+                          <Input
+                            id="account-username"
+                            value={user?.username || ""}
+                            disabled
                             className="mt-1"
                           />
                         </div>
                         <div>
                           <Label htmlFor="account-role">Account Type</Label>
-                          <Input 
-                            id="account-role" 
-                            value="Seller" 
-                            disabled 
+                          <Input
+                            id="account-role"
+                            value="Seller"
+                            disabled
                             className="mt-1"
                           />
                         </div>
                       </div>
                     </div>
-                    
+
                     <div>
-                      <h3 className="text-lg font-medium mb-4">Notification Preferences</h3>
+                      <h3 className="text-lg font-medium mb-4">
+                        Notification Preferences
+                      </h3>
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <Label htmlFor="notify-sales">Sales notifications</Label>
+                          <Label htmlFor="notify-sales">
+                            Sales notifications
+                          </Label>
                           <Checkbox id="notify-sales" checked />
                         </div>
                         <div className="flex items-center justify-between">
-                          <Label htmlFor="notify-reviews">New review notifications</Label>
+                          <Label htmlFor="notify-reviews">
+                            New review notifications
+                          </Label>
                           <Checkbox id="notify-reviews" checked />
                         </div>
                         <div className="flex items-center justify-between">
@@ -1156,7 +1349,7 @@ export default function SellerDashboard() {
           </Tabs>
         </div>
       </main>
-      
+
       {/* Listing Type Selection Dialog */}
       <Dialog open={isTypeSelectionOpen} onOpenChange={setIsTypeSelectionOpen}>
         <DialogContent className="max-w-md">
@@ -1166,9 +1359,12 @@ export default function SellerDashboard() {
               Choose how you want to list your perfume product
             </DialogDescription>
           </DialogHeader>
-          
+
           <Form {...listingTypeForm}>
-            <form onSubmit={listingTypeForm.handleSubmit(onSelectListingType)} className="space-y-6">
+            <form
+              onSubmit={listingTypeForm.handleSubmit(onSelectListingType)}
+              className="space-y-6"
+            >
               <div className="grid grid-cols-1 gap-4">
                 <div className="flex flex-col space-y-4">
                   {/* Fixed Price Option */}
@@ -1177,10 +1373,10 @@ export default function SellerDashboard() {
                     name="listingType"
                     render={({ field }) => (
                       <div className="space-y-4">
-                        <div 
+                        <div
                           className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                            field.value === "fixed" 
-                              ? "border-gold bg-gold/10 text-black" 
+                            field.value === "fixed"
+                              ? "border-gold bg-gold/10 text-black"
                               : "border-gray-200 hover:border-gold/50 text-gray-800"
                           }`}
                           onClick={() => field.onChange("fixed")}
@@ -1196,11 +1392,11 @@ export default function SellerDashboard() {
                               />
                             </FormControl>
                             <div className="flex-1">
-                              <FormLabel 
+                              <FormLabel
                                 htmlFor="fixed-price-option"
                                 className="font-medium cursor-pointer flex items-center text-base"
                               >
-                                <Tag className="mr-2 h-5 w-5" /> 
+                                <Tag className="mr-2 h-5 w-5" />
                                 Fixed Price
                               </FormLabel>
                               <p className="text-sm text-gray-600 mt-1">
@@ -1209,12 +1405,12 @@ export default function SellerDashboard() {
                             </div>
                           </FormItem>
                         </div>
-                        
+
                         {/* Auction Option */}
-                        <div 
+                        <div
                           className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                            field.value === "auction" 
-                              ? "border-gold bg-gold/10 text-black" 
+                            field.value === "auction"
+                              ? "border-gold bg-gold/10 text-black"
                               : "border-gray-200 hover:border-gold/50 text-gray-800"
                           }`}
                           onClick={() => field.onChange("auction")}
@@ -1230,15 +1426,16 @@ export default function SellerDashboard() {
                               />
                             </FormControl>
                             <div className="flex-1">
-                              <FormLabel 
+                              <FormLabel
                                 htmlFor="auction-option"
                                 className="font-medium cursor-pointer flex items-center text-base"
                               >
-                                <Timer className="mr-2 h-5 w-5" /> 
+                                <Timer className="mr-2 h-5 w-5" />
                                 Auction
                               </FormLabel>
                               <p className="text-sm text-gray-600 mt-1">
-                                Allow buyers to bid, potentially increasing final price
+                                Allow buyers to bid, potentially increasing
+                                final price
                               </p>
                             </div>
                           </FormItem>
@@ -1248,16 +1445,16 @@ export default function SellerDashboard() {
                   />
                 </div>
               </div>
-              
+
               <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setIsTypeSelectionOpen(false)}
                 >
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   type="submit"
                   className="bg-gold text-rich-black hover:bg-metallic-gold"
                 >
@@ -1268,33 +1465,34 @@ export default function SellerDashboard() {
           </Form>
         </DialogContent>
       </Dialog>
-      
+
       {/* Product Form Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {isEditMode 
-                ? "Edit Product" 
-                : isAuctionForm 
-                  ? "Create Auction Listing" 
-                  : "Add Fixed Price Listing"
-              }
+              {isEditMode
+                ? "Edit Product"
+                : isAuctionForm
+                  ? "Create Auction Listing"
+                  : "Add Fixed Price Listing"}
             </DialogTitle>
             <DialogDescription>
-              {isEditMode 
-                ? "Update your product information below" 
+              {isEditMode
+                ? "Update your product information below"
                 : isAuctionForm
                   ? "Set up your auction listing details below"
-                  : "Fill in the details to add a new perfume product"
-              }
+                  : "Fill in the details to add a new perfume product"}
             </DialogDescription>
           </DialogHeader>
-          
+
           {isAuctionForm ? (
             // Auction form
             <Form {...auctionForm}>
-              <form onSubmit={auctionForm.handleSubmit(onSubmitAuction)} className="space-y-6">
+              <form
+                onSubmit={auctionForm.handleSubmit(onSubmitAuction)}
+                className="space-y-6"
+              >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={auctionForm.control}
@@ -1309,7 +1507,7 @@ export default function SellerDashboard() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={auctionForm.control}
                     name="brand"
@@ -1324,7 +1522,7 @@ export default function SellerDashboard() {
                     )}
                   />
                 </div>
-                
+
                 <FormField
                   control={auctionForm.control}
                   name="description"
@@ -1332,17 +1530,17 @@ export default function SellerDashboard() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Describe your product..." 
-                          className="min-h-24" 
-                          {...field} 
+                        <Textarea
+                          placeholder="Describe your product..."
+                          className="min-h-24"
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={auctionForm.control}
@@ -1351,48 +1549,60 @@ export default function SellerDashboard() {
                       <FormItem>
                         <FormLabel>Starting Price (MYR)</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min="0.01" 
+                          <Input
+                            type="number"
+                            min="0.01"
                             step="0.01"
-                            placeholder="99.99" 
+                            placeholder="99.99"
                             {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                            onChange={(e) =>
+                              field.onChange(parseFloat(e.target.value))
+                            }
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={auctionForm.control}
                     name="reservePrice"
                     render={({ field }) => (
                       <FormItem>
                         <div className="flex items-center gap-2">
-                          <FormLabel>Reserve Price (Optional)</FormLabel>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-primary text-xs font-semibold cursor-help">i</span>
+                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-primary text-xs font-semibold cursor-help">
+                                  i
+                                </span>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
-                                <p>The minimum price you are willing to accept for this item. If the auction ends without meeting this price, it will be marked as "reserve not met" and you'll be notified.</p>
+                                <p>
+                                  The minimum price you are willing to accept
+                                  for this item. If the auction ends without
+                                  meeting this price, it will be marked as
+                                  "reserve not met" and you'll be notified.
+                                </p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
+                          <FormLabel>Reserve Price (Optional)</FormLabel>
                         </div>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min="0.01" 
+                          <Input
+                            type="number"
+                            min="0.01"
                             step="0.01"
-                            placeholder="Minimum acceptable price" 
+                            placeholder="Minimum acceptable price"
                             {...field}
-                            value={field.value || ''}
+                            value={field.value || ""}
                             onChange={(e) => {
-                              const value = e.target.value === '' ? undefined : parseFloat(e.target.value);
+                              const value =
+                                e.target.value === ""
+                                  ? undefined
+                                  : parseFloat(e.target.value);
                               field.onChange(value);
                             }}
                           />
@@ -1402,7 +1612,7 @@ export default function SellerDashboard() {
                     )}
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={auctionForm.control}
@@ -1414,24 +1624,32 @@ export default function SellerDashboard() {
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-primary text-xs font-semibold cursor-help">i</span>
+                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-primary text-xs font-semibold cursor-help">
+                                  i
+                                </span>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
-                                <p>The price at which a buyer can immediately purchase this item and end the auction. When a buyer uses this option, they'll be redirected to contact you to complete the purchase.</p>
+                                <p>
+                                  The price at which a buyer can immediately
+                                  purchase this item and end the auction.
+                                </p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
                         </div>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min="0.01" 
+                          <Input
+                            type="number"
+                            min="0.01"
                             step="0.01"
-                            placeholder="Immediate purchase price" 
+                            placeholder="Immediate purchase price"
                             {...field}
-                            value={field.value || ''}
+                            value={field.value || ""}
                             onChange={(e) => {
-                              const value = e.target.value === '' ? undefined : parseFloat(e.target.value);
+                              const value =
+                                e.target.value === ""
+                                  ? undefined
+                                  : parseFloat(e.target.value);
                               field.onChange(value);
                             }}
                           />
@@ -1440,7 +1658,7 @@ export default function SellerDashboard() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={auctionForm.control}
                     name="bidIncrement"
@@ -1448,13 +1666,15 @@ export default function SellerDashboard() {
                       <FormItem>
                         <FormLabel>Bid Increment (MYR)</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min="1" 
+                          <Input
+                            type="number"
+                            min="1"
                             step="1"
-                            placeholder="5" 
+                            placeholder="5"
                             {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                            onChange={(e) =>
+                              field.onChange(parseFloat(e.target.value))
+                            }
                           />
                         </FormControl>
                         <FormMessage />
@@ -1462,7 +1682,7 @@ export default function SellerDashboard() {
                     )}
                   />
                 </div>
-                
+
                 <FormField
                   control={auctionForm.control}
                   name="auctionEndDate"
@@ -1470,10 +1690,14 @@ export default function SellerDashboard() {
                     <FormItem>
                       <FormLabel>Auction End Date</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="datetime-local" 
+                        <Input
+                          type="datetime-local"
                           {...field}
-                          value={field.value instanceof Date ? field.value.toISOString().slice(0, 16) : ''}
+                          value={
+                            field.value instanceof Date
+                              ? field.value.toISOString().slice(0, 16)
+                              : ""
+                          }
                           onChange={(e) => {
                             const date = new Date(e.target.value);
                             field.onChange(date);
@@ -1484,15 +1708,17 @@ export default function SellerDashboard() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={auctionForm.control}
                   name="categoryId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <Select 
-                        onValueChange={(value) => field.onChange(parseInt(value))}
+                      <Select
+                        onValueChange={(value) =>
+                          field.onChange(parseInt(value))
+                        }
                         value={field.value ? field.value.toString() : undefined}
                       >
                         <FormControl>
@@ -1502,8 +1728,8 @@ export default function SellerDashboard() {
                         </FormControl>
                         <SelectContent>
                           {categories?.map((category) => (
-                            <SelectItem 
-                              key={category.id} 
+                            <SelectItem
+                              key={category.id}
                               value={category.id.toString()}
                             >
                               {category.name}
@@ -1515,7 +1741,7 @@ export default function SellerDashboard() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={auctionForm.control}
                   name="imageUrl"
@@ -1525,31 +1751,38 @@ export default function SellerDashboard() {
                       <div className="flex flex-col gap-2">
                         <div className="border rounded-md p-4 bg-gray-50">
                           <div className="flex items-center justify-center w-full">
-                            <label htmlFor="auction-images" className="cursor-pointer w-full">
+                            <label
+                              htmlFor="auction-images"
+                              className="cursor-pointer w-full"
+                            >
                               <div className="flex flex-col items-center justify-center py-4 border-2 border-dashed rounded-md border-gray-300 hover:border-gold transition-colors">
                                 <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                                <p className="text-sm text-gray-500">Click to upload images</p>
-                                <p className="text-xs text-gray-400 mt-1">JPG, PNG, or GIF up to 5MB</p>
+                                <p className="text-sm text-gray-500">
+                                  Click to upload images
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  JPG, PNG, or GIF up to 5MB
+                                </p>
                               </div>
-                              <input 
-                                id="auction-images" 
-                                type="file" 
-                                multiple 
-                                accept="image/*" 
-                                className="hidden" 
+                              <input
+                                id="auction-images"
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                className="hidden"
                                 onChange={(e) => handleAuctionImageUpload(e)}
                               />
                             </label>
                           </div>
                         </div>
-                        
+
                         {/* Preview area for uploaded images */}
                         {imagePreviewUrls.length > 0 && (
                           <div className="grid grid-cols-5 gap-2 mt-3">
                             {imagePreviewUrls.map((url, index) => (
                               <div key={index} className="relative group">
-                                <img 
-                                  src={url} 
+                                <img
+                                  src={url}
                                   alt={`Preview ${index + 1}`}
                                   className="w-full h-16 object-cover rounded-md border border-gray-200"
                                 />
@@ -1569,7 +1802,7 @@ export default function SellerDashboard() {
                     </FormItem>
                   )}
                 />
-                
+
                 <div className="flex flex-wrap gap-4">
                   <FormField
                     control={auctionForm.control}
@@ -1586,26 +1819,12 @@ export default function SellerDashboard() {
                       </FormItem>
                     )}
                   />
-                  
-                  <FormField
-                    control={auctionForm.control}
-                    name="isFeatured"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-2">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <FormLabel className="m-0">Feature this product</FormLabel>
-                      </FormItem>
-                    )}
-                  />
                 </div>
-                
+
                 {/* Secondhand perfume specific fields */}
-                <h3 className="text-lg font-medium mt-8 mb-4">Perfume Condition Details</h3>
+                <h3 className="text-lg font-medium mt-8 mb-4">
+                  Perfume Condition Details
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={auctionForm.control}
@@ -1614,12 +1833,14 @@ export default function SellerDashboard() {
                       <FormItem>
                         <FormLabel>Bottle Size (ml)</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min={1} 
+                          <Input
+                            type="number"
+                            min={1}
                             placeholder="100"
                             {...field}
-                            onChange={e => field.onChange(parseInt(e.target.value))}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value))
+                            }
                           />
                         </FormControl>
                         <FormMessage />
@@ -1633,20 +1854,22 @@ export default function SellerDashboard() {
                       <FormItem>
                         <FormLabel>Bottle Fullness (%)</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min={1} 
-                            max={100} 
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
                             placeholder="100"
                             {...field}
-                            onChange={e => field.onChange(parseInt(e.target.value))}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value))
+                            }
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={auctionForm.control}
                     name="purchaseYear"
@@ -1654,20 +1877,25 @@ export default function SellerDashboard() {
                       <FormItem>
                         <FormLabel>Purchase Year</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min={1970} 
+                          <Input
+                            type="number"
+                            min={1970}
                             max={new Date().getFullYear()}
                             placeholder={new Date().getFullYear().toString()}
                             {...field}
-                            onChange={e => field.onChange(parseInt(e.target.value) || new Date().getFullYear())}
+                            onChange={(e) =>
+                              field.onChange(
+                                parseInt(e.target.value) ||
+                                  new Date().getFullYear(),
+                              )
+                            }
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={auctionForm.control}
                     name="boxCondition"
@@ -1694,7 +1922,7 @@ export default function SellerDashboard() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={auctionForm.control}
                     name="batchCode"
@@ -1702,10 +1930,10 @@ export default function SellerDashboard() {
                       <FormItem>
                         <FormLabel>Batch Code (Optional)</FormLabel>
                         <FormControl>
-                          <Input 
+                          <Input
                             placeholder="e.g., 8K01"
                             {...field}
-                            value={field.value || ''}
+                            value={field.value || ""}
                           />
                         </FormControl>
                         <FormMessage />
@@ -1713,16 +1941,16 @@ export default function SellerDashboard() {
                     )}
                   />
                 </div>
-                
+
                 <DialogFooter>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setIsDialogOpen(false)}
                   >
                     Cancel
                   </Button>
-                  <Button 
+                  <Button
                     type="submit"
                     className="bg-gold text-rich-black hover:bg-metallic-gold"
                     disabled={createAuctionMutation.isPending}
@@ -1742,383 +1970,401 @@ export default function SellerDashboard() {
           ) : (
             // Fixed price product form
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmitProduct)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Product Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Midnight Rose" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="brand"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Brand</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Chanel" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Describe your product..." 
-                        className="min-h-24" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price (MYR)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0.01" 
-                          step="0.01"
-                          placeholder="99.99" 
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="stockQuantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stock Quantity</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          step="1" 
-                          placeholder="1"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="categoryId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <Select 
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                        value={field.value ? field.value.toString() : undefined}
-                      >
+              <form
+                onSubmit={form.handleSubmit(onSubmitProduct)}
+                className="space-y-6"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Product Name</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
+                          <Input placeholder="e.g., Midnight Rose" {...field} />
                         </FormControl>
-                        <SelectContent>
-                          {categories?.map((category) => (
-                            <SelectItem 
-                              key={category.id} 
-                              value={category.id.toString()}
-                            >
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="brand"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Brand</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Chanel" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe your product..."
+                          className="min-h-24"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="imageUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product Images (up to 5)</FormLabel>
-                    <div className="flex flex-col gap-2">
-                      <div className="border rounded-md p-4 bg-gray-50">
-                        <div className="flex items-center justify-center w-full">
-                          <label htmlFor="product-images" className="cursor-pointer w-full">
-                            <div className="flex flex-col items-center justify-center py-4 border-2 border-dashed rounded-md border-gray-300 hover:border-gold transition-colors">
-                              <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                              <p className="text-sm text-gray-500">Click to upload images</p>
-                              <p className="text-xs text-gray-400 mt-1">JPG, PNG, or GIF up to 5MB</p>
-                            </div>
-                            <input 
-                              id="product-images" 
-                              type="file" 
-                              multiple 
-                              accept="image/*" 
-                              className="hidden" 
-                              onChange={(e) => handleImageUpload(e)}
-                            />
-                          </label>
-                        </div>
-                      </div>
-                      
-                      {/* Preview area for uploaded images */}
-                      {imagePreviewUrls.length > 0 && (
-                        <div className="grid grid-cols-5 gap-2 mt-3">
-                          {imagePreviewUrls.map((url, index) => (
-                            <div key={index} className="relative group">
-                              <img 
-                                src={url} 
-                                alt={`Preview ${index + 1}`}
-                                className="w-full h-16 object-cover rounded-md border border-gray-200"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeImage(index)}
-                                className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Price (MYR)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="99.99"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(parseFloat(e.target.value))
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="stockQuantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Stock Quantity</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="1"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value))
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="categoryId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select
+                          onValueChange={(value) =>
+                            field.onChange(parseInt(value))
+                          }
+                          value={
+                            field.value ? field.value.toString() : undefined
+                          }
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories?.map((category) => (
+                              <SelectItem
+                                key={category.id}
+                                value={category.id.toString()}
                               >
-                                <X className="h-3 w-3 text-gray-600" />
-                              </button>
-                            </div>
-                          ))}
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="imageUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Images (up to 5)</FormLabel>
+                      <div className="flex flex-col gap-2">
+                        <div className="border rounded-md p-4 bg-gray-50">
+                          <div className="flex items-center justify-center w-full">
+                            <label
+                              htmlFor="product-images"
+                              className="cursor-pointer w-full"
+                            >
+                              <div className="flex flex-col items-center justify-center py-4 border-2 border-dashed rounded-md border-gray-300 hover:border-gold transition-colors">
+                                <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                <p className="text-sm text-gray-500">
+                                  Click to upload images
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  JPG, PNG, or GIF up to 5MB
+                                </p>
+                              </div>
+                              <input
+                                id="product-images"
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleImageUpload(e)}
+                              />
+                            </label>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="flex flex-wrap gap-4">
-                <FormField
-                  control={form.control}
-                  name="isNew"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center space-x-2">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormLabel className="m-0">Mark as New</FormLabel>
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="isFeatured"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center space-x-2">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormLabel className="m-0">Feature this product</FormLabel>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              {/* Secondhand perfume specific fields */}
-              <h3 className="text-lg font-medium mt-8 mb-4">Perfume Condition Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="volume"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bottle Size (ml)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min={1} 
-                          placeholder="100"
-                          {...field}
-                          onChange={e => field.onChange(parseInt(e.target.value))}
-                        />
-                      </FormControl>
+
+                        {/* Preview area for uploaded images */}
+                        {imagePreviewUrls.length > 0 && (
+                          <div className="grid grid-cols-5 gap-2 mt-3">
+                            {imagePreviewUrls.map((url, index) => (
+                              <div key={index} className="relative group">
+                                <img
+                                  src={url}
+                                  alt={`Preview ${index + 1}`}
+                                  className="w-full h-16 object-cover rounded-md border border-gray-200"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(index)}
+                                  className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X className="h-3 w-3 text-gray-600" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="remainingPercentage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bottle Fullness (%)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min={1} 
-                          max={100} 
-                          placeholder="100"
-                          {...field}
-                          onChange={e => field.onChange(parseInt(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="purchaseYear"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Purchase Year</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min={1970} 
-                          max={new Date().getFullYear()}
-                          placeholder={new Date().getFullYear().toString()}
-                          {...field}
-                          onChange={e => field.onChange(parseInt(e.target.value) || new Date().getFullYear())}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="boxCondition"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Box Condition</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                      >
+
+                <div className="flex flex-wrap gap-4">
+                  <FormField
+                    control={form.control}
+                    name="isNew"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2">
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select box condition" />
-                          </SelectTrigger>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Good">Good</SelectItem>
-                          <SelectItem value="Damaged">Damaged</SelectItem>
-                          <SelectItem value="No Box">No Box</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="batchCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Batch Code (Optional)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="e.g., 8K01"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="listingType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Listing Type</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                      >
+                        <FormLabel className="m-0">Mark as New</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Secondhand perfume specific fields */}
+                <h3 className="text-lg font-medium mt-8 mb-4">
+                  Perfume Condition Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="volume"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bottle Size (ml)</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select listing type" />
-                          </SelectTrigger>
+                          <Input
+                            type="number"
+                            min={1}
+                            placeholder="100"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value))
+                            }
+                          />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="fixed">Fixed Price</SelectItem>
-                          <SelectItem value="negotiable">Negotiable</SelectItem>
-                          <SelectItem value="auction">Auction</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit"
-                  className="bg-gold text-rich-black hover:bg-metallic-gold"
-                  disabled={createProductMutation.isPending || updateProductMutation.isPending}
-                >
-                  {(createProductMutation.isPending || updateProductMutation.isPending) ? (
-                    <span className="flex items-center">
-                      <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
-                      {isEditMode ? "Updating..." : "Creating..."}
-                    </span>
-                  ) : (
-                    isEditMode ? "Update Product" : "Create Product"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="remainingPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bottle Fullness (%)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
+                            placeholder="100"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value))
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="purchaseYear"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Purchase Year</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={1970}
+                            max={new Date().getFullYear()}
+                            placeholder={new Date().getFullYear().toString()}
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(
+                                parseInt(e.target.value) ||
+                                  new Date().getFullYear(),
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="boxCondition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Box Condition</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select box condition" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Good">Good</SelectItem>
+                            <SelectItem value="Damaged">Damaged</SelectItem>
+                            <SelectItem value="No Box">No Box</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="batchCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Batch Code (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., 8K01" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="listingType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Listing Type</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select listing type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="fixed">Fixed Price</SelectItem>
+                            <SelectItem value="negotiable">
+                              Negotiable
+                            </SelectItem>
+                            <SelectItem value="auction">Auction</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-gold text-rich-black hover:bg-metallic-gold"
+                    disabled={
+                      createProductMutation.isPending ||
+                      updateProductMutation.isPending
+                    }
+                  >
+                    {createProductMutation.isPending ||
+                    updateProductMutation.isPending ? (
+                      <span className="flex items-center">
+                        <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
+                        {isEditMode ? "Updating..." : "Creating..."}
+                      </span>
+                    ) : isEditMode ? (
+                      "Update Product"
+                    ) : (
+                      "Create Product"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
           )}
         </DialogContent>
       </Dialog>
-      
+
       <Footer />
     </div>
   );

@@ -291,7 +291,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   // Format currency (memoized)
   const formatCurrency = useCallback((amount: number | null | undefined) => {
     if (amount === null || amount === undefined) return 'N/A';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'MYR' }).format(amount).replace('MYR', 'RM');
   }, []);
   
   // Handle bid submission
