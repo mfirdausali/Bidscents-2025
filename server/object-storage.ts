@@ -8,13 +8,15 @@ export const IMAGE_TYPES = {
   COVER: 'cover'
 };
 
-// Initialize the Replit Object Storage client with a hardcoded bucket ID
-// This is the default bucket ID format used by Replit
+// Initialize the Replit Object Storage client
+// Use environment variable for deployment or fallback to default bucket ID
+const bucketId = process.env.REPLIT_OBJECT_STORAGE_BUCKET_ID || "replit-objstore-0eba980b-4a8f-47b6-90af-f554bb8688e2";
+
 export const storageClient = new Client({
-  bucketId: "replit-objstore-0eba980b-4a8f-47b6-90af-f554bb8688e2" // Using the ID from the current project
+  bucketId: bucketId
 });
 
-console.log("Initialized Replit Object Storage client with project bucket");
+console.log(`Initialized Replit Object Storage client with bucket: ${bucketId}`);
 
 /**
  * Upload an image to the Replit Object Storage bucket
