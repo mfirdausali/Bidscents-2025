@@ -198,6 +198,7 @@ export default function SellerDashboard() {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  const [boostedProducts, setBoostedProducts] = useState<number[]>([]);
 
   // Fetch seller's products
   const { data: products, isLoading: isLoadingProducts } = useQuery<
@@ -833,6 +834,28 @@ export default function SellerDashboard() {
       product.brand.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
+  // Handle boost checkbox changes
+  const toggleBoostProduct = (productId: number) => {
+    setBoostedProducts((prev) => {
+      if (prev.includes(productId)) {
+        // Remove product from boosted list
+        return prev.filter((id) => id !== productId);
+      } else {
+        // Add product to boosted list
+        return [...prev, productId];
+      }
+    });
+  };
+
+  // Handle boost checkout
+  const handleBoostCheckout = () => {
+    toast({
+      title: "Boost Selected Products",
+      description: `You selected ${boostedProducts.length} product(s) for premium promotion at RM10 for 7 days.`,
+    });
+    // Future implementation: Redirect to Billplz payment page
+  };
+
   // Calculate dashboard statistics
   const totalProducts = products?.length || 0;
   const totalStock =
@@ -951,6 +974,14 @@ export default function SellerDashboard() {
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead className="bg-[#FFF9E6]">
+                              <div className="flex items-center">
+                                Boost
+                                <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-[#FF9800] text-white">
+                                  NEW
+                                </span>
+                              </div>
+                            </TableHead>
                             <TableHead>Image</TableHead>
                             <TableHead>Name</TableHead>
                             <TableHead>Brand</TableHead>
@@ -966,6 +997,14 @@ export default function SellerDashboard() {
                         <TableBody>
                           {filteredProducts.map((product) => (
                             <TableRow key={product.id}>
+                              <TableCell className="bg-[#FFF9E6]">
+                                <Checkbox
+                                  id={`boost-${product.id}`}
+                                  checked={boostedProducts.includes(product.id)}
+                                  onCheckedChange={() => toggleBoostProduct(product.id)}
+                                  className="h-5 w-5 border-2 border-[#F5A623] data-[state=checked]:bg-[#F5A623] data-[state=checked]:text-white rounded-sm focus:ring-0 animate-[pulse_0.5s_ease-in-out] transition-all duration-300 ease-in-out"
+                                />
+                              </TableCell>
                               <TableCell>
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100">
                                   <img
@@ -2365,6 +2404,21 @@ export default function SellerDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Floating action button for boosting products */}
+      {boostedProducts.length > 0 && (
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-[fadeIn_0.3s_ease-in-out]">
+          <Button 
+            onClick={handleBoostCheckout}
+            className="bg-gradient-to-r from-gold to-metallic-gold text-rich-black hover:from-metallic-gold hover:to-gold shadow-lg px-6 py-6 rounded-full flex items-center space-x-2 transition-all duration-300 ease-in-out"
+          >
+            <span className="font-semibold">Boost Selected ({boostedProducts.length})</span>
+            <span className="mx-2 text-xs bg-white/20 px-2 py-1 rounded">RM10 for 7 days</span>
+            <span className="flex items-center">
+              Checkout →
+            </span>
+          </Button>
+        </div>
+      )}
       <Footer />
     </div>
   );
