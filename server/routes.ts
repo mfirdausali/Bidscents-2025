@@ -2499,16 +2499,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!bill || !bill.id) {
         // If bill creation failed
-        await storage.updatePaymentStatus(payment.id, 'failed');
+        await storage.updatePaymentStatus(
+          payment.id, 
+          'failed',
+          undefined, // No bill ID
+          undefined, // No payment channel
+          undefined  // No paid date
+        );
         return res.status(500).json({ message: 'Failed to create payment bill' });
       }
       
       // Update payment with bill ID
       await storage.updatePaymentStatus(
         payment.id, 
-        'due',  // Keep status as 'due' until paid
-        undefined, // No paid date yet
-        { bill_id: bill.id } // Update with bill ID
+        'due',   // Keep status as 'due' until paid
+        bill.id, // Set the bill ID
+        undefined, // No payment channel yet
+        undefined  // No paid date yet
       );
       
       // Return bill information with payment popup message
@@ -2587,8 +2594,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updatePaymentStatus(
             payment.id, 
             'paid',
-            undefined,
-            { id: billId, transaction_id, transaction_status }
+            billId,
+            payment_channel,
+            undefined // No need to update paid date since it's already marked as paid
           );
           console.log(`Updated bill_id for payment ${payment.id} to ${billId}`);
         }
@@ -2606,15 +2614,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedPayment = await storage.updatePaymentStatus(
         payment.id,
         status,
-        paidDate,
-        {
-          ...paymentData,
-          // Ensure these fields are explicitly included
-          id: billId,                      // Billplz bill ID
-          payment_channel,                // Payment method used
-          transaction_id,                 // Transaction reference 
-          transaction_status              // Status of the transaction
-        }
+        billId,                    // Bill ID from Billplz
+        payment_channel || null,   // Payment method
+        paidDate                  // Payment date
       );
       
       console.log(`Payment status updated to ${status}`);

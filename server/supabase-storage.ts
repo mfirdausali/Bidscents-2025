@@ -1750,7 +1750,7 @@ export class SupabaseStorage implements IStorage {
     return data.map(this.mapPaymentFromDb);
   }
   
-  async updatePaymentStatus(id: number | string, status: string, paidAt?: Date, webhookPayload?: any): Promise<Payment> {
+  async updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment> {
     console.log(`Updating payment ${id} to status '${status}'${paidAt ? ' with paid date ' + paidAt : ''}`);
     
     const updateData: any = { 
@@ -1758,27 +1758,19 @@ export class SupabaseStorage implements IStorage {
       updated_at: new Date()
     };
     
+    // Add bill_id if provided
+    if (billId) {
+      updateData.bill_id = billId;
+    }
+    
+    // Add payment_channel if provided
+    if (paymentChannel) {
+      updateData.payment_channel = paymentChannel;
+    }
+    
+    // Add paid_at if provided
     if (paidAt) {
       updateData.paid_at = paidAt;
-    }
-    
-    // If the response includes a bill ID, make sure to store it
-    if (webhookPayload && webhookPayload.id) {
-      updateData.bill_id = webhookPayload.id;
-    }
-    
-    // Store the complete webhook payload for debugging
-    if (webhookPayload) {
-      updateData.webhook_payload = typeof webhookPayload === 'string' 
-        ? webhookPayload 
-        : JSON.stringify(webhookPayload);
-    }
-    
-    // Add additional payment details if available
-    if (webhookPayload && webhookPayload.transaction_id) {
-      updateData.payment_channel = webhookPayload.payment_channel || null;
-      updateData.transaction_id = webhookPayload.transaction_id || null;
-      updateData.transaction_status = webhookPayload.transaction_status || null;
     }
     
     // Directly log what's being sent to the database
@@ -1841,12 +1833,17 @@ export class SupabaseStorage implements IStorage {
       id: data.id,
       orderId: data.order_id,
       billId: data.bill_id,
-      collectionId: data.collection_id,
       amount: data.amount, // This is already in sen
       status: data.status,
+      userId: data.user_id,
+      productIds: data.product_ids,
+      paymentType: data.payment_type,
+      paymentChannel: data.payment_channel,
+      featureDuration: data.feature_duration,
       paidAt: data.paid_at ? new Date(data.paid_at) : null,
       createdAt: data.created_at ? new Date(data.created_at) : null,
-      webhookPayload: webhookPayload
+      updatedAt: data.updated_at ? new Date(data.updated_at) : null,
+      metadata: data.metadata
     };
   }
 }
