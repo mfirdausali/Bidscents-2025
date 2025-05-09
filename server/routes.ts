@@ -2482,6 +2482,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? `Product Boost for ${productNames}`
         : `Product Boost for ${validProducts.length} products`;
       
+      // Get base URL for callbacks
+      const baseUrl = process.env.APP_URL || `https://${req.get('host')}`;
+      
       // Create a Billplz bill
       const bill = await billplz.createBill({
         name: req.user.username || 'User',
@@ -2490,8 +2493,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description,
         reference_1: orderId,
         reference_2: productIds.join(','),
-        callback_url: `${process.env.APP_URL || 'http://localhost:5000'}/api/payments/webhook`,
-        redirect_url: returnUrl
+        callback_url: `${baseUrl}/api/payments/webhook`,
+        redirect_url: `${baseUrl}/api/payments/process-redirect` // Use our payment processor instead of direct return
       });
       
       if (!bill || !bill.id) {
@@ -2528,53 +2531,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // POST /api/payments/webhook - Billplz webhook callback
-  app.post('/api/payments/webhook', async (req, res) => {
+  // Shared function to process payment updates from both webhook and redirect
+  async function processPaymentUpdate(paymentData, isWebhook = false) {
     try {
-      console.log('Received payment webhook:', req.body);
+      console.log(`Processing payment update from ${isWebhook ? 'webhook' : 'redirect'}:`, paymentData);
       
-      // Get the X-Signature header
-      const xSignature = req.headers['x-signature'] as string;
-      
-      // Verify the signature
-      if (!xSignature || !billplz.verifyWebhookSignature(req.body, xSignature)) {
-        console.error('Invalid webhook signature');
-        return res.status(401).json({ message: 'Invalid signature' });
-      }
-      
-      // Extract data from webhook payload
+      // Extract data from payment payload
       const {
         id: billId,
-        collection_id,
         paid,
-        state,
-        amount,
-        paid_amount,
         paid_at,
         reference_1: orderId,
         reference_2: productId,
         payment_channel,
-        transaction_id,
-        transaction_status,
-      } = req.body;
+      } = paymentData;
+      
+      if (!orderId) {
+        console.error('Missing order ID in payment data');
+        return { success: false, message: 'Missing order ID' };
+      }
       
       // Find the associated payment
       const payment = await storage.getPaymentByOrderId(orderId);
       if (!payment) {
         console.error('Payment not found for order ID:', orderId);
-        return res.status(404).json({ message: 'Payment not found' });
+        return { success: false, message: 'Payment not found' };
+      }
+      
+      // Check if payment already processed to prevent duplicate processing
+      if (payment.status === 'paid') {
+        console.log(`Payment ${payment.id} already marked as paid, skipping update`);
+        return { success: true, message: 'Payment already processed', payment };
       }
       
       // Update payment status
-      const status = paid === 'true' ? 'paid' : 'failed';
+      const status = paid === 'true' || paid === true ? 'paid' : 'failed';
       const paidDate = paid_at ? new Date(paid_at) : undefined;
       
-      // Update payment with webhook data
-      await storage.updatePaymentStatus(
+      console.log(`Updating payment ${payment.id} status to ${status}`);
+      
+      // Update payment with data
+      const updatedPayment = await storage.updatePaymentStatus(
         payment.id,
         status,
         paidDate,
-        req.body // Store the complete webhook payload
+        paymentData // Store the complete payload
       );
       
       // If payment is successful, process boost for all products
@@ -2583,18 +2584,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Extract product IDs from payment metadata
           let productIds: string[] = [];
           
-          // Try to get product IDs from webhook reference_2
+          // Try to get product IDs from reference_2
           if (productId) {
             productIds = productId.split(',');
           }
-          // If not available in webhook, try to get from payment.productIds
+          // If not available, try to get from payment.productIds
           else if (payment.productIds) {
             productIds = payment.productIds;
           }
           
           if (productIds.length === 0) {
             console.warn('No product IDs found in payment for boosting');
-            return res.json({ success: true, message: 'Payment processed but no products to boost' });
+            return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
           
           // Calculate 7 days from now for boost expiry
@@ -2630,18 +2631,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const successCount = results.filter(result => result).length;
           
           console.log(`Boosted ${successCount} out of ${productIds.length} products`);
+          return { 
+            success: true, 
+            message: `Payment processed and ${successCount} products boosted`, 
+            payment: updatedPayment 
+          };
         } catch (productError) {
           console.error('Error updating product featured status:', productError);
           // We still return success as the payment was processed correctly
+          return { 
+            success: true, 
+            message: 'Payment processed but error boosting products', 
+            payment: updatedPayment,
+            error: productError
+          };
         }
       }
       
+      return { success: true, message: 'Payment processed', status, payment: updatedPayment };
+    } catch (error) {
+      console.error('Error processing payment update:', error);
+      return { success: false, message: 'Error processing payment', error };
+    }
+  }
+
+  // POST /api/payments/webhook - Billplz webhook callback
+  app.post('/api/payments/webhook', async (req, res) => {
+    try {
+      console.log('Received payment webhook:', req.body);
+      
+      // Get the X-Signature header
+      const xSignature = req.headers['x-signature'] as string;
+      
+      // Verify the signature
+      if (!xSignature || !billplz.verifyWebhookSignature(req.body, xSignature)) {
+        console.error('Invalid webhook signature');
+        return res.status(401).json({ message: 'Invalid signature' });
+      }
+      
+      // Process the payment using the shared function
+      const result = await processPaymentUpdate(req.body, true);
+      
       // Respond to the webhook
-      res.json({ success: true });
+      res.json({ success: result.success, message: result.message });
       
     } catch (error) {
       console.error('Error processing payment webhook:', error);
       res.status(500).json({ message: 'Error processing payment' });
+    }
+  });
+  
+  // GET /api/payments/process-redirect - Handle redirect from Billplz payment
+  app.get('/api/payments/process-redirect', async (req, res) => {
+    try {
+      console.log('Received payment redirect:', req.query);
+      
+      // Verify the payment data is from Billplz using x_signature
+      const xSignature = req.query['billplz[x_signature]'] as string;
+      if (!xSignature) {
+        console.error('Missing X-Signature in redirect');
+        return res.status(400).json({ message: 'Invalid payment redirect: missing signature' });
+      }
+      
+      // Verify signature
+      const isSignatureValid = billplz.verifyRedirectSignature(req.query, xSignature);
+      if (!isSignatureValid) {
+        console.error('Invalid X-Signature in redirect');
+        return res.status(401).json({ message: 'Invalid payment redirect: signature verification failed' });
+      }
+      
+      // Convert query parameters to a format compatible with processPaymentUpdate
+      const paymentData = {
+        id: req.query['billplz[id]'],
+        paid: req.query['billplz[paid]'],
+        paid_at: req.query['billplz[paid_at]'],
+        reference_1: req.query['billplz[reference_1]'],
+        reference_2: req.query['billplz[reference_2]'],
+        transaction_id: req.query['billplz[transaction_id]'],
+        transaction_status: req.query['billplz[transaction_status]'],
+        x_signature: xSignature
+      };
+      
+      console.log('Processing payment from redirect with data:', paymentData);
+      
+      // Process the payment using the shared function
+      const result = await processPaymentUpdate(paymentData, false);
+      
+      // Redirect to seller dashboard with status
+      const redirectUrl = '/seller/dashboard?payment=' + 
+        (result.success ? 'success' : 'failed') + 
+        '&message=' + encodeURIComponent(result.message || '');
+      
+      res.redirect(redirectUrl);
+      
+    } catch (error) {
+      console.error('Error processing payment redirect:', error);
+      res.redirect('/seller/dashboard?payment=error&message=Error+processing+payment');
     }
   });
   
