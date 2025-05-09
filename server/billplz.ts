@@ -14,6 +14,16 @@ const BILLPLZ_SECRET_KEY = process.env.BILLPLZ_SECRET_KEY;
 const BILLPLZ_XSIGN_KEY = process.env.BILLPLZ_XSIGN_KEY;
 const BILLPLZ_COLLECTION_ID = process.env.BILLPLZ_COLLECTION_ID;
 
+// Log configuration once on startup for diagnostics
+console.log('⚙️ BILLPLZ CONFIGURATION ⚙️');
+console.log('-------------------------');
+console.log('BILLPLZ_BASE_URL:', BILLPLZ_BASE_URL);
+console.log('BILLPLZ_COLLECTION_ID present:', !!BILLPLZ_COLLECTION_ID);
+console.log('BILLPLZ_XSIGN_KEY present:', !!BILLPLZ_XSIGN_KEY);
+console.log('BILLPLZ_SECRET_KEY present:', !!BILLPLZ_SECRET_KEY);
+console.log('BILLPLZ_XSIGN_KEY length:', BILLPLZ_XSIGN_KEY?.length);
+console.log('-------------------------');
+
 if (!BILLPLZ_SECRET_KEY || !BILLPLZ_XSIGN_KEY || !BILLPLZ_COLLECTION_ID) {
   console.error('Missing required Billplz environment variables');
 }
@@ -286,8 +296,26 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
   
   // 4. Sort keys alphabetically and pipe-concatenate key+value pairs according to Billplz docs
   const keys = Object.keys(payloadForSignature).sort();
-  const concatenatedString = keys.map(key => `${key}${payloadForSignature[key]}`).join('|');
   
+  // Handle case where values are arrays (Express query parser might create these)
+  const normalizedPayload: Record<string, string> = {};
+  for (const key of keys) {
+    let value = payloadForSignature[key];
+    
+    // If value is an array with one item, use that item instead
+    if (Array.isArray(value) && value.length === 1) {
+      console.log(`Converting array value for key '${key}' to string:`, value[0]);
+      normalizedPayload[key] = value[0].toString();
+    } else {
+      normalizedPayload[key] = value?.toString() || '';
+    }
+  }
+  
+  // Re-sort keys after normalization
+  const sortedKeys = Object.keys(normalizedPayload).sort();
+  const concatenatedString = sortedKeys.map(key => `${key}${normalizedPayload[key]}`).join('|');
+  
+  console.log('SIGNATURE BUILDING: Normalized payload:', normalizedPayload);
   console.log('SIGNATURE BUILDING: Concatenated string for signature:', concatenatedString);
 
   // 5. Create HMAC-SHA256 signature
