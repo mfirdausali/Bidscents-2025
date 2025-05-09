@@ -175,21 +175,41 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
     return false;
   }
 
-  console.log('Verifying redirect signature with input query params:', JSON.stringify(queryParams, null, 2));
+  console.log('🔐 SIGNATURE VERIFICATION START 🔐');
+  console.log('-------------------------------------');
+  console.log('Input query params:', JSON.stringify(queryParams, null, 2));
   console.log('X-Signature to verify:', xSignature);
+  console.log('BILLPLZ_XSIGN_KEY exists:', !!BILLPLZ_XSIGN_KEY);
+  console.log('BILLPLZ_XSIGN_KEY length:', BILLPLZ_XSIGN_KEY?.length);
+  console.log('-------------------------------------');
 
   // 1. Check if we have a nested billplz object (Express 4.18+) or flat structure
   const qp = queryParams.billplz || queryParams;
   
   // 2. Find the x_signature either in the nested object or as a flat key
-  const receivedSignature = qp.x_signature || queryParams['billplz[x_signature]'];
+  let receivedSignature;
   
-  // Make sure the provided xSignature matches what's in the query params
-  if (!receivedSignature) {
+  // Debug all available signatures in different formats
+  if (qp.x_signature) {
+    console.log('Found qp.x_signature:', qp.x_signature);
+    receivedSignature = qp.x_signature;
+  } else if (queryParams['billplz[x_signature]']) {
+    console.log('Found billplz[x_signature]:', queryParams['billplz[x_signature]']);
+    receivedSignature = queryParams['billplz[x_signature]'];
+  } else {
+    // Look for any key containing 'x_signature'
+    console.log('Searching for signature in all keys...');
+    Object.entries(queryParams).forEach(([key, value]) => {
+      if (key.includes('x_signature') || key.includes('signature')) {
+        console.log(`Found possible signature in key '${key}':`, value);
+      }
+    });
+    
     console.error('Missing x_signature in query parameters');
     return false;
   }
   
+  // Make sure the provided xSignature matches what's in the query params
   if (receivedSignature !== xSignature) {
     console.error(`Signature mismatch: Provided ${xSignature} but found ${receivedSignature} in query params`);
     return false;
@@ -198,15 +218,27 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
   // 3. Create payload for signature verification - properly extract keys
   const payloadForSignature: Record<string, any> = {};
   
+  // Create debug info for request structure
+  let requestStructureDebug = {
+    hasNestedBillplz: !!queryParams.billplz && typeof queryParams.billplz === 'object',
+    flatKeysFound: [] as string[],
+    nestedKeysFound: [] as string[],
+    allQueryKeys: Object.keys(queryParams)
+  };
+  
   // Handle nested object case first
-  if (queryParams.billplz && typeof queryParams.billplz === 'object') {
-    console.log('Using nested billplz object format');
+  if (requestStructureDebug.hasNestedBillplz) {
+    console.log('QUERY STRUCTURE: Using nested billplz object format');
     // If using Express 4.18+ with nested objects
     const billplzParams = { ...queryParams.billplz };
     delete billplzParams.x_signature;
     Object.assign(payloadForSignature, billplzParams);
+    
+    // For debugging
+    requestStructureDebug.nestedKeysFound = Object.keys(billplzParams);
+    console.log('Keys found in nested billplz object:', requestStructureDebug.nestedKeysFound);
   } else {
-    console.log('Using flat billplz[param]=value format');
+    console.log('QUERY STRUCTURE: Using flat billplz[param]=value format');
     // Handle flat keys case (older Express or custom query parser)
     for (const [key, value] of Object.entries(queryParams)) {
       // Skip the signature parameter itself
@@ -215,42 +247,87 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
       // Extract the parameter name from the format 'billplz[param]'
       const match = key.match(/billplz\[(.*)\]/);
       if (match && match[1]) {
-        payloadForSignature[match[1]] = value;
+        const paramName = match[1];
+        payloadForSignature[paramName] = value;
+        requestStructureDebug.flatKeysFound.push(paramName);
       }
     }
+    console.log('Extracted parameters from flat keys:', requestStructureDebug.flatKeysFound);
   }
   
-  console.log('Extracted payload for signature verification:', payloadForSignature);
+  console.log('PAYLOAD EXTRACTION: Complete payload for signature verification:', payloadForSignature);
+  
+  // Handle special case if payload is empty - this is usually a bug!
+  if (Object.keys(payloadForSignature).length === 0) {
+    console.error('⚠️ CRITICAL ERROR: Empty payload for signature verification');
+    console.log('This usually means the query parameters format is not recognized.');
+    console.log('Attempting fallback extraction method...');
+    
+    // Fallback extraction for any structure
+    // Direct extraction for nested format
+    if (queryParams.billplz && typeof queryParams.billplz === 'object') {
+      for (const [key, value] of Object.entries(queryParams.billplz)) {
+        if (key !== 'x_signature') {
+          payloadForSignature[key] = value;
+        }
+      }
+    } else {
+      // Try to find any 'billplz[XXX]' style param and extract XXX as key
+      for (const [key, value] of Object.entries(queryParams)) {
+        if (key !== 'billplz[x_signature]' && key.startsWith('billplz[') && key.endsWith(']')) {
+          const paramName = key.substring(8, key.length - 1);
+          payloadForSignature[paramName] = value;
+        }
+      }
+    }
+    
+    console.log('FALLBACK EXTRACTION: Updated payload:', payloadForSignature);
+  }
   
   // 4. Sort keys alphabetically and pipe-concatenate key+value pairs according to Billplz docs
   const keys = Object.keys(payloadForSignature).sort();
   const concatenatedString = keys.map(key => `${key}${payloadForSignature[key]}`).join('|');
   
-  console.log('Building signature with concatenated string:', concatenatedString);
+  console.log('SIGNATURE BUILDING: Concatenated string for signature:', concatenatedString);
 
   // 5. Create HMAC-SHA256 signature
   const hmac = crypto.createHmac('sha256', BILLPLZ_XSIGN_KEY);
   hmac.update(concatenatedString);
   const calculatedSignature = hmac.digest('hex');
 
-  console.log('Verifying redirect signature:');
-  console.log('- Calculated:', calculatedSignature);
-  console.log('- Received:', xSignature);
+  console.log('SIGNATURE VERIFICATION:');
+  console.log('- Calculated signature:', calculatedSignature);
+  console.log('- Received signature:', xSignature);
+  console.log('- Signatures match?', calculatedSignature === xSignature);
   
   // 6. Use constant-time comparison for security
   try {
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(calculatedSignature, 'hex'),
-      Buffer.from(xSignature, 'hex')
-    );
-    console.log(`Signature verification result: ${isValid ? 'VALID' : 'INVALID'} (timing-safe comparison)`);
+    const bufCalc = Buffer.from(calculatedSignature, 'hex');
+    const bufReceived = Buffer.from(xSignature, 'hex');
+    
+    console.log('- Buffer lengths match?', bufCalc.length === bufReceived.length);
+    
+    if (bufCalc.length !== bufReceived.length) {
+      console.error('⚠️ Buffer lengths do not match! Cannot use timing-safe comparison');
+      console.log('- Calculated buffer length:', bufCalc.length);
+      console.log('- Received buffer length:', bufReceived.length);
+      // Fallback to regular string comparison
+      const isValid = calculatedSignature === xSignature;
+      console.log(`RESULT: ${isValid ? 'VALID ✅' : 'INVALID ❌'} (string comparison)`);
+      return isValid;
+    }
+    
+    const isValid = crypto.timingSafeEqual(bufCalc, bufReceived);
+    console.log(`RESULT: ${isValid ? 'VALID ✅' : 'INVALID ❌'} (timing-safe comparison)`);
     return isValid;
   } catch (e) {
     console.error('Error in timing-safe signature comparison:', e);
     // Fallback to regular comparison if lengths are different or other errors
     const isValid = calculatedSignature === xSignature;
-    console.log(`Signature verification result: ${isValid ? 'VALID' : 'INVALID'} (fallback comparison)`);
+    console.log(`RESULT: ${isValid ? 'VALID ✅' : 'INVALID ❌'} (fallback string comparison)`);
     return isValid;
+  } finally {
+    console.log('🔐 SIGNATURE VERIFICATION END 🔐');
   }
 }
 
