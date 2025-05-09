@@ -847,7 +847,7 @@ export default function SellerDashboard() {
     });
   };
 
-  // Handle boost checkout
+  // Handle boost checkout - now supporting multiple products
   const handleBoostCheckout = async () => {
     if (boostedProducts.length === 0) {
       toast({
@@ -864,18 +864,17 @@ export default function SellerDashboard() {
     });
 
     try {
-      // For now, we're implementing boost for one product at a time
-      // Future enhancement: Batch processing for multiple products
-      const productId = boostedProducts[0];
+      // Convert product IDs to strings for the API
+      const productIds = boostedProducts.map(id => id.toString());
       
-      // Create payment request for the product boost
+      // Create payment request for multiple product boost
       const response = await fetch('/api/payments/create-boost', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          productId,
+          productIds, // Send all selected product IDs
           returnUrl: window.location.href, // Return to the seller dashboard after payment
         }),
         credentials: 'include',
@@ -888,17 +887,44 @@ export default function SellerDashboard() {
 
       const paymentData = await response.json();
       
-      // Show a brief toast message before redirecting
-      toast({
-        title: "Redirecting to payment",
-        description: "You will be redirected to Billplz to complete your payment...",
+      // Calculate total cost
+      const totalCost = paymentData.totalAmount || 10 * boostedProducts.length;
+      const productText = boostedProducts.length === 1 ? 'product' : 'products';
+      
+      // Show popup with countdown before redirecting
+      const countdownSeconds = 5; // 5 second countdown
+      let remainingSeconds = countdownSeconds;
+      
+      // Create toast with initial countdown
+      const { dismiss } = toast({
+        title: `Boosting ${boostedProducts.length} ${productText} (RM${totalCost})`,
+        description: `You will be redirected to Billplz in ${remainingSeconds} seconds...`,
+        duration: (countdownSeconds + 1) * 1000, // Add 1 second buffer
       });
+      
+      // Set up countdown interval
+      const countdownInterval = setInterval(() => {
+        remainingSeconds -= 1;
+        
+        // Update toast message with new countdown
+        if (remainingSeconds > 0) {
+          toast({
+            title: `Boosting ${boostedProducts.length} ${productText} (RM${totalCost})`,
+            description: `You will be redirected to Billplz in ${remainingSeconds} seconds...`,
+            duration: remainingSeconds * 1000 + 500, // Add buffer
+          });
+        } else {
+          // Clear interval when countdown reaches 0
+          clearInterval(countdownInterval);
+          dismiss();
+          
+          // Redirect to the Billplz payment page
+          window.location.href = paymentData.billUrl;
+        }
+      }, 1000);
 
-      // Set a short timeout before redirecting to allow the toast to be visible
-      setTimeout(() => {
-        // Redirect to the Billplz payment page
-        window.location.href = paymentData.billUrl;
-      }, 3000);
+      // Cleanup interval if user navigates away
+      return () => clearInterval(countdownInterval);
       
     } catch (error) {
       console.error('Payment error:', error);
@@ -2485,7 +2511,12 @@ export default function SellerDashboard() {
             className="bg-gradient-to-r from-gold to-metallic-gold text-rich-black hover:from-metallic-gold hover:to-gold shadow-lg px-6 py-6 rounded-full flex items-center space-x-2 transition-all duration-300 ease-in-out"
           >
             <span className="font-semibold">Boost Selected ({boostedProducts.length})</span>
-            <span className="mx-2 text-xs bg-white/20 px-2 py-1 rounded">RM10 for 7 days</span>
+            <span className="mx-2 text-xs bg-white/20 px-2 py-1 rounded">
+              {boostedProducts.length === 1 
+                ? "RM10 for 7 days" 
+                : `RM${10 * boostedProducts.length} total for 7 days`
+              }
+            </span>
             <span className="flex items-center">
               Checkout →
             </span>
