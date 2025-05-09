@@ -258,6 +258,20 @@ export const insertBidSchema = createInsertSchema(bids).pick({
   isWinning: true,
 });
 
+export const insertPaymentSchema = createInsertSchema(payments).pick({
+  userId: true,
+  orderId: true,
+  billId: true,
+  amount: true,
+  status: true,
+  paymentType: true,
+  featureDuration: true,
+  productIds: true,
+  paymentChannel: true,
+  paidAt: true,
+  metadata: true,
+});
+
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -288,6 +302,9 @@ export type InsertAuction = z.infer<typeof insertAuctionSchema>;
 
 export type Bid = typeof bids.$inferSelect;
 export type InsertBid = z.infer<typeof insertBidSchema>;
+
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 // Extended types
 export type ProductWithDetails = Product & {
