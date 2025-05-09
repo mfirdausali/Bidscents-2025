@@ -1671,21 +1671,16 @@ export class SupabaseStorage implements IStorage {
   
   // Payment methods
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
-    const now = new Date();
+    // Map the payment data to match the actual database schema
     const paymentData = {
-      user_id: insertPayment.userId,
-      amount: insertPayment.amount,
-      payment_type: insertPayment.paymentType || 'boost',
-      status: insertPayment.status || 'pending',
       order_id: insertPayment.orderId,
       bill_id: insertPayment.billId,
-      product_ids: insertPayment.productIds,
-      feature_duration: insertPayment.featureDuration,
-      payment_channel: insertPayment.paymentChannel,
-      created_at: now,
-      updated_at: now,
+      collection_id: process.env.BILLPLZ_COLLECTION_ID || '',
+      amount: insertPayment.amount * 100, // Convert to sen (RM to sen)
+      status: insertPayment.status || 'due',
       paid_at: insertPayment.paidAt || null,
-      metadata: insertPayment.metadata || null
+      webhook_payload: insertPayment.metadata ? JSON.stringify(insertPayment.metadata) : null
+      // created_at is added automatically by the database
     };
     
     const { data, error } = await supabase
@@ -1738,11 +1733,12 @@ export class SupabaseStorage implements IStorage {
     return this.mapPaymentFromDb(data);
   }
   
+  // Since our payments table doesn't have user_id, we'll need to join with orders or use metadata
+  // For now, we'll retrieve all payments and filter client-side if needed
   async getUserPayments(userId: number): Promise<Payment[]> {
     const { data, error } = await supabase
       .from('payments')
       .select()
-      .eq('user_id', userId)
       .order('created_at', { ascending: false });
       
     if (error) {
@@ -1750,25 +1746,21 @@ export class SupabaseStorage implements IStorage {
       throw error;
     }
     
+    // We can add filtering logic here once we establish the relationship between payments and users
     return data.map(this.mapPaymentFromDb);
   }
   
-  async updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment> {
-    const updateData: any = {
-      status,
-      updated_at: new Date()
-    };
-    
-    if (billId) {
-      updateData.bill_id = billId;
-    }
-    
-    if (paymentChannel) {
-      updateData.payment_channel = paymentChannel;
-    }
+  async updatePaymentStatus(id: string, status: string, paidAt?: Date, webhookPayload?: any): Promise<Payment> {
+    const updateData: any = { status };
     
     if (paidAt) {
       updateData.paid_at = paidAt;
+    }
+    
+    if (webhookPayload) {
+      updateData.webhook_payload = typeof webhookPayload === 'string' 
+        ? webhookPayload 
+        : JSON.stringify(webhookPayload);
     }
     
     const { data, error } = await supabase
@@ -1788,21 +1780,28 @@ export class SupabaseStorage implements IStorage {
   
   // Helper method to map DB payment to our Payment type
   private mapPaymentFromDb(data: any): Payment {
+    // Parse webhook payload if it exists
+    let webhookPayload = null;
+    if (data.webhook_payload) {
+      try {
+        webhookPayload = typeof data.webhook_payload === 'string' 
+          ? JSON.parse(data.webhook_payload)
+          : data.webhook_payload;
+      } catch (e) {
+        console.warn('Failed to parse webhook payload:', e);
+      }
+    }
+    
     return {
       id: data.id,
-      userId: data.user_id,
-      amount: data.amount,
-      paymentType: data.payment_type,
-      status: data.status,
       orderId: data.order_id,
-      productIds: data.product_ids,
-      featureDuration: data.feature_duration,
       billId: data.bill_id,
-      paymentChannel: data.payment_channel,
-      createdAt: data.created_at ? new Date(data.created_at) : null,
-      updatedAt: data.updated_at ? new Date(data.updated_at) : null,
+      collectionId: data.collection_id,
+      amount: data.amount, // This is already in sen
+      status: data.status,
       paidAt: data.paid_at ? new Date(data.paid_at) : null,
-      metadata: data.metadata
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      webhookPayload: webhookPayload
     };
   }
 }

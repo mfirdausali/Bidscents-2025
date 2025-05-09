@@ -2409,56 +2409,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // No imports needed here - moved to the top of the file
   
-  // POST /api/payments/create-boost - Create a boost payment
+  // POST /api/payments/create-boost - Create a boost payment for one or more products
   app.post('/api/payments/create-boost', async (req, res) => {
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: 'Unauthorized: Please log in to make payments' });
       }
       
-      // Validate request body
+      // Validate request body - now supporting multiple product IDs
       const paymentSchema = z.object({
-        productId: z.number().int().positive(),
+        productIds: z.array(z.string()).min(1),
         returnUrl: z.string().url()
       });
       
-      const { productId, returnUrl } = paymentSchema.parse(req.body);
+      const { productIds, returnUrl } = paymentSchema.parse(req.body);
       
-      // Check if the product exists and belongs to the user
-      const product = await storage.getProductById(productId);
-      if (!product) {
-        return res.status(404).json({ message: 'Product not found' });
+      // Check if all products exist and belong to the user
+      const productValidations = await Promise.all(
+        productIds.map(async (pid) => {
+          const productId = parseInt(pid);
+          const product = await storage.getProductById(productId);
+          return { 
+            productId,
+            product,
+            valid: product && product.sellerId === req.user.id 
+          };
+        })
+      );
+      
+      // Filter out invalid products
+      const invalidProducts = productValidations.filter(p => !p.valid);
+      if (invalidProducts.length > 0) {
+        return res.status(403).json({ 
+          message: 'Some products are invalid or do not belong to you',
+          invalidProductIds: invalidProducts.map(p => p.productId)
+        });
       }
       
-      if (product.sellerId !== req.user.id) {
-        return res.status(403).json({ message: 'Forbidden: You can only boost your own products' });
-      }
+      // Get valid products
+      const validProducts = productValidations
+        .filter(p => p.valid)
+        .map(p => p.product);
       
-      // Fixed boost amount in sen (RM10 = 1000 sen)
-      const boostAmount = 1000;
+      // Fixed boost amount per product in sen (RM10 = 1000 sen)
+      const boostAmountPerProduct = 1000;
+      const totalAmount = boostAmountPerProduct * validProducts.length;
       
       // Generate a unique order ID
-      const orderId = `boost-${productId}-${Date.now()}`;
+      const orderId = `boost-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       
       // Create a new payment record
       const payment = await storage.createPayment({
-        userId: req.user.id,
-        amount: boostAmount / 100, // Store in RM
-        paymentType: 'boost',
-        status: 'pending',
         orderId,
-        productIds: [productId.toString()],
-        featureDuration: 7 // 7 days boost
+        amount: totalAmount / 100, // Convert sen to RM for storage
+        status: 'due',
+        billId: null,
+        metadata: {
+          userId: req.user.id,
+          paymentType: 'boost',
+          productIds: productIds,
+          featureDuration: 7 // 7 days boost
+        }
       });
+      
+      // Create product names list for description
+      const productNames = validProducts.map(p => p.name).join(', ');
+      const description = validProducts.length === 1
+        ? `Product Boost for ${productNames}`
+        : `Product Boost for ${validProducts.length} products`;
       
       // Create a Billplz bill
       const bill = await billplz.createBill({
         name: req.user.username || 'User',
         email: req.user.email,
-        amount: boostAmount, // Amount in sen
-        description: `Product Boost for ${product.name}`,
+        amount: totalAmount, // Amount in sen
+        description,
         reference_1: orderId,
-        reference_2: productId.toString(),
+        reference_2: productIds.join(','),
         callback_url: `${process.env.APP_URL || 'http://localhost:5000'}/api/payments/webhook`,
         redirect_url: returnUrl
       });
@@ -2470,14 +2497,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Update payment with bill ID
-      await storage.updatePaymentStatus(payment.id, 'pending', bill.id);
+      await storage.updatePaymentStatus(
+        payment.id, 
+        'due',  // Keep status as 'due' until paid
+        undefined, // No paid date yet
+        { bill_id: bill.id } // Update with bill ID
+      );
       
-      // Return bill information
+      // Return bill information with payment popup message
       res.json({
         billId: bill.id,
         billUrl: billplz.getBillURL(bill.id),
         orderId,
-        status: 'pending'
+        status: 'due',
+        message: 'You will be redirected to Billplz to complete your payment...',
+        productCount: validProducts.length,
+        totalAmount: totalAmount / 100 // Convert sen to RM for display
       });
       
     } catch (error) {
@@ -2527,39 +2562,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Update payment status
-      const status = paid === 'true' ? 'completed' : 'failed';
+      const status = paid === 'true' ? 'paid' : 'failed';
       const paidDate = paid_at ? new Date(paid_at) : undefined;
       
+      // Update payment with webhook data
       await storage.updatePaymentStatus(
         payment.id,
         status,
-        billId,
-        payment_channel,
-        paidDate
+        paidDate,
+        req.body // Store the complete webhook payload
       );
       
-      // If payment is successful, update product as featured
-      if (status === 'completed' && payment.paymentType === 'boost' && payment.productIds && payment.productIds.length > 0) {
+      // If payment is successful, process boost for all products
+      if (status === 'paid') {
         try {
-          // Get the product ID from the first element of productIds array
-          const productId = parseInt(payment.productIds[0]);
+          // Extract product IDs from payment metadata
+          let productIds: string[] = [];
           
-          // Get the product
-          const product = await storage.getProductById(productId);
-          if (product) {
-            // Calculate 7 days from now for boost expiry
-            const boostExpiryDate = new Date();
-            boostExpiryDate.setDate(boostExpiryDate.getDate() + 7);
-            
-            // Update the product to be featured
-            await storage.updateProduct(product.id, {
-              ...product,
-              isFeatured: true,
-              featuredUntil: boostExpiryDate
-            });
-            
-            console.log(`Product ${product.id} boosted until ${boostExpiryDate}`);
+          // Try to get product IDs from webhook reference_2
+          if (productId) {
+            productIds = productId.split(',');
           }
+          // If not available in webhook, try to get from payment metadata
+          else if (payment.webhookPayload?.productIds) {
+            productIds = payment.webhookPayload.productIds;
+          }
+          
+          if (productIds.length === 0) {
+            console.warn('No product IDs found in payment for boosting');
+            return res.json({ success: true, message: 'Payment processed but no products to boost' });
+          }
+          
+          // Calculate 7 days from now for boost expiry
+          const boostExpiryDate = new Date();
+          boostExpiryDate.setDate(boostExpiryDate.getDate() + 7);
+          
+          // Update each product to be featured
+          const updatePromises = productIds.map(async (pid) => {
+            try {
+              const productId = parseInt(pid);
+              const product = await storage.getProductById(productId);
+              
+              if (product) {
+                await storage.updateProduct(product.id, {
+                  ...product,
+                  isFeatured: true,
+                  featuredUntil: boostExpiryDate
+                });
+                console.log(`Product ${product.id} boosted until ${boostExpiryDate}`);
+                return true;
+              } else {
+                console.warn(`Product ID ${productId} not found for boosting`);
+                return false;
+              }
+            } catch (err) {
+              console.error(`Error boosting product ${pid}:`, err);
+              return false;
+            }
+          });
+          
+          // Wait for all product updates to complete
+          const results = await Promise.all(updatePromises);
+          const successCount = results.filter(result => result).length;
+          
+          console.log(`Boosted ${successCount} out of ${productIds.length} products`);
         } catch (productError) {
           console.error('Error updating product featured status:', productError);
           // We still return success as the payment was processed correctly
