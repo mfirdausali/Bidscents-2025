@@ -46,6 +46,7 @@ export const products = pgTable("products", {
   sellerId: integer("seller_id").references(() => users.id).notNull(),
   isNew: boolean("is_new").default(false), // In secondhand context: like new condition
   isFeatured: boolean("is_featured").default(false),
+  featuredUntil: timestamp("featured_until"), // When the featured status expires
   createdAt: timestamp("created_at").defaultNow(),
   // Secondhand perfume specific fields
   remainingPercentage: integer("remaining_percentage").default(100), // How full is the bottle (1-100%)
@@ -185,6 +186,7 @@ export const insertProductSchema = createInsertSchema(products).pick({
   sellerId: true,
   isNew: true,
   isFeatured: true,
+  featuredUntil: true,
   remainingPercentage: true,
   batchCode: true,
   purchaseYear: true,
