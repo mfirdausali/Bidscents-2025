@@ -175,13 +175,23 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
     return false;
   }
 
+  console.log('Verifying redirect signature with input query params:', JSON.stringify(queryParams, null, 2));
+  console.log('X-Signature to verify:', xSignature);
+
   // 1. Check if we have a nested billplz object (Express 4.18+) or flat structure
   const qp = queryParams.billplz || queryParams;
   
   // 2. Find the x_signature either in the nested object or as a flat key
   const receivedSignature = qp.x_signature || queryParams['billplz[x_signature]'];
-  if (!receivedSignature && receivedSignature !== xSignature) {
-    console.error('Signature mismatch: parameter extraction failed');
+  
+  // Make sure the provided xSignature matches what's in the query params
+  if (!receivedSignature) {
+    console.error('Missing x_signature in query parameters');
+    return false;
+  }
+  
+  if (receivedSignature !== xSignature) {
+    console.error(`Signature mismatch: Provided ${xSignature} but found ${receivedSignature} in query params`);
     return false;
   }
   
@@ -189,11 +199,14 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
   const payloadForSignature: Record<string, any> = {};
   
   // Handle nested object case first
-  if (queryParams.billplz) {
+  if (queryParams.billplz && typeof queryParams.billplz === 'object') {
+    console.log('Using nested billplz object format');
     // If using Express 4.18+ with nested objects
-    const { x_signature, ...fields } = queryParams.billplz;
-    Object.assign(payloadForSignature, fields);
+    const billplzParams = { ...queryParams.billplz };
+    delete billplzParams.x_signature;
+    Object.assign(payloadForSignature, billplzParams);
   } else {
+    console.log('Using flat billplz[param]=value format');
     // Handle flat keys case (older Express or custom query parser)
     for (const [key, value] of Object.entries(queryParams)) {
       // Skip the signature parameter itself
@@ -206,6 +219,8 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
       }
     }
   }
+  
+  console.log('Extracted payload for signature verification:', payloadForSignature);
   
   // 4. Sort keys alphabetically and pipe-concatenate key+value pairs according to Billplz docs
   const keys = Object.keys(payloadForSignature).sort();
@@ -224,14 +239,18 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
   
   // 6. Use constant-time comparison for security
   try {
-    return crypto.timingSafeEqual(
+    const isValid = crypto.timingSafeEqual(
       Buffer.from(calculatedSignature, 'hex'),
       Buffer.from(xSignature, 'hex')
     );
+    console.log(`Signature verification result: ${isValid ? 'VALID' : 'INVALID'} (timing-safe comparison)`);
+    return isValid;
   } catch (e) {
-    console.error('Error in signature comparison:', e);
+    console.error('Error in timing-safe signature comparison:', e);
     // Fallback to regular comparison if lengths are different or other errors
-    return calculatedSignature === xSignature;
+    const isValid = calculatedSignature === xSignature;
+    console.log(`Signature verification result: ${isValid ? 'VALID' : 'INVALID'} (fallback comparison)`);
+    return isValid;
   }
 }
 
