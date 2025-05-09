@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -130,6 +130,24 @@ export const bids = pgTable("bids", {
   amount: doublePrecision("amount").notNull(),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
   isWinning: boolean("is_winning").default(false),
+});
+
+// Payments table for Billplz
+export const payments = pgTable("payments", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  orderId: text("order_id").notNull().unique(), // Our internal order ID (UUID)
+  billId: text("bill_id"), // Billplz bill ID
+  amount: integer("amount").notNull(), // Amount in sen (smallest unit)
+  status: text("status").notNull().default("pending"), // pending, paid, failed
+  paymentType: text("payment_type").notNull().default("boost"), // Type of payment (boost, order, etc.)
+  featureDuration: integer("feature_duration"), // Duration in days for featured products
+  productIds: text("product_ids").array(), // Product IDs to boost
+  paymentChannel: text("payment_channel"), // Payment channel used (from Billplz)
+  paidAt: timestamp("paid_at"), // When payment was completed
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  metadata: jsonb("metadata"), // Additional data related to the payment
 });
 
 // Zod schemas for data validation
