@@ -1,4 +1,4 @@
-import { users, products, categories, reviews, orders, orderItems, productImages, messages } from "@shared/schema";
+import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids, payments } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
@@ -6,7 +6,10 @@ import type {
   Review, InsertReview,
   Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
   ProductImage, InsertProductImage,
-  Message, InsertMessage, MessageWithDetails
+  Message, InsertMessage, MessageWithDetails,
+  Auction, InsertAuction, AuctionWithDetails,
+  Bid, InsertBid, BidWithDetails,
+  Payment, InsertPayment
 } from "@shared/schema";
 
 // Define cart types since they're removed from schema but still required by the interface
@@ -119,6 +122,13 @@ export interface IStorage {
   sendMessage(message: InsertMessage): Promise<Message>;
   markMessageAsRead(id: number): Promise<Message>;
   markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void>;
+  
+  // Payment methods
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  getPaymentByOrderId(orderId: string): Promise<Payment | undefined>;
+  getPaymentByBillId(billId: string): Promise<Payment | undefined>;
+  getUserPayments(userId: number): Promise<Payment[]>;
+  updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment>;
   
   // Session storage
   sessionStore: any;
