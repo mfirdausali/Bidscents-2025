@@ -2587,9 +2587,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (productId) {
             productIds = productId.split(',');
           }
-          // If not available in webhook, try to get from payment metadata
-          else if (payment.webhookPayload?.productIds) {
-            productIds = payment.webhookPayload.productIds;
+          // If not available in webhook, try to get from payment.productIds
+          else if (payment.productIds) {
+            productIds = payment.productIds;
           }
           
           if (productIds.length === 0) {
