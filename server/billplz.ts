@@ -147,11 +147,3 @@ export function verifyWebhookSignature(payload: any, xSignature: string): boolea
 export function getBillURL(billId: string): string {
   return `https://www.billplz-sandbox.com/bills/${billId}`;
 }
-
-export default {
-  createBill,
-  getBill,
-  deleteBill,
-  verifyWebhookSignature,
-  getBillURL,
-};

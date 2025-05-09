@@ -1154,6 +1154,80 @@ export class DatabaseStorage implements IStorage {
       );
   }
   
+  // Payment methods
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    const result = await db
+      .insert(payments)
+      .values({
+        ...insertPayment,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning()
+      .execute();
+      
+    return result[0];
+  }
+  
+  async getPaymentByOrderId(orderId: string): Promise<Payment | undefined> {
+    const result = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.orderId, orderId))
+      .execute();
+      
+    return result[0];
+  }
+  
+  async getPaymentByBillId(billId: string): Promise<Payment | undefined> {
+    const result = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.billId, billId))
+      .execute();
+      
+    return result[0];
+  }
+  
+  async getUserPayments(userId: number): Promise<Payment[]> {
+    const result = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.userId, userId))
+      .orderBy(desc(payments.createdAt))
+      .execute();
+      
+    return result;
+  }
+  
+  async updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment> {
+    const updateValues: Partial<Payment> = {
+      status,
+      updatedAt: new Date(),
+    };
+    
+    if (billId) {
+      updateValues.billId = billId;
+    }
+    
+    if (paymentChannel) {
+      updateValues.paymentChannel = paymentChannel;
+    }
+    
+    if (paidAt) {
+      updateValues.paidAt = paidAt;
+    }
+    
+    const result = await db
+      .update(payments)
+      .set(updateValues)
+      .where(eq(payments.id, id))
+      .returning()
+      .execute();
+      
+    return result[0];
+  }
+  
   private async addMessageDetails(messagesList: Message[]): Promise<MessageWithDetails[]> {
     // Import decryption utility
     const { decryptMessage, isEncrypted } = await import('./encryption');
