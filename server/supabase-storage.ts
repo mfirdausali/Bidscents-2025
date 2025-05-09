@@ -1750,32 +1750,77 @@ export class SupabaseStorage implements IStorage {
     return data.map(this.mapPaymentFromDb);
   }
   
-  async updatePaymentStatus(id: string, status: string, paidAt?: Date, webhookPayload?: any): Promise<Payment> {
-    const updateData: any = { status };
+  async updatePaymentStatus(id: number | string, status: string, paidAt?: Date, webhookPayload?: any): Promise<Payment> {
+    console.log(`Updating payment ${id} to status '${status}'${paidAt ? ' with paid date ' + paidAt : ''}`);
+    
+    const updateData: any = { 
+      status,
+      updated_at: new Date()
+    };
     
     if (paidAt) {
       updateData.paid_at = paidAt;
     }
     
+    // If the response includes a bill ID, make sure to store it
+    if (webhookPayload && webhookPayload.id) {
+      updateData.bill_id = webhookPayload.id;
+    }
+    
+    // Store the complete webhook payload for debugging
     if (webhookPayload) {
       updateData.webhook_payload = typeof webhookPayload === 'string' 
         ? webhookPayload 
         : JSON.stringify(webhookPayload);
     }
     
-    const { data, error } = await supabase
-      .from('payments')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-      
-    if (error) {
-      console.error('Error updating payment status:', error);
-      throw error;
+    // Add additional payment details if available
+    if (webhookPayload && webhookPayload.transaction_id) {
+      updateData.payment_channel = webhookPayload.payment_channel || null;
+      updateData.transaction_id = webhookPayload.transaction_id || null;
+      updateData.transaction_status = webhookPayload.transaction_status || null;
     }
     
-    return this.mapPaymentFromDb(data);
+    // Directly log what's being sent to the database
+    console.log('Sending update to database:', { 
+      table: 'payments',
+      id,
+      updateData
+    });
+    
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('Error updating payment status:', error);
+        throw error;
+      }
+      
+      console.log('Payment updated successfully:', data);
+      return this.mapPaymentFromDb(data);
+    } catch (err) {
+      console.error('Database error updating payment:', err);
+      
+      // Try to get the payment to check if it exists
+      const { data } = await supabase
+        .from('payments')
+        .select()
+        .eq('id', id)
+        .single();
+        
+      if (!data) {
+        console.error(`Payment with ID ${id} not found`);
+      } else {
+        console.log('Payment exists but could not be updated:', data);
+      }
+      
+      throw err;
+    }
   }
   
   // Helper method to map DB payment to our Payment type

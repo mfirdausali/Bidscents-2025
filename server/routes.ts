@@ -2534,7 +2534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shared function to process payment updates from both webhook and redirect
   async function processPaymentUpdate(paymentData, isWebhook = false) {
     try {
-      console.log(`Processing payment update from ${isWebhook ? 'webhook' : 'redirect'}:`, paymentData);
+      console.log(`Processing payment update from ${isWebhook ? 'webhook' : 'redirect'}:`, JSON.stringify(paymentData, null, 2));
       
       // Extract data from payment payload
       const {
@@ -2544,12 +2544,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reference_1: orderId,
         reference_2: productId,
         payment_channel,
+        transaction_id,
+        transaction_status
       } = paymentData;
       
       if (!orderId) {
         console.error('Missing order ID in payment data');
         return { success: false, message: 'Missing order ID' };
       }
+      
+      // Log the status flags for debugging
+      console.log('Payment status flags:', {
+        billId, 
+        paid: paid,
+        paidType: typeof paid,
+        isPaidTrue: paid === 'true',
+        isPaidTrueBoolean: paid === true,
+        orderId,
+        productId
+      });
       
       // Find the associated payment
       const payment = await storage.getPaymentByOrderId(orderId);
@@ -2558,39 +2571,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return { success: false, message: 'Payment not found' };
       }
       
+      console.log('Found payment record:', {
+        id: payment.id,
+        orderId: payment.orderId,
+        currentStatus: payment.status,
+        amount: payment.amount,
+        productIds: payment.productIds
+      });
+      
       // Check if payment already processed to prevent duplicate processing
       if (payment.status === 'paid') {
-        console.log(`Payment ${payment.id} already marked as paid, skipping update`);
+        console.log(`Payment ${payment.id} already marked as paid, skipping status update`);
+        // Even if already paid, we'll update the bill_id if it wasn't set before
+        if (!payment.billId && billId) {
+          await storage.updatePaymentStatus(
+            payment.id, 
+            'paid',
+            undefined,
+            { id: billId, transaction_id, transaction_status }
+          );
+          console.log(`Updated bill_id for payment ${payment.id} to ${billId}`);
+        }
         return { success: true, message: 'Payment already processed', payment };
       }
       
-      // Update payment status
-      const status = paid === 'true' || paid === true ? 'paid' : 'failed';
-      const paidDate = paid_at ? new Date(paid_at) : undefined;
+      // Determine payment status - handle both string and boolean values from Billplz
+      const isPaid = paid === 'true' || paid === true;
+      const status = isPaid ? 'paid' : 'failed';
+      const paidDate = paid_at ? new Date(paid_at) : isPaid ? new Date() : undefined;
       
-      console.log(`Updating payment ${payment.id} status to ${status}`);
+      console.log(`Updating payment ${payment.id} status to '${status}'${paidDate ? ' with paid date ' + paidDate : ''}`);
       
-      // Update payment with data
+      // Update payment with complete data
       const updatedPayment = await storage.updatePaymentStatus(
         payment.id,
         status,
         paidDate,
-        paymentData // Store the complete payload
+        {
+          ...paymentData,
+          // Ensure these fields are explicitly included
+          id: billId,                      // Billplz bill ID
+          payment_channel,                // Payment method used
+          transaction_id,                 // Transaction reference 
+          transaction_status              // Status of the transaction
+        }
       );
       
-      // If payment is successful, process boost for all products
+      console.log(`Payment status updated to ${status}`);
+      
+      // CRITICAL: If payment is successful, process boost for all products
       if (status === 'paid') {
         try {
-          // Extract product IDs from payment metadata
+          // Extract product IDs from payment metadata or from reference_2
           let productIds: string[] = [];
           
-          // Try to get product IDs from reference_2
-          if (productId) {
-            productIds = productId.split(',');
-          }
-          // If not available, try to get from payment.productIds
-          else if (payment.productIds) {
+          // First check the payment record for productIds
+          if (payment.productIds && payment.productIds.length > 0) {
             productIds = payment.productIds;
+            console.log(`Using productIds from payment record: ${productIds.join(', ')}`);
+          }
+          // Then check if reference_2 contains comma-separated product IDs
+          else if (productId && productId.includes(',')) {
+            productIds = productId.split(',');
+            console.log(`Using productIds from reference_2: ${productIds.join(', ')}`);
+          }
+          // Finally, check if reference_2 is a single product ID
+          else if (productId) {
+            productIds = [productId];
+            console.log(`Using single productId from reference_2: ${productId}`);
           }
           
           if (productIds.length === 0) {
@@ -2602,26 +2650,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const boostExpiryDate = new Date();
           boostExpiryDate.setDate(boostExpiryDate.getDate() + 7);
           
+          console.log(`Will boost ${productIds.length} products until ${boostExpiryDate}`);
+          
           // Update each product to be featured
           const updatePromises = productIds.map(async (pid) => {
             try {
-              const productId = parseInt(pid);
+              // Ensure the product ID is numeric
+              const productId = typeof pid === 'string' ? parseInt(pid) : pid;
+              if (isNaN(productId)) {
+                console.warn(`Invalid product ID: ${pid}`);
+                return false;
+              }
+              
               const product = await storage.getProductById(productId);
               
               if (product) {
+                // Update the product with featured flag and expiry date
                 await storage.updateProduct(product.id, {
                   ...product,
                   isFeatured: true,
                   featuredUntil: boostExpiryDate
                 });
-                console.log(`Product ${product.id} boosted until ${boostExpiryDate}`);
+                console.log(`✅ Product #${product.id} "${product.name}" boosted until ${boostExpiryDate}`);
                 return true;
               } else {
-                console.warn(`Product ID ${productId} not found for boosting`);
+                console.warn(`⚠️ Product ID ${productId} not found for boosting`);
                 return false;
               }
             } catch (err) {
-              console.error(`Error boosting product ${pid}:`, err);
+              console.error(`❌ Error boosting product ${pid}:`, err);
               return false;
             }
           });
@@ -2630,7 +2687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const results = await Promise.all(updatePromises);
           const successCount = results.filter(result => result).length;
           
-          console.log(`Boosted ${successCount} out of ${productIds.length} products`);
+          console.log(`🚀 Boosted ${successCount} out of ${productIds.length} products`);
           return { 
             success: true, 
             message: `Payment processed and ${successCount} products boosted`, 
@@ -2684,7 +2741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/payments/process-redirect - Handle redirect from Billplz payment
   app.get('/api/payments/process-redirect', async (req, res) => {
     try {
-      console.log('Received payment redirect with query params:', req.query);
+      console.log('Received payment redirect with query params:', JSON.stringify(req.query, null, 2));
       
       // 1. Pick the right container - handle both Express 4.18+ and older versions
       const qp = req.query.billplz || req.query;
@@ -2698,6 +2755,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 3. Verify signature
       const isSignatureValid = billplz.verifyRedirectSignature(req.query, xSignature as string);
+      console.log(`Signature verification result: ${isSignatureValid ? 'VALID' : 'INVALID'}`);
+      
       if (!isSignatureValid) {
         console.error('Invalid X-Signature in redirect');
         return res.status(401).json({ message: 'Invalid payment redirect: signature verification failed' });
@@ -2742,34 +2801,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('Processing payment from redirect with normalized data:', paymentData);
       
-      // 6. Find the payment by orderId and update its status in UI
-      const orderId = reference1;
-      if (orderId) {
-        const payment = await storage.getPaymentByOrderId(orderId as string);
-        if (payment) {
-          console.log(`Found payment #${payment.id} with order ID ${orderId}`);
-          
-          // Redirect to seller dashboard with status
-          // NOTE: We ONLY update the UI here and wait for the webhook to process the actual payment
-          const redirectUrl = '/seller/dashboard?payment=' + 
-            (paid === 'true' ? 'success' : 'failed') + 
-            '&message=' + encodeURIComponent(paid === 'true' 
-              ? 'Payment completed successfully! Your products will be boosted shortly.' 
-              : 'Payment was not successful. Please try again.');
-          
-          return res.redirect(redirectUrl);
-        }
-      }
-      
-      // 7. Process the payment using the shared function only if we couldn't find the payment
-      // This is a fallback in case the webhook hasn't arrived yet
+      // 6. Always process the payment directly from the redirect URL
+      // This ensures the payment gets updated even if the webhook fails
       const result = await processPaymentUpdate(paymentData, false);
       
-      // 8. Redirect to seller dashboard with status
+      // 7. Redirect to seller dashboard with status and detailed information
       const redirectUrl = '/seller/dashboard?payment=' + 
-        (result.success ? 'success' : 'failed') + 
-        '&message=' + encodeURIComponent(result.message || '');
+        (result.success && paid === 'true' ? 'success' : 'failed') + 
+        '&message=' + encodeURIComponent(
+          paid === 'true'
+            ? 'Payment completed successfully! Your products will be boosted now.'
+            : 'Payment was not successful. Please try again.'
+        ) +
+        '&id=' + encodeURIComponent(billplzId || '');
       
+      console.log(`Redirecting user to: ${redirectUrl}`);
       res.redirect(redirectUrl);
       
     } catch (error) {
