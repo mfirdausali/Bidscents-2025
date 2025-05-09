@@ -1753,9 +1753,9 @@ export class SupabaseStorage implements IStorage {
   async updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment> {
     console.log(`Updating payment ${id} to status '${status}'${paidAt ? ' with paid date ' + paidAt : ''}`);
     
+    // Only include fields that exist in the actual database schema
     const updateData: any = { 
-      status,
-      updated_at: new Date()
+      status
     };
     
     // Add bill_id if provided
@@ -1781,6 +1781,25 @@ export class SupabaseStorage implements IStorage {
     });
     
     try {
+      // Get the current payment first to ensure we have access to all fields
+      const { data: existingPayment, error: fetchError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+      if (fetchError) {
+        console.error('Error fetching existing payment:', fetchError);
+        throw fetchError;
+      }
+      
+      if (!existingPayment) {
+        throw new Error(`Payment with ID ${id} not found`);
+      }
+      
+      console.log('Existing payment:', existingPayment);
+      
+      // Update the payment
       const { data, error } = await supabase
         .from('payments')
         .update(updateData)
@@ -1790,6 +1809,8 @@ export class SupabaseStorage implements IStorage {
         
       if (error) {
         console.error('Error updating payment status:', error);
+        // Log the fields we tried to update
+        console.error('Fields attempted to update:', Object.keys(updateData).join(', '));
         throw error;
       }
       
@@ -1809,6 +1830,7 @@ export class SupabaseStorage implements IStorage {
         console.error(`Payment with ID ${id} not found`);
       } else {
         console.log('Payment exists but could not be updated:', data);
+        console.log('Available fields in payment record:', Object.keys(data).join(', '));
       }
       
       throw err;
@@ -1817,6 +1839,15 @@ export class SupabaseStorage implements IStorage {
   
   // Helper method to map DB payment to our Payment type
   private mapPaymentFromDb(data: any): Payment {
+    // Log the actual data structure from the database for debugging
+    console.log('Mapping payment data from DB:', {
+      availableFields: Object.keys(data),
+      dataTypes: Object.entries(data).reduce((acc, [key, val]) => {
+        acc[key] = typeof val;
+        return acc;
+      }, {})
+    });
+    
     // Parse webhook payload if it exists
     let webhookPayload = null;
     if (data.webhook_payload) {
@@ -1829,21 +1860,26 @@ export class SupabaseStorage implements IStorage {
       }
     }
     
-    return {
+    // Use optional chaining to safely handle missing fields
+    // Use default values for required fields in our schema
+    const payment: Payment = {
       id: data.id,
-      orderId: data.order_id,
-      billId: data.bill_id,
-      amount: data.amount, // This is already in sen
-      status: data.status,
-      userId: data.user_id,
-      productIds: data.product_ids,
-      paymentType: data.payment_type,
-      paymentChannel: data.payment_channel,
-      featureDuration: data.feature_duration,
+      userId: data.user_id || 0, // Default to 0 if missing
+      orderId: data.order_id || '',
+      billId: data.bill_id || null,
+      amount: data.amount || 0,
+      status: data.status || 'unknown',
+      paymentType: data.payment_type || 'unknown',
+      featureDuration: data.feature_duration || null,
+      productIds: data.product_ids || null,
+      paymentChannel: data.payment_channel || null,
       paidAt: data.paid_at ? new Date(data.paid_at) : null,
       createdAt: data.created_at ? new Date(data.created_at) : null,
       updatedAt: data.updated_at ? new Date(data.updated_at) : null,
-      metadata: data.metadata
+      metadata: data.metadata || null
     };
+    
+    console.log('Mapped payment:', payment);
+    return payment;
   }
 }
