@@ -1,0 +1,166 @@
+1 Route map (fixed names)
+purpose	HTTP verb	path	file that exports handler
+capture raw query (middleware)	ALL	/api/payments/process-redirect	middlewares/rawQuery.js
+verify redirect & 302 → UI	GET	/api/payments/process-redirect	routes/payments/redirect.js
+
+Rule – mount rawQuery.js before any body/query parser and before redirect.js.
+
+2 rawQuery.js – capture untouched bytes
+Signature:
+
+js
+Copy
+Edit
+module.exports = function rawQueryGrabber (req, res, next) { … }
+Where to read: req.originalUrl.
+
+Extraction algorithm
+
+const idx = req.originalUrl.indexOf('?') – if idx === -1, set req.rawQuery = '' and next().
+
+ELSE req.rawQuery = req.originalUrl.slice(idx + 1).
+
+DO NOT decodeURIComponent or call any string replace.
+
+Store: attach the string to req.rawQuery. Nothing else.
+
+Placement code (app.js)
+
+js
+Copy
+Edit
+const rawQuery = require('./middlewares/rawQuery');
+app.use('/api/payments/process-redirect', rawQuery);
+3 redirect.js – six deterministic stages
+Stage A Early rejects
+If req.method !== 'GET' → res.status(405).end().
+
+If req.rawQuery === '' → res.status(400).end('missing query').
+
+Stage B Isolate signature without decode
+Regex
+
+txt
+Copy
+Edit
+(?:^|&)billplz\[x_signature]=([0-9a-f]{64})(?:&|$)
+No flags.
+
+If no match → verified = false; go to Stage E.
+
+const sig = match[1].
+
+const unsignedQuery = req.rawQuery.replace(match[0], '') // removes key=value & possible leading &
+Then .replace(/^&|&$/g, '') to strip boundary ampersands.
+
+Stage C Build source string (never decode)
+const pairs = unsignedQuery === '' ? [] : unsignedQuery.split('&');
+
+pairs.sort();  // built-in ASCII sort
+
+const source = pairs.map(p => p.replace('=', '')).join('|');
+
+Stage D Compute HMAC
+js
+Copy
+Edit
+const crypto = require('crypto');
+const keyBuf  = Buffer.from(process.env.BILLPLZ_XSIGN_KEY, 'utf8');   // 32 hex chars from dashboard
+const calcBuf = crypto.createHmac('sha256', keyBuf)
+                      .update(source, 'utf8')
+                      .digest();
+const sigBuf  = Buffer.from(sig, 'hex');
+const verified = sigBuf.length === calcBuf.length &&
+                 crypto.timingSafeEqual(sigBuf, calcBuf);
+Zero allocations beyond these two buffers.
+
+Stage E Decide UI target (never mutate DB)
+Extract billplz[id] and billplz[paid] the safe way:
+
+js
+Copy
+Edit
+const urlParams = new URLSearchParams(req.rawQuery);
+const billId = urlParams.get('billplz[id]');
+const paidFlag = urlParams.get('billplz[paid]');   // 'true' | 'false' | null
+Query DB read-only:
+
+sql
+Copy
+Edit
+SELECT status FROM payments WHERE bill_id = $1;
+Accept result 'paid' | 'failed' | 'due' | null.
+
+Derive uiState table:
+
+verified	db status	uiState
+false	any	error
+true	paid	success
+true	failed	failed
+true	due	pending
+true	null	pending
+
+Redirect:
+
+js
+Copy
+Edit
+const dash = '/seller/dashboard';
+const loc  = `${dash}?payment=${uiState}`;
+res.redirect(303, loc);          // 303 to follow spec (GET after POST-style action)
+Duration – ensure entire handler <10 ms on warm path.
+
+Stage F Audit log (non-blocking)
+After res.end():
+
+js
+Copy
+Edit
+logger.info({
+  tag: 'bp-redirect',
+  bill_id: billId,
+  verified,
+  paidFlag,
+  dbStatus,
+  uiState
+});
+Async; failure cannot affect response.
+
+4 Unit tests (must all pass)
+test vector	expectation
+Raw query exactly copied from Billplz docs	status 303 → success
+Swap two key orders	still verified
+Replace %2B with + manually	verification fails
+Clip 1 nibble off signature	verification fails
+No webhook yet (status='due')	pending redirect
+Replay same URL 30×	always same uiState; handler returns in <10 ms
+
+Helper: load captured redirect URL strings from sandbox runs into fixtures.
+
+5 Monitoring thresholds
+Counter redirect.total, redirect.verified, redirect.invalidsig.
+
+Alert if invalidsig / redirect.total > 0.05 % over 10 min.
+
+Gauge redirect.latency_p99; alert if >20 ms.
+
+6 Deployment guardrail
+Ship code under feature flag REDIRECT_V2_SHADOW.
+
+In shadow, compute verification and log result but keep feeding old flow.
+
+After ≥50 000 real redirects or 48 h (whichever later) with invalidsig=0, flip flag to put V2 live.
+
+Remove legacy flow two weeks later.
+
+Follow these instructions byte-for-byte and your Express 4 .21 .2 service will:
+
+reproduce Billplz’s HMAC perfectly,
+
+never double-write payment rows,
+
+handle any arrival order,
+
+surface instant UX,
+
+and deliver observability strong enough to spot one-in-a-million anomalies.
