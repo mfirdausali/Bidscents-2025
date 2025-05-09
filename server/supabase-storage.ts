@@ -1,4 +1,4 @@
-import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids } from "@shared/schema";
+import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids, payments } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
@@ -8,7 +8,8 @@ import type {
   ProductImage, InsertProductImage,
   Message, InsertMessage, MessageWithDetails,
   Auction, InsertAuction,
-  Bid, InsertBid
+  Bid, InsertBid,
+  Payment, InsertPayment
 } from "@shared/schema";
 
 // Define cart types since they're removed from schema but still in interface
@@ -520,6 +521,7 @@ export class SupabaseStorage implements IStorage {
     if (product.sellerId !== undefined) dbProduct.seller_id = product.sellerId;
     if (product.isNew !== undefined) dbProduct.is_new = product.isNew;
     if (product.isFeatured !== undefined) dbProduct.is_featured = product.isFeatured;
+    if (product.featuredUntil !== undefined) dbProduct.featured_until = product.featuredUntil;
     if (product.remainingPercentage !== undefined) dbProduct.remaining_percentage = product.remainingPercentage;
     if (product.batchCode !== undefined) dbProduct.batch_code = product.batchCode;
     if (product.purchaseYear !== undefined) dbProduct.purchase_year = product.purchaseYear;
