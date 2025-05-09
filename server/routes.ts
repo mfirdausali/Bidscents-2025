@@ -2684,40 +2684,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/payments/process-redirect - Handle redirect from Billplz payment
   app.get('/api/payments/process-redirect', async (req, res) => {
     try {
-      console.log('Received payment redirect:', req.query);
+      console.log('Received payment redirect with query params:', req.query);
       
-      // Verify the payment data is from Billplz using x_signature
-      const xSignature = req.query['billplz[x_signature]'] as string;
+      // 1. Pick the right container - handle both Express 4.18+ and older versions
+      const qp = req.query.billplz || req.query;
+      
+      // 2. Locate the signature from either format
+      const xSignature = qp.x_signature || req.query['billplz[x_signature]'];
       if (!xSignature) {
         console.error('Missing X-Signature in redirect');
         return res.status(400).json({ message: 'Invalid payment redirect: missing signature' });
       }
       
-      // Verify signature
-      const isSignatureValid = billplz.verifyRedirectSignature(req.query, xSignature);
+      // 3. Verify signature
+      const isSignatureValid = billplz.verifyRedirectSignature(req.query, xSignature as string);
       if (!isSignatureValid) {
         console.error('Invalid X-Signature in redirect');
         return res.status(401).json({ message: 'Invalid payment redirect: signature verification failed' });
       }
       
-      // Convert query parameters to a format compatible with processPaymentUpdate
+      // 4. Extract billplz parameters for payment processing
+      // Different query parameter formats based on Express version
+      let billplzId, paid, paidAt, reference1, reference2, transactionId, transactionStatus;
+      
+      if (req.query.billplz) {
+        // Nested object structure (Express 4.18+)
+        const bp = req.query.billplz as any;
+        billplzId = bp.id;
+        paid = bp.paid;
+        paidAt = bp.paid_at;
+        reference1 = bp.reference_1;
+        reference2 = bp.reference_2;
+        transactionId = bp.transaction_id;
+        transactionStatus = bp.transaction_status;
+      } else {
+        // Flat parameters structure (older Express)
+        billplzId = req.query['billplz[id]'];
+        paid = req.query['billplz[paid]'];
+        paidAt = req.query['billplz[paid_at]'];
+        reference1 = req.query['billplz[reference_1]'];
+        reference2 = req.query['billplz[reference_2]'];
+        transactionId = req.query['billplz[transaction_id]'];
+        transactionStatus = req.query['billplz[transaction_status]'];
+      }
+      
+      // 5. Convert query parameters to a format compatible with processPaymentUpdate
       const paymentData = {
-        id: req.query['billplz[id]'],
-        paid: req.query['billplz[paid]'],
-        paid_at: req.query['billplz[paid_at]'],
-        reference_1: req.query['billplz[reference_1]'],
-        reference_2: req.query['billplz[reference_2]'],
-        transaction_id: req.query['billplz[transaction_id]'],
-        transaction_status: req.query['billplz[transaction_status]'],
+        id: billplzId,
+        paid: paid,
+        paid_at: paidAt,
+        reference_1: reference1,
+        reference_2: reference2,
+        transaction_id: transactionId,
+        transaction_status: transactionStatus,
         x_signature: xSignature
       };
       
-      console.log('Processing payment from redirect with data:', paymentData);
+      console.log('Processing payment from redirect with normalized data:', paymentData);
       
-      // Process the payment using the shared function
+      // 6. Find the payment by orderId and update its status in UI
+      const orderId = reference1;
+      if (orderId) {
+        const payment = await storage.getPaymentByOrderId(orderId as string);
+        if (payment) {
+          console.log(`Found payment #${payment.id} with order ID ${orderId}`);
+          
+          // Redirect to seller dashboard with status
+          // NOTE: We ONLY update the UI here and wait for the webhook to process the actual payment
+          const redirectUrl = '/seller/dashboard?payment=' + 
+            (paid === 'true' ? 'success' : 'failed') + 
+            '&message=' + encodeURIComponent(paid === 'true' 
+              ? 'Payment completed successfully! Your products will be boosted shortly.' 
+              : 'Payment was not successful. Please try again.');
+          
+          return res.redirect(redirectUrl);
+        }
+      }
+      
+      // 7. Process the payment using the shared function only if we couldn't find the payment
+      // This is a fallback in case the webhook hasn't arrived yet
       const result = await processPaymentUpdate(paymentData, false);
       
-      // Redirect to seller dashboard with status
+      // 8. Redirect to seller dashboard with status
       const redirectUrl = '/seller/dashboard?payment=' + 
         (result.success ? 'success' : 'failed') + 
         '&message=' + encodeURIComponent(result.message || '');

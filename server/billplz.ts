@@ -129,16 +129,34 @@ export function verifyWebhookSignature(payload: any, xSignature: string): boolea
   const payloadForSignature = { ...payload };
   delete payloadForSignature.x_signature;
 
-  // Sort keys alphabetically and concatenate key=value pairs
+  // Sort keys alphabetically and concatenate key=value pairs with pipe separator
+  // According to Billplz docs: "Sort all remaining keys in ascending ASCII, 
+  // and join them with a single pipe: key1value1|key2value2..."
   const keys = Object.keys(payloadForSignature).sort();
-  const concatenatedString = keys.map(key => `${key}${payloadForSignature[key]}`).join('');
+  const concatenatedString = keys.map(key => `${key}${payloadForSignature[key]}`).join('|');
+
+  console.log('Building webhook signature with concatenated string:', concatenatedString);
 
   // Create HMAC-SHA256 signature
   const hmac = crypto.createHmac('sha256', BILLPLZ_XSIGN_KEY);
   hmac.update(concatenatedString);
-  const generatedSignature = hmac.digest('hex');
+  const calculatedSignature = hmac.digest('hex');
 
-  return generatedSignature === xSignature;
+  console.log('Verifying webhook signature:');
+  console.log('- Calculated:', calculatedSignature);
+  console.log('- Received:', xSignature);
+
+  // Use constant-time comparison for security
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(calculatedSignature, 'hex'),
+      Buffer.from(xSignature, 'hex')
+    );
+  } catch (e) {
+    console.error('Error in signature comparison:', e);
+    // Fallback to regular comparison if lengths are different or other errors
+    return calculatedSignature === xSignature;
+  }
 }
 
 /**
@@ -157,33 +175,64 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
     return false;
   }
 
-  // Extract all billplz parameters and create clean payload without the signature
+  // 1. Check if we have a nested billplz object (Express 4.18+) or flat structure
+  const qp = queryParams.billplz || queryParams;
+  
+  // 2. Find the x_signature either in the nested object or as a flat key
+  const receivedSignature = qp.x_signature || queryParams['billplz[x_signature]'];
+  if (!receivedSignature && receivedSignature !== xSignature) {
+    console.error('Signature mismatch: parameter extraction failed');
+    return false;
+  }
+  
+  // 3. Create payload for signature verification - properly extract keys
   const payloadForSignature: Record<string, any> = {};
-  for (const [key, value] of Object.entries(queryParams)) {
-    // Skip the signature parameter itself
-    if (key === 'billplz[x_signature]') continue;
-    
-    // Extract the parameter name from the format 'billplz[param]'
-    const match = key.match(/billplz\[(.*)\]/);
-    if (match && match[1]) {
-      payloadForSignature[match[1]] = value;
+  
+  // Handle nested object case first
+  if (queryParams.billplz) {
+    // If using Express 4.18+ with nested objects
+    const { x_signature, ...fields } = queryParams.billplz;
+    Object.assign(payloadForSignature, fields);
+  } else {
+    // Handle flat keys case (older Express or custom query parser)
+    for (const [key, value] of Object.entries(queryParams)) {
+      // Skip the signature parameter itself
+      if (key === 'billplz[x_signature]') continue;
+      
+      // Extract the parameter name from the format 'billplz[param]'
+      const match = key.match(/billplz\[(.*)\]/);
+      if (match && match[1]) {
+        payloadForSignature[match[1]] = value;
+      }
     }
   }
-
-  // Sort keys alphabetically and concatenate key=value pairs
+  
+  // 4. Sort keys alphabetically and pipe-concatenate key+value pairs according to Billplz docs
   const keys = Object.keys(payloadForSignature).sort();
-  const concatenatedString = keys.map(key => `${key}${payloadForSignature[key]}`).join('');
+  const concatenatedString = keys.map(key => `${key}${payloadForSignature[key]}`).join('|');
+  
+  console.log('Building signature with concatenated string:', concatenatedString);
 
-  // Create HMAC-SHA256 signature
+  // 5. Create HMAC-SHA256 signature
   const hmac = crypto.createHmac('sha256', BILLPLZ_XSIGN_KEY);
   hmac.update(concatenatedString);
-  const generatedSignature = hmac.digest('hex');
+  const calculatedSignature = hmac.digest('hex');
 
   console.log('Verifying redirect signature:');
-  console.log('- Generated:', generatedSignature);
+  console.log('- Calculated:', calculatedSignature);
   console.log('- Received:', xSignature);
   
-  return generatedSignature === xSignature;
+  // 6. Use constant-time comparison for security
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(calculatedSignature, 'hex'),
+      Buffer.from(xSignature, 'hex')
+    );
+  } catch (e) {
+    console.error('Error in signature comparison:', e);
+    // Fallback to regular comparison if lengths are different or other errors
+    return calculatedSignature === xSignature;
+  }
 }
 
 /**
