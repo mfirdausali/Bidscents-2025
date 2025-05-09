@@ -1675,15 +1675,17 @@ export class SupabaseStorage implements IStorage {
     const paymentData = {
       user_id: insertPayment.userId,
       amount: insertPayment.amount,
-      type: insertPayment.type,
-      status: insertPayment.status,
+      payment_type: insertPayment.paymentType || 'boost',
+      status: insertPayment.status || 'pending',
       order_id: insertPayment.orderId,
-      product_id: insertPayment.productId,
       bill_id: insertPayment.billId,
+      product_ids: insertPayment.productIds,
+      feature_duration: insertPayment.featureDuration,
       payment_channel: insertPayment.paymentChannel,
       created_at: now,
       updated_at: now,
-      paid_at: null
+      paid_at: insertPayment.paidAt || null,
+      metadata: insertPayment.metadata || null
     };
     
     const { data, error } = await supabase
@@ -1790,15 +1792,17 @@ export class SupabaseStorage implements IStorage {
       id: data.id,
       userId: data.user_id,
       amount: data.amount,
-      type: data.type,
+      paymentType: data.payment_type,
       status: data.status,
       orderId: data.order_id,
-      productId: data.product_id,
+      productIds: data.product_ids,
+      featureDuration: data.feature_duration,
       billId: data.bill_id,
       paymentChannel: data.payment_channel,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
-      paidAt: data.paid_at ? new Date(data.paid_at) : null
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      updatedAt: data.updated_at ? new Date(data.updated_at) : null,
+      paidAt: data.paid_at ? new Date(data.paid_at) : null,
+      metadata: data.metadata
     };
   }
 }
