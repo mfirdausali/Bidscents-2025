@@ -848,12 +848,66 @@ export default function SellerDashboard() {
   };
 
   // Handle boost checkout
-  const handleBoostCheckout = () => {
+  const handleBoostCheckout = async () => {
+    if (boostedProducts.length === 0) {
+      toast({
+        title: "No products selected",
+        description: "Please select at least one product to boost",
+        variant: "destructive"
+      });
+      return;
+    }
+
     toast({
-      title: "Boost Selected Products",
-      description: `You selected ${boostedProducts.length} product(s) for premium promotion at RM10 for 7 days.`,
+      title: "Processing your request",
+      description: "Please wait while we prepare your payment...",
     });
-    // Future implementation: Redirect to Billplz payment page
+
+    try {
+      // For now, we're implementing boost for one product at a time
+      // Future enhancement: Batch processing for multiple products
+      const productId = boostedProducts[0];
+      
+      // Create payment request for the product boost
+      const response = await fetch('/api/payments/create-boost', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          productId,
+          returnUrl: window.location.href, // Return to the seller dashboard after payment
+        }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create payment');
+      }
+
+      const paymentData = await response.json();
+      
+      // Show a brief toast message before redirecting
+      toast({
+        title: "Redirecting to payment",
+        description: "You will be redirected to Billplz to complete your payment...",
+      });
+
+      // Set a short timeout before redirecting to allow the toast to be visible
+      setTimeout(() => {
+        // Redirect to the Billplz payment page
+        window.location.href = paymentData.billUrl;
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast({
+        title: "Payment Error",
+        description: error instanceof Error ? error.message : "Failed to process payment request",
+        variant: "destructive",
+      });
+    }
   };
 
   // Calculate dashboard statistics

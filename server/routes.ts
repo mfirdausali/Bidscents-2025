@@ -2444,10 +2444,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const payment = await storage.createPayment({
         userId: req.user.id,
         amount: boostAmount / 100, // Store in RM
-        type: 'boost',
+        paymentType: 'boost',
         status: 'pending',
         orderId,
-        productId
+        productIds: [productId.toString()],
+        featureDuration: 7 // 7 days boost
       });
       
       // Create a Billplz bill
@@ -2538,10 +2539,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // If payment is successful, update product as featured
-      if (status === 'completed' && payment.type === 'boost' && payment.productId) {
+      if (status === 'completed' && payment.paymentType === 'boost' && payment.productIds && payment.productIds.length > 0) {
         try {
+          // Get the product ID from the first element of productIds array
+          const productId = parseInt(payment.productIds[0]);
+          
           // Get the product
-          const product = await storage.getProductById(payment.productId);
+          const product = await storage.getProductById(productId);
           if (product) {
             // Calculate 7 days from now for boost expiry
             const boostExpiryDate = new Date();
