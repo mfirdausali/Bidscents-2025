@@ -142,6 +142,51 @@ export function verifyWebhookSignature(payload: any, xSignature: string): boolea
 }
 
 /**
+ * Verify X-Signature for redirect parameters
+ * 
+ * Billplz redirect uses different format than webhook for query parameters
+ * Query parameters are in format 'billplz[param]=value'
+ * 
+ * @param queryParams The redirect query parameters
+ * @param xSignature The X-Signature value from the redirect URL
+ * @returns boolean indicating if the signature is valid
+ */
+export function verifyRedirectSignature(queryParams: Record<string, any>, xSignature: string): boolean {
+  if (!BILLPLZ_XSIGN_KEY) {
+    console.error('Missing BILLPLZ_XSIGN_KEY environment variable');
+    return false;
+  }
+
+  // Extract all billplz parameters and create clean payload without the signature
+  const payloadForSignature: Record<string, any> = {};
+  for (const [key, value] of Object.entries(queryParams)) {
+    // Skip the signature parameter itself
+    if (key === 'billplz[x_signature]') continue;
+    
+    // Extract the parameter name from the format 'billplz[param]'
+    const match = key.match(/billplz\[(.*)\]/);
+    if (match && match[1]) {
+      payloadForSignature[match[1]] = value;
+    }
+  }
+
+  // Sort keys alphabetically and concatenate key=value pairs
+  const keys = Object.keys(payloadForSignature).sort();
+  const concatenatedString = keys.map(key => `${key}${payloadForSignature[key]}`).join('');
+
+  // Create HMAC-SHA256 signature
+  const hmac = crypto.createHmac('sha256', BILLPLZ_XSIGN_KEY);
+  hmac.update(concatenatedString);
+  const generatedSignature = hmac.digest('hex');
+
+  console.log('Verifying redirect signature:');
+  console.log('- Generated:', generatedSignature);
+  console.log('- Received:', xSignature);
+  
+  return generatedSignature === xSignature;
+}
+
+/**
  * Format a URL for the Billplz bill payment page
  */
 export function getBillURL(billId: string): string {
