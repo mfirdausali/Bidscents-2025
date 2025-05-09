@@ -439,6 +439,7 @@ export class SupabaseStorage implements IStorage {
       sellerId: product.seller_id,
       isNew: product.is_new,
       isFeatured: product.is_featured,
+      featuredUntil: product.featured_until,
       createdAt: product.created_at,
       remainingPercentage: product.remaining_percentage,
       batchCode: product.batch_code,
@@ -479,6 +480,7 @@ export class SupabaseStorage implements IStorage {
       seller_id: product.sellerId,
       is_new: product.isNew,
       is_featured: product.isFeatured,
+      featured_until: product.featuredUntil,
       remaining_percentage: product.remainingPercentage,
       batch_code: product.batchCode,
       purchase_year: product.purchaseYear,
@@ -1663,5 +1665,138 @@ export class SupabaseStorage implements IStorage {
       console.error('Error marking all messages as read:', error);
       throw new Error('Failed to mark all messages as read');
     }
+  }
+  
+  // Payment methods
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    const now = new Date();
+    const paymentData = {
+      user_id: insertPayment.userId,
+      amount: insertPayment.amount,
+      type: insertPayment.type,
+      status: insertPayment.status,
+      order_id: insertPayment.orderId,
+      product_id: insertPayment.productId,
+      bill_id: insertPayment.billId,
+      payment_channel: insertPayment.paymentChannel,
+      created_at: now,
+      updated_at: now,
+      paid_at: null
+    };
+    
+    const { data, error } = await supabase
+      .from('payments')
+      .insert(paymentData)
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Error creating payment:', error);
+      throw error;
+    }
+    
+    return this.mapPaymentFromDb(data);
+  }
+  
+  async getPaymentByOrderId(orderId: string): Promise<Payment | undefined> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select()
+      .eq('order_id', orderId)
+      .single();
+      
+    if (error) {
+      if (error.code === 'PGRST116') { // No rows returned
+        return undefined;
+      }
+      console.error('Error getting payment by order ID:', error);
+      throw error;
+    }
+    
+    return this.mapPaymentFromDb(data);
+  }
+  
+  async getPaymentByBillId(billId: string): Promise<Payment | undefined> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select()
+      .eq('bill_id', billId)
+      .single();
+      
+    if (error) {
+      if (error.code === 'PGRST116') { // No rows returned
+        return undefined;
+      }
+      console.error('Error getting payment by bill ID:', error);
+      throw error;
+    }
+    
+    return this.mapPaymentFromDb(data);
+  }
+  
+  async getUserPayments(userId: number): Promise<Payment[]> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select()
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('Error getting user payments:', error);
+      throw error;
+    }
+    
+    return data.map(this.mapPaymentFromDb);
+  }
+  
+  async updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment> {
+    const updateData: any = {
+      status,
+      updated_at: new Date()
+    };
+    
+    if (billId) {
+      updateData.bill_id = billId;
+    }
+    
+    if (paymentChannel) {
+      updateData.payment_channel = paymentChannel;
+    }
+    
+    if (paidAt) {
+      updateData.paid_at = paidAt;
+    }
+    
+    const { data, error } = await supabase
+      .from('payments')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Error updating payment status:', error);
+      throw error;
+    }
+    
+    return this.mapPaymentFromDb(data);
+  }
+  
+  // Helper method to map DB payment to our Payment type
+  private mapPaymentFromDb(data: any): Payment {
+    return {
+      id: data.id,
+      userId: data.user_id,
+      amount: data.amount,
+      type: data.type,
+      status: data.status,
+      orderId: data.order_id,
+      productId: data.product_id,
+      billId: data.bill_id,
+      paymentChannel: data.payment_channel,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+      paidAt: data.paid_at ? new Date(data.paid_at) : null
+    };
   }
 }
