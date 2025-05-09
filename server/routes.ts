@@ -2740,118 +2740,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Raw query middleware specifically for Billplz redirect
+  // This captures the original query string before Express parses it
+  app.use('/api/payments/process-redirect', (req, res, next) => {
+    // Extract the raw query string from the original URL
+    req.rawQuery = req.originalUrl.split('?')[1] || '';
+    console.log('🔍 RAW QUERY CAPTURED:', req.rawQuery);
+    next();
+  });
+
   // GET /api/payments/process-redirect - Handle redirect from Billplz payment
   app.get('/api/payments/process-redirect', async (req, res) => {
     try {
       console.log('🔄 PAYMENT REDIRECT RECEIVED 🔄');
       console.log('---------------------------------------');
-      console.log('Full query params:', JSON.stringify(req.query, null, 2));
       
-      // Process the Billplz query parameters
-      const formattedQueryString = Object.entries(req.query)
-        .map(([k, v]) => `${k}=${v}`)
-        .join('&');
-      console.log('Query string representation:', formattedQueryString);
-
-      // BILLPLZ DEBUG SECTION - Log all available environment variables
-      console.log('Environment checks:');
-      console.log('- BILLPLZ_COLLECTION_ID present:', !!process.env.BILLPLZ_COLLECTION_ID);
-      console.log('- BILLPLZ_XSIGN_KEY present:', !!process.env.BILLPLZ_XSIGN_KEY);
-      console.log('- BILLPLZ_SECRET_KEY present:', !!process.env.BILLPLZ_SECRET_KEY);
-
-      // 1. Extract signature from query parameters - handle all possible formats
-      // This is critical for proper signature verification
-      let xSignature;
-      
-      // Format detection - log query parameters shape for debugging
-      console.log('Query parameters object type:', typeof req.query);
-      console.log('Query parameters keys:', Object.keys(req.query));
-      
-      // Handle different possible locations of the signature
-      if (req.query.billplz && typeof req.query.billplz === 'object' && (req.query.billplz as any).x_signature) {
-        // Nested object with billplz.x_signature
-        xSignature = (req.query.billplz as any).x_signature;
-        console.log('Signature extracted from nested billplz.x_signature:', xSignature);
-      }
-      else if (req.query['billplz[x_signature]']) {
-        // Flat structure with billplz[x_signature]
-        xSignature = req.query['billplz[x_signature]'] as string;
-        console.log('Signature extracted from flat billplz[x_signature]:', xSignature);
-      }
-      else {
-        // Last resort - try to find any parameter containing 'signature'
-        console.log('Searching for signature parameter in all query parameters...');
-        Object.entries(req.query).forEach(([key, value]) => {
-          if (key.includes('signature') || key.includes('x_signature')) {
-            console.log(`Found possible signature in '${key}':`, value);
-            if (!xSignature) xSignature = value as string;
-          }
+      // Stage A: Early rejects
+      if (!req.rawQuery || req.rawQuery === '') {
+        console.error('❌ ERROR: Missing query parameters in payment redirect');
+        return res.status(400).json({
+          message: 'Invalid payment redirect: missing query parameters',
+          details: 'No query parameters were found in the redirect URL.'
         });
       }
-
-      // Validate that we found a signature
-      if (!xSignature) {
-        console.error('❌ ERROR: Missing X-Signature in redirect parameters');
-        // Return a user-friendly error response
-        return res.status(400).json({ 
+      
+      console.log('📝 Parsed query params:', JSON.stringify(req.query, null, 2));
+      console.log('📝 Raw query string:', req.rawQuery);
+      
+      // Environment checks
+      if (!process.env.BILLPLZ_XSIGN_KEY) {
+        console.error('❌ ERROR: Missing BILLPLZ_XSIGN_KEY environment variable');
+        return res.status(500).json({
+          message: 'Server configuration error',
+          details: 'Missing required environment variable for payment verification.'
+        });
+      }
+      
+      // Stage B: Extract signature from the raw query string
+      const signatureMatch = req.rawQuery.match(/(?:^|&)billplz\[x_signature\]=([0-9a-f]{64})(?:&|$)/);
+      
+      if (!signatureMatch) {
+        console.error('❌ ERROR: No valid signature found in the redirect URL');
+        return res.status(400).json({
           message: 'Invalid payment redirect: missing signature',
-          details: 'The payment gateway did not provide a valid signature for verification.',
-          query_keys: Object.keys(req.query)
+          details: 'Could not find a valid signature parameter in the URL.'
         });
       }
       
-      console.log('Extracted X-Signature for verification:', xSignature);
+      const signature = signatureMatch[1];
+      console.log('🔑 Extracted signature:', signature);
       
-      // 2. Verify the payment signature
-      const isSignatureValid = billplz.verifyRedirectSignature(req.query, xSignature);
+      // Remove the signature part from the query string
+      let unsignedQuery = req.rawQuery.replace(signatureMatch[0], '');
+      // Clean up any boundary ampersands
+      unsignedQuery = unsignedQuery.replace(/^&|&$/g, '');
       
-      // 3. Proceed only if signature is valid
+      console.log('🧩 Unsigned query portion for verification:', unsignedQuery);
+      
+      // Stage C: Build the source string for HMAC
+      // Split into key=value pairs and sort them
+      const pairs = unsignedQuery ? unsignedQuery.split('&') : [];
+      pairs.sort(); // Sort alphabetically as Billplz does
+      
+      // Join with pipes, removing equal signs
+      const sourceString = pairs.map(p => p.replace('=', '')).join('|');
+      
+      console.log('🔗 Source string for HMAC:', sourceString);
+      
+      // Stage D: Verify the signature
+      const keyBuffer = Buffer.from(process.env.BILLPLZ_XSIGN_KEY, 'utf8');
+      const hmac = crypto.createHmac('sha256', keyBuffer);
+      hmac.update(sourceString, 'utf8');
+      const calculatedSignature = hmac.digest('hex');
+      
+      console.log('🔐 Calculated signature:', calculatedSignature);
+      console.log('🔐 Received signature:', signature);
+      
+      // Constant-time comparison for security
+      let isSignatureValid = false;
+      try {
+        const calcBuffer = Buffer.from(calculatedSignature, 'hex');
+        const sigBuffer = Buffer.from(signature, 'hex');
+        
+        if (calcBuffer.length === sigBuffer.length) {
+          isSignatureValid = crypto.timingSafeEqual(calcBuffer, sigBuffer);
+        } else {
+          console.error('❌ ERROR: Buffer length mismatch, cannot use timing-safe comparison');
+          isSignatureValid = calculatedSignature === signature;
+        }
+      } catch (e) {
+        console.error('❌ ERROR: Exception during signature verification:', e);
+        isSignatureValid = calculatedSignature === signature; // Fallback
+      }
+      
+      console.log(`🔐 Signature verification result: ${isSignatureValid ? 'VALID ✅' : 'INVALID ❌'}`);
+      
+      // Proceed only if signature is valid
       if (!isSignatureValid) {
-        console.error('❌ ERROR: Invalid signature in payment redirect');
-        return res.status(401).json({ 
+        console.error('❌ ERROR: Signature verification failed');
+        return res.status(401).json({
           message: 'Invalid payment redirect: signature verification failed',
-          details: 'The payment signature could not be verified. This could be due to tampering or a configuration issue.'
+          details: 'The payment signature could not be verified.'
         });
       }
       
       console.log('✅ Signature verification successful!');
       
-      // 4. Extract billplz parameters for payment processing
-      // Extract payment data handling both nested and flat parameter formats
-      const extractParam = (paramName: string): any => {
-        // Try nested format first (Express 4.18+)
-        if (req.query.billplz && typeof req.query.billplz === 'object') {
-          return (req.query.billplz as any)[paramName];
-        }
-        // Then try flat format
-        return req.query[`billplz[${paramName}]`];
-      };
+      // Stage E: Extract payment data from URL parameters
+      // We can now safely use the parsed query params since we verified the signature
+      const urlParams = new URLSearchParams(req.rawQuery);
       
-      // Extract all required parameters
-      const billplzId = extractParam('id');
-      const paid = extractParam('paid');
-      const paidAt = extractParam('paid_at');
-      const reference1 = extractParam('reference_1');
-      const reference2 = extractParam('reference_2');
-      const transactionId = extractParam('transaction_id');
-      const transactionStatus = extractParam('transaction_status');
+      const billplzId = urlParams.get('billplz[id]');
+      const paid = urlParams.get('billplz[paid]');
+      const paidAt = urlParams.get('billplz[paid_at]');
+      const reference1 = urlParams.get('billplz[reference_1]');
+      const reference2 = urlParams.get('billplz[reference_2]');
+      const transactionId = urlParams.get('billplz[transaction_id]');
+      const transactionStatus = urlParams.get('billplz[transaction_status]');
       
-      console.log('Extracted payment parameters:');
+      console.log('📊 Extracted payment parameters:');
       console.log('- Bill ID:', billplzId);
       console.log('- Paid status:', paid);
+      console.log('- Paid at:', paidAt);
       console.log('- Order ID (reference_1):', reference1);
       console.log('- Product ID (reference_2):', reference2);
+      console.log('- Transaction ID:', transactionId);
+      console.log('- Transaction status:', transactionStatus);
       
-      // 5. Make sure we have the minimum required data
+      // Validate we have the minimum required data
       if (!billplzId || !reference1) {
-        console.error('❌ ERROR: Missing critical payment data (bill_id or order_id)');
-        return res.status(400).json({ 
-          message: 'Invalid payment data: missing bill ID or order reference',
-          details: 'The payment gateway returned incomplete payment information.'
+        console.error('❌ ERROR: Missing critical payment data');
+        return res.status(400).json({
+          message: 'Invalid payment data: missing critical fields',
+          details: 'The payment gateway returned incomplete information.'
         });
       }
       
-      // 6. Normalize the data for payment processing
+      // Normalize the data for payment processing
       const paymentData = {
         id: billplzId,
         paid: paid,
@@ -2862,38 +2887,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transaction_status: transactionStatus
       };
       
-      console.log('Normalized payment data for processing:', paymentData);
+      console.log('📦 Normalized payment data for processing:', paymentData);
       
-      // 7. Process the payment update
-      console.log('Processing payment from redirect...');
+      // Process the payment - this updates the database
+      console.log('⚙️ Processing payment from redirect...');
       const result = await processPaymentUpdate(paymentData, false);
-      console.log('Payment processing result:', result);
+      console.log('⚙️ Payment processing result:', result);
       
-      // 8. Redirect to seller dashboard with appropriate status
-      const isPaid = paid === 'true' || paid === true;
+      // Determine UI state based on the payment status
+      const isPaid = paid === 'true';
+      const uiState = result.success && isPaid ? 'success' : 
+                      isPaid === false ? 'failed' : 'pending';
       
-      const redirectUrl = '/seller/dashboard?payment=' + 
-        (result.success && isPaid ? 'success' : 'failed') + 
-        '&message=' + encodeURIComponent(
-          isPaid
-            ? 'Payment completed successfully! Your products will be boosted now.'
-            : 'Payment was not successful. Please try again.'
-        ) +
-        '&id=' + encodeURIComponent(billplzId || '');
+      // Build a redirect URL with appropriate status
+      const message = encodeURIComponent(
+        uiState === 'success' ? 'Payment completed successfully! Your products will be boosted now.' :
+        uiState === 'failed' ? 'Payment was not successful. Please try again.' : 
+        'Payment is being processed. Please wait a moment.'
+      );
       
-      console.log(`Redirecting user to: ${redirectUrl}`);
-      res.redirect(redirectUrl);
+      const redirectUrl = `/seller/dashboard?payment=${uiState}&message=${message}&id=${encodeURIComponent(billplzId || '')}`;
+      
+      console.log(`🔄 Redirecting user to: ${redirectUrl}`);
+      
+      // Use 303 status code (See Other) to follow the spec for redirects after actions
+      return res.redirect(303, redirectUrl);
       
     } catch (error) {
       console.error('❌ ERROR: Exception in payment redirect handler:', error);
-      // Log the detailed error and stack trace
+      // Log the detailed error
       if (error instanceof Error) {
         console.error('Error details:', error.message);
         console.error('Stack trace:', error.stack);
       }
       
-      // Provide a user-friendly error response
-      res.redirect('/seller/dashboard?payment=error&message=Error+processing+payment&details=An+unexpected+error+occurred');
+      // Provide a user-friendly error redirect
+      return res.redirect('/seller/dashboard?payment=error&message=Error+processing+payment&details=An+unexpected+error+occurred');
     }
   });
   
