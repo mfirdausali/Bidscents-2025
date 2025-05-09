@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertProductSchema, insertReviewSchema, insertProductImageSchema, insertMessageSchema } from "@shared/schema";
+import { insertProductSchema, insertReviewSchema, insertProductImageSchema, insertMessageSchema, insertPaymentSchema } from "@shared/schema";
 import { productImages } from "@shared/schema";
 import { db } from "./db";
 import { z } from "zod";
@@ -15,6 +15,7 @@ import { users } from "@shared/schema"; // Import the users schema for database 
 import { WebSocketServer, WebSocket } from 'ws';
 import { encryptMessage, decryptMessage, isEncrypted } from './encryption';
 import { generateSellerPreview } from './social-preview';
+import * as billplz from './billplz';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -2403,6 +2404,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error getting product auctions:', error);
       res.status(500).json({ message: 'Error retrieving product auctions' });
+    }
+  });
+  
+  // No imports needed here - moved to the top of the file
+  
+  // POST /api/payments/create-boost - Create a boost payment
+  app.post('/api/payments/create-boost', async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'Unauthorized: Please log in to make payments' });
+      }
+      
+      // Validate request body
+      const paymentSchema = z.object({
+        productId: z.number().int().positive(),
+        returnUrl: z.string().url()
+      });
+      
+      const { productId, returnUrl } = paymentSchema.parse(req.body);
+      
+      // Check if the product exists and belongs to the user
+      const product = await storage.getProductById(productId);
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      
+      if (product.sellerId !== req.user.id) {
+        return res.status(403).json({ message: 'Forbidden: You can only boost your own products' });
+      }
+      
+      // Fixed boost amount in sen (RM10 = 1000 sen)
+      const boostAmount = 1000;
+      
+      // Generate a unique order ID
+      const orderId = `boost-${productId}-${Date.now()}`;
+      
+      // Create a new payment record
+      const payment = await storage.createPayment({
+        userId: req.user.id,
+        amount: boostAmount / 100, // Store in RM
+        type: 'boost',
+        status: 'pending',
+        orderId,
+        productId
+      });
+      
+      // Create a Billplz bill
+      const bill = await billplz.createBill({
+        name: req.user.username || 'User',
+        email: req.user.email,
+        amount: boostAmount, // Amount in sen
+        description: `Product Boost for ${product.name}`,
+        reference_1: orderId,
+        reference_2: productId.toString(),
+        callback_url: `${process.env.APP_URL || 'http://localhost:5000'}/api/payments/webhook`,
+        redirect_url: returnUrl
+      });
+      
+      if (!bill || !bill.id) {
+        // If bill creation failed
+        await storage.updatePaymentStatus(payment.id, 'failed');
+        return res.status(500).json({ message: 'Failed to create payment bill' });
+      }
+      
+      // Update payment with bill ID
+      await storage.updatePaymentStatus(payment.id, 'pending', bill.id);
+      
+      // Return bill information
+      res.json({
+        billId: bill.id,
+        billUrl: billplz.getBillURL(bill.id),
+        orderId,
+        status: 'pending'
+      });
+      
+    } catch (error) {
+      console.error('Error creating boost payment:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Error creating payment' });
+    }
+  });
+  
+  // POST /api/payments/webhook - Billplz webhook callback
+  app.post('/api/payments/webhook', async (req, res) => {
+    try {
+      console.log('Received payment webhook:', req.body);
+      
+      // Get the X-Signature header
+      const xSignature = req.headers['x-signature'] as string;
+      
+      // Verify the signature
+      if (!xSignature || !billplz.verifyWebhookSignature(req.body, xSignature)) {
+        console.error('Invalid webhook signature');
+        return res.status(401).json({ message: 'Invalid signature' });
+      }
+      
+      // Extract data from webhook payload
+      const {
+        id: billId,
+        collection_id,
+        paid,
+        state,
+        amount,
+        paid_amount,
+        paid_at,
+        reference_1: orderId,
+        reference_2: productId,
+        payment_channel,
+        transaction_id,
+        transaction_status,
+      } = req.body;
+      
+      // Find the associated payment
+      const payment = await storage.getPaymentByOrderId(orderId);
+      if (!payment) {
+        console.error('Payment not found for order ID:', orderId);
+        return res.status(404).json({ message: 'Payment not found' });
+      }
+      
+      // Update payment status
+      const status = paid === 'true' ? 'completed' : 'failed';
+      const paidDate = paid_at ? new Date(paid_at) : undefined;
+      
+      await storage.updatePaymentStatus(
+        payment.id,
+        status,
+        billId,
+        payment_channel,
+        paidDate
+      );
+      
+      // If payment is successful, update product as featured
+      if (status === 'completed' && payment.type === 'boost' && payment.productId) {
+        try {
+          // Get the product
+          const product = await storage.getProductById(payment.productId);
+          if (product) {
+            // Calculate 7 days from now for boost expiry
+            const boostExpiryDate = new Date();
+            boostExpiryDate.setDate(boostExpiryDate.getDate() + 7);
+            
+            // Update the product to be featured
+            await storage.updateProduct(product.id, {
+              ...product,
+              isFeatured: true,
+              featuredUntil: boostExpiryDate
+            });
+            
+            console.log(`Product ${product.id} boosted until ${boostExpiryDate}`);
+          }
+        } catch (productError) {
+          console.error('Error updating product featured status:', productError);
+          // We still return success as the payment was processed correctly
+        }
+      }
+      
+      // Respond to the webhook
+      res.json({ success: true });
+      
+    } catch (error) {
+      console.error('Error processing payment webhook:', error);
+      res.status(500).json({ message: 'Error processing payment' });
+    }
+  });
+  
+  // GET /api/payments/user - Get user's payments
+  app.get('/api/payments/user', async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'Unauthorized: Please log in to view payments' });
+      }
+      
+      const payments = await storage.getUserPayments(req.user.id);
+      res.json(payments);
+      
+    } catch (error) {
+      console.error('Error retrieving user payments:', error);
+      res.status(500).json({ message: 'Error retrieving payments' });
     }
   });
   
