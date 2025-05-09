@@ -16,6 +16,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { encryptMessage, decryptMessage, isEncrypted } from './encryption';
 import { generateSellerPreview } from './social-preview';
 import * as billplz from './billplz';
+import crypto from 'crypto';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -2455,20 +2456,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const boostAmountPerProduct = 1000;
       const totalAmount = boostAmountPerProduct * validProducts.length;
       
-      // Generate a unique order ID
-      const orderId = `boost-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      // Generate a proper UUID for order ID
+      const orderId = crypto.randomUUID();
       
       // Create a new payment record
       const payment = await storage.createPayment({
+        userId: req.user.id,
         orderId,
         amount: totalAmount / 100, // Convert sen to RM for storage
         status: 'due',
         billId: null,
+        paymentType: 'boost',
+        featureDuration: 7, // 7 days boost
+        productIds: productIds,
         metadata: {
-          userId: req.user.id,
           paymentType: 'boost',
-          productIds: productIds,
-          featureDuration: 7 // 7 days boost
+          productCount: validProducts.length,
+          productDetails: validProducts.map(p => ({ id: p.id, name: p.name }))
         }
       });
       
