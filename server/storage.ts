@@ -71,6 +71,7 @@ export interface IStorage {
   getProductById(id: number): Promise<ProductWithDetails | undefined>;
   getFeaturedProducts(): Promise<ProductWithDetails[]>;
   getSellerProducts(sellerId: number): Promise<ProductWithDetails[]>;
+  getAllProductsWithDetails(): Promise<ProductWithDetails[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: InsertProduct): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
