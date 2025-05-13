@@ -51,11 +51,7 @@ export function ListingsTab({ products, handleRemoveListing, handleMessageUser }
                   {product.seller?.username || `User #${product.sellerId}`}
                 </TableCell>
                 <TableCell>
-                  {!product.isDeleted ? (
-                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Active</span>
-                  ) : (
-                    <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">Inactive</span>
-                  )}
+                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Active</span>
                   {product.isFeatured && product.featuredUntil && new Date(product.featuredUntil) > new Date() && (
                     <span className="ml-2 bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">Featured</span>
                   )}

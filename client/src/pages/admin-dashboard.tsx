@@ -420,6 +420,14 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+            
+            <TabsContent value="listings">
+              <ListingsTab 
+                products={products} 
+                handleRemoveListing={handleRemoveListing} 
+                handleMessageUser={handleMessageUser} 
+              />
+            </TabsContent>
           </Tabs>
         </div>
       </main>
@@ -429,26 +437,63 @@ export default function AdminDashboard() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {dialogAction === "ban" ? "Ban User" : "Unban User"}
+              {dialogAction === "ban" ? "Ban User" : 
+               dialogAction === "unban" ? "Unban User" : 
+               "Remove Listing"}
             </DialogTitle>
             <DialogDescription>
               {dialogAction === "ban"
                 ? "Are you sure you want to ban this user? They will no longer be able to make purchases."
-                : "Are you sure you want to unban this user? They will be able to use the platform again."}
+                : dialogAction === "unban"
+                ? "Are you sure you want to unban this user? They will be able to use the platform again."
+                : "Are you sure you want to remove this listing? The seller will be notified."}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end space-x-2 mt-4">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          
+          {dialogAction === "removeListing" && (
+            <div className="py-4">
+              <Label htmlFor="reason" className="block mb-2">Reason for removal:</Label>
+              <Textarea 
+                id="reason"
+                placeholder="Please provide a reason for removing this listing..."
+                className="min-h-[100px]"
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+              />
+            </div>
+          )}
+          
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDialogOpen(false);
+                if (dialogAction === "removeListing") {
+                  setActionReason("");
+                }
+              }}
+            >
               Cancel
             </Button>
-            <Button 
-              variant="default" 
-              onClick={confirmBanUser}
-              className={dialogAction === "ban" ? "bg-red-600 hover:bg-red-700" : ""}
-            >
-              {dialogAction === "ban" ? "Ban User" : "Unban User"}
-            </Button>
-          </div>
+            {dialogAction === "ban" || dialogAction === "unban" ? (
+              <Button 
+                variant="default" 
+                onClick={confirmBanUser}
+                className={dialogAction === "ban" ? "bg-red-600 hover:bg-red-700" : ""}
+              >
+                {dialogAction === "ban" ? "Ban User" : "Unban User"}
+              </Button>
+            ) : (
+              <Button 
+                variant="default"
+                onClick={confirmRemoveListing}
+                disabled={!actionReason.trim()}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Remove Listing
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
