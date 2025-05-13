@@ -467,6 +467,24 @@ export class SupabaseStorage implements IStorage {
     
     return this.addProductDetails(mappedProducts as Product[]);
   }
+  
+  async getAllProductsWithDetails(): Promise<ProductWithDetails[]> {
+    // Get all products from the database with no filters
+    const { data, error } = await supabase
+      .from('products')
+      .select('*');
+    
+    if (error) {
+      console.error('Error getting all products for admin:', error);
+      return [];
+    }
+    
+    // Map from snake_case to camelCase for our application logic
+    const mappedProducts = (data || []).map(product => this.mapSnakeToCamelCase(product));
+    
+    // Add seller, category, and other details to each product
+    return this.addProductDetails(mappedProducts as Product[]);
+  }
 
   async createProduct(product: InsertProduct): Promise<Product> {
     // Convert camelCase to snake_case for DB
