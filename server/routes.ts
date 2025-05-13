@@ -1100,6 +1100,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // Admin route to remove a product listing and notify the seller
+  app.post("/api/admin/products/:id/remove", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const { reason } = z.object({ reason: z.string().min(1) }).parse(req.body);
+      
+      // Fetch the product to get seller information
+      const product = await storage.getProductById(id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      // Get seller information
+      const seller = await storage.getUser(product.sellerId);
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+      
+      // Mark the product as inactive by setting stock to 0
+      await storage.updateProduct(id, { stockQuantity: 0 });
+      
+      // Send notification to seller
+      const messageContent = `Your listing "${product.name}" has been removed by an administrator for the following reason: ${reason}. If you believe this was done in error, please contact support.`;
+      
+      const ADMIN_USER_ID = 32; // The ID of the admin account used for system messages
+      
+      await storage.sendMessage({
+        senderId: ADMIN_USER_ID,
+        receiverId: seller.id,
+        content: messageContent,
+        productId: product.id,
+        isRead: false
+      });
+      
+      console.log(`Admin removed product #${id}, message sent to seller #${seller.id}`);
+      
+      res.json({ 
+        message: "Product listing removed and seller notified",
+        productId: id
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   // Endpoint to serve images
   app.get('/api/images/:imageId', async (req, res, next) => {
