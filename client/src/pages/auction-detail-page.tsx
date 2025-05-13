@@ -851,55 +851,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
             </Card>
           </TabsContent>
           
-          <TabsContent value="seller" className="p-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Seller Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {product.seller ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center space-x-2 mb-4">
-                      <div className="h-16 w-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                        {product.seller.profileImage ? (
-                          <img 
-                            src={`/api/images/${product.seller.profileImage}`} 
-                            alt={product.seller.username || 'Seller'} 
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <User className="h-8 w-8 text-gray-400" />
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <h3 className="text-lg font-medium">{product.seller.username || 'Seller'}</h3>
-                        <div className="flex items-center space-x-1 text-sm text-gray-500">
-                          {product.seller.isVerified && (
-                            <span className="flex items-center text-blue-500">
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Verified
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="text-center py-2">
-                      <Button asChild variant="outline">
-                        <Link href={`/seller/${product.sellerId}`}>
-                          View Seller Profile
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-gray-500">
-                    <p>Seller information is not available</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+
         </Tabs>
       </div>
       <Footer />
