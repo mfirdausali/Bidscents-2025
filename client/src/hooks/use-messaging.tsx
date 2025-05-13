@@ -201,6 +201,30 @@ export function useMessaging() {
             });
           }
           
+          // Handle messages read confirmation
+          if (data.type === 'messages_read') {
+            console.log('Messages marked as read:', data);
+            
+            // Update message read state in our local messages list
+            setMessages(prev => {
+              return prev.map(msg => {
+                // If the message was sent by the specified sender 
+                // and received by the current user, mark it as read
+                if ((data.messageId && msg.id === data.messageId) || 
+                    (data.senderId && msg.senderId === data.senderId && msg.receiverId === user.id)) {
+                  return { ...msg, isRead: true };
+                }
+                return msg;
+              });
+            });
+            
+            // Dispatch custom event for unread count update
+            const messagingEvent = new CustomEvent('messaging:update', {
+              detail: data
+            });
+            window.dispatchEvent(messagingEvent);
+          }
+          
           // Handle errors
           if (data.type === 'error') {
             console.error('WebSocket error:', data.message);
@@ -401,6 +425,16 @@ export function useMessaging() {
           return msg;
         });
       });
+      
+      // Dispatch custom event for unread count update
+      const messagingEvent = new CustomEvent('messaging:update', {
+        detail: {
+          type: 'messages_read',
+          messageId,
+          senderId
+        }
+      });
+      window.dispatchEvent(messagingEvent);
       
       return true;
     } catch (error) {
