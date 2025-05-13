@@ -609,6 +609,13 @@ export class MemStorage implements IStorage {
     }
   }
   
+  async getUnreadMessageCount(userId: number): Promise<number> {
+    const unreadMessages = Array.from(this.messages.values()).filter(
+      message => message.receiverId === userId && !message.isRead
+    );
+    return unreadMessages.length;
+  }
+  
   private async addMessageDetails(messages: Message[]): Promise<MessageWithDetails[]> {
     // Import decryption utility
     const { decryptMessage, isEncrypted } = await import('./encryption');

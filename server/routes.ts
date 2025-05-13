@@ -1451,6 +1451,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // Endpoint to get unread message count
+  app.get("/api/messages/unread-count", async (req, res, next) => {
+    try {
+      // Check authentication
+      if (!req.isAuthenticated()) {
+        return res.status(403).json({ message: "Unauthorized: Must be logged in to get unread messages" });
+      }
+      
+      const currentUserId = req.user.id;
+      
+      // Get unread message count
+      const count = await storage.getUnreadMessageCount(currentUserId);
+      
+      res.json({ count });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   const httpServer = createServer(app);
   
