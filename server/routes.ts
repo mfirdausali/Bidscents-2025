@@ -1138,10 +1138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Seller not found" });
       }
       
-      // Mark the product as inactive by setting stock to 0
-      await storage.updateProduct(id, { stockQuantity: 0 });
-      
-      // Send notification to seller
+      // Send notification to seller before deleting the product
       const messageContent = `Your listing "${product.name}" has been removed by an administrator for the following reason: ${reason}. If you believe this was done in error, please contact support.`;
       
       const ADMIN_USER_ID = 32; // The ID of the admin account used for system messages
@@ -1154,10 +1151,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isRead: false
       });
       
-      console.log(`Admin removed product #${id}, message sent to seller #${seller.id}`);
+      // Check if product has an associated auction and delete it
+      try {
+        const auctions = await storage.getProductAuctions(id);
+        if (auctions && auctions.length > 0) {
+          console.log(`Admin deleting ${auctions.length} auctions for product #${id}`);
+          for (const auction of auctions) {
+            await storage.deleteAuction(auction.id);
+          }
+        }
+      } catch (err) {
+        console.error(`Error deleting associated auctions for product #${id}:`, err);
+        // Continue with product deletion even if auction deletion fails
+      }
+      
+      // Now delete product images from object storage and database
+      try {
+        const productImages = await storage.getProductImages(id);
+        console.log(`Admin deleting ${productImages.length} images for product #${id}`);
+        
+        for (const image of productImages) {
+          // Delete from object storage
+          if (image.imageUrl) {
+            const deleteResult = await objectStorage.deleteProductImage(image.imageUrl);
+            console.log(`Deleted image ${image.imageUrl} from storage: ${deleteResult ? 'success' : 'failed'}`);
+          }
+          // Delete from database
+          await storage.deleteProductImage(image.id);
+        }
+      } catch (err) {
+        console.error(`Error deleting product images for product #${id}:`, err);
+        // Continue with product deletion even if image deletion fails
+      }
+      
+      // Finally, delete the product itself
+      await storage.deleteProduct(id);
+      
+      console.log(`Admin completely deleted product #${id}, message sent to seller #${seller.id}`);
       
       res.json({ 
-        message: "Product listing removed and seller notified",
+        message: "Product listing completely removed and seller notified",
         productId: id
       });
     } catch (error) {
