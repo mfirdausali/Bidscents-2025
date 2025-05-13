@@ -122,6 +122,7 @@ export interface IStorage {
   sendMessage(message: InsertMessage): Promise<Message>;
   markMessageAsRead(id: number): Promise<Message>;
   markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void>;
+  getUnreadMessageCount(userId: number): Promise<number>;
   
   // Payment methods
   createPayment(payment: InsertPayment): Promise<Payment>;
