@@ -619,7 +619,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                     Contact Seller
                   </Button>
                   <Button variant="outline" size="sm" asChild>
-                    <Link href={`/seller/${product.sellerId}`}>View Seller</Link>
+                    <Link href={`/sellers/${product.sellerId}`}>View Seller</Link>
                   </Button>
                 </div>
               </div>
