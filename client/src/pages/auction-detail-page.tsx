@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Clock, DollarSign, User, Users, CheckCircle } from "lucide-react";
+import { Clock, DollarSign, User, Users, CheckCircle, MessageCircle } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
@@ -567,6 +567,64 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
             <h2 className="text-2xl font-semibold mb-2">{product.brand} {product.name}</h2>
             <p className="text-gray-600 mb-4">{product.description}</p>
             
+            {/* Seller information */}
+            {product.seller && (
+              <div className="flex items-center mb-4 text-sm bg-gray-50 p-3 rounded-md">
+                <div className="flex-1">
+                  <p className="font-medium">Seller: {product.seller.username || 'Seller'}</p>
+                  <p className="text-gray-500 text-xs">Trusted Seller</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (!user) {
+                        toast({
+                          title: 'Authentication Required',
+                          description: 'You need to log in to contact sellers.',
+                          variant: 'default',
+                        });
+                        navigate('/auth');
+                        return;
+                      }
+                      
+                      // Don't allow messaging yourself
+                      if (user.id === product.seller.id) {
+                        toast({
+                          title: 'Cannot Message Yourself',
+                          description: 'This is your own auction listing.',
+                          variant: 'default',
+                        });
+                        return;
+                      }
+                      
+                      // Create a template message for the conversation
+                      const templateMessage = `Hi ${product.seller.username}, I am interested in your auction for "${product.name}".`;
+                      
+                      // Store the selected seller information and template message in sessionStorage
+                      sessionStorage.setItem('selectedConversation', JSON.stringify({
+                        userId: product.seller.id,
+                        username: product.seller.username || 'Seller',
+                        profileImage: product.seller.profileImage || null,
+                        productId: product.id,
+                        productName: product.name,
+                        templateMessage
+                      }));
+                      
+                      navigate('/messages');
+                    }}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Contact Seller
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/seller/${product.sellerId}`}>View Seller</Link>
+                  </Button>
+                </div>
+              </div>
+            )}
+            
             <div className="bg-gray-50 p-4 rounded-lg mb-6">
               <div className="flex justify-between mb-2">
                 <span className="text-gray-600">Starting Price:</span>
@@ -642,10 +700,9 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
         
         {/* Tabs for additional information */}
         <Tabs defaultValue="bidHistory" className="mt-8">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="bidHistory">Bid History</TabsTrigger>
             <TabsTrigger value="details">Product Details</TabsTrigger>
-            <TabsTrigger value="seller">Seller Information</TabsTrigger>
           </TabsList>
           
           <TabsContent value="bidHistory" className="p-4">
