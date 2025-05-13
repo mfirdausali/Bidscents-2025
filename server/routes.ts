@@ -407,6 +407,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // Get all products (for admin dashboard)
+  app.get("/api/products/all", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+      
+      // Get all products with seller information
+      const products = await storage.getAllProductsWithDetails();
+      res.json(products);
+    } catch (error) {
+      next(error);
+    }
+  });
 
   app.get("/api/products/featured", async (_req, res, next) => {
     try {
