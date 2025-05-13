@@ -1669,6 +1669,21 @@ export class SupabaseStorage implements IStorage {
     }
   }
   
+  async getUnreadMessageCount(userId: number): Promise<number> {
+    const { data, error, count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_id', userId)
+      .eq('is_read', false);
+      
+    if (error) {
+      console.error('Error getting unread message count:', error);
+      throw new Error('Failed to get unread message count');
+    }
+    
+    return count || 0;
+  }
+  
   // Payment methods
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
     // Map the payment data to match the actual database schema
