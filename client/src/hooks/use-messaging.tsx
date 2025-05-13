@@ -178,6 +178,12 @@ export function useMessaging() {
               description: data.message.content.substring(0, 50) + (data.message.content.length > 50 ? '...' : ''),
               variant: 'default',
             });
+            
+            // Dispatch a custom event for other components (like unread count)
+            const messagingEvent = new CustomEvent('messaging:update', {
+              detail: data
+            });
+            window.dispatchEvent(messagingEvent);
           }
           
           // Handle sent message confirmation
