@@ -114,7 +114,22 @@ export default function MessagesPage() {
         );
         
         if (unreadMessages.length > 0) {
-          markAsRead(undefined, userId);
+          console.log(`Marking ${unreadMessages.length} messages as read from sender ID ${userId}`);
+          const success = markAsRead(undefined, userId);
+          
+          if (success) {
+            // Update local state to show messages as read
+            setActiveChat(prev => 
+              prev.map(msg => 
+                msg.senderId === userId && msg.receiverId === user.id && !msg.isRead 
+                  ? { ...msg, isRead: true } 
+                  : msg
+              )
+            );
+            
+            // Also ensure we update the unread message count in the header
+            // This will be handled by the WebSocket notification in useUnreadMessages
+          }
         }
       } else {
         setActiveChat([]);

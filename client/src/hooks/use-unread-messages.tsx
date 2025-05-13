@@ -1,12 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './use-auth';
 import { useToast } from './use-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+// Type for WebSocket message
+type WebSocketMessage = {
+  type: string;
+  [key: string]: any;
+};
 
 // This hook handles fetching and updating the unread message count
 export function useUnreadMessages() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Use React Query to fetch the unread message count
   const {
@@ -33,6 +40,42 @@ export function useUnreadMessages() {
     retry: 3,
   });
 
+  // Listen for message updates from the messaging hook
+  // instead of creating our own WebSocket connection
+  useEffect(() => {
+    // Set up an event listener for the custom message events
+    const handleCustomMessageEvent = (event: CustomEvent) => {
+      const data = event.detail;
+      
+      // Check if this is a new message for the current user
+      if (data.type === 'new_message' && data.message?.receiverId === user?.id) {
+        console.log('New message detected, refreshing unread count');
+        refetch();
+      }
+      
+      // Check if messages were marked as read
+      if (data.type === 'messages_read') {
+        console.log('Messages marked as read, refreshing unread count');
+        refetch();
+      }
+    };
+
+    // Add the event listener
+    window.addEventListener('messaging:update' as any, handleCustomMessageEvent);
+    
+    // Clean up on unmount
+    return () => {
+      window.removeEventListener('messaging:update' as any, handleCustomMessageEvent);
+    };
+  }, [user, refetch]);
+  
+  // Always refresh the count when the component mounts
+  useEffect(() => {
+    if (user) {
+      refetch();
+    }
+  }, [user, refetch]);
+
   // This function can be called to manually refresh the unread count
   const refreshUnreadCount = () => {
     if (user) {
@@ -46,6 +89,13 @@ export function useUnreadMessages() {
       console.error('Error fetching unread message count:', error);
     }
   }, [error]);
+
+  // Invalidate the unread count query when the user changes
+  useEffect(() => {
+    if (user) {
+      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
+    }
+  }, [user, queryClient]);
 
   return {
     unreadCount,
