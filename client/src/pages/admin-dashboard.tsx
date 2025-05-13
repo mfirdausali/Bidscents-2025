@@ -11,15 +11,18 @@ import {
 } from "@/components/ui/table";
 import { 
   Dialog, DialogContent, DialogDescription, 
-  DialogHeader, DialogTitle 
+  DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { User, Order } from "@shared/schema";
+import { User, Order, ProductWithDetails } from "@shared/schema";
 import { 
   Users, Package, Truck, AlertCircle, CheckCircle, 
-  UserX, UserCheck, ShoppingBag, MessageSquare
+  UserX, UserCheck, ShoppingBag, MessageSquare,
+  XCircle, Tag, CircleAlert
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -28,8 +31,10 @@ export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("users");
   const [userToAction, setUserToAction] = useState<User | null>(null);
+  const [productToAction, setProductToAction] = useState<ProductWithDetails | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [dialogAction, setDialogAction] = useState<"ban" | "unban" | null>(null);
+  const [dialogAction, setDialogAction] = useState<"ban" | "unban" | "removeListing" | null>(null);
+  const [actionReason, setActionReason] = useState("");
   
   // Fetch all users
   const { data: users = [] } = useQuery<User[]>({
@@ -43,6 +48,13 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/orders"],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!user?.isAdmin && activeTab === "orders",
+  });
+  
+  // Fetch all products/listings
+  const { data: products = [] } = useQuery<ProductWithDetails[]>({
+    queryKey: ["/api/products/all"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!user?.isAdmin && activeTab === "listings",
   });
   
   // Ban/unban user mutation
@@ -90,6 +102,30 @@ export default function AdminDashboard() {
     },
   });
   
+  // Remove listing mutation
+  const removeListingMutation = useMutation({
+    mutationFn: async ({ productId, reason }: { productId: number, reason: string }) => {
+      const res = await apiRequest("POST", `/api/admin/products/${productId}/remove`, { reason });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products/all"] });
+      setIsDialogOpen(false);
+      setActionReason("");
+      toast({
+        title: "Success",
+        description: "Listing has been removed and seller has been notified",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
   // Redirect if not admin
   useEffect(() => {
     if (user && !user.isAdmin) {
@@ -109,6 +145,22 @@ export default function AdminDashboard() {
       banUserMutation.mutate({ 
         userId: userToAction.id, 
         isBanned: dialogAction === "ban" 
+      });
+    }
+  };
+  
+  const handleRemoveListing = (product: ProductWithDetails) => {
+    setProductToAction(product);
+    setDialogAction("removeListing");
+    setActionReason("");
+    setIsDialogOpen(true);
+  };
+  
+  const confirmRemoveListing = () => {
+    if (productToAction && actionReason.trim()) {
+      removeListingMutation.mutate({
+        productId: productToAction.id,
+        reason: actionReason.trim()
       });
     }
   };
