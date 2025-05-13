@@ -24,6 +24,7 @@ import {
   UserX, UserCheck, ShoppingBag, MessageSquare,
   XCircle, Tag, CircleAlert
 } from "lucide-react";
+import { ListingsTab } from "./admin-dashboard-listings";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -250,6 +251,7 @@ export default function AdminDashboard() {
             <TabsList className="mb-6">
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="orders">Orders</TabsTrigger>
+              <TabsTrigger value="listings">Listings</TabsTrigger>
             </TabsList>
             
             <TabsContent value="users">
