@@ -2813,11 +2813,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
           
-          // Calculate 7 days from now for boost expiry
+          // Determine feature duration - use from payment record or default to 7 days
+          const featureDuration = payment.featureDuration || 7; // Default to 7 days if not specified
+          const featuredAt = new Date(); // Current timestamp for when it was featured
           const boostExpiryDate = new Date();
-          boostExpiryDate.setDate(boostExpiryDate.getDate() + 7);
+          boostExpiryDate.setDate(boostExpiryDate.getDate() + featureDuration);
           
-          console.log(`Will boost ${productIds.length} products until ${boostExpiryDate}`);
+          console.log(`Will boost ${productIds.length} products for ${featureDuration} days until ${boostExpiryDate}`);
           
           // Update each product to be featured
           const updatePromises = productIds.map(async (pid) => {
@@ -2832,10 +2834,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const product = await storage.getProductById(productId);
               
               if (product) {
-                // Update the product with featured flag and expiry date
+                // Update the product with featured flag, status, timestamps
                 await storage.updateProduct(product.id, {
                   ...product,
                   isFeatured: true,
+                  status: 'featured',
+                  featuredAt: featuredAt,
                   featuredUntil: boostExpiryDate
                 });
                 console.log(`✅ Product #${product.id} "${product.name}" boosted until ${boostExpiryDate}`);
