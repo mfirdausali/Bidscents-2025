@@ -2843,16 +2843,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('---------------------------------------');
       console.log('Headers:', req.headers);
       console.log('Received payment webhook payload:', req.body);
+      console.log('Content-Type:', req.headers['content-type']);
       
-      // Get the X-Signature header
-      const xSignature = req.headers['x-signature'] as string;
+      // DEBUG: Log all potential signature sources
+      console.log('🔍 DEBUG: Checking all possible signature sources:');
+      console.log('- x-signature header:', req.headers['x-signature']);
+      console.log('- X-Signature header:', req.headers['X-Signature']);
+      console.log('- x_signature in body:', req.body?.x_signature);
+      console.log('- x_signature type:', typeof req.body?.x_signature);
+     
+      // Get the X-Signature from header OR body (Billplz might send it in either place)
+      let xSignature = req.headers['x-signature'] as string || 
+                       req.headers['X-Signature'] as string;
+      
+      // If not in headers, try to get from body
+      if (!xSignature && req.body && req.body.x_signature) {
+        xSignature = req.body.x_signature;
+        console.log('✅ Found signature in request body');
+      }
       
       if (!xSignature) {
-        console.error('❌ ERROR: Missing X-Signature header');
+        console.error('❌ ERROR: Missing X-Signature (checked headers and body)');
         return res.status(400).json({ message: 'Missing X-Signature header' });
       }
       
-      console.log('🔑 X-Signature from headers:', xSignature);
+      console.log('🔑 X-Signature found:', xSignature);
       
       // Try signature verification
       let isValid = false;
@@ -2931,16 +2946,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // EMERGENCY BYPASS - Direct access to parameters using req.query
-      // Since the URL is directly from Billplz, we can trust the parameters
-      const directBillId = req.query["billplz[id]"] as string || "";
-      const directPaid = req.query["billplz[paid]"] as string || "";
-      const directPaidAt = req.query["billplz[paid_at]"] as string || "";
-      const directRef1 = req.query["billplz[reference_1]"] as string || "";
-      const directRef2 = req.query["billplz[reference_2]"] as string || "";
-      const directTransId = req.query["billplz[transaction_id]"] as string || "";
-      const directTransStatus = req.query["billplz[transaction_status]"] as string || "";
-      const directSignature = req.query["billplz[x_signature]"] as string || "";
+      // DEBUG: Log all available parameter formats for troubleshooting
+      console.log('🔍 DEBUG: Query parameter format investigation:');
+      console.log('> req.query has billplz property?', 'billplz' in req.query);
+      console.log('> req.query.billplz type:', req.query.billplz ? typeof req.query.billplz : 'undefined');
+      console.log('> Direct access to billplz[id]:', req.query["billplz[id]"]);
+      
+      // Safely access nested property
+      const billplzObj = req.query.billplz as any;
+      console.log('> Access via nested object:', billplzObj?.id);
+      
+      // Fix: Access nested billplz object (Express transforms billplz[param] to req.query.billplz.param)
+      let directBillId = '';
+      let directPaid = '';
+      let directPaidAt = '';
+      let directRef1 = '';
+      let directRef2 = '';
+      let directTransId = '';
+      let directTransStatus = '';
+      let directSignature = '';
+      
+      // Handle both formats: nested object and flat parameters
+      if (req.query.billplz && typeof req.query.billplz === 'object') {
+        // Express 4.18+ with nested objects
+        const billplz = req.query.billplz as any;
+        directBillId = billplz.id || '';
+        directPaid = billplz.paid || '';
+        directPaidAt = billplz.paid_at || '';
+        directRef1 = billplz.reference_1 || '';
+        directRef2 = billplz.reference_2 || '';
+        directTransId = billplz.transaction_id || '';
+        directTransStatus = billplz.transaction_status || '';
+        directSignature = billplz.x_signature || '';
+        
+        console.log('✅ Using nested billplz object format');
+      } else {
+        // Flat key format
+        directBillId = req.query["billplz[id]"] as string || "";
+        directPaid = req.query["billplz[paid]"] as string || "";
+        directPaidAt = req.query["billplz[paid_at]"] as string || "";
+        directRef1 = req.query["billplz[reference_1]"] as string || "";
+        directRef2 = req.query["billplz[reference_2]"] as string || "";
+        directTransId = req.query["billplz[transaction_id]"] as string || "";
+        directTransStatus = req.query["billplz[transaction_status]"] as string || "";
+        directSignature = req.query["billplz[x_signature]"] as string || "";
+        
+        console.log('✅ Using flat billplz parameter format');
+      }
       
       console.log('🧩 Direct parameter access:');
       console.log('- Bill ID:', directBillId);
