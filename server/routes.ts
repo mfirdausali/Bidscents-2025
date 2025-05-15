@@ -2685,11 +2685,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transaction_status
       } = paymentData;
       
-      if (!orderId) {
-        console.error('Missing order ID in payment data');
-        return { success: false, message: 'Missing order ID' };
-      }
-      
       // Log the status flags for debugging
       console.log('Payment status flags:', {
         billId, 
@@ -2701,11 +2696,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productId
       });
       
-      // Find the associated payment
-      const payment = await storage.getPaymentByOrderId(orderId);
+      // Find the associated payment with fallback mechanism
+      let payment;
+      
+      // First try by orderId if available
+      if (orderId) {
+        console.log(`Attempting to find payment by orderId (reference_1): ${orderId}`);
+        payment = await storage.getPaymentByOrderId(orderId);
+      }
+      
+      // If not found by orderId or if orderId was missing, try finding by bill_id
+      if (!payment && billId) {
+        console.log(`Payment not found by orderId or orderId missing. Attempting to find by bill_id: ${billId}`);
+        payment = await storage.getPaymentByBillId(billId);
+      }
+      
       if (!payment) {
-        console.error('Payment not found for order ID:', orderId);
-        return { success: false, message: 'Payment not found' };
+        console.error(`🔴 Payment not found for ${orderId ? 'orderId: ' + orderId : ''} ${billId ? 'or bill_id: ' + billId : ''}`);
+        return { success: false, message: 'Payment record not found in our system.' };
       }
       
       console.log('Found payment record:', {
