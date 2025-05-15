@@ -30,6 +30,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
   
+  // Raw query middleware specifically for Billplz redirect
+  // This captures the original query string before Express parses it
+  app.use('/api/payments/process-redirect', (req: Request & { rawQuery?: string }, res: Response, next: NextFunction) => {
+    // Extract the raw query string from the original URL
+    req.rawQuery = req.originalUrl.split('?')[1] || '';
+    console.log('🔍 RAW QUERY CAPTURED:', req.rawQuery);
+    
+    // Debug info about the request
+    console.log('🔍 REDIRECT REQUEST DETAILS:');
+    console.log('> Full URL:', req.protocol + '://' + req.get('host') + req.originalUrl);
+    console.log('> Host:', req.get('host'));
+    console.log('> Original URL:', req.originalUrl);
+    console.log('> Path:', req.path);
+    console.log('> Headers:', JSON.stringify(req.headers, null, 2));
+    
+    next();
+  });
+  
   // Social preview routes for better WhatsApp/Facebook sharing
   app.get("/social/seller/:id", generateSellerPreview);
 
@@ -2669,7 +2687,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Shared function to process payment updates from both webhook and redirect
-  async function processPaymentUpdate(paymentData, isWebhook = false) {
+  async function processPaymentUpdate(paymentData: {
+    id?: string; // billId
+    paid?: string | boolean;
+    paid_at?: string;
+    reference_1?: string; // orderId
+    reference_2?: string; // productId
+    payment_channel?: string;
+    transaction_id?: string;
+    transaction_status?: string;
+  }, isWebhook = false) {
     try {
       console.log(`Processing payment update from ${isWebhook ? 'webhook' : 'redirect'}:`, JSON.stringify(paymentData, null, 2));
       
@@ -2931,23 +2958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Raw query middleware specifically for Billplz redirect
-  // This captures the original query string before Express parses it
-  app.use('/api/payments/process-redirect', (req, res, next) => {
-    // Extract the raw query string from the original URL
-    req.rawQuery = req.originalUrl.split('?')[1] || '';
-    console.log('🔍 RAW QUERY CAPTURED:', req.rawQuery);
-    
-    // Debug info about the request
-    console.log('🔍 REDIRECT REQUEST DETAILS:');
-    console.log('> Full URL:', req.protocol + '://' + req.get('host') + req.originalUrl);
-    console.log('> Host:', req.get('host'));
-    console.log('> Original URL:', req.originalUrl);
-    console.log('> Path:', req.path);
-    console.log('> Headers:', JSON.stringify(req.headers, null, 2));
-    
-    next();
-  });
+  // Billplz redirect route is registered above with middleware to capture raw query
 
   // GET /api/payments/process-redirect - Handle redirect from Billplz payment
   app.get('/api/payments/process-redirect', async (req, res) => {
