@@ -46,6 +46,7 @@ export const products = pgTable("products", {
   sellerId: integer("seller_id").references(() => users.id).notNull(),
   isNew: boolean("is_new").default(false), // In secondhand context: like new condition
   isFeatured: boolean("is_featured").default(false),
+  featuredAt: timestamp("featured_at"), // When the product was featured
   featuredUntil: timestamp("featured_until"), // When the featured status expires
   createdAt: timestamp("created_at").defaultNow(),
   // Secondhand perfume specific fields
@@ -54,6 +55,7 @@ export const products = pgTable("products", {
   purchaseYear: integer("purchase_year"), // When was it originally purchased
   boxCondition: text("box_condition"), // Condition of the box/packaging
   listingType: text("listing_type").default("fixed"), // fixed, negotiable, auction
+  status: text("status").default("active"), // active, featured, sold, archived
   volume: integer("volume") // Bottle size (e.g., "50ml", "100ml", "3.4oz")
 });
 
@@ -186,12 +188,14 @@ export const insertProductSchema = createInsertSchema(products).pick({
   sellerId: true,
   isNew: true,
   isFeatured: true,
+  featuredAt: true,
   featuredUntil: true,
   remainingPercentage: true,
   batchCode: true,
   purchaseYear: true,
   boxCondition: true,
   listingType: true,
+  status: true,
   volume: true,
 });
 
