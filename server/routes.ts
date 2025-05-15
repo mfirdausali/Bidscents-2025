@@ -2598,8 +2598,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? `Product Boost for ${productNames}`
         : `Product Boost for ${validProducts.length} products`;
       
-      // Get base URL for callbacks
-      const baseUrl = process.env.APP_URL || `https://${req.get('host')}`;
+      // Get base URL for callbacks - use development URL for testing
+      // In development, use the Replit domain; in production, use APP_URL
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      const baseUrl = isDevelopment
+        ? `https://${req.get('host')}`  // Use Replit domain
+        : (process.env.APP_URL || `https://${req.get('host')}`);
+      
+      console.log(`🌍 Using base URL for payments: ${baseUrl} (${isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode)`);
       
       // Create a Billplz bill
       const bill = await billplz.createBill({
@@ -2891,6 +2897,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Extract the raw query string from the original URL
     req.rawQuery = req.originalUrl.split('?')[1] || '';
     console.log('🔍 RAW QUERY CAPTURED:', req.rawQuery);
+    
+    // Debug info about the request
+    console.log('🔍 REDIRECT REQUEST DETAILS:');
+    console.log('> Full URL:', req.protocol + '://' + req.get('host') + req.originalUrl);
+    console.log('> Host:', req.get('host'));
+    console.log('> Original URL:', req.originalUrl);
+    console.log('> Path:', req.path);
+    console.log('> Headers:', JSON.stringify(req.headers, null, 2));
+    
     next();
   });
 
