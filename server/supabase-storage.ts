@@ -1853,19 +1853,44 @@ export class SupabaseStorage implements IStorage {
         return;
       }
       
+      console.log('🔍 DEBUGGING: Looking for product IDs in payment record:', {
+        paymentId,
+        hasProductId: payment.hasOwnProperty('product_id') && payment.product_id !== null,
+        productId: payment.product_id,
+        hasProductIds: payment.hasOwnProperty('productIds') && payment.productIds !== null,
+        productIds: payment.productIds,
+        hasMetadata: payment.hasOwnProperty('metadata') && payment.metadata !== null
+      });
+      
       // Extract product IDs from the payment
       let productIds: number[] = [];
       
-      if (payment.metadata && payment.metadata.productIds) {
+      // First check the product_id column (singular)
+      if (payment.product_id !== null && payment.product_id !== undefined) {
+        console.log('✅ Found product_id in direct column:', payment.product_id);
+        productIds = [Number(payment.product_id)];
+      } 
+      // Then check productIds array
+      else if (payment.productIds) {
+        console.log('✅ Found product IDs in productIds array:', payment.productIds);
+        productIds = Array.isArray(payment.productIds)
+          ? payment.productIds.map(id => Number(id))
+          : [Number(payment.productIds)];
+      }
+      // Then check metadata
+      else if (payment.metadata && payment.metadata.productIds) {
         // If product IDs are stored in the metadata directly
+        console.log('✅ Found product IDs in metadata.productIds:', payment.metadata.productIds);
         productIds = Array.isArray(payment.metadata.productIds) 
           ? payment.metadata.productIds.map(id => Number(id)) 
           : [Number(payment.metadata.productIds)];
       } else if (payment.metadata && payment.metadata.product_id) {
         // Alternative: product_id in metadata
+        console.log('✅ Found product_id in metadata.product_id:', payment.metadata.product_id);
         productIds = [Number(payment.metadata.product_id)];
       } else if (payment.metadata && payment.metadata.product_ids) {
         // Alternative: product_ids as string in metadata
+        console.log('✅ Found product_ids in metadata.product_ids:', payment.metadata.product_ids);
         const ids = typeof payment.metadata.product_ids === 'string'
           ? payment.metadata.product_ids.split(',')
           : payment.metadata.product_ids;
@@ -1944,6 +1969,22 @@ export class SupabaseStorage implements IStorage {
   async updatePaymentProductIds(id: number, productIds: string[]): Promise<Payment> {
     console.log(`Updating payment ${id} with product IDs: ${productIds.join(', ')}`);
     
+    // DEBUGGING: Check database schema first
+    console.log('🔍 DEBUGGING: Checking database schema for payments table');
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('payments')
+      .select('*')
+      .limit(1);
+      
+    if (tableError) {
+      console.error('Error getting table schema:', tableError);
+    } else {
+      console.log('Available columns in payments table:', Object.keys(tableInfo[0] || {}));
+    }
+    
+    // DEBUGGING: Get the first product ID if available
+    const firstProductId = productIds.length > 0 ? productIds[0] : null;
+    
     // Convert product IDs to JSON string for webhook_payload storage
     // Store both as array in metadata and as string in webhook_payload for backward compatibility
     const productDetails = productIds.map(pid => ({ id: pid }));
@@ -1953,18 +1994,22 @@ export class SupabaseStorage implements IStorage {
       updatedAt: new Date().toISOString()
     };
     
-    // Store both in webhook_payload AND in the product_ids column
+    // Store in multiple places to see which one works
     const updateData: any = {
       webhook_payload: JSON.stringify(metadata),
-      product_ids: productIds,  // Store directly in product_ids column
-      metadata: metadata        // Also store in metadata column if available
+      product_ids: productIds,              // Try as array
+      product_id: firstProductId,           // Try as single value
+      metadata: metadata                    // Also store in metadata column
     };
     
-    console.log('Sending product ID update to database:', {
+    console.log('🔍 DEBUGGING: Sending product ID update to database:', {
       table: 'payments',
       id,
       productCount: productIds.length,
-      fields: Object.keys(updateData)
+      updateFields: Object.keys(updateData),
+      productIds,
+      firstProductId,
+      productIdType: typeof firstProductId
     });
     
     try {
@@ -1984,13 +2029,16 @@ export class SupabaseStorage implements IStorage {
         throw new Error(`Payment with ID ${id} not found`);
       }
       
-      console.log('Existing payment:', {
+      console.log('🔍 DEBUGGING: Existing payment:', {
         id: existingPayment.id,
         availableFields: Object.keys(existingPayment),
+        currentProductId: existingPayment.product_id || 'none',
         currentProductIds: existingPayment.product_ids || 'none'
       });
       
-      // Update the payment
+      // Try different methods to see what works
+      // 1. First try with basic update
+      console.log('🔍 DEBUGGING: Attempting update method #1 (basic update)');
       const { data, error } = await supabase
         .from('payments')
         .update(updateData)
@@ -2002,11 +2050,36 @@ export class SupabaseStorage implements IStorage {
         console.error('Error updating payment status:', error);
         // Log the fields we tried to update
         console.error('Fields attempted to update:', Object.keys(updateData).join(', '));
-        throw error;
+        console.error('Error details:', error.details, error.message, error.hint);
+        
+        // Let's try a different method - just update the product_id field
+        console.log('🔍 DEBUGGING: Attempting update method #2 (individual field update)');
+        const simpleUpdateData = { product_id: firstProductId };
+        
+        const { data: data2, error: error2 } = await supabase
+          .from('payments')
+          .update(simpleUpdateData)
+          .eq('id', id)
+          .select()
+          .single();
+          
+        if (error2) {
+          console.error('Second update attempt also failed:', error2);
+          throw error; // Throw the original error
+        }
+        
+        console.log('🎉 Second update attempt succeeded!', {
+          id: data2.id,
+          product_id: data2.product_id,
+          updated_at: data2.updated_at
+        });
+        
+        return this.mapPaymentFromDb(data2);
       }
       
-      console.log('Payment updated successfully:', {
+      console.log('🎉 Payment updated successfully:', {
         id: data.id,
+        product_id: data.product_id,
         product_ids: data.product_ids,
         updated_at: data.updated_at
       });
@@ -2058,6 +2131,15 @@ export class SupabaseStorage implements IStorage {
       }
     }
     
+    // Check for product_id and add it to product_ids if needed
+    let productIds = data.product_ids || null;
+    
+    // If we have a product_id but no product_ids, use that
+    if (!productIds && data.product_id) {
+      console.log('Found product_id in database record, converting to productIds array:', data.product_id);
+      productIds = [data.product_id];
+    }
+    
     // Use optional chaining to safely handle missing fields
     // Use default values for required fields in our schema
     const payment: Payment = {
@@ -2069,7 +2151,8 @@ export class SupabaseStorage implements IStorage {
       status: data.status || 'unknown',
       paymentType: data.payment_type || 'unknown',
       featureDuration: data.feature_duration || null,
-      productIds: data.product_ids || null,
+      productIds: productIds,
+      product_id: data.product_id || null, // Add this field even though it's not in the schema
       paymentChannel: data.payment_channel || null,
       paidAt: data.paid_at ? new Date(data.paid_at) : null,
       createdAt: data.created_at ? new Date(data.created_at) : null,
@@ -2077,7 +2160,12 @@ export class SupabaseStorage implements IStorage {
       metadata: data.metadata || null
     };
     
-    console.log('Mapped payment:', payment);
+    console.log('Mapped payment:', {
+      id: payment.id,
+      status: payment.status,
+      productIds: payment.productIds,
+      product_id: payment.product_id
+    });
     return payment;
   }
 }
