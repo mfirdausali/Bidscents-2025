@@ -18,6 +18,14 @@ import { generateSellerPreview } from './social-preview';
 import * as billplz from './billplz';
 import crypto from 'crypto';
 
+/**
+ * Helper function to determine if we're in a sandbox environment
+ * This is used throughout the payment processing system
+ */
+function isBillplzSandbox(): boolean {
+  return process.env.BILLPLZ_BASE_URL?.includes('sandbox') ?? true;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
@@ -2946,14 +2954,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('📝 Query object:', JSON.stringify(req.query, null, 2));
       console.log('📝 Full URL:', req.protocol + '://' + req.get('host') + req.originalUrl);
       
-      // Environment checks
-      if (!process.env.BILLPLZ_XSIGN_KEY) {
+      // Environment checks - only for production
+      if (!process.env.BILLPLZ_XSIGN_KEY && !isBillplzSandbox()) {
         console.error('❌ ERROR: Missing BILLPLZ_XSIGN_KEY environment variable');
         return res.status(500).json({
           message: 'Server configuration error',
           details: 'Missing required environment variable for payment verification.'
         });
       }
+      
+      // Get sandbox status
+      const isSandbox = isBillplzSandbox();
+      console.log(`🌍 Running in ${isSandbox ? 'SANDBOX' : 'PRODUCTION'} mode`);
       
       // DEBUG: Log all available parameter formats for troubleshooting
       console.log('🔍 DEBUG: Query parameter format investigation:');
@@ -3013,12 +3025,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('- Transaction status:', directTransStatus);
       console.log('- X-Signature:', directSignature);
       
-      if (!directBillId || !directSignature) {
-        console.error('❌ ERROR: Missing critical redirect parameters');
+      // Only require billId (make signature optional in sandbox)
+      if (!directBillId) {
+        console.error('❌ ERROR: Missing critical redirect parameter: billId');
         return res.status(400).json({
-          message: 'Invalid payment redirect: missing parameters',
-          details: 'Required parameters billplz[id] or billplz[x_signature] not found.'
+          message: 'Invalid payment redirect: missing bill ID',
+          details: 'Required parameter billplz[id] not found.'
         });
+      }
+      
+      // Make signature optional in sandbox environment
+      if (!directSignature && !isBillplzSandbox()) {
+        console.error('❌ ERROR: Missing signature in production environment');
+        return res.status(400).json({
+          message: 'Invalid payment redirect: missing signature',
+          details: 'Required parameter billplz[x_signature] not found.'
+        });
+      } else if (!directSignature) {
+        console.warn('⚠️ SANDBOX MODE: Missing signature but continuing for testing purposes');
       }
       
       // Build the paymentData object 
@@ -3051,8 +3075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // For PRODUCTION environment, strictly enforce signature verification
-      // For SANDBOX, allow bypass for testing
-      const isSandbox = process.env.BILLPLZ_BASE_URL?.includes('sandbox') ?? true;
+      // For SANDBOX, allow bypass for testing (isSandbox already defined above)
       
       if (!signatureValid && !isSandbox) {
         console.error('❌ ERROR: Signature verification failed in PRODUCTION environment');
