@@ -2882,6 +2882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('📝 Parsed query params:', JSON.stringify(req.query, null, 2));
       console.log('📝 Raw query string:', req.rawQuery);
+      console.log('📝 Environment url:', req.protocol + '://' + req.get('host') + req.originalUrl);
       
       // Environment checks
       if (!process.env.BILLPLZ_XSIGN_KEY) {
@@ -2892,18 +2893,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Stage B: Extract signature from the parsed query params
-      const signatureFromQuery = req.query['billplz[x_signature]'] as string;
+      // Stage B: Extract signature from raw query string using regex
+      // Format: billplz%5Bx_signature%5D=25319a1c54b42ce800e1396fd33362c808ea0c82593bf4d13e153661b97dcd54
+      const signatureMatch = req.rawQuery.match(/billplz(?:%5B|\[)x_signature(?:%5D|\])=([a-f0-9]{64})/i);
       
-      if (!signatureFromQuery) {
-        console.error('❌ ERROR: No signature found in the redirect URL query parameters');
-        return res.status(400).json({
-          message: 'Invalid payment redirect: missing signature',
-          details: 'Could not find a signature parameter in the URL query.'
+      console.log('Raw signature regex match result:', signatureMatch);
+      
+      if (!signatureMatch || !signatureMatch[1]) {
+        // Try an alternate format
+        const altSignatureMatch = req.rawQuery.match(/[?&]billplz(?:%5B|\[)x_signature(?:%5D|\])=([^&]+)/i);
+        
+        console.log('Alternate signature match attempt:', altSignatureMatch);
+        
+        // Print all query parameters for debugging
+        console.log('All query parameters:');
+        Object.keys(req.query).forEach(key => {
+          console.log(`- ${key}: ${req.query[key]}`);
         });
+        
+        if (!altSignatureMatch || !altSignatureMatch[1]) {
+          console.error('❌ ERROR: No signature found in the redirect URL query parameters');
+          return res.status(400).json({
+            message: 'Invalid payment redirect: missing signature',
+            details: 'Could not find a signature parameter in the URL query.'
+          });
+        }
+        
+        var signatureFromQuery = altSignatureMatch[1];
+      } else {
+        var signatureFromQuery = signatureMatch[1];
       }
       
-      console.log('🔑 Extracted signature from query params:', signatureFromQuery);
+      console.log('🔑 Extracted signature from URL:', signatureFromQuery);
       
       // Stage C: Verify the signature using the new implementation
       const isSignatureValid = billplz.verifyRedirectSignature(req.rawQuery, signatureFromQuery);
