@@ -2692,8 +2692,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     paid?: string | boolean;
     paid_at?: string;
     reference_1?: string; // orderId
-    reference_2?: string; // productId
+    reference_2?: string; // productId(s) - can be single ID or comma-separated list
     payment_channel?: string;
+    reference_3?: string; // additional reference if needed
     transaction_id?: string;
     transaction_status?: string;
   }, isWebhook = false) {
@@ -2720,7 +2721,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isPaidTrue: paid === 'true',
         isPaidTrueBoolean: paid === true,
         orderId,
-        productId
+        productId,
+        productIdType: typeof productId
       });
       
       // Find the associated payment with fallback mechanism
@@ -2798,14 +2800,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Using productIds from payment record: ${productIds.join(', ')}`);
           }
           // Then check if reference_2 contains comma-separated product IDs
-          else if (productId && productId.includes(',')) {
+          else if (productId && typeof productId === 'string' && productId.includes(',')) {
             productIds = productId.split(',');
             console.log(`Using productIds from reference_2: ${productIds.join(', ')}`);
+            
+            // Update the payment record with these product IDs if they weren't stored before
+            if (!payment.productIds || payment.productIds.length === 0) {
+              try {
+                await storage.updatePaymentProductIds(payment.id, productIds);
+                console.log(`✅ Updated payment ${payment.id} with product IDs from reference_2`);
+              } catch (err) {
+                console.error(`❌ Error updating payment with product IDs:`, err);
+              }
+            }
           }
           // Finally, check if reference_2 is a single product ID
           else if (productId) {
             productIds = [productId];
             console.log(`Using single productId from reference_2: ${productId}`);
+            
+            // Update the payment record with this product ID if it wasn't stored before
+            if (!payment.productIds || payment.productIds.length === 0) {
+              try {
+                await storage.updatePaymentProductIds(payment.id, productIds);
+                console.log(`✅ Updated payment ${payment.id} with single product ID from reference_2`);
+              } catch (err) {
+                console.error(`❌ Error updating payment with product ID:`, err);
+              }
+            }
           }
           
           if (productIds.length === 0) {
