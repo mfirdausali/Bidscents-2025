@@ -1,0 +1,489 @@
+I. Fix Redirect X-Signature Verification
+
+The custom signature verification logic in server/routes.ts for the /api/payments/process-redirect endpoint needs to be replaced to correctly align with Billplz documentation. The billplz.verifyRedirectSignature function in billplz.ts should be used and potentially refined.
+
+A. Refine billplz.verifyRedirectSignature in server/billplz.ts:
+
+The core idea is that the source string for redirects is built from URL-decoded key + value pairs, where key is the full parameter name (e.g., billplz[id]), sorted alphabetically, and then joined by |. The billplz[x_signature] parameter must be excluded from this source string.
+
+TypeScript
+
+// server/billplz.ts
+
+// ... (other functions remain the same) ...
+
+/**
+ * Verify X-Signature for redirect parameters
+ *
+ * @param rawQueryString The raw query string from the redirect URL (e.g., req.rawQuery)
+ * @param expectedXSignature The X-Signature value extracted from the redirect URL's 'billplz[x_signature]' parameter
+ * @returns boolean indicating if the signature is valid
+ */
+export function verifyRedirectSignature(rawQueryString: string, expectedXSignature: string): boolean {
+  if (!BILLPLZ_XSIGN_KEY) {
+    console.error('🔴 Missing BILLPLZ_XSIGN_KEY environment variable for redirect verification');
+    return false;
+  }
+  if (!rawQueryString) {
+    console.error('🔴 Raw query string is empty for redirect signature verification.');
+    return false;
+  }
+   if (!expectedXSignature) {
+    console.error('🔴 Expected X-Signature is missing for redirect verification.');
+    return false;
+  }
+
+  console.log('🔐 REDIRECT SIGNATURE VERIFICATION START (billplz.ts) 🔐');
+  console.log('Raw Query String:', rawQueryString);
+  console.log('Expected X-Signature:', expectedXSignature);
+
+  const params = new URLSearchParams(rawQueryString);
+  const elementsToSign: string[] = [];
+
+  // Iterate over all URL-decoded parameters to construct elements like "keyvalue"
+  // where 'key' is the full parameter name (e.g., "billplz[id]")
+  // and 'value' is its URL-decoded value.
+  for (const [key, value] of params.entries()) {
+    if (key !== 'billplz[x_signature]') { // Exclude the signature itself
+      elementsToSign.push(`${key}${value}`);
+    }
+  }
+
+  // Sort in ascending order, case-insensitive, as per general X-Signature rules.
+  // Billplz PDF page 45 step #3 implies standard string sort for the constructed "keyvalue" elements.
+  elementsToSign.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+  const sourceString = elementsToSign.join('|');
+  console.log('Concatenated Source String for Redirect HMAC:', sourceString);
+
+  const hmac = crypto.createHmac('sha256', BILLPLZ_XSIGN_KEY);
+  hmac.update(sourceString);
+  const calculatedSignature = hmac.digest('hex');
+
+  console.log('Calculated Redirect Signature:', calculatedSignature);
+
+  try {
+    const calcBuffer = Buffer.from(calculatedSignature, 'hex');
+    const expectedBuffer = Buffer.from(expectedXSignature, 'hex');
+
+    if (calcBuffer.length !== expectedBuffer.length) {
+        console.warn('⚠️ Buffer length mismatch for redirect signature. Calculated:', calcBuffer.length, 'Expected:', expectedBuffer.length);
+        // Fallback to direct string comparison if lengths differ, though this usually indicates a problem.
+        const isEqual = calculatedSignature === expectedXSignature;
+        console.log(`RESULT (fallback string comparison): ${isEqual ? 'VALID ✅' : 'INVALID ❌'}`);
+        console.log('🔐 REDIRECT SIGNATURE VERIFICATION END (billplz.ts) 🔐');
+        return isEqual;
+    }
+
+    const isValid = crypto.timingSafeEqual(calcBuffer, expectedBuffer);
+    console.log(`RESULT (timing-safe comparison): ${isValid ? 'VALID ✅' : 'INVALID ❌'}`);
+    console.log('🔐 REDIRECT SIGNATURE VERIFICATION END (billplz.ts) 🔐');
+    return isValid;
+  } catch (e) {
+    console.error('🔴 Error in timing-safe comparison for redirect:', e);
+    // Fallback to regular comparison for other crypto errors
+    const isEqual = calculatedSignature === expectedXSignature;
+    console.log(`RESULT (exception fallback string comparison): ${isEqual ? 'VALID ✅' : 'INVALID ❌'}`);
+    console.log('🔐 REDIRECT SIGNATURE VERIFICATION END (billplz.ts) 🔐');
+    return isEqual;
+  }
+}
+
+// ... (other functions like getBillURL) ...
+B. Update server/routes.ts to use the refined billplz.verifyRedirectSignature:
+
+TypeScript
+
+// server/routes.ts
+// ... (other imports) ...
+import * as billplz from './billplz'; // Ensure this is how you import
+
+// ...
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // ... (other routes) ...
+
+  // Raw query middleware specifically for Billplz redirect
+  // This captures the original query string before Express parses it
+  app.use('/api/payments/process-redirect', (req: Request & { rawQuery?: string }, res: Response, next: NextFunction) => {
+    // Extract the raw query string from the original URL
+    req.rawQuery = req.originalUrl.split('?')[1] || '';
+    console.log('🔍 RAW QUERY CAPTURED (middleware):', req.rawQuery);
+    next();
+  });
+
+  // GET /api/payments/process-redirect - Handle redirect from Billplz payment
+  app.get('/api/payments/process-redirect', async (req: Request & { rawQuery?: string }, res: Response) => {
+    try {
+      console.log('🔄 PAYMENT REDIRECT RECEIVED (routes.ts) 🔄');
+      console.log('---------------------------------------');
+      console.log('📝 Express Parsed Query (req.query):', JSON.stringify(req.query, null, 2));
+      console.log('📝 Raw Query String (req.rawQuery):', req.rawQuery);
+
+      if (!req.rawQuery || req.rawQuery === '') {
+        console.error('❌ ERROR: Missing query parameters in payment redirect (rawQuery empty)');
+        return res.status(400).json({
+          message: 'Invalid payment redirect: missing query parameters',
+          details: 'No query parameters were found in the redirect URL.'
+        });
+      }
+
+      // Extract the x_signature from the Express parsed query (which is URL-decoded)
+      // req.query will look like: { billplz: { id: '...', x_signature: '...' } }
+      const signatureFromUrl = req.query.billplz && typeof req.query.billplz === 'object'
+        ? (req.query.billplz as any).x_signature as string
+        : req.query['billplz[x_signature]'] as string; // Fallback for flatter structures if any
+
+      if (!signatureFromUrl) {
+        console.error('❌ ERROR: Could not extract billplz[x_signature] from parsed query parameters');
+        // Attempt to extract from rawQuery as a last resort for logging/debugging, but parsed should work
+        const rawSigMatch = req.rawQuery.match(/billplz\[x_signature\]=([0-9a-fA-F]{64})/);
+        console.log('Raw query signature match attempt:', rawSigMatch ? rawSigMatch[1] : 'Not found in raw');
+        return res.status(400).json({
+          message: 'Invalid payment redirect: missing signature parameter',
+          details: 'The x_signature parameter was not found in the redirect URL query.'
+        });
+      }
+      console.log('🔑 Extracted expected X-Signature (from req.query):', signatureFromUrl);
+
+      // Verify the signature using the raw query string and the extracted signature
+      const isSignatureValid = billplz.verifyRedirectSignature(req.rawQuery, signatureFromUrl);
+
+      if (!isSignatureValid) {
+        console.error('❌ ERROR: Redirect signature verification failed (routes.ts)');
+        // Consider redirecting to an error page instead of JSON response for better UX
+        return res.redirect(`/seller/dashboard?payment=error&message=${encodeURIComponent('Payment verification failed. Please contact support.')}`);
+      }
+      console.log('✅ Redirect signature verification successful! (routes.ts)');
+
+      // Extract payment data from URL parameters (use URLSearchParams on rawQuery for consistency)
+      const urlParams = new URLSearchParams(req.rawQuery);
+      const paymentData = {
+        id: urlParams.get('billplz[id]'), // Billplz Bill ID
+        paid: urlParams.get('billplz[paid]'), // 'true' or 'false'
+        paid_at: urlParams.get('billplz[paid_at]'),
+        reference_1: urlParams.get('billplz[reference_1]'), // Your internal orderId
+        reference_2: urlParams.get('billplz[reference_2]'), // Your productIds
+        transaction_id: urlParams.get('billplz[transaction_id]'), // Optional
+        transaction_status: urlParams.get('billplz[transaction_status]') // Optional
+      };
+
+      console.log('📊 Extracted payment parameters from raw query:', paymentData);
+
+      if (!paymentData.id || !paymentData.reference_1) {
+        console.error('❌ ERROR: Missing critical payment data (bill_id or reference_1) after signature validation');
+        return res.redirect(`/seller/dashboard?payment=error&message=${encodeURIComponent('Payment data incomplete after verification.')}`);
+      }
+
+      console.log('⚙️ Processing payment from redirect (routes.ts)...');
+      const result = await processPaymentUpdate(paymentData, false); // processPaymentUpdate expects decoded values
+      console.log('⚙️ Payment processing result (routes.ts):', result);
+
+      const isPaid = paymentData.paid === 'true';
+      const uiState = result.success && isPaid ? 'success' :
+                      (result.success && !isPaid && paymentData.paid === 'false') ? 'failed' : // Explicitly check for 'false'
+                      'pending'; // Default to pending if not clearly success or failed but processing was ok
+
+      let redirectMessage = '';
+      if (uiState === 'success') {
+        redirectMessage = 'Payment completed successfully! Your products will be boosted shortly.';
+      } else if (uiState === 'failed') {
+        redirectMessage = 'Payment was not successful. Please try again or contact support.';
+      } else if (result.message === 'Payment already processed') {
+        redirectMessage = 'Payment was already confirmed. Your boost should be active.';
+      }
+      else {
+        redirectMessage = result.message || 'Payment is being processed. Please check your dashboard shortly.';
+      }
+
+      const finalRedirectUrl = `/seller/dashboard?payment=${uiState}&message=${encodeURIComponent(redirectMessage)}&order_id=${encodeURIComponent(paymentData.reference_1)}&bill_id=${encodeURIComponent(paymentData.id)}`;
+      console.log(`🔄 Redirecting user to: ${finalRedirectUrl}`);
+      return res.redirect(303, finalRedirectUrl);
+
+    } catch (error) {
+      console.error('❌ ERROR: Exception in payment redirect handler (routes.ts):', error);
+      // Log the detailed error
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Stack trace:', error.stack);
+      }
+      return res.redirect(`/seller/dashboard?payment=error&message=${encodeURIComponent('An unexpected error occurred while processing your payment.')}`);
+    }
+  });
+
+  // ... (rest of the routes, including webhook)
+}
+
+// ... (processPaymentUpdate function)
+II. Address Webhook Data Handling & Signature
+
+A. Handle Missing reference_1 in Webhook Payload in processPaymentUpdate:
+
+The log clearly shows reference_1 (your orderId) is missing from the webhook payload. You must adapt processPaymentUpdate to use the Billplz id (which is the bill_id) to fetch your internal payment record.
+
+TypeScript
+
+// server/routes.ts
+
+async function processPaymentUpdate(paymentData: any, isWebhook = false) {
+  try {
+    console.log(`Processing payment update from ${isWebhook ? 'webhook' : 'redirect'}:`, JSON.stringify(paymentData, null, 2));
+
+    const billIdFromPayload = paymentData.id; // This is the Billplz Bill ID
+    const orderIdFromPayload = paymentData.reference_1; // This might be undefined for webhooks
+
+    let payment;
+
+    if (orderIdFromPayload) {
+      console.log(`Attempting to find payment by orderId (reference_1): ${orderIdFromPayload}`);
+      payment = await storage.getPaymentByOrderId(orderIdFromPayload);
+    }
+
+    // If not found by orderId (especially for webhooks) or if orderId was missing, try finding by bill_id
+    if (!payment && billIdFromPayload) {
+      console.log(`Payment not found by orderId or orderId missing. Attempting to find by bill_id: ${billIdFromPayload}`);
+      payment = await storage.getPaymentByBillId(billIdFromPayload); // << YOU NEED TO IMPLEMENT storage.getPaymentByBillId
+    }
+
+    if (!payment) {
+      console.error(`🔴 Payment not found for ${orderIdFromPayload ? 'orderId: ' + orderIdFromPayload : ''} ${billIdFromPayload ? 'or bill_id: ' + billIdFromPayload : ''}`);
+      return { success: false, message: 'Payment record not found in our system.' };
+    }
+
+    console.log('Found payment record:', { /* ... */ });
+
+    // ... (rest of your existing logic: idempotency check, status update, boosting products)
+    // Ensure that when you update product status, you use payment.productIds
+
+    // CRITICAL: If payment is successful, process boost for all products
+    const isPaid = paymentData.paid === 'true' || paymentData.paid === true;
+    if (isPaid && payment.status !== 'paid') { // Process boost only if newly marked as paid
+        // ... (your existing boost logic using payment.productIds)
+    } else if (isPaid && payment.status === 'paid') {
+        console.log(`Boost for payment ${payment.id} likely already processed.`);
+    }
+
+
+    return { success: true, message: 'Payment processed successfully', payment, status: paymentData.paid === 'true' ? 'paid' : 'failed' }; // Include final status
+
+  } catch (error) {
+    console.error('🔴 Error processing payment update:', error);
+    return { success: false, message: 'Error processing payment update', error };
+  }
+}
+Action Required: You will need to add a method getPaymentByBillId(billId: string) to your storage module that fetches a payment record based on the billId column (where you store the Billplz bill ID).
+B. Re-check verifyWebhookSignature in billplz.ts:
+
+The log shows the calculated webhook signature differs from the received one.
+Calculated: 88fa807916bea793af0b75c60e1b4f971b3e1b387bb5cf876f63c72e5a4d1e6d
+Received: bf656d102e6e78bc58bdeed9552c412c1a6e644570163ccb632cb855351eebab
+
+Your current webhook signature generation:
+
+TypeScript
+
+// server/billplz.ts - verifyWebhookSignature
+const payloadForSignature = { ...payload };
+delete payloadForSignature.x_signature;
+const keys = Object.keys(payloadForSignature).sort(); // Standard string sort
+const concatenatedString = keys.map(key => `${key}${payloadForSignature[key]}`).join('|');
+This matches the documented method (page 43-44 of the PDF) where strings of keyvalue are created, then these strings are sorted and joined. Let's ensure the sorting is strictly as Billplz expects. The PDF example for webhooks sorts the concatenated keyvalue strings, not just the keys.
+
+If the example shows amount100 then collection_idyhx5t1pp, etc., these are the actual strings being sorted.
+
+TypeScript
+
+// server/billplz.ts - Revised verifyWebhookSignature (if the above is not working)
+export function verifyWebhookSignature(payload: any, xSignatureHeader: string): boolean {
+  if (!BILLPLZ_XSIGN_KEY) {
+    console.error('🔴 Missing BILLPLZ_XSIGN_KEY for webhook verification');
+    return false;
+  }
+  if (!xSignatureHeader) {
+    console.error('🔴 Missing X-Signature header for webhook verification');
+    return false;
+  }
+
+  console.log('🔑 WEBHOOK SIGNATURE VERIFICATION START (billplz.ts) 🔑');
+  console.log('Received Webhook Payload:', JSON.stringify(payload, null, 2));
+  console.log('Received X-Signature Header:', xSignatureHeader);
+
+  // Create a copy of the payload to avoid modifying the original req.body
+  const payloadForSignature = { ...payload };
+
+  // The x_signature field should NOT be part of the data to be signed.
+  // Billplz might send it in the body OR header. The PDF example doesn't show it in the body for signing.
+  // If it IS in the body and should be excluded (like typical x_signature fields), ensure it's removed.
+  if (payloadForSignature.hasOwnProperty('x_signature')) {
+      console.log("Found 'x_signature' in webhook payload body, removing for signature calculation.");
+      delete payloadForSignature.x_signature;
+  }
+
+
+  const elementsToSign: string[] = [];
+  for (const key in payloadForSignature) {
+    if (Object.prototype.hasOwnProperty.call(payloadForSignature, key)) {
+      // Ensure value is a string. Handle null/undefined as empty string if that's Billplz's behavior.
+      // The example shows `mobile` (empty string) as just `mobile` in the sorted list.
+      let value = payloadForSignature[key];
+      if (value === null || value === undefined) {
+        value = '';
+      }
+      elementsToSign.push(`${key}${value}`);
+    }
+  }
+
+  // Sort the "keyvalue" strings alphabetically, case-insensitively (as per general X-sig guidance, though example implies standard sort)
+  // Using case-insensitive to be safer.
+  elementsToSign.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+  const sourceString = elementsToSign.join('|');
+  console.log('Concatenated Source String for Webhook HMAC:', sourceString);
+
+  const hmac = crypto.createHmac('sha256', BILLPLZ_XSIGN_KEY);
+  hmac.update(sourceString);
+  const calculatedSignature = hmac.digest('hex');
+
+  console.log('Calculated Webhook Signature:', calculatedSignature);
+
+  try {
+    const calcBuffer = Buffer.from(calculatedSignature, 'hex');
+    const expectedBuffer = Buffer.from(xSignatureHeader, 'hex');
+
+     if (calcBuffer.length !== expectedBuffer.length) {
+        console.warn('⚠️ Buffer length mismatch for webhook signature. Calculated:', calcBuffer.length, 'Expected:', expectedBuffer.length);
+        const isEqual = calculatedSignature === xSignatureHeader;
+        console.log(`RESULT (fallback string comparison): ${isEqual ? 'VALID ✅' : 'INVALID ❌'}`);
+        console.log('🔑 WEBHOOK SIGNATURE VERIFICATION END (billplz.ts) 🔑');
+        return isEqual;
+    }
+
+    const isValid = crypto.timingSafeEqual(calcBuffer, expectedBuffer);
+    console.log(`RESULT (timing-safe comparison): ${isValid ? 'VALID ✅' : 'INVALID ❌'}`);
+    console.log('🔑 WEBHOOK SIGNATURE VERIFICATION END (billplz.ts) 🔑');
+    return isValid;
+  } catch (e) {
+    console.error('🔴 Error in timing-safe comparison for webhook:', e);
+    const isEqual = calculatedSignature === xSignatureHeader;
+    console.log(`RESULT (exception fallback string comparison): ${isEqual ? 'VALID ✅' : 'INVALID ❌'}`);
+    console.log('🔑 WEBHOOK SIGNATURE VERIFICATION END (billplz.ts) 🔑');
+    return isEqual;
+  }
+}
+And in server/routes.ts for the webhook:
+
+TypeScript
+
+// server/routes.ts - /api/payments/webhook
+  app.post('/api/payments/webhook', async (req, res) => {
+    try {
+      console.log('💰 PAYMENT WEBHOOK RECEIVED (routes.ts) 💰');
+      console.log('---------------------------------------');
+      console.log('Webhook Headers:', JSON.stringify(req.headers, null, 2));
+      console.log('Webhook Body (req.body):', JSON.stringify(req.body, null, 2)); // Will be object if body-parser is used
+
+      // Billplz sends x-signature in header for webhooks
+      const xSignatureFromHeader = req.headers['x-signature'] as string || req.headers['X-Signature'] as string;
+
+      if (!xSignatureFromHeader) {
+          console.error('🔴 Invalid webhook: Missing x-signature header.');
+          return res.status(401).json({ message: 'Invalid webhook: Missing signature header' });
+      }
+      console.log('🔑 X-Signature from header:', xSignatureFromHeader);
+
+      // The req.body is already parsed by Express (e.g., express.urlencoded middleware)
+      if (!billplz.verifyWebhookSignature(req.body, xSignatureFromHeader)) {
+        console.error('🔴 Invalid webhook signature (routes.ts)');
+        // In sandbox, you might allow processing for testing, but in production, this MUST be an error.
+        if (process.env.NODE_ENV === 'production') {
+            return res.status(401).json({ message: 'Invalid signature' });
+        }
+        console.warn('⚠️ SANDBOX MODE: Invalid webhook signature but continuing for testing...');
+      } else {
+        console.log('✅ Webhook signature VERIFIED (routes.ts)');
+      }
+
+      const result = await processPaymentUpdate(req.body, true);
+      console.log('✅ Webhook processing result (routes.ts):', result);
+      return res.status(200).json({ success: result.success, message: result.message }); // Always respond 200 to Billplz if processed
+
+    } catch (error) {
+      console.error('🔴 Error processing payment webhook (routes.ts):', error);
+      res.status(500).json({ message: 'Error processing payment webhook' });
+    }
+  });
+III. General Code Refinements:
+
+Content-Type for createBill in billplz.ts:
+As discussed before, createBill should send data as application/x-www-form-urlencoded. Update billplz.ts and the billplzRequest function to handle this:
+
+TypeScript
+
+// server/billplz.ts
+
+// Modify billplzRequest to handle different content types
+async function billplzRequest(
+  endpoint: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+  body?: any,
+  contentType: string = 'application/json' // Add default, allow override
+): Promise<any> {
+  const url = `<span class="math-inline">\{BILLPLZ\_BASE\_URL\}</span>{endpoint}`;
+  const headers: Record<string, string> = {
+    'Authorization': createAuthHeader(),
+    // Content-Type will be set based on 'contentType' param
+  };
+  if (contentType) {
+    headers['Content-Type'] = contentType;
+  }
+
+  let requestBody: any;
+  if (body) {
+    if (contentType === 'application/json') {
+      requestBody = JSON.stringify(body);
+    } else if (contentType === 'application/x-www-form-urlencoded') {
+      requestBody = body; // Assuming body is already URLSearchParams
+    } else {
+      requestBody = body; // For other types or if body is already string/Buffer
+    }
+  }
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers,
+      body: requestBody,
+    });
+    // ... rest of the function ...
+  } // ...
+}
+
+export async function createBill(params: { /* ... */ }): Promise<any> {
+  const amount = Math.round(params.amount);
+  const billPayload: Record<string, string | number | undefined> = { // Use a more specific type if possible
+    collection_id: BILLPLZ_COLLECTION_ID,
+    name: params.name,
+    email: params.email,
+    amount,
+    description: params.description,
+    callback_url: params.callback_url,
+    redirect_url: params.redirect_url,
+    reference_1: params.reference_1,
+    reference_2: params.reference_2,
+  };
+
+  const formData = new URLSearchParams();
+  for (const key in billPayload) {
+    if (billPayload[key] !== undefined && billPayload[key] !== null) {
+      formData.append(key, billPayload[key]!.toString());
+    }
+  }
+  console.log('Creating Billplz bill with form data:', formData.toString());
+  return billplzRequest('/v3/bills', 'POST', formData, 'application/x-www-form-urlencoded');
+}
+Testing and Verification:
+
+Thoroughly test the redirect flow in the Billplz sandbox. Pay close attention to the console logs for the sourceString and calculatedSignature in billplz.verifyRedirectSignature.
+Test the webhook flow. If reference_1 is consistently missing, the logic to fetch payment by bill_id is essential.
+Confirm BILLPLZ_XSIGN_KEY: Double, triple-check that the BILLPLZ_XSIGN_KEY in your .env file is an exact copy from your Billplz dashboard (for sandbox and production respectively) with no leading/trailing spaces or encoding issues.
+By implementing these changes, your signature verification should become more reliable, and your webhook processing logic will be more robust in identifying the correct internal payment record.
