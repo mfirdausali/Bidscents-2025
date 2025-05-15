@@ -2834,56 +2834,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn('No product IDs found in payment for boosting');
             return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
+
+          // The product status update now happens automatically in updatePaymentStatus
+          // This is handled by updateProductFeaturedStatusForPayment in SupabaseStorage
+          // It uses the product IDs from the payment record
           
-          // Determine feature duration - use from payment record or default to 7 days
-          const featureDuration = payment.featureDuration || 7; // Default to 7 days if not specified
-          const featuredAt = new Date(); // Current timestamp for when it was featured
-          const boostExpiryDate = new Date();
-          boostExpiryDate.setDate(boostExpiryDate.getDate() + featureDuration);
-          
-          console.log(`Will boost ${productIds.length} products for ${featureDuration} days until ${boostExpiryDate}`);
-          
-          // Update each product to be featured
-          const updatePromises = productIds.map(async (pid) => {
-            try {
-              // Ensure the product ID is numeric
-              const productId = typeof pid === 'string' ? parseInt(pid) : pid;
-              if (isNaN(productId)) {
-                console.warn(`Invalid product ID: ${pid}`);
-                return false;
-              }
-              
-              const product = await storage.getProductById(productId);
-              
-              if (product) {
-                // Update the product with featured flag, status, timestamps
-                await storage.updateProduct(product.id, {
-                  ...product,
-                  isFeatured: true,
-                  status: 'featured',
-                  featuredAt: featuredAt,
-                  featuredUntil: boostExpiryDate
-                });
-                console.log(`✅ Product #${product.id} "${product.name}" boosted until ${boostExpiryDate}`);
-                return true;
-              } else {
-                console.warn(`⚠️ Product ID ${productId} not found for boosting`);
-                return false;
-              }
-            } catch (err) {
-              console.error(`❌ Error boosting product ${pid}:`, err);
-              return false;
-            }
-          });
-          
-          // Wait for all product updates to complete
-          const results = await Promise.all(updatePromises);
-          const successCount = results.filter(result => result).length;
-          
-          console.log(`🚀 Boosted ${successCount} out of ${productIds.length} products`);
+          console.log(`🚀 Payment has been marked as paid, products will be featured automatically`);
           return { 
             success: true, 
-            message: `Payment processed and ${successCount} products boosted`, 
+            message: `Payment processed and products will be featured`, 
             payment: updatedPayment 
           };
         } catch (productError) {

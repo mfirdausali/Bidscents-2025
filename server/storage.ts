@@ -127,10 +127,12 @@ export interface IStorage {
   
   // Payment methods
   createPayment(payment: InsertPayment): Promise<Payment>;
+  getPaymentById(id: number): Promise<Payment | undefined>;
   getPaymentByOrderId(orderId: string): Promise<Payment | undefined>;
   getPaymentByBillId(billId: string): Promise<Payment | undefined>;
   getUserPayments(userId: number): Promise<Payment[]>;
   updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment>;
+  updatePaymentProductIds(id: number, productIds: string[]): Promise<Payment>;
   
   // Session storage
   sessionStore: any;
