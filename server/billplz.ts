@@ -14,6 +14,14 @@ const BILLPLZ_SECRET_KEY = process.env.BILLPLZ_SECRET_KEY;
 const BILLPLZ_XSIGN_KEY = process.env.BILLPLZ_XSIGN_KEY;
 const BILLPLZ_COLLECTION_ID = process.env.BILLPLZ_COLLECTION_ID;
 
+// Determine if we're using sandbox or production
+const IS_SANDBOX = BILLPLZ_BASE_URL.includes('sandbox');
+
+// Use appropriate view URL based on environment
+const BILLPLZ_VIEW_BASE_URL = IS_SANDBOX 
+  ? 'https://www.billplz-sandbox.com' 
+  : 'https://www.billplz.com';
+
 // Log configuration once on startup for diagnostics
 console.log('⚙️ BILLPLZ CONFIGURATION ⚙️');
 console.log('-------------------------');
@@ -22,6 +30,7 @@ console.log('BILLPLZ_COLLECTION_ID present:', !!BILLPLZ_COLLECTION_ID);
 console.log('BILLPLZ_XSIGN_KEY present:', !!BILLPLZ_XSIGN_KEY);
 console.log('BILLPLZ_SECRET_KEY present:', !!BILLPLZ_SECRET_KEY);
 console.log('BILLPLZ_XSIGN_KEY length:', BILLPLZ_XSIGN_KEY?.length);
+console.log('Environment:', IS_SANDBOX ? 'SANDBOX' : 'PRODUCTION');
 console.log('-------------------------');
 
 if (!BILLPLZ_SECRET_KEY || !BILLPLZ_XSIGN_KEY || !BILLPLZ_COLLECTION_ID) {
@@ -330,12 +339,10 @@ export function verifyRedirectSignature(rawQueryString: string, expectedSignatur
  * Format a URL for the Billplz bill payment page
  */
 export function getBillURL(billId: string): string {
-  // Use a configurable base URL via environment variables, with sandbox fallback
-  const BILLPLZ_VIEW_BASE_URL = process.env.BILLPLZ_VIEW_BASE_URL || 'https://www.billplz-sandbox.com';
-  
   // Log the URL being generated for debugging
   const url = `${BILLPLZ_VIEW_BASE_URL}/bills/${billId}`;
   console.log(`🔗 Generated Billplz payment URL: ${url}`);
+  console.log(`   Using ${IS_SANDBOX ? 'SANDBOX' : 'PRODUCTION'} environment`);
   
   return url;
 }
