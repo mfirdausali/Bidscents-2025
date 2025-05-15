@@ -2862,9 +2862,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('✅ Found signature in request body');
       }
       
-      if (!xSignature) {
+      // For sandbox environment, make signature optional
+      const isSandbox = process.env.BILLPLZ_BASE_URL?.includes('sandbox') ?? true;
+      
+      if (!xSignature && !isSandbox) {
         console.error('❌ ERROR: Missing X-Signature (checked headers and body)');
         return res.status(400).json({ message: 'Missing X-Signature header' });
+      } else if (!xSignature) {
+        console.warn('⚠️ SANDBOX MODE: Missing signature but continuing for testing purposes');
+        // In sandbox, we'll continue without a signature for easier testing
       }
       
       console.log('🔑 X-Signature found:', xSignature);
@@ -2878,13 +2884,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('⚠️ Error during webhook signature verification:', sigError);
       }
       
-      // For PRODUCTION environment, strictly enforce signature verification
-      // For SANDBOX, allow bypass for testing
-      const isSandbox = process.env.BILLPLZ_BASE_URL?.includes('sandbox') ?? true;
-      
-      if (!isValid && !isSandbox) {
-        console.error('❌ ERROR: Invalid X-Signature in PRODUCTION environment');
-        return res.status(401).json({ message: 'Invalid signature' });
+      // Only do signature verification if we have a signature
+      if (xSignature) {
+        // For PRODUCTION environment, strictly enforce signature verification
+        // For SANDBOX, already defined above
+        if (!isValid && !isSandbox) {
+          console.error('❌ ERROR: Invalid X-Signature in PRODUCTION environment');
+          return res.status(401).json({ message: 'Invalid signature' });
+        } else if (!isValid) {
+          console.warn('⚠️ SANDBOX MODE: Invalid signature but continuing for testing');
+        }
       }
       
       // Process the payment using the shared function
