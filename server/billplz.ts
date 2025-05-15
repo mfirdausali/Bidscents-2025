@@ -43,30 +43,65 @@ function createAuthHeader(): string {
 async function billplzRequest(
   endpoint: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  body?: any
+  body?: any,
+  contentType: string = 'application/json'
 ): Promise<any> {
   const url = `${BILLPLZ_BASE_URL}${endpoint}`;
   const headers: Record<string, string> = {
     'Authorization': createAuthHeader(),
-    'Content-Type': 'application/json',
+    'Content-Type': contentType,
   };
+
+  console.log(`🚀 Billplz API Request: ${method} ${endpoint}`);
+  console.log(`🔍 Content-Type: ${contentType}`);
+  
+  // Handle different content types
+  let processedBody;
+  if (body) {
+    if (contentType === 'application/json') {
+      processedBody = JSON.stringify(body);
+      console.log(`📦 Request body (JSON):`, JSON.stringify(body, null, 2));
+    } else if (contentType === 'application/x-www-form-urlencoded') {
+      // If body is URLSearchParams, use it directly
+      if (body instanceof URLSearchParams) {
+        processedBody = body;
+      } else {
+        // Convert object to URLSearchParams
+        const formData = new URLSearchParams();
+        for (const key in body) {
+          if (body[key] !== undefined && body[key] !== null) {
+            formData.append(key, body[key].toString());
+          }
+        }
+        processedBody = formData;
+      }
+      console.log(`📦 Request body (form):`, processedBody.toString());
+    } else {
+      processedBody = body;
+    }
+  }
 
   try {
     const response = await fetch(url, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: processedBody,
     });
+
+    // Log response status
+    console.log(`🔄 Response status: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Billplz API error: ${response.status} ${response.statusText}`, errorText);
+      console.error(`❌ Billplz API error: ${response.status} ${response.statusText}`, errorText);
       throw new Error(`Billplz API error: ${response.status} ${response.statusText}`);
     }
 
-    return await response.json();
+    const responseData = await response.json();
+    console.log(`✅ Response data:`, JSON.stringify(responseData, null, 2));
+    return responseData;
   } catch (error) {
-    console.error('Error making Billplz API request:', error);
+    console.error('❌ Error making Billplz API request:', error);
     throw error;
   }
 }
@@ -87,6 +122,15 @@ export async function createBill(params: {
   // Ensure amount is an integer in sen
   const amount = Math.round(params.amount);
 
+  console.log('🔔 Creating Billplz bill with params:', {
+    name: params.name,
+    email: params.email,
+    amount,
+    description: params.description,
+    ref1: params.reference_1,
+    ref2: params.reference_2
+  });
+
   const payload = {
     collection_id: BILLPLZ_COLLECTION_ID,
     name: params.name,
@@ -105,7 +149,15 @@ export async function createBill(params: {
     payload.reference_2 = params.reference_2;
   }
 
-  return billplzRequest('/v3/bills', 'POST', payload);
+  // Billplz API docs mention it accepts both form-urlencoded and JSON
+  // But many issues can be resolved by using form-urlencoded, which is the
+  // more traditional format for this API
+  return billplzRequest(
+    '/v3/bills', 
+    'POST', 
+    payload, 
+    'application/x-www-form-urlencoded'
+  );
 }
 
 /**
@@ -175,187 +227,102 @@ export function verifyWebhookSignature(payload: any, xSignature: string): boolea
  * Billplz redirect uses different format than webhook for query parameters
  * Query parameters are in format 'billplz[param]=value'
  * 
- * @param queryParams The redirect query parameters
- * @param xSignature The X-Signature value from the redirect URL
+ * @param rawQueryString The raw query string from the redirect URL
+ * @param expectedSignature The X-Signature value to verify against
  * @returns boolean indicating if the signature is valid
  */
-export function verifyRedirectSignature(queryParams: Record<string, any>, xSignature: string): boolean {
+export function verifyRedirectSignature(rawQueryString: string, expectedSignature: string): boolean {
   if (!BILLPLZ_XSIGN_KEY) {
     console.error('Missing BILLPLZ_XSIGN_KEY environment variable');
     return false;
   }
+  
+  if (!rawQueryString) {
+    console.error('Raw query string is empty for redirect signature verification');
+    return false;
+  }
 
-  console.log('🔐 SIGNATURE VERIFICATION START 🔐');
+  console.log('🔐 REDIRECT SIGNATURE VERIFICATION START 🔐');
   console.log('-------------------------------------');
-  console.log('Input query params:', JSON.stringify(queryParams, null, 2));
-  console.log('X-Signature to verify:', xSignature);
+  console.log('Raw query string:', rawQueryString);
+  console.log('Expected signature:', expectedSignature);
   console.log('BILLPLZ_XSIGN_KEY exists:', !!BILLPLZ_XSIGN_KEY);
   console.log('BILLPLZ_XSIGN_KEY length:', BILLPLZ_XSIGN_KEY?.length);
   console.log('-------------------------------------');
 
-  // 1. Check if we have a nested billplz object (Express 4.18+) or flat structure
-  const qp = queryParams.billplz || queryParams;
-  
-  // 2. Find the x_signature either in the nested object or as a flat key
-  let receivedSignature;
-  
-  // Debug all available signatures in different formats
-  if (qp.x_signature) {
-    console.log('Found qp.x_signature:', qp.x_signature);
-    receivedSignature = qp.x_signature;
-  } else if (queryParams['billplz[x_signature]']) {
-    console.log('Found billplz[x_signature]:', queryParams['billplz[x_signature]']);
-    receivedSignature = queryParams['billplz[x_signature]'];
-  } else {
-    // Look for any key containing 'x_signature'
-    console.log('Searching for signature in all keys...');
-    Object.entries(queryParams).forEach(([key, value]) => {
-      if (key.includes('x_signature') || key.includes('signature')) {
-        console.log(`Found possible signature in key '${key}':`, value);
-      }
-    });
-    
-    console.error('Missing x_signature in query parameters');
-    return false;
-  }
-  
-  // Make sure the provided xSignature matches what's in the query params
-  if (receivedSignature !== xSignature) {
-    console.error(`Signature mismatch: Provided ${xSignature} but found ${receivedSignature} in query params`);
-    return false;
-  }
-  
-  // 3. Create payload for signature verification - properly extract keys
-  const payloadForSignature: Record<string, any> = {};
-  
-  // Create debug info for request structure
-  let requestStructureDebug = {
-    hasNestedBillplz: !!queryParams.billplz && typeof queryParams.billplz === 'object',
-    flatKeysFound: [] as string[],
-    nestedKeysFound: [] as string[],
-    allQueryKeys: Object.keys(queryParams)
-  };
-  
-  // Handle nested object case first
-  if (requestStructureDebug.hasNestedBillplz) {
-    console.log('QUERY STRUCTURE: Using nested billplz object format');
-    // If using Express 4.18+ with nested objects
-    const billplzParams = { ...queryParams.billplz };
-    delete billplzParams.x_signature;
-    Object.assign(payloadForSignature, billplzParams);
-    
-    // For debugging
-    requestStructureDebug.nestedKeysFound = Object.keys(billplzParams);
-    console.log('Keys found in nested billplz object:', requestStructureDebug.nestedKeysFound);
-  } else {
-    console.log('QUERY STRUCTURE: Using flat billplz[param]=value format');
-    // Handle flat keys case (older Express or custom query parser)
-    for (const [key, value] of Object.entries(queryParams)) {
-      // Skip the signature parameter itself
-      if (key === 'billplz[x_signature]') continue;
-      
-      // Extract the parameter name from the format 'billplz[param]'
-      const match = key.match(/billplz\[(.*)\]/);
-      if (match && match[1]) {
-        const paramName = match[1];
-        payloadForSignature[paramName] = value;
-        requestStructureDebug.flatKeysFound.push(paramName);
-      }
-    }
-    console.log('Extracted parameters from flat keys:', requestStructureDebug.flatKeysFound);
-  }
-  
-  console.log('PAYLOAD EXTRACTION: Complete payload for signature verification:', payloadForSignature);
-  
-  // Handle special case if payload is empty - this is usually a bug!
-  if (Object.keys(payloadForSignature).length === 0) {
-    console.error('⚠️ CRITICAL ERROR: Empty payload for signature verification');
-    console.log('This usually means the query parameters format is not recognized.');
-    console.log('Attempting fallback extraction method...');
-    
-    // Fallback extraction for any structure
-    // Direct extraction for nested format
-    if (queryParams.billplz && typeof queryParams.billplz === 'object') {
-      for (const [key, value] of Object.entries(queryParams.billplz)) {
-        if (key !== 'x_signature') {
-          payloadForSignature[key] = value;
-        }
-      }
-    } else {
-      // Try to find any 'billplz[XXX]' style param and extract XXX as key
-      for (const [key, value] of Object.entries(queryParams)) {
-        if (key !== 'billplz[x_signature]' && key.startsWith('billplz[') && key.endsWith(']')) {
-          const paramName = key.substring(8, key.length - 1);
-          payloadForSignature[paramName] = value;
-        }
-      }
-    }
-    
-    console.log('FALLBACK EXTRACTION: Updated payload:', payloadForSignature);
-  }
-  
-  // 4. Sort keys alphabetically and pipe-concatenate key+value pairs according to Billplz docs
-  const keys = Object.keys(payloadForSignature).sort();
-  
-  // Handle case where values are arrays (Express query parser might create these)
-  const normalizedPayload: Record<string, string> = {};
-  for (const key of keys) {
-    let value = payloadForSignature[key];
-    
-    // If value is an array with one item, use that item instead
-    if (Array.isArray(value) && value.length === 1) {
-      console.log(`Converting array value for key '${key}' to string:`, value[0]);
-      normalizedPayload[key] = value[0].toString();
-    } else {
-      normalizedPayload[key] = value?.toString() || '';
-    }
-  }
-  
-  // Re-sort keys after normalization
-  const sortedKeys = Object.keys(normalizedPayload).sort();
-  const concatenatedString = sortedKeys.map(key => `${key}${normalizedPayload[key]}`).join('|');
-  
-  console.log('SIGNATURE BUILDING: Normalized payload:', normalizedPayload);
-  console.log('SIGNATURE BUILDING: Concatenated string for signature:', concatenatedString);
-
-  // 5. Create HMAC-SHA256 signature
-  const hmac = crypto.createHmac('sha256', BILLPLZ_XSIGN_KEY);
-  hmac.update(concatenatedString);
-  const calculatedSignature = hmac.digest('hex');
-
-  console.log('SIGNATURE VERIFICATION:');
-  console.log('- Calculated signature:', calculatedSignature);
-  console.log('- Received signature:', xSignature);
-  console.log('- Signatures match?', calculatedSignature === xSignature);
-  
-  // 6. Use constant-time comparison for security
   try {
-    const bufCalc = Buffer.from(calculatedSignature, 'hex');
-    const bufReceived = Buffer.from(xSignature, 'hex');
+    // Split the raw query string into parts
+    const parts = rawQueryString.split('&');
     
-    console.log('- Buffer lengths match?', bufCalc.length === bufReceived.length);
+    // Create a list of key-value pairs in the format "keyvalue" (without the =)
+    const elementsToSign: string[] = [];
     
-    if (bufCalc.length !== bufReceived.length) {
-      console.error('⚠️ Buffer lengths do not match! Cannot use timing-safe comparison');
-      console.log('- Calculated buffer length:', bufCalc.length);
-      console.log('- Received buffer length:', bufReceived.length);
-      // Fallback to regular string comparison
-      const isValid = calculatedSignature === xSignature;
-      console.log(`RESULT: ${isValid ? 'VALID ✅' : 'INVALID ❌'} (string comparison)`);
+    // Log all parameters for debugging
+    console.log('Parsed parameters:');
+    
+    for (const part of parts) {
+      // Skip empty parts
+      if (!part) continue;
+      
+      // Split into key and value
+      const [key, value] = part.split('=');
+      
+      if (key && key !== 'billplz[x_signature]') {
+        const decodedValue = decodeURIComponent(value || '');
+        console.log(`- ${key} = ${decodedValue}`);
+        
+        // Add to elements to sign
+        elementsToSign.push(`${key}${decodedValue}`);
+      }
+    }
+    
+    // Sort elements alphabetically as per Billplz requirements
+    elementsToSign.sort();
+    
+    // Print the elements for debugging
+    console.log('Sorted elements for signing:');
+    elementsToSign.forEach(element => console.log(`- ${element}`));
+    
+    // Join with pipe character
+    const sourceString = elementsToSign.join('|');
+    console.log('Source string for HMAC:', sourceString);
+    
+    // Create HMAC signature
+    const hmac = crypto.createHmac('sha256', BILLPLZ_XSIGN_KEY);
+    hmac.update(sourceString);
+    const calculatedSignature = hmac.digest('hex');
+    
+    console.log('Calculated signature:', calculatedSignature);
+    console.log('Expected signature:', expectedSignature);
+    
+    // Use timing-safe comparison for security
+    try {
+      const bufCalc = Buffer.from(calculatedSignature, 'hex');
+      const bufExpected = Buffer.from(expectedSignature, 'hex');
+      
+      if (bufCalc.length !== bufExpected.length) {
+        console.error('Buffer lengths do not match, cannot use timing-safe comparison');
+        const isValid = calculatedSignature === expectedSignature;
+        console.log(`Signature verification result: ${isValid ? 'VALID ✅' : 'INVALID ❌'} (string comparison)`);
+        console.log('🔐 REDIRECT SIGNATURE VERIFICATION END 🔐');
+        return isValid;
+      }
+      
+      const isValid = crypto.timingSafeEqual(bufCalc, bufExpected);
+      console.log(`Signature verification result: ${isValid ? 'VALID ✅' : 'INVALID ❌'} (timing-safe comparison)`);
+      console.log('🔐 REDIRECT SIGNATURE VERIFICATION END 🔐');
+      return isValid;
+    } catch (error) {
+      console.error('Error in timing-safe comparison:', error);
+      const isValid = calculatedSignature === expectedSignature;
+      console.log(`Signature verification result: ${isValid ? 'VALID ✅' : 'INVALID ❌'} (fallback string comparison)`);
+      console.log('🔐 REDIRECT SIGNATURE VERIFICATION END 🔐');
       return isValid;
     }
-    
-    const isValid = crypto.timingSafeEqual(bufCalc, bufReceived);
-    console.log(`RESULT: ${isValid ? 'VALID ✅' : 'INVALID ❌'} (timing-safe comparison)`);
-    return isValid;
-  } catch (e) {
-    console.error('Error in timing-safe signature comparison:', e);
-    // Fallback to regular comparison if lengths are different or other errors
-    const isValid = calculatedSignature === xSignature;
-    console.log(`RESULT: ${isValid ? 'VALID ✅' : 'INVALID ❌'} (fallback string comparison)`);
-    return isValid;
-  } finally {
-    console.log('🔐 SIGNATURE VERIFICATION END 🔐');
+  } catch (error) {
+    console.error('Error processing redirect signature verification:', error);
+    console.log('🔐 REDIRECT SIGNATURE VERIFICATION END 🔐');
+    return false;
   }
 }
 
@@ -363,5 +330,12 @@ export function verifyRedirectSignature(queryParams: Record<string, any>, xSigna
  * Format a URL for the Billplz bill payment page
  */
 export function getBillURL(billId: string): string {
-  return `https://www.billplz-sandbox.com/bills/${billId}`;
+  // Use a configurable base URL via environment variables, with sandbox fallback
+  const BILLPLZ_VIEW_BASE_URL = process.env.BILLPLZ_VIEW_BASE_URL || 'https://www.billplz-sandbox.com';
+  
+  // Log the URL being generated for debugging
+  const url = `${BILLPLZ_VIEW_BASE_URL}/bills/${billId}`;
+  console.log(`🔗 Generated Billplz payment URL: ${url}`);
+  
+  return url;
 }

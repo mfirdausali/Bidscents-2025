@@ -2892,64 +2892,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Stage B: Extract signature from the raw query string
-      const signatureMatch = req.rawQuery.match(/(?:^|&)billplz\[x_signature\]=([0-9a-f]{64})(?:&|$)/);
+      // Stage B: Extract signature from the parsed query params
+      const signatureFromQuery = req.query['billplz[x_signature]'] as string;
       
-      if (!signatureMatch) {
-        console.error('❌ ERROR: No valid signature found in the redirect URL');
+      if (!signatureFromQuery) {
+        console.error('❌ ERROR: No signature found in the redirect URL query parameters');
         return res.status(400).json({
           message: 'Invalid payment redirect: missing signature',
-          details: 'Could not find a valid signature parameter in the URL.'
+          details: 'Could not find a signature parameter in the URL query.'
         });
       }
       
-      const signature = signatureMatch[1];
-      console.log('🔑 Extracted signature:', signature);
+      console.log('🔑 Extracted signature from query params:', signatureFromQuery);
       
-      // Remove the signature part from the query string
-      let unsignedQuery = req.rawQuery.replace(signatureMatch[0], '');
-      // Clean up any boundary ampersands
-      unsignedQuery = unsignedQuery.replace(/^&|&$/g, '');
-      
-      console.log('🧩 Unsigned query portion for verification:', unsignedQuery);
-      
-      // Stage C: Build the source string for HMAC
-      // Split into key=value pairs and sort them
-      const pairs = unsignedQuery ? unsignedQuery.split('&') : [];
-      pairs.sort(); // Sort alphabetically as Billplz does
-      
-      // Join with pipes, removing equal signs
-      const sourceString = pairs.map(p => p.replace('=', '')).join('|');
-      
-      console.log('🔗 Source string for HMAC:', sourceString);
-      
-      // Stage D: Verify the signature
-      const keyBuffer = Buffer.from(process.env.BILLPLZ_XSIGN_KEY, 'utf8');
-      const hmac = crypto.createHmac('sha256', keyBuffer);
-      hmac.update(sourceString, 'utf8');
-      const calculatedSignature = hmac.digest('hex');
-      
-      console.log('🔐 Calculated signature:', calculatedSignature);
-      console.log('🔐 Received signature:', signature);
-      
-      // Constant-time comparison for security
-      let isSignatureValid = false;
-      try {
-        const calcBuffer = Buffer.from(calculatedSignature, 'hex');
-        const sigBuffer = Buffer.from(signature, 'hex');
-        
-        if (calcBuffer.length === sigBuffer.length) {
-          isSignatureValid = crypto.timingSafeEqual(calcBuffer, sigBuffer);
-        } else {
-          console.error('❌ ERROR: Buffer length mismatch, cannot use timing-safe comparison');
-          isSignatureValid = calculatedSignature === signature;
-        }
-      } catch (e) {
-        console.error('❌ ERROR: Exception during signature verification:', e);
-        isSignatureValid = calculatedSignature === signature; // Fallback
-      }
-      
-      console.log(`🔐 Signature verification result: ${isSignatureValid ? 'VALID ✅' : 'INVALID ❌'}`);
+      // Stage C: Verify the signature using the new implementation
+      const isSignatureValid = billplz.verifyRedirectSignature(req.rawQuery, signatureFromQuery);
       
       // Proceed only if signature is valid
       if (!isSignatureValid) {
@@ -2962,7 +2919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('✅ Signature verification successful!');
       
-      // Stage E: Extract payment data from URL parameters
+      // Stage D: Extract payment data from URL parameters using URLSearchParams
       // We can now safely use the parsed query params since we verified the signature
       const urlParams = new URLSearchParams(req.rawQuery);
       
