@@ -2871,7 +2871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // For sandbox environment, make signature optional
-      const isSandbox = process.env.BILLPLZ_BASE_URL?.includes('sandbox') ?? true;
+      const isSandbox = isBillplzSandbox();
       
       if (!xSignature && !isSandbox) {
         console.error('❌ ERROR: Missing X-Signature (checked headers and body)');
@@ -3075,7 +3075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // For PRODUCTION environment, strictly enforce signature verification
-      // For SANDBOX, allow bypass for testing (isSandbox already defined above)
+      // For SANDBOX, allow bypass for testing
       
       if (!signatureValid && !isSandbox) {
         console.error('❌ ERROR: Signature verification failed in PRODUCTION environment');
