@@ -1237,6 +1237,27 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
   
+  /**
+   * Update payment with product IDs
+   * This ensures product IDs are stored in the payment record
+   * even if they were only sent via the Billplz reference fields
+   */
+  async updatePaymentProductIds(id: number, productIds: string[]): Promise<Payment> {
+    const updateValues: Partial<Payment> = {
+      productIds,
+      updatedAt: new Date(),
+    };
+    
+    const result = await db
+      .update(payments)
+      .set(updateValues)
+      .where(eq(payments.id, id))
+      .returning()
+      .execute();
+      
+    return result[0];
+  }
+  
   private async addMessageDetails(messagesList: Message[]): Promise<MessageWithDetails[]> {
     // Import decryption utility
     const { decryptMessage, isEncrypted } = await import('./encryption');
