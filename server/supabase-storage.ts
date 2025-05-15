@@ -1814,6 +1814,156 @@ export class SupabaseStorage implements IStorage {
     });
     
     try {
+      const { data, error } = await supabase
+        .from('payments')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error(`Error updating payment ${id}:`, error);
+        throw error;
+      }
+      
+      console.log(`✅ Successfully updated payment ${id} to status '${status}'`);
+      
+      // If status is 'paid', update the product's featured status
+      if (status === 'paid') {
+        await this.updateProductFeaturedStatusForPayment(data.id);
+      }
+      
+      return this.mapPaymentFromDb(data);
+    } catch (err) {
+      console.error(`❌ Failed to update payment ${id}:`, err);
+      throw err;
+    }
+  }
+  
+  /**
+   * Updates product featured status when a payment is completed
+   * This links payments to products by making them featured when payment is successful
+   */
+  private async updateProductFeaturedStatusForPayment(paymentId: number): Promise<void> {
+    try {
+      // Get the payment to extract product IDs
+      const payment = await this.getPaymentById(paymentId);
+      if (!payment) {
+        console.error(`Cannot update product featured status: Payment ${paymentId} not found`);
+        return;
+      }
+      
+      // Extract product IDs from the payment
+      let productIds: number[] = [];
+      
+      if (payment.metadata && payment.metadata.productIds) {
+        // If product IDs are stored in the metadata directly
+        productIds = Array.isArray(payment.metadata.productIds) 
+          ? payment.metadata.productIds.map(id => Number(id)) 
+          : [Number(payment.metadata.productIds)];
+      } else if (payment.metadata && payment.metadata.product_id) {
+        // Alternative: product_id in metadata
+        productIds = [Number(payment.metadata.product_id)];
+      } else if (payment.metadata && payment.metadata.product_ids) {
+        // Alternative: product_ids as string in metadata
+        const ids = typeof payment.metadata.product_ids === 'string'
+          ? payment.metadata.product_ids.split(',')
+          : payment.metadata.product_ids;
+        productIds = ids.map(id => Number(id));
+      }
+      
+      if (productIds.length === 0) {
+        console.warn(`Payment ${paymentId} has no associated product IDs, cannot update featured status`);
+        return;
+      }
+      
+      console.log(`Updating featured status for ${productIds.length} products from payment ${paymentId}`);
+      
+      // Feature duration in days (default to 7 if not specified)
+      const featureDuration = payment.metadata && payment.metadata.featureDuration
+        ? Number(payment.metadata.featureDuration)
+        : 7;
+      
+      // Calculate the featured until date
+      const now = new Date();
+      const featuredUntil = new Date(now);
+      featuredUntil.setDate(now.getDate() + featureDuration);
+      
+      // Update each product
+      for (const productId of productIds) {
+        console.log(`Setting product ${productId} as featured until ${featuredUntil.toISOString()}`);
+        
+        // Update the product
+        const { error } = await supabase
+          .from('products')
+          .update({
+            is_featured: true,
+            featured_at: now.toISOString(),
+            featured_until: featuredUntil.toISOString(),
+            status: 'featured'
+          })
+          .eq('id', productId);
+          
+        if (error) {
+          console.error(`Failed to update featured status for product ${productId}:`, error);
+        } else {
+          console.log(`✅ Successfully featured product ${productId}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error in updateProductFeaturedStatusForPayment:', err);
+    }
+  }
+  
+  /**
+   * Get a payment by ID
+   */
+  async getPaymentById(id: number): Promise<Payment | undefined> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select()
+      .eq('id', id)
+      .single();
+      
+    if (error) {
+      if (error.code === 'PGRST116') { // No rows returned
+        return undefined;
+      }
+      console.error('Error getting payment by ID:', error);
+      throw error;
+    }
+    
+    return this.mapPaymentFromDb(data);
+  }
+  
+  /**
+   * Update payment with product IDs
+   * This ensures product IDs are stored in the payment record
+   * even if they were only sent via the Billplz reference fields
+   */
+  async updatePaymentProductIds(id: number, productIds: string[]): Promise<Payment> {
+    console.log(`Updating payment ${id} with product IDs: ${productIds.join(', ')}`);
+    
+    // Convert product IDs to JSON string for webhook_payload storage
+    // Store both as array in metadata and as string in webhook_payload for backward compatibility
+    const productDetails = productIds.map(pid => ({ id: pid }));
+    const metadata = {
+      productIds,
+      productDetails,
+      updatedAt: new Date().toISOString()
+    };
+    
+    const updateData: any = {
+      webhook_payload: JSON.stringify(metadata)
+    };
+    
+    console.log('Sending product ID update to database:', {
+      table: 'payments',
+      id,
+      productCount: productIds.length
+    });
+    
+    try {
       // Get the current payment first to ensure we have access to all fields
       const { data: existingPayment, error: fetchError } = await supabase
         .from('payments')
