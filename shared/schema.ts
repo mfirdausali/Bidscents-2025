@@ -309,7 +309,9 @@ export type InsertAuction = z.infer<typeof insertAuctionSchema>;
 export type Bid = typeof bids.$inferSelect;
 export type InsertBid = z.infer<typeof insertBidSchema>;
 
-export type Payment = typeof payments.$inferSelect;
+export type Payment = typeof payments.$inferSelect & {
+  product_id?: string | number | null; // Added for compatibility with database structure
+};
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 // Extended types
