@@ -1953,14 +1953,18 @@ export class SupabaseStorage implements IStorage {
       updatedAt: new Date().toISOString()
     };
     
+    // Store both in webhook_payload AND in the product_ids column
     const updateData: any = {
-      webhook_payload: JSON.stringify(metadata)
+      webhook_payload: JSON.stringify(metadata),
+      product_ids: productIds,  // Store directly in product_ids column
+      metadata: metadata        // Also store in metadata column if available
     };
     
     console.log('Sending product ID update to database:', {
       table: 'payments',
       id,
-      productCount: productIds.length
+      productCount: productIds.length,
+      fields: Object.keys(updateData)
     });
     
     try {
@@ -1980,7 +1984,11 @@ export class SupabaseStorage implements IStorage {
         throw new Error(`Payment with ID ${id} not found`);
       }
       
-      console.log('Existing payment:', existingPayment);
+      console.log('Existing payment:', {
+        id: existingPayment.id,
+        availableFields: Object.keys(existingPayment),
+        currentProductIds: existingPayment.product_ids || 'none'
+      });
       
       // Update the payment
       const { data, error } = await supabase
@@ -1997,7 +2005,12 @@ export class SupabaseStorage implements IStorage {
         throw error;
       }
       
-      console.log('Payment updated successfully:', data);
+      console.log('Payment updated successfully:', {
+        id: data.id,
+        product_ids: data.product_ids,
+        updated_at: data.updated_at
+      });
+      
       return this.mapPaymentFromDb(data);
     } catch (err) {
       console.error('Database error updating payment:', err);
@@ -2012,8 +2025,10 @@ export class SupabaseStorage implements IStorage {
       if (!data) {
         console.error(`Payment with ID ${id} not found`);
       } else {
-        console.log('Payment exists but could not be updated:', data);
-        console.log('Available fields in payment record:', Object.keys(data).join(', '));
+        console.log('Payment exists but could not be updated:', {
+          availableFields: Object.keys(data).join(', '),
+          product_ids_field_exists: Object.keys(data).includes('product_ids')
+        });
       }
       
       throw err;
