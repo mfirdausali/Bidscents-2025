@@ -107,50 +107,38 @@ export function FeaturedProductCarousel() {
   return (
     <section className="py-8 lg:py-16 bg-white">
       <div className="container mx-auto px-4 lg:px-6">
-        <h2 className="font-playfair text-2xl lg:text-3xl font-bold mb-6 lg:mb-10 text-center">Featured Products</h2>
+        <h2 className="font-playfair text-2xl lg:text-3xl font-bold mb-4 lg:mb-8 text-center">Featured Products</h2>
         
         <div className="relative max-w-6xl mx-auto">
           {/* Fixed width container to prevent resizing */}
           <div className="overflow-hidden">
             {/* Apply smooth transition */}
             <div className={`transition-all duration-700 ease-in-out ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
-              <div className="space-y-8 lg:space-y-12">
-                {/* First Product - Image Left, Text Right */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-center min-h-[250px] lg:min-h-[300px]">
-                  <div className="h-60 lg:h-72 w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 min-h-[400px] lg:min-h-[500px]">
+                {/* First Product */}
+                <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
+                    <div className="absolute top-0 left-0 z-10 m-2">
+                      <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
+                        Featured
+                      </div>
+                    </div>
                     <img 
                       src={getProductImageUrl(firstProduct)} 
                       alt={firstProduct.name} 
-                      className="rounded-lg shadow-xl w-full h-full object-cover transition-opacity duration-700 ease-in-out"
+                      className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="flex flex-col h-full">
-                    <div className="text-sm bg-gold text-rich-black px-3 py-1 rounded-full inline-block mb-2 uppercase tracking-wider">Featured</div>
-                    <h3 className="font-playfair text-2xl lg:text-3xl font-bold mb-2 line-clamp-2">{firstProduct.name}</h3>
-                    <div className="text-xl text-gold mb-3">RM {firstProduct.price.toFixed(2)}</div>
-                    
-                    {/* Additional details on desktop */}
-                    <div className="hidden lg:grid grid-cols-2 gap-3 mb-4">
-                      {firstProduct.volume && (
-                        <div className="bg-gray-100 p-2 rounded-md">
-                          <div className="text-xs text-gray-500">Volume</div>
-                          <div className="font-medium truncate text-sm">{firstProduct.volume}</div>
-                        </div>
-                      )}
-                      <div className="bg-gray-100 p-2 rounded-md">
-                        <div className="text-xs text-gray-500">Fullness</div>
-                        <div className="font-medium truncate text-sm">{firstProduct.remainingPercentage || 100}% Remaining</div>
-                      </div>
-                    </div>
-                    
-                    <p className="text-gray-600 mb-4 line-clamp-2">
+                  <div className="flex-1 p-4 flex flex-col">
+                    <h3 className="font-playfair text-lg font-bold mb-2 line-clamp-2">{firstProduct.name}</h3>
+                    <p className="text-gold font-medium mb-3">RM {firstProduct.price.toFixed(2)}</p>
+                    <div className="mb-3 text-sm text-gray-600 line-clamp-2">
                       {firstProduct.description || "No description available."}
-                    </p>
-                    
+                    </div>
                     <div className="mt-auto">
                       <Link href={`/products/${firstProduct.id}`} className="w-full">
                         <Button 
-                          className="w-full bg-purple-600 text-white hover:bg-purple-700 py-3 rounded-full"
+                          className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
                         >
                           View Details
                         </Button>
@@ -159,47 +147,35 @@ export function FeaturedProductCarousel() {
                   </div>
                 </div>
 
-                {/* Second Product - Image Right, Text Left (reversed on mobile) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-center min-h-[250px] lg:min-h-[300px]">
-                  <div className="flex flex-col h-full order-2 lg:order-1">
-                    <div className="text-sm bg-gold text-rich-black px-3 py-1 rounded-full inline-block mb-2 uppercase tracking-wider">Featured</div>
-                    <h3 className="font-playfair text-2xl lg:text-3xl font-bold mb-2 line-clamp-2">{secondProduct.name}</h3>
-                    <div className="text-xl text-gold mb-3">RM {secondProduct.price.toFixed(2)}</div>
-                    
-                    {/* Additional details on desktop */}
-                    <div className="hidden lg:grid grid-cols-2 gap-3 mb-4">
-                      {secondProduct.volume && (
-                        <div className="bg-gray-100 p-2 rounded-md">
-                          <div className="text-xs text-gray-500">Volume</div>
-                          <div className="font-medium truncate text-sm">{secondProduct.volume}</div>
-                        </div>
-                      )}
-                      <div className="bg-gray-100 p-2 rounded-md">
-                        <div className="text-xs text-gray-500">Fullness</div>
-                        <div className="font-medium truncate text-sm">{secondProduct.remainingPercentage || 100}% Remaining</div>
+                {/* Second Product */}
+                <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
+                    <div className="absolute top-0 left-0 z-10 m-2">
+                      <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
+                        Featured
                       </div>
                     </div>
-                    
-                    <p className="text-gray-600 mb-4 line-clamp-2">
+                    <img 
+                      src={getProductImageUrl(secondProduct)} 
+                      alt={secondProduct.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 p-4 flex flex-col">
+                    <h3 className="font-playfair text-lg font-bold mb-2 line-clamp-2">{secondProduct.name}</h3>
+                    <p className="text-gold font-medium mb-3">RM {secondProduct.price.toFixed(2)}</p>
+                    <div className="mb-3 text-sm text-gray-600 line-clamp-2">
                       {secondProduct.description || "No description available."}
-                    </p>
-                    
+                    </div>
                     <div className="mt-auto">
                       <Link href={`/products/${secondProduct.id}`} className="w-full">
                         <Button 
-                          className="w-full bg-purple-600 text-white hover:bg-purple-700 py-3 rounded-full"
+                          className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
                         >
                           View Details
                         </Button>
                       </Link>
                     </div>
-                  </div>
-                  <div className="h-60 lg:h-72 w-full order-1 lg:order-2">
-                    <img 
-                      src={getProductImageUrl(secondProduct)} 
-                      alt={secondProduct.name} 
-                      className="rounded-lg shadow-xl w-full h-full object-cover transition-opacity duration-700 ease-in-out"
-                    />
                   </div>
                 </div>
               </div>
@@ -211,25 +187,25 @@ export function FeaturedProductCarousel() {
             <>
               {/* Navigation arrows */}
               <button 
-                className="absolute top-1/2 left-3 transform -translate-y-1/2 bg-rich-black bg-opacity-70 text-white p-2 rounded-full hover:bg-gold hover:text-rich-black transition z-10"
+                className="absolute top-1/2 left-2 md:left-4 transform -translate-y-1/2 bg-rich-black bg-opacity-70 text-white p-2 rounded-full hover:bg-gold hover:text-rich-black transition z-10"
                 onClick={handlePrev}
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4 md:h-6 md:w-6" />
               </button>
               <button 
-                className="absolute top-1/2 right-3 transform -translate-y-1/2 bg-rich-black bg-opacity-70 text-white p-2 rounded-full hover:bg-gold hover:text-rich-black transition z-10"
+                className="absolute top-1/2 right-2 md:right-4 transform -translate-y-1/2 bg-rich-black bg-opacity-70 text-white p-2 rounded-full hover:bg-gold hover:text-rich-black transition z-10"
                 onClick={handleNext}
               >
-                <ArrowRight className="h-5 w-5" />
+                <ArrowRight className="h-4 w-4 md:h-6 md:w-6" />
               </button>
               
               {/* Pagination dots */}
-              <div className="mt-8 flex justify-center items-center">
+              <div className="mt-6 flex justify-center items-center">
                 <div className="flex space-x-2">
                   {paginationDotIndices.map((dotIndex) => (
                     <button
                       key={dotIndex}
-                      className={`w-3 h-3 mx-1 rounded-full transition-colors duration-300 ${
+                      className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
                         dotIndex === currentIndex ? 'bg-gold' : 'bg-gray-300'
                       }`}
                       onClick={() => {
