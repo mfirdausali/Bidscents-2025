@@ -873,6 +873,18 @@ export default function SellerDashboard() {
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.brand.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+  
+  // Track boosted products based on featuredUntil date
+  useEffect(() => {
+    if (products) {
+      const nowDate = new Date();
+      const boosted = products
+        .filter(p => p.isFeatured && p.featuredUntil && new Date(p.featuredUntil) > nowDate)
+        .map(p => p.id);
+      
+      setBoostedProductIds(boosted);
+    }
+  }, [products]);
 
   // Handle boost checkbox changes
   const toggleBoostProduct = (productId: number) => {
@@ -1116,14 +1128,25 @@ export default function SellerDashboard() {
                         </TableHeader>
                         <TableBody>
                           {filteredProducts.map((product) => (
-                            <TableRow key={product.id}>
+                            <TableRow 
+                              key={product.id}
+                              className={boostedProductIds.includes(product.id) ? "bg-yellow-50" : ""}
+                            >
                               <TableCell className="bg-[#FFF9E6]">
-                                <Checkbox
-                                  id={`boost-${product.id}`}
-                                  checked={boostedProducts.includes(product.id)}
-                                  onCheckedChange={() => toggleBoostProduct(product.id)}
-                                  className="h-5 w-5 border-2 border-[#F5A623] data-[state=checked]:bg-[#F5A623] data-[state=checked]:text-white rounded-sm focus:ring-0 animate-pulse transition-all duration-300 ease-in-out"
-                                />
+                                {boostedProductIds.includes(product.id) ? (
+                                  <div className="flex items-center justify-center">
+                                    <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-semibold rounded">
+                                      Boosted
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <Checkbox
+                                    id={`boost-${product.id}`}
+                                    checked={boostedProducts.includes(product.id)}
+                                    onCheckedChange={() => toggleBoostProduct(product.id)}
+                                    className="h-5 w-5 border-2 border-[#F5A623] data-[state=checked]:bg-[#F5A623] data-[state=checked]:text-white rounded-sm focus:ring-0 animate-pulse transition-all duration-300 ease-in-out"
+                                  />
+                                )}
                               </TableCell>
                               <TableCell>
                                 <div className="w-10 h-10 rounded overflow-hidden bg-gray-100">
