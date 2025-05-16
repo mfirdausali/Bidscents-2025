@@ -3,16 +3,14 @@ import { ProductWithDetails } from "@shared/schema";
 import { Button } from "./button";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Star, StarHalf, ArrowLeft, ArrowRight } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
 export function FeaturedProductCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const { user, setCartCount } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   // Fetch featured products
@@ -21,18 +19,22 @@ export function FeaturedProductCarousel() {
   });
 
   const handlePrev = () => {
-    if (!featuredProducts || featuredProducts.length === 0 || isTransitioning) return;
+    if (!featuredProducts || featuredProducts.length < 2 || isTransitioning) return;
     
     // Start transition animation
     setIsTransitioning(true);
     
-    // After a brief fade out, change the product
+    // After a brief fade out, change the product pair
     setTimeout(() => {
-      setCurrentIndex((prevIndex) => 
-        prevIndex === 0 ? featuredProducts.length - 1 : prevIndex - 1
-      );
+      setCurrentIndex((prevIndex) => {
+        // Calculate the new index ensuring it's a multiple of 2
+        const newIndex = prevIndex === 0 
+          ? Math.floor((featuredProducts.length - 1) / 2) * 2 
+          : prevIndex - 2;
+        return newIndex;
+      });
       
-      // Allow time for the new product to render before fading back in
+      // Allow time for the new products to render before fading back in
       setTimeout(() => {
         setIsTransitioning(false);
       }, 50);
@@ -40,18 +42,21 @@ export function FeaturedProductCarousel() {
   };
 
   const handleNext = () => {
-    if (!featuredProducts || featuredProducts.length === 0 || isTransitioning) return;
+    if (!featuredProducts || featuredProducts.length < 2 || isTransitioning) return;
     
     // Start transition animation
     setIsTransitioning(true);
     
-    // After a brief fade out, change the product
+    // After a brief fade out, change the product pair
     setTimeout(() => {
-      setCurrentIndex((prevIndex) => 
-        prevIndex === featuredProducts.length - 1 ? 0 : prevIndex + 1
-      );
+      setCurrentIndex((prevIndex) => {
+        // Calculate the new index ensuring it's a multiple of 2
+        const maxStartIndex = Math.floor((featuredProducts.length - 1) / 2) * 2;
+        const newIndex = prevIndex >= maxStartIndex ? 0 : prevIndex + 2;
+        return newIndex;
+      });
       
-      // Allow time for the new product to render before fading back in
+      // Allow time for the new products to render before fading back in
       setTimeout(() => {
         setIsTransitioning(false);
       }, 50);
@@ -60,97 +65,44 @@ export function FeaturedProductCarousel() {
 
   // Auto-advance carousel every 10 seconds (longer time on each product)
   useEffect(() => {
-    if (!featuredProducts || featuredProducts.length <= 1) return;
+    if (!featuredProducts || featuredProducts.length < 2) return;
 
     const intervalId = setInterval(() => {
       // Don't auto-advance if already in transition
       if (!isTransitioning) {
         handleNext();
       }
-    }, 10000); // Increased from 5000 to 10000 ms
+    }, 10000); // 10 seconds
 
     return () => {
       clearInterval(intervalId);
     };
   }, [featuredProducts, currentIndex, isTransitioning]);
 
-  // Function to render star ratings
-  const renderStars = (rating: number | undefined) => {
-    if (!rating) rating = 0;
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-
-    // Add full stars
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={`star-${i}`} className="fill-gold text-gold" />);
-    }
-
-    // Add half star if needed
-    if (hasHalfStar) {
-      stars.push(<StarHalf key="half-star" className="fill-gold text-gold" />);
-    }
-
-    // Add empty stars to make total of 5
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(<Star key={`empty-${i}`} className="text-gold" />);
-    }
-
-    return stars;
-  };
-
-  // Handle add to cart
-  const handleAddToCart = async (product: ProductWithDetails) => {
-    if (!user) {
-      toast({
-        title: "Please sign in",
-        description: "You need to be signed in to add items to your cart",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsAddingToCart(true);
-    try {
-      await apiRequest("POST", "/api/cart", {
-        productId: product.id,
-        quantity: 1,
-      });
-      
-      toast({
-        title: "Added to cart",
-        description: `${product.name} has been added to your cart`,
-      });
-      
-      // Refetch cart items to update count
-      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
-      
-      // Get updated cart count
-      const response = await fetch("/api/cart", {
-        credentials: "include",
-      });
-      
-      if (response.ok) {
-        const cartItems = await response.json();
-        setCartCount(cartItems.length);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add item to cart",
-        variant: "destructive",
-      });
-    } finally {
-      setIsAddingToCart(false);
-    }
-  };
-
   if (!featuredProducts || featuredProducts.length === 0) {
     return null;
   }
 
-  const currentProduct = featuredProducts[currentIndex];
+  // Helper function to get product image URL
+  const getProductImageUrl = (product: ProductWithDetails) => {
+    if (product.images && product.images.find(img => img.imageOrder === 0)) {
+      return `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`;
+    } else if (product.images && product.images.length > 0) {
+      return `/api/images/${product.images[0].imageUrl}`;
+    } else {
+      return `/api/images/${product.imageUrl}`;
+    }
+  };
+
+  // Get current pair of products to display
+  const firstProduct = featuredProducts[currentIndex];
+  // Get second product or undefined if not available
+  const secondProduct = currentIndex + 1 < featuredProducts.length ? 
+    featuredProducts[currentIndex + 1] : featuredProducts[0];
+
+  // Calculate the number of pagination dots (each dot represents a pair of products)
+  const paginationDotsCount = Math.ceil(featuredProducts.length / 2);
+  const paginationDotIndices = Array.from({ length: paginationDotsCount }, (_, i) => i * 2);
 
   return (
     <section className="py-8 lg:py-16 bg-white">
@@ -162,160 +114,123 @@ export function FeaturedProductCarousel() {
           <div className="overflow-hidden">
             {/* Apply smooth transition */}
             <div className={`transition-all duration-700 ease-in-out ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 items-center min-h-[400px] lg:min-h-[600px]">
-                <div className="h-72 lg:h-96">
-                  <img 
-                    src={
-                      // First, try to find an image with imageOrder=0
-                      currentProduct.images && currentProduct.images.find(img => img.imageOrder === 0)
-                        ? `/api/images/${currentProduct.images.find(img => img.imageOrder === 0)?.imageUrl}`
-                        // Then try any available image
-                        : currentProduct.images && currentProduct.images.length > 0
-                          ? `/api/images/${currentProduct.images[0].imageUrl}`
-                          // Fallback to the old imageUrl field if no images in the table
-                          : `/api/images/${currentProduct.imageUrl}`
-                    }
-                    alt={currentProduct.name} 
-                    className="rounded-lg shadow-xl w-full h-full object-cover transition-opacity duration-700 ease-in-out"
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 min-h-[400px] lg:min-h-[500px]">
+                {/* First Product */}
+                <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
+                    <div className="absolute top-0 left-0 z-10 m-2">
+                      <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
+                        Featured
+                      </div>
+                    </div>
+                    <img 
+                      src={getProductImageUrl(firstProduct)} 
+                      alt={firstProduct.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 p-4 flex flex-col">
+                    <h3 className="font-playfair text-lg font-bold mb-2 line-clamp-2">{firstProduct.name}</h3>
+                    <p className="text-gold font-medium mb-3">RM {firstProduct.price.toFixed(2)}</p>
+                    <div className="mb-3 text-sm text-gray-600 line-clamp-2">
+                      {firstProduct.description || "No description available."}
+                    </div>
+                    <div className="mt-auto">
+                      <Link href={`/products/${firstProduct.id}`} className="w-full">
+                        <Button 
+                          className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
+                        >
+                          View Details
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
                 </div>
-                <div className="lg:min-h-[400px] min-h-[250px] flex flex-col">
-                  <div className="text-sm bg-gold text-rich-black px-3 py-1 rounded-full inline-block mb-1 lg:mb-2 uppercase tracking-wider">Featured</div>
-                  <h2 className="font-playfair text-3xl lg:text-4xl font-bold mb-2 lg:mb-3 line-clamp-2 h-[60px] lg:h-[80px]">{currentProduct.name}</h2>
-                  <div className="text-xl text-gold mb-2 lg:mb-3">RM {currentProduct.price.toFixed(2)}</div>
-                  
-                  <div className="flex items-center mb-3 lg:mb-6">
-                    <div className="flex text-gold">
-                      {renderStars(currentProduct.averageRating)}
-                    </div>
-                    <span className="text-sm text-gray-500 ml-2">
-                      ({currentProduct.reviews?.length || 0} reviews)
-                    </span>
-                  </div>
-                  
-                  {/* All detailed product info removed - only showing on desktop */}
-                  <div className="hidden lg:block mb-6">
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                      {currentProduct.volume && (
-                        <div className="bg-gray-100 p-3 rounded-md">
-                          <div className="text-xs text-gray-500">Volume</div>
-                          <div className="font-medium truncate">{currentProduct.volume}</div>
-                        </div>
-                      )}
-                      <div className="bg-gray-100 p-3 rounded-md">
-                        <div className="text-xs text-gray-500">Fullness</div>
-                        <div className="font-medium truncate">{currentProduct.remainingPercentage || 100}% Remaining</div>
-                      </div>
-                      {currentProduct.batchCode && (
-                        <div className="bg-gray-100 p-3 rounded-md">
-                          <div className="text-xs text-gray-500">Batch Code</div>
-                          <div className="font-medium truncate">{currentProduct.batchCode}</div>
-                        </div>
-                      )}
-                      {currentProduct.boxCondition && (
-                        <div className="bg-gray-100 p-3 rounded-md">
-                          <div className="text-xs text-gray-500">Box Condition</div>
-                          <div className="font-medium truncate">{currentProduct.boxCondition}</div>
-                        </div>
-                      )}
-                      {currentProduct.listingType && (
-                        <div className="bg-gray-100 p-3 rounded-md">
-                          <div className="text-xs text-gray-500">Listing Type</div>
-                          <div className="font-medium truncate">
-                            {currentProduct.listingType.charAt(0).toUpperCase() + currentProduct.listingType.slice(1)}
-                          </div>
-                        </div>
-                      )}
-                      <div className="bg-gray-100 p-3 rounded-md">
-                        <div className="text-xs text-gray-500">Seller</div>
-                        <div className="font-medium truncate flex items-center">
-                          {currentProduct.seller?.username || "Unknown"}
-                        </div>
+
+                {/* Second Product */}
+                <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
+                    <div className="absolute top-0 left-0 z-10 m-2">
+                      <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
+                        Featured
                       </div>
                     </div>
-                    
-                    <p className="text-gray-600 mt-4 h-[80px] overflow-y-auto line-clamp-4">
-                      {currentProduct.description || "No description available."}
-                    </p>
+                    <img 
+                      src={getProductImageUrl(secondProduct)} 
+                      alt={secondProduct.name} 
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                  
-                  <div className="mt-auto flex space-x-4">
-                    <Link href={`/products/${currentProduct.id}`} className="w-full">
-                      <Button 
-                        className="w-full bg-purple-600 text-white hover:bg-purple-700 py-4 lg:py-6 rounded-full text-sm lg:text-base"
-                      >
-                        View Details
-                      </Button>
-                    </Link>
+                  <div className="flex-1 p-4 flex flex-col">
+                    <h3 className="font-playfair text-lg font-bold mb-2 line-clamp-2">{secondProduct.name}</h3>
+                    <p className="text-gold font-medium mb-3">RM {secondProduct.price.toFixed(2)}</p>
+                    <div className="mb-3 text-sm text-gray-600 line-clamp-2">
+                      {secondProduct.description || "No description available."}
+                    </div>
+                    <div className="mt-auto">
+                      <Link href={`/products/${secondProduct.id}`} className="w-full">
+                        <Button 
+                          className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
+                        >
+                          View Details
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
           
-          {/* Navigation arrows */}
-          <button 
-            className="absolute top-1/2 left-4 transform -translate-y-1/2 bg-rich-black bg-opacity-70 text-white p-2 rounded-full hover:bg-gold hover:text-rich-black transition z-10"
-            onClick={handlePrev}
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </button>
-          <button 
-            className="absolute top-1/2 right-4 transform -translate-y-1/2 bg-rich-black bg-opacity-70 text-white p-2 rounded-full hover:bg-gold hover:text-rich-black transition z-10"
-            onClick={handleNext}
-          >
-            <ArrowRight className="h-6 w-6" />
-          </button>
-          
-          {/* Carousel dots and navigation buttons */}
-          <div className="mt-8 flex justify-center items-center">
-            {/* Left navigation button */}
-            <button 
-              className="bg-rich-black text-gray-700 h-8 w-8 rounded-full flex items-center justify-center mr-4 hover:bg-gold hover:text-rich-black transition"
-              onClick={handlePrev}
-              aria-label="Previous"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            
-            {/* Dots */}
-            <div className="flex">
-              {featuredProducts.map((_, index) => (
-                <button
-                  key={index}
-                  className={`w-3 h-3 mx-1 rounded-full transition-colors duration-300 ${
-                    index === currentIndex ? 'bg-gold' : 'bg-gray-300'
-                  }`}
-                  onClick={() => {
-                    if (isTransitioning || index === currentIndex) return;
-                    
-                    // Start transition animation
-                    setIsTransitioning(true);
-                    
-                    // After a brief fade out, change the product
-                    setTimeout(() => {
-                      setCurrentIndex(index);
-                      
-                      // Allow time for the new product to render before fading back in
-                      setTimeout(() => {
-                        setIsTransitioning(false);
-                      }, 50);
-                    }, 350);
-                  }}
-                  aria-label={`Go to slide ${index + 1}`}
-                />
-              ))}
-            </div>
-            
-            {/* Right navigation button */}
-            <button 
-              className="bg-rich-black text-gray-700 h-8 w-8 rounded-full flex items-center justify-center ml-4 hover:bg-gold hover:text-rich-black transition"
-              onClick={handleNext}
-              aria-label="Next"
-            >
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
+          {/* Only show navigation arrows if we have more than 2 products */}
+          {featuredProducts.length > 2 && (
+            <>
+              {/* Navigation arrows */}
+              <button 
+                className="absolute top-1/2 left-2 md:left-4 transform -translate-y-1/2 bg-rich-black bg-opacity-70 text-white p-2 rounded-full hover:bg-gold hover:text-rich-black transition z-10"
+                onClick={handlePrev}
+              >
+                <ArrowLeft className="h-4 w-4 md:h-6 md:w-6" />
+              </button>
+              <button 
+                className="absolute top-1/2 right-2 md:right-4 transform -translate-y-1/2 bg-rich-black bg-opacity-70 text-white p-2 rounded-full hover:bg-gold hover:text-rich-black transition z-10"
+                onClick={handleNext}
+              >
+                <ArrowRight className="h-4 w-4 md:h-6 md:w-6" />
+              </button>
+              
+              {/* Pagination dots */}
+              <div className="mt-6 flex justify-center items-center">
+                <div className="flex space-x-2">
+                  {paginationDotIndices.map((dotIndex) => (
+                    <button
+                      key={dotIndex}
+                      className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
+                        dotIndex === currentIndex ? 'bg-gold' : 'bg-gray-300'
+                      }`}
+                      onClick={() => {
+                        if (isTransitioning || dotIndex === currentIndex) return;
+                        
+                        // Start transition animation
+                        setIsTransitioning(true);
+                        
+                        // After a brief fade out, change to the product pair
+                        setTimeout(() => {
+                          setCurrentIndex(dotIndex);
+                          
+                          // Allow time for the new products to render before fading back in
+                          setTimeout(() => {
+                            setIsTransitioning(false);
+                          }, 50);
+                        }, 350);
+                      }}
+                      aria-label={`Go to products ${dotIndex + 1} and ${dotIndex + 2}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </section>
