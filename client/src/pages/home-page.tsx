@@ -94,10 +94,10 @@ export default function HomePage() {
       </section>
 
       {/* Browse Categories */}
-      <section className="container mx-auto px-6 py-6 ">
-        <h2 className="text-xl font-bold mb-4">Browse Categories</h2>
+      <section className="container mx-auto px-6 py-3">
+        <h2 className="text-xl font-bold mb-2">Browse Categories</h2>
 
-        <div className="grid grid-cols-4 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 md:grid-cols-4 gap-2">
           {/* Designer category (ID: 1) */}
           <Link
             href="/products?category=1"
@@ -150,8 +150,8 @@ export default function HomePage() {
       <FeaturedProductCarousel />
 
       {/* Auction Listings */}
-      <section className="container mx-auto px-6 py-8 bg-gray-50">
-        <div className="flex justify-between items-center mb-6">
+      <section className="container mx-auto px-6 py-4 bg-gray-50">
+        <div className="flex justify-between items-center mb-3">
           <h2 className="text-2xl font-bold">Live Auctions</h2>
           <Link
             href="/products?type=auction"
@@ -244,8 +244,8 @@ export default function HomePage() {
       </section>
 
       {/* Recent Listings */}
-      <section className="container mx-auto px-6 py-8">
-        <div className="flex justify-between items-center mb-6">
+      <section className="container mx-auto px-6 py-4">
+        <div className="flex justify-between items-center mb-3">
           <h2 className="text-2xl font-bold">Recent Listings</h2>
           <Link
             href="/products"

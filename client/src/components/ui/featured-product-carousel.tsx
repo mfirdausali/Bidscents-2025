@@ -105,9 +105,9 @@ export function FeaturedProductCarousel() {
   const paginationDotIndices = Array.from({ length: paginationDotsCount }, (_, i) => i * 2);
 
   return (
-    <section className="py-8 lg:py-16 bg-white">
+    <section className="py-4 lg:py-8 bg-white">
       <div className="container mx-auto px-4 lg:px-6">
-        <h2 className="font-playfair text-2xl lg:text-3xl font-bold mb-4 lg:mb-8 text-center">Featured Products</h2>
+        <h2 className="font-playfair text-2xl lg:text-3xl font-bold mb-3 lg:mb-5 text-center">Featured Products</h2>
         
         <div className="relative max-w-6xl mx-auto">
           {/* Fixed width container to prevent resizing */}
