@@ -147,7 +147,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
                   : '/placeholder.jpg' // Default placeholder
             }
             alt={product.name}
-            className="w-full h-48 object-cover"
+            className="w-full h-36 md:h-48 object-cover"
             onError={(e) => {
               e.currentTarget.src = '/placeholder.jpg';
               e.currentTarget.onerror = null; // Prevent infinite loop
@@ -182,16 +182,16 @@ export function AuctionCard({ product, images }: AuctionProps) {
         </Badge>
       </div>
       
-      <div className="p-4 flex flex-col flex-grow">
+      <div className="p-3 md:p-4 flex flex-col flex-grow">
         {/* Product name */}
         <Link href={`/auctions/${product.auction.id}`}>
-          <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-1 mb-1">
+          <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-1 mb-0.5 md:mb-1">
             {product.name}
           </h3>
         </Link>
         
         {/* Product subtitle */}
-        <div className="text-sm font-medium text-gray-600 mb-1 line-clamp-1">
+        <div className="text-sm font-medium text-gray-600 mb-0.5 md:mb-1 line-clamp-1">
           {product.brand} {product.volume && 
             (product.remainingPercentage === 100 
               ? `(${product.volume})` 
@@ -200,23 +200,23 @@ export function AuctionCard({ product, images }: AuctionProps) {
           }
         </div>
         
-        {/* Batch code and year */}
-        <div className="text-xs text-gray-500 mb-2">
+        {/* Batch code and year - hide on mobile */}
+        <div className="text-xs text-gray-500 mb-1 md:mb-2 hidden md:block">
           {product.batchCode && `Batch ${product.batchCode}`}
         </div>
         
         {/* Location and seller */}
-        <div className="flex items-center text-xs text-gray-500 mb-1">
+        <div className="flex items-center text-xs text-gray-500 mb-0.5 md:mb-1">
           <span className="inline-block mr-1">
             {product.seller?.username || 'Seller'}
           </span>
         </div>
         
         {/* Divider */}
-        <div className="border-t border-gray-100 my-2"></div>
+        <div className="border-t border-gray-100 my-1 md:my-2"></div>
         
         {/* Price section with bids and time remaining */}
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-2 md:mb-3">
           <span className="font-semibold text-amber-600">
             RM {currentPrice.toFixed(0)}
           </span>
@@ -235,7 +235,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
         <Button
           asChild
           disabled={!isActive}
-          className="bg-amber-500 hover:bg-amber-600 text-white text-xs py-2 w-full rounded-md"
+          className="bg-amber-500 hover:bg-amber-600 text-white text-xs py-1.5 md:py-2 w-full rounded-md"
         >
           <Link href={`/auctions/${product.auction.id}`}>
             {isActive ? "Place Bid" : "Auction Ended"}
