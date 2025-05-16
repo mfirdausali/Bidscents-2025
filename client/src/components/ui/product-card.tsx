@@ -63,7 +63,7 @@ export function ProductCard({ product }: ProductCardProps) {
                     : '/placeholder.jpg' // Default placeholder
             }
             alt={product.name}
-            className="w-full h-48 object-cover"
+            className="w-full h-36 md:h-48 object-cover"
             onError={(e) => {
               e.currentTarget.src = '/placeholder.jpg';
               e.currentTarget.onerror = null; // Prevent infinite loop
@@ -105,16 +105,16 @@ export function ProductCard({ product }: ProductCardProps) {
         </Badge>
       </div>
       
-      <div className="p-4 flex flex-col flex-grow">
+      <div className="p-3 md:p-4 flex flex-col flex-grow">
         {/* Product name */}
         <Link href={`/products/${product.id}`}>
-          <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-1 mb-1">
+          <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-1 mb-0.5 md:mb-1">
             {product.name}
           </h3>
         </Link>
         
         {/* Product subtitle */}
-        <div className="text-sm font-medium text-gray-600 mb-1 line-clamp-1">
+        <div className="text-sm font-medium text-gray-600 mb-0.5 md:mb-1 line-clamp-1">
           {product.brand} {product.volume && 
             (product.isNew 
               ? `(${product.volume})` 
@@ -123,23 +123,23 @@ export function ProductCard({ product }: ProductCardProps) {
           }
         </div>
         
-        {/* Batch code and year */}
-        <div className="text-xs text-gray-500 mb-2">
+        {/* Batch code and year - hide on mobile */}
+        <div className="text-xs text-gray-500 mb-1 md:mb-2 hidden md:block">
           {product.batchCode && `Batch ${product.batchCode}`}
         </div>
         
         {/* Location and seller */}
-        <div className="flex items-center text-xs text-gray-500 mb-1">
+        <div className="flex items-center text-xs text-gray-500 mb-0.5 md:mb-1">
           <span className="inline-block mr-1">
             {product.seller?.username || 'Seller'}
           </span>
         </div>
         
         {/* Divider */}
-        <div className="border-t border-gray-100 my-2"></div>
+        <div className="border-t border-gray-100 my-1 md:my-2"></div>
         
         {/* Price section */}
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-2 md:mb-3">
           <span className="font-semibold text-purple-600">
             RM {product.price.toFixed(0)}
           </span>
@@ -165,11 +165,11 @@ export function ProductCard({ product }: ProductCardProps) {
               productName={product.name}
               variant="secondary"
               size="sm"
-              className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded-md"
+              className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-1.5 md:py-2 rounded-md"
             />
             <Button
               variant="outline"
-              className="border-purple-600 text-purple-600 hover:bg-purple-50 text-xs py-2 rounded-md"
+              className="border-purple-600 text-purple-600 hover:bg-purple-50 text-xs py-1.5 md:py-2 rounded-md"
             >
               Make Offer
             </Button>
