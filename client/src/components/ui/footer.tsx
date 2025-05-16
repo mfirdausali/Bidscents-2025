@@ -67,31 +67,6 @@ export function Footer() {
                   About Us
                 </a>
               </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-600 hover:text-purple-600 transition-colors"
-                >
-                  Blog
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-600 hover:text-purple-600 transition-colors"
-                >
-                  FAQs
-                </a>
-              </li>
-              <li></li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-600 hover:text-purple-600 transition-colors"
-                >
-                  Help Center
-                </a>
-              </li>
             </ul>
           </div>
 
