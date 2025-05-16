@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import {
   ProductWithDetails,
   InsertProduct,
@@ -184,6 +185,7 @@ type AuctionFormValues = z.infer<typeof auctionSchema>;
 export default function SellerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [location] = useLocation();
 
   const [activeTab, setActiveTab] = useState("products");
   const [isEditMode, setIsEditMode] = useState(false);
@@ -199,6 +201,44 @@ export default function SellerDashboard() {
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [boostedProducts, setBoostedProducts] = useState<number[]>([]);
+  const [boostedProductIds, setBoostedProductIds] = useState<number[]>([]);
+
+  // Check for payment redirect parameters
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const paymentStatus = searchParams.get('payment');
+    const paymentMessage = searchParams.get('message');
+    
+    if (paymentStatus && paymentMessage) {
+      // Handle payment status
+      if (paymentStatus === 'success') {
+        toast({
+          title: "Payment Successful",
+          description: decodeURIComponent(paymentMessage),
+          variant: "default",
+          className: "bg-green-100 border-green-400 text-green-800"
+        });
+        
+        // Force a refresh of the products data
+        queryClient.invalidateQueries({ queryKey: ["/api/seller/products", user?.id] });
+      } else if (paymentStatus === 'failed') {
+        toast({
+          title: "Payment Failed",
+          description: decodeURIComponent(paymentMessage),
+          variant: "destructive"
+        });
+      } else if (paymentStatus === 'error') {
+        toast({
+          title: "Payment Error",
+          description: decodeURIComponent(paymentMessage),
+          variant: "destructive"
+        });
+      }
+      
+      // Clean up the URL to prevent duplicate notifications on refresh
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [location, toast]);
 
   // Fetch seller's products
   const { data: products, isLoading: isLoadingProducts } = useQuery<
