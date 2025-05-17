@@ -458,8 +458,8 @@ export default function MessagesPage() {
           productId: selectedConversation.productId || null
         };
         
-        // Update the messages state with the new message
-        setMessages(prevMessages => [newMessage, ...prevMessages]);
+        // Add the new message to the current conversation
+        setActiveChat(prevChat => [newMessage, ...prevChat]);
         
         // Scroll to the bottom to show the new message
         setTimeout(() => {
