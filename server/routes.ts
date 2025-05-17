@@ -1650,10 +1650,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const messages = await storage.getUserMessages(userId);
       
-      // Decrypt message content
+      // Decrypt message content and prepare file URLs
       const decryptedMessages = messages.map(msg => ({
         ...msg,
-        content: msg.content ? decryptMessage(msg.content) : msg.content
+        content: msg.content ? decryptMessage(msg.content) : msg.content,
+        fileUrl: msg.file_url // Map file_url to fileUrl for frontend consistency
       }));
       
       res.json(decryptedMessages);
@@ -1687,10 +1688,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conversation = await storage.getConversation(currentUserId, otherUserId);
       }
       
-      // Decrypt message content
+      // Decrypt message content and prepare file URLs
       const decryptedConversation = conversation.map(msg => ({
         ...msg,
-        content: msg.content ? decryptMessage(msg.content) : msg.content
+        content: msg.content ? decryptMessage(msg.content) : msg.content,
+        fileUrl: msg.file_url // Map file_url to fileUrl for frontend consistency
       }));
       
       res.json(decryptedConversation);
