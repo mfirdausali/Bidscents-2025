@@ -215,7 +215,11 @@ export default function MessagesPage() {
   };
   
   // Truncate message content for preview
-  const truncateMessage = (content: string, maxLength = 60) => {
+  const truncateMessage = (content: string | null, maxLength = 60) => {
+    // Handle null content (like for FILE type messages)
+    if (!content) {
+      return '[File Attachment]';
+    }
     return content.length > maxLength
       ? content.substring(0, maxLength) + '...'
       : content;
@@ -481,7 +485,9 @@ export default function MessagesPage() {
                           {conversation.lastMessage.senderId === user.id && (
                             <span className="text-muted-foreground mr-1">You:</span>
                           )}
-                          {truncateMessage(conversation.lastMessage.content)}
+                          {conversation.lastMessage.messageType === 'FILE' 
+                            ? '[File Attachment]' 
+                            : truncateMessage(conversation.lastMessage.content)}
                         </div>
                         {conversation.productInfo && (
                           <Badge variant="outline" className="mt-1 text-xs px-2 py-0">
