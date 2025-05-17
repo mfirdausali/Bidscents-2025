@@ -5,18 +5,27 @@ import { randomUUID } from 'crypto';
 export const IMAGE_TYPES = {
   PRODUCT: 'product',
   PROFILE: 'profile',
-  COVER: 'cover'
+  COVER: 'cover',
+  MESSAGE_FILE: 'message-file'
 };
 
-// Initialize the Replit Object Storage client
+// Initialize the Replit Object Storage clients
 // Use environment variable for deployment or fallback to default bucket ID
-const bucketId = process.env.REPLIT_OBJECT_STORAGE_BUCKET_ID || "replit-objstore-0eba980b-4a8f-47b6-90af-f554bb8688e2";
+const productBucketId = process.env.REPLIT_OBJECT_STORAGE_BUCKET_ID || "replit-objstore-0eba980b-4a8f-47b6-90af-f554bb8688e2";
+const messageBucketId = "replit-objstore-94260517-cd41-4021-b194-9f9e53fa8889";
 
+// Client for product images and user profiles
 export const storageClient = new Client({
-  bucketId: bucketId
+  bucketId: productBucketId
 });
 
-console.log(`Initialized Replit Object Storage client with bucket: ${bucketId}`);
+// Client for message file uploads
+export const messageFileStorageClient = new Client({
+  bucketId: messageBucketId
+});
+
+console.log(`Initialized main storage client with bucket: ${productBucketId}`);
+console.log(`Initialized message files storage client with bucket: ${messageBucketId}`);
 
 /**
  * Upload an image to the Replit Object Storage bucket
@@ -217,5 +226,68 @@ export async function validateImage(
   // such as detecting image dimensions
   
   return { valid: true };
+}
+
+/**
+ * Upload a file for a message
+ * @param fileBuffer The file buffer to upload
+ * @param contentType The content type of the file
+ * @returns Promise with the result of the upload
+ */
+export async function uploadMessageFile(
+  fileBuffer: Buffer,
+  contentType: string
+): Promise<{ url: string, success: boolean }> {
+  try {
+    // Create an ID that includes the type prefix
+    const fileId = generateImageId(IMAGE_TYPES.MESSAGE_FILE);
+    
+    // Upload the file using the message file storage client
+    const result = await messageFileStorageClient.uploadFromBytes(fileId, fileBuffer);
+    
+    if (!result.ok) {
+      console.error('Error uploading message file:', result.error);
+      throw new Error('Failed to upload message file');
+    }
+    
+    console.log(`Successfully uploaded message file ${fileId}`);
+    return { url: fileId, success: true };
+  } catch (error) {
+    console.error('Error in uploadMessageFile:', error);
+    return {
+      url: '',
+      success: false
+    };
+  }
+}
+
+/**
+ * Get a message file from Replit Object Storage
+ * @param fileId The ID of the file to retrieve
+ * @returns Promise with the file buffer or null if not found
+ */
+export async function getMessageFileFromStorage(fileId: string): Promise<Buffer | null> {
+  try {
+    const result = await messageFileStorageClient.downloadAsBytes(fileId);
+    
+    if (!result.ok || !result.value) {
+      console.error('Error retrieving message file from Replit Object Storage:', result.error);
+      return null;
+    }
+    
+    return result.value[0]; // downloadAsBytes returns an array with one Buffer
+  } catch (error) {
+    console.error('Error in getMessageFileFromStorage:', error);
+    return null;
+  }
+}
+
+/**
+ * Get the public URL for a message file
+ * @param fileId The ID of the file
+ * @returns The public URL to access the file
+ */
+export function getMessageFilePublicUrl(fileId: string): string {
+  return `/api/message-files/${fileId}`;
 }
 
