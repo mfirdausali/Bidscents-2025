@@ -234,6 +234,77 @@ export default function MessagesPage() {
     loadConversation(conversation.userId, conversation.productInfo?.id);
   }, [loadConversation]);
   
+  // Handle file upload
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (!user?.id || !selectedConversation) {
+      toast({
+        title: 'Upload Failed',
+        description: 'You must select a conversation before uploading files.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsUploading(true);
+    
+    try {
+      // Create form data for the file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('receiverId', selectedConversation.userId.toString());
+      if (selectedConversation.productId) {
+        formData.append('productId', selectedConversation.productId.toString());
+      }
+      
+      // Send the file to server
+      const response = await fetch('/api/messages/upload-file', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload file');
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: 'File Uploaded',
+        description: 'Your file has been sent successfully.',
+        variant: 'default',
+      });
+      
+      // File messages will be received via the WebSocket connection
+      // No need to manually update the UI
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: 'Upload Failed',
+        description: error instanceof Error ? error.message : 'Failed to upload file. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  }, [user?.id, selectedConversation, toast]);
+  
+  // Trigger the file input click
+  const triggerFileUpload = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+  
+  // Handle file selection from input
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+    // Reset the input value so the same file can be selected again
+    if (e.target) e.target.value = '';
+  }, [handleFileUpload]);
+
   // Handle sending a message
   const handleSendMessage = useCallback(() => {
     if (!messageText.trim() || !user?.id || !selectedConversation) return;
@@ -541,6 +612,46 @@ export default function MessagesPage() {
                 {/* Message Input Area - Fixed at bottom */}
                 <div className="p-3 border-t flex-shrink-0 bg-background">
                   <div className="flex items-center space-x-2">
+                    {/* Hidden file input */}
+                    <input 
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={handleFileSelect}
+                      accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    />
+                    
+                    {/* File upload button */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 rounded-full"
+                          disabled={isUploading || !selectedConversation}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-56 p-2" side="top">
+                        <div className="space-y-1">
+                          <Button 
+                            variant="ghost" 
+                            className="w-full justify-start"
+                            onClick={triggerFileUpload}
+                            disabled={isUploading || !selectedConversation}
+                          >
+                            <div className="flex items-center">
+                              <Upload className="mr-2 h-4 w-4" />
+                              <span>Upload file</span>
+                            </div>
+                          </Button>
+                          {/* Additional options can be added here, 
+                          like creating a transaction */}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    
                     <Input
                       value={messageText}
                       onChange={(e) => setMessageText(e.target.value)}
@@ -555,7 +666,7 @@ export default function MessagesPage() {
                     />
                     <Button 
                       onClick={handleSendMessage} 
-                      disabled={!messageText.trim() || loadingChat} 
+                      disabled={!messageText.trim() || loadingChat || isUploading} 
                       size="icon"
                       className="h-10 w-10 rounded-full"
                     >

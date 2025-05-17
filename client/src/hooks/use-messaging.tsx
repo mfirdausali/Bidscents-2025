@@ -8,10 +8,14 @@ export interface Message {
   id: number;
   senderId: number;
   receiverId: number;
-  content: string;
+  content: string | null;
   createdAt: Date | string;
   isRead: boolean;
   productId?: number | null;
+  messageType?: 'TEXT' | 'ACTION' | 'FILE';
+  actionType?: 'INITIATE' | 'CONFIRM_PAYMENT' | 'CONFIRM_DELIVERY' | 'REVIEW' | null;
+  isClicked?: boolean;
+  fileUrl?: string | null;
   sender?: {
     id: number;
     username: string;
