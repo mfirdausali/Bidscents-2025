@@ -16,6 +16,15 @@ import {
   PopoverContent, 
   PopoverTrigger 
 } from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog';
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -624,18 +633,43 @@ export default function MessagesPage() {
                               {msg.messageType === 'FILE' ? (
                                 <div className="file-message">
                                   {msg.fileUrl && (
-                                    <a 
-                                      href={`/api/message-files/${msg.fileUrl}`} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="flex items-center p-2 bg-muted rounded-md no-underline text-foreground hover:bg-muted/80 mb-2"
-                                    >
-                                      <File className="h-8 w-8 mr-2 text-primary" />
-                                      <div>
-                                        <div className="font-medium">File Attachment</div>
-                                        <div className="text-xs text-muted-foreground">Click to open</div>
-                                      </div>
-                                    </a>
+                                    <Dialog>
+                                      <DialogTrigger asChild>
+                                        <button 
+                                          className="flex w-full items-center p-2 bg-muted rounded-md text-foreground hover:bg-muted/80 mb-2"
+                                        >
+                                          <File className="h-8 w-8 mr-2 text-primary" />
+                                          <div className="text-left">
+                                            <div className="font-medium">File Attachment</div>
+                                            <div className="text-xs text-muted-foreground">Click to view</div>
+                                          </div>
+                                        </button>
+                                      </DialogTrigger>
+                                      <DialogContent className="max-w-4xl">
+                                        <DialogHeader>
+                                          <DialogTitle>File Attachment</DialogTitle>
+                                          <DialogDescription>
+                                            Shared in conversation on {format(new Date(msg.createdAt), 'PPP')}
+                                          </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="flex flex-col items-center justify-center p-4">
+                                          <iframe 
+                                            src={msg.fileUrl} 
+                                            className="w-full h-[60vh] border rounded"
+                                          />
+                                        </div>
+                                        <DialogFooter>
+                                          <a 
+                                            href={msg.fileUrl} 
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                                          >
+                                            Open in New Tab
+                                          </a>
+                                        </DialogFooter>
+                                      </DialogContent>
+                                    </Dialog>
                                   )}
                                 </div>
                               ) : (
