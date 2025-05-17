@@ -267,17 +267,27 @@ export async function uploadMessageFile(
  * @returns Promise with the file buffer or null if not found
  */
 export async function getMessageFileFromStorage(fileId: string): Promise<Buffer | null> {
+  console.log(`🔍 Attempting to retrieve message file: "${fileId}" from storage`);
+  
   try {
+    console.log(`Making request to object storage for file: ${fileId}`);
     const result = await messageFileStorageClient.downloadAsBytes(fileId);
     
     if (!result.ok || !result.value) {
-      console.error('Error retrieving message file from Replit Object Storage:', result.error);
+      console.error(`❌ Error retrieving message file ${fileId}:`, result.error);
       return null;
     }
     
-    return result.value[0]; // downloadAsBytes returns an array with one Buffer
+    // Log success
+    console.log(`✅ Successfully retrieved message file from storage: ${fileId}`);
+    
+    // Return the file data as a buffer
+    const fileBuffer = result.value[0]; // downloadAsBytes returns an array with one Buffer
+    console.log(`📁 File size: ${fileBuffer.length} bytes`);
+    
+    return fileBuffer;
   } catch (error) {
-    console.error('Error in getMessageFileFromStorage:', error);
+    console.error(`❌ Exception retrieving message file ${fileId}:`, error);
     return null;
   }
 }
@@ -288,6 +298,16 @@ export async function getMessageFileFromStorage(fileId: string): Promise<Buffer 
  * @returns The public URL to access the file
  */
 export function getMessageFilePublicUrl(fileId: string): string {
-  return `/api/message-files/${fileId}`;
+  console.log(`🔗 Creating public URL for message file: "${fileId}"`);
+  
+  if (!fileId) {
+    console.warn('⚠️ Attempted to get public URL for empty/null fileId');
+    return '';
+  }
+  
+  // Construct the API endpoint URL that will serve the file
+  const url = `/api/message-files/${fileId}`;
+  console.log(`🔗 Generated URL: ${url}`);
+  return url;
 }
 
