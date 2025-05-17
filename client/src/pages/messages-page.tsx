@@ -34,7 +34,7 @@ interface FilePreviewProps {
 }
 
 const FilePreviewComponent: React.FC<FilePreviewProps> = ({ fileUrl }) => {
-  const [fileType, setFileType] = useState<'image' | 'pdf' | 'other'>('other');
+  const [previewType, setPreviewType] = useState<string>('unknown');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,20 +49,20 @@ const FilePreviewComponent: React.FC<FilePreviewProps> = ({ fileUrl }) => {
         
         if (contentType) {
           if (contentType.startsWith('image/')) {
-            setFileType('image');
+            setPreviewType('image');
           } else if (contentType === 'application/pdf') {
-            setFileType('pdf');
+            setPreviewType('pdf');
           } else {
-            setFileType('other');
+            setPreviewType('other');
           }
         } else {
           // Fallback to extension checking if header doesn't work
           if (fileUrl.match(/\.(jpeg|jpg|gif|png|webp)(\?|$)/i)) {
-            setFileType('image');
+            setPreviewType('image');
           } else if (fileUrl.match(/\.(pdf)(\?|$)/i)) {
-            setFileType('pdf');
+            setPreviewType('pdf');
           } else {
-            setFileType('other');
+            setPreviewType('other');
           }
         }
         setLoading(false);
@@ -95,66 +95,65 @@ const FilePreviewComponent: React.FC<FilePreviewProps> = ({ fileUrl }) => {
   }
 
   // Render based on file type
-  switch (fileType) {
-    case 'image':
-      return (
-        <div className="w-full max-h-[60vh] flex items-center justify-center bg-background">
-          <img 
-            src={fileUrl} 
-            alt="File preview" 
-            className="max-w-full max-h-[60vh] object-contain" 
-            onError={() => setError('Failed to load image')}
-          />
-        </div>
-      );
-    case 'pdf':
-      return (
-        <iframe 
-          src={fileUrl}
-          className="w-full h-[60vh] border rounded"
-          title="PDF preview"
+  if (previewType === 'image') {
+    return (
+      <div className="w-full max-h-[60vh] flex items-center justify-center bg-background">
+        <img 
+          src={fileUrl} 
+          alt="File preview" 
+          className="max-w-full max-h-[60vh] object-contain" 
+          onError={() => setError('Failed to load image')}
         />
-      );
-    default:
-      // For other file types, we'll use a simple viewer with iframe as fallback
-      return (
-        <div className="w-full h-[60vh] flex flex-col">
-          <div className="mb-2 p-2 bg-muted rounded-t-md">
-            <Tabs defaultValue="preview" className="w-full">
-              <TabsList>
-                <TabsTrigger value="preview">Preview</TabsTrigger>
-                <TabsTrigger value="info">File Info</TabsTrigger>
-              </TabsList>
-              <TabsContent value="preview" className="p-0">
-                <iframe 
-                  src={fileUrl} 
-                  className="w-full h-[50vh] border rounded bg-background"
-                  title="File preview"
-                />
-              </TabsContent>
-              <TabsContent value="info" className="bg-card p-4 rounded-md">
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-center py-8">
-                    {fileType === 'pdf' && (
-                      <FileText className="h-20 w-20 text-primary" />
-                    )}
-                    {fileType === 'image' && (
-                      <ImageIcon className="h-20 w-20 text-primary" />
-                    )}
-                    {fileType === 'other' && (
-                      <FileText className="h-20 w-20 text-primary" />
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground text-center">
-                    This file may need to be downloaded to view its contents properly.
-                  </p>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
-      );
+      </div>
+    );
   }
+  
+  if (previewType === 'pdf') {
+    return (
+      <iframe 
+        src={fileUrl}
+        className="w-full h-[60vh] border rounded"
+        title="PDF preview"
+      />
+    );
+  }
+  
+  // For other file types, we'll use a tabbed interface
+  return (
+    <div className="w-full h-[60vh] flex flex-col">
+      <div className="mb-2 p-2 bg-muted rounded-t-md">
+        <Tabs defaultValue="preview" className="w-full">
+          <TabsList>
+            <TabsTrigger value="preview">Preview</TabsTrigger>
+            <TabsTrigger value="info">File Info</TabsTrigger>
+          </TabsList>
+          <TabsContent value="preview" className="p-0">
+            <iframe 
+              src={fileUrl} 
+              className="w-full h-[50vh] border rounded bg-background"
+              title="File preview"
+            />
+          </TabsContent>
+          <TabsContent value="info" className="bg-card p-4 rounded-md">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-center py-8">
+                {previewType.includes('pdf') ? (
+                  <FileText className="h-20 w-20 text-primary" />
+                ) : previewType.includes('image') ? (
+                  <ImageIcon className="h-20 w-20 text-primary" />
+                ) : (
+                  <FileText className="h-20 w-20 text-primary" />
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                This file may need to be downloaded to view its contents properly.
+              </p>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
 };
 
 export default function MessagesPage() {
