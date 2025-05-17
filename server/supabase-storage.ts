@@ -1515,7 +1515,7 @@ export class SupabaseStorage implements IStorage {
     // Get messages without trying to join users table
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select('*, file_url, message_type') // Explicitly select the new columns
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
       .order('created_at', { ascending: true });
       
@@ -1528,6 +1528,12 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
+    // Special debugging log to see what fields are actually coming from the database
+    if (data.length > 0) {
+      console.log(`Message fields available in database:`, Object.keys(data[0]));
+      console.log(`Sample message data:`, JSON.stringify(data[0]));
+    }
+    
     // We only need these two users
     const user1 = await this.getUser(userId1);
     const user2 = await this.getUser(userId2);
@@ -1537,10 +1543,15 @@ export class SupabaseStorage implements IStorage {
     
     // Map from snake_case to camelCase and decrypt message content
     const messages = data.map(msg => {
-      // Decrypt the message content if it's encrypted
+      // Decrypt the message content if it's encrypted and not null
       let content = msg.content;
-      if (isEncrypted(content)) {
+      if (content && isEncrypted(content)) {
         content = decryptMessage(content);
+      }
+      
+      // Check for message #142 specifically
+      if (msg.id === 142) {
+        console.log(`Found message #142:`, JSON.stringify(msg, null, 2));
       }
       
       return {
@@ -1551,6 +1562,9 @@ export class SupabaseStorage implements IStorage {
         isRead: msg.is_read,
         createdAt: new Date(msg.created_at),
         productId: msg.product_id,
+        // Add the new fields for file messages
+        messageType: msg.message_type || 'TEXT',
+        fileUrl: msg.file_url || null,
         // Add sender and receiver details
         sender: msg.sender_id === userId1 ? user1 : user2,
         receiver: msg.receiver_id === userId1 ? user1 : user2
@@ -1564,7 +1578,7 @@ export class SupabaseStorage implements IStorage {
     // Get messages without trying to join users table
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select('*, file_url, message_type') // Explicitly request the file columns
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
       .eq('product_id', productId)
       .order('created_at', { ascending: true });
@@ -1578,6 +1592,11 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
+    // Special debugging log to see what fields are actually coming from the database
+    if (data.length > 0) {
+      console.log(`Product message fields available in database:`, Object.keys(data[0]));
+    }
+    
     // We only need these two users
     const user1 = await this.getUser(userId1);
     const user2 = await this.getUser(userId2);
@@ -1587,11 +1606,14 @@ export class SupabaseStorage implements IStorage {
     
     // Map from snake_case to camelCase and decrypt message content
     const messages = data.map(msg => {
-      // Decrypt the message content if it's encrypted
+      // Decrypt the message content if it's encrypted and not null
       let content = msg.content;
-      if (isEncrypted(content)) {
+      if (content && isEncrypted(content)) {
         content = decryptMessage(content);
       }
+      
+      // Log each message's raw structure for debugging
+      console.log(`Processing product message ${msg.id}, type: ${msg.message_type}, file_url: ${msg.file_url}`);
       
       return {
         id: msg.id,
@@ -1601,6 +1623,9 @@ export class SupabaseStorage implements IStorage {
         isRead: msg.is_read,
         createdAt: new Date(msg.created_at),
         productId: msg.product_id,
+        // Add the new fields for file messages
+        messageType: msg.message_type || 'TEXT',
+        fileUrl: msg.file_url || null,
         // Add sender and receiver details
         sender: msg.sender_id === userId1 ? user1 : user2,
         receiver: msg.receiver_id === userId1 ? user1 : user2
