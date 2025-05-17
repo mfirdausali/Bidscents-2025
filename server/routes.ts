@@ -287,8 +287,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Configure multer for file uploads
-  const upload = multer({
+  // Configure multer for image uploads
+  const imageUpload = multer({
     limits: {
       fileSize: 5 * 1024 * 1024, // 5MB max file size
     },
@@ -301,6 +301,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+  
+  // Configure multer for message file uploads (images, pdfs, etc.)
+  const messageFileUpload = multer({
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB max file size
+    },
+    fileFilter: (_req, file, cb) => {
+      // Accept image files, PDFs, and other common document types
+      const allowedMimeTypes = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'application/pdf', 'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      
+      if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only images, PDFs, and common document types are allowed'));
+      }
+    }
+  });
 
   // Serve social media preview image
   app.get('/social-preview.jpg', (req, res) => {
@@ -308,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Profile image upload endpoint
-  app.post("/api/user/avatar", upload.single('image'), async (req, res, next) => {
+  app.post("/api/user/avatar", imageUpload.single('image'), async (req, res, next) => {
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized: Please log in to upload a profile image" });
@@ -358,7 +379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cover photo upload endpoint
-  app.post("/api/user/cover", upload.single('image'), async (req, res, next) => {
+  app.post("/api/user/cover", imageUpload.single('image'), async (req, res, next) => {
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized: Please log in to upload a cover photo" });

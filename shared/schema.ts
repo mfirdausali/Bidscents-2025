@@ -107,7 +107,7 @@ export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
   receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  content: text("content").notNull(), // Encrypted message content
+  content: text("content"), // Encrypted message content (nullable)
   productId: integer("product_id").references(() => products.id), // Optional reference to product
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at").defaultNow(),
