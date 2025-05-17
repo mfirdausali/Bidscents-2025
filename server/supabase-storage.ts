@@ -1488,6 +1488,9 @@ export class SupabaseStorage implements IStorage {
         content = decryptMessage(content);
       }
       
+      // Log the raw message fields for debugging
+      console.log(`Message ${msg.id} raw fields:`, Object.keys(msg));
+      
       return {
         id: msg.id,
         senderId: msg.sender_id,
@@ -1496,6 +1499,9 @@ export class SupabaseStorage implements IStorage {
         isRead: msg.is_read,
         createdAt: new Date(msg.created_at),
         productId: msg.product_id,
+        // Add the new fields for file messages
+        messageType: msg.message_type || 'TEXT',
+        fileUrl: msg.file_url || null,
         // Add sender and receiver details if available
         sender: users[msg.sender_id],
         receiver: users[msg.receiver_id]
