@@ -1371,23 +1371,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { fileId } = req.params;
       
-      console.log(`Attempting to retrieve message file with ID: ${fileId}`);
-
-      // Determine content type based on file extension or default to octet-stream
-      let contentType = 'application/octet-stream';
-      if (fileId.endsWith('.png')) contentType = 'image/png';
-      if (fileId.endsWith('.jpg') || fileId.endsWith('.jpeg')) contentType = 'image/jpeg';
-      if (fileId.endsWith('.gif')) contentType = 'image/gif';
-      if (fileId.endsWith('.webp')) contentType = 'image/webp';
-      if (fileId.endsWith('.pdf')) contentType = 'application/pdf';
-      if (fileId.endsWith('.doc')) contentType = 'application/msword';
-      if (fileId.endsWith('.docx')) contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      // Check if we should serve the file for preview
+      const isPreview = req.query.preview === 'true';
+      
+      console.log(`Attempting to retrieve message file with ID: ${fileId}, preview mode: ${isPreview}`);
 
       // Get the file from Replit Object Storage
       const fileBuffer = await objectStorage.getMessageFileFromStorage(fileId);
 
       if (fileBuffer) {
+        // Get content type from metadata if available, or try to detect from file signature
+        let contentType = 'application/octet-stream';
+        
+        // Check file signatures to determine content type
+        if (fileBuffer.length > 8) {
+          const signature = fileBuffer.slice(0, 8).toString('hex');
+          
+          // Check file signatures for common types
+          if (signature.startsWith('89504e47')) {
+            contentType = 'image/png';
+          } else if (signature.startsWith('ffd8ff')) {
+            contentType = 'image/jpeg';
+          } else if (signature.startsWith('47494638')) {
+            contentType = 'image/gif';
+          } else if (signature.startsWith('25504446')) {
+            contentType = 'application/pdf';
+          } else if (signature.startsWith('504b0304')) {
+            // Could be DOCX, XLSX, PPTX (all Office Open XML formats)
+            if (fileId.endsWith('.docx')) {
+              contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            } else {
+              contentType = 'application/zip';
+            }
+          }
+        }
+        
+        // Add disposition header based on whether we're previewing or downloading
+        if (isPreview) {
+          res.setHeader('Content-Disposition', 'inline');
+        } else {
+          // For download, suggest a filename
+          const filename = fileId.includes('_') ? fileId.split('_').pop() : fileId;
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        }
+        
         console.log(`Message file ${fileId} found - serving with content type ${contentType}`);
+        
         // Send the file with the appropriate content type
         res.setHeader('Content-Type', contentType);
         res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours

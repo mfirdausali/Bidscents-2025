@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, Link } from 'wouter';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, ArrowLeft, RefreshCw, Send, User, Plus, Upload, File, FileText, Image as ImageIcon } from 'lucide-react';
+import { MessageSquare, ArrowLeft, RefreshCw, Send, User, Plus, Upload, File, FileText, Image as ImageIcon, FileIcon, PaperclipIcon } from 'lucide-react';
 import { 
   Popover, 
   PopoverContent, 
@@ -25,6 +25,137 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Component to handle different file type previews
+interface FilePreviewProps {
+  fileUrl: string;
+}
+
+const FilePreviewComponent: React.FC<FilePreviewProps> = ({ fileUrl }) => {
+  const [fileType, setFileType] = useState<'image' | 'pdf' | 'other'>('other');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Attempt to detect file type by extension or try loading it
+    const detectFileType = async () => {
+      setLoading(true);
+      try {
+        // Try a HEAD request to get content type if possible
+        const response = await fetch(fileUrl, { method: 'HEAD' });
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType) {
+          if (contentType.startsWith('image/')) {
+            setFileType('image');
+          } else if (contentType === 'application/pdf') {
+            setFileType('pdf');
+          } else {
+            setFileType('other');
+          }
+        } else {
+          // Fallback to extension checking if header doesn't work
+          if (fileUrl.match(/\.(jpeg|jpg|gif|png|webp)(\?|$)/i)) {
+            setFileType('image');
+          } else if (fileUrl.match(/\.(pdf)(\?|$)/i)) {
+            setFileType('pdf');
+          } else {
+            setFileType('other');
+          }
+        }
+        setLoading(false);
+      } catch (err) {
+        console.error('Error detecting file type:', err);
+        setError('Failed to load preview');
+        setLoading(false);
+      }
+    };
+
+    detectFileType();
+  }, [fileUrl]);
+
+  if (loading) {
+    return (
+      <div className="w-full h-[60vh] flex flex-col items-center justify-center">
+        <Skeleton className="h-[60vh] w-full rounded-md" />
+        <p className="text-sm text-muted-foreground mt-2">Loading preview...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-[60vh] flex flex-col items-center justify-center bg-muted rounded-md">
+        <FileIcon className="h-16 w-16 text-muted-foreground mb-4" />
+        <p className="text-sm text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+
+  // Render based on file type
+  switch (fileType) {
+    case 'image':
+      return (
+        <div className="w-full max-h-[60vh] flex items-center justify-center bg-background">
+          <img 
+            src={fileUrl} 
+            alt="File preview" 
+            className="max-w-full max-h-[60vh] object-contain" 
+            onError={() => setError('Failed to load image')}
+          />
+        </div>
+      );
+    case 'pdf':
+      return (
+        <iframe 
+          src={fileUrl}
+          className="w-full h-[60vh] border rounded"
+          title="PDF preview"
+        />
+      );
+    default:
+      // For other file types, we'll use a simple viewer with iframe as fallback
+      return (
+        <div className="w-full h-[60vh] flex flex-col">
+          <div className="mb-2 p-2 bg-muted rounded-t-md">
+            <Tabs defaultValue="preview" className="w-full">
+              <TabsList>
+                <TabsTrigger value="preview">Preview</TabsTrigger>
+                <TabsTrigger value="info">File Info</TabsTrigger>
+              </TabsList>
+              <TabsContent value="preview" className="p-0">
+                <iframe 
+                  src={fileUrl} 
+                  className="w-full h-[50vh] border rounded bg-background"
+                  title="File preview"
+                />
+              </TabsContent>
+              <TabsContent value="info" className="bg-card p-4 rounded-md">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-center py-8">
+                    {fileType === 'pdf' && (
+                      <FileText className="h-20 w-20 text-primary" />
+                    )}
+                    {fileType === 'image' && (
+                      <ImageIcon className="h-20 w-20 text-primary" />
+                    )}
+                    {fileType === 'other' && (
+                      <FileText className="h-20 w-20 text-primary" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center">
+                    This file may need to be downloaded to view its contents properly.
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+      );
+  }
+};
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -653,14 +784,19 @@ export default function MessagesPage() {
                                           </DialogDescription>
                                         </DialogHeader>
                                         <div className="flex flex-col items-center justify-center p-4">
-                                          <iframe 
-                                            src={msg.fileUrl} 
-                                            className="w-full h-[60vh] border rounded"
-                                          />
+                                          {/* Add preview parameter to request inline content */}
+                                          <FilePreviewComponent fileUrl={`${msg.fileUrl}?preview=true`} />
                                         </div>
-                                        <DialogFooter>
+                                        <DialogFooter className="flex gap-2">
                                           <a 
                                             href={msg.fileUrl} 
+                                            download
+                                            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2"
+                                          >
+                                            Download
+                                          </a>
+                                          <a 
+                                            href={`${msg.fileUrl}?preview=true`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
