@@ -621,58 +621,21 @@ export default function MessagesPage() {
                                   : 'bg-background rounded-tl-none shadow-sm'
                               }`}
                             >
-                              {console.log("Message in render:", msg)}
                               {msg.messageType === 'FILE' ? (
                                 <div className="file-message">
-                                  {console.log("Found FILE message, fileUrl:", msg.fileUrl)}
-                                  {/* File preview based on file type */}
-                                  {msg.fileUrl ? (
-                                    <>
-                                      {console.log("Rendering file:", msg.fileUrl)}
-                                      {msg.fileUrl.toLowerCase().match(/\.(jpeg|jpg|png|gif|webp)$/) ? (
-                                        // Image file preview
-                                        <a 
-                                          href={`/api/message-files/${msg.fileUrl}`} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="block mb-2"
-                                        >
-                                          <img 
-                                            src={`/api/message-files/${msg.fileUrl}`} 
-                                            alt="Shared image" 
-                                            className="max-w-full rounded-md max-h-[200px] object-contain"
-                                          />
-                                        </a>
-                                      ) : msg.fileUrl.toLowerCase().match(/\.(pdf)$/) ? (
-                                        // PDF file icon and link
-                                        <a 
-                                          href={`/api/message-files/${msg.fileUrl}`} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="flex items-center p-2 bg-muted rounded-md no-underline text-foreground hover:bg-muted/80 mb-2"
-                                        >
-                                          <FileText className="h-8 w-8 mr-2 text-primary" />
-                                          <div>
-                                            <div className="font-medium">PDF Document</div>
-                                            <div className="text-xs text-muted-foreground">Click to open</div>
-                                          </div>
-                                        </a>
-                                      ) : (
-                                        // Generic file icon and link for other file types
-                                        <a 
-                                          href={`/api/message-files/${msg.fileUrl}`} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="flex items-center p-2 bg-muted rounded-md no-underline text-foreground hover:bg-muted/80 mb-2"
-                                        >
-                                          <File className="h-8 w-8 mr-2 text-primary" />
-                                          <div>
-                                            <div className="font-medium">Document</div>
-                                            <div className="text-xs text-muted-foreground">Click to open</div>
-                                          </div>
-                                        </a>
-                                      )}
-                                    </>
+                                  {msg.fileUrl && (
+                                    <a 
+                                      href={`/api/message-files/${msg.fileUrl}`} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="flex items-center p-2 bg-muted rounded-md no-underline text-foreground hover:bg-muted/80 mb-2"
+                                    >
+                                      <File className="h-8 w-8 mr-2 text-primary" />
+                                      <div>
+                                        <div className="font-medium">File Attachment</div>
+                                        <div className="text-xs text-muted-foreground">Click to open</div>
+                                      </div>
+                                    </a>
                                   )}
                                 </div>
                               ) : (
