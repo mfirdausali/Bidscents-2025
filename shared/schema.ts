@@ -5,6 +5,7 @@ import { z } from "zod";
 // Enum types
 export const messageTypeEnum = pgEnum('message_type', ['TEXT', 'ACTION', 'FILE']);
 export const actionTypeEnum = pgEnum('action_type', ['INITIATE', 'CONFIRM_PAYMENT', 'CONFIRM_DELIVERY', 'REVIEW']);
+export const transactionStatusEnum = pgEnum('transaction_status', ['WAITING_PAYMENT', 'WAITING_DELIVERY', 'WAITING_REVIEW', 'COMPLETED', 'CANCELLED']);
 
 // Users table
 export const users = pgTable("users", {
@@ -161,6 +162,18 @@ export const payments = pgTable("payments", {
   metadata: jsonb("metadata"), // Additional data related to the payment
 });
 
+// Transactions table
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  sellerId: integer("seller_id").references(() => users.id).notNull(),
+  buyerId: integer("buyer_id").references(() => users.id).notNull(),
+  amount: doublePrecision("amount").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  status: transactionStatusEnum("status").notNull().default('WAITING_PAYMENT'),
+});
+
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -290,6 +303,14 @@ export const insertPaymentSchema = createInsertSchema(payments).pick({
   metadata: true,
 });
 
+export const insertTransactionSchema = createInsertSchema(transactions).pick({
+  productId: true,
+  sellerId: true,
+  buyerId: true,
+  amount: true,
+  status: true,
+});
+
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -326,6 +347,9 @@ export type Payment = typeof payments.$inferSelect & {
 };
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
 // Extended types
 export type ProductWithDetails = Product & {
   category?: Category;
@@ -356,6 +380,12 @@ export type AuctionWithDetails = Auction & {
 export type BidWithDetails = Bid & {
   auction?: Auction;
   bidder?: User;
+};
+
+export type TransactionWithDetails = Transaction & {
+  product?: Product;
+  seller?: User;
+  buyer?: User;
 };
 
 // Note: Relations are handled through joins in the DatabaseStorage implementation
