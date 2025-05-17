@@ -1730,11 +1730,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fileUrl: fileUrl
         };
         
-        // Log a concise message for file messages only
-        if (isFileMessage) {
-          console.log(`Processing file message ${msg.id}, fileUrl: ${mappedMsg.fileUrl}`);
-        }
-        
         return mappedMsg;
       });
       

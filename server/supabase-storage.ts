@@ -1488,8 +1488,7 @@ export class SupabaseStorage implements IStorage {
         content = decryptMessage(content);
       }
       
-      // Log the raw message fields for debugging
-      console.log(`Message ${msg.id} raw fields:`, Object.keys(msg));
+      // No need to log raw message fields anymore
       
       return {
         id: msg.id,
