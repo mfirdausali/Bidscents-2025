@@ -1689,11 +1689,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Decrypt message content and prepare file URLs
-      const decryptedConversation = conversation.map(msg => ({
-        ...msg,
-        content: msg.content ? decryptMessage(msg.content) : msg.content,
-        fileUrl: msg.file_url // Map file_url to fileUrl for frontend consistency
-      }));
+      console.log("Raw conversation messages from DB:", JSON.stringify(conversation, null, 2));
+      
+      const decryptedConversation = conversation.map(msg => {
+        // Debug each message conversion
+        console.log(`Processing message ${msg.id}, type: ${msg.message_type}, file_url: ${msg.file_url}`);
+        
+        // Create a properly mapped message with fileUrl
+        const mappedMsg = {
+          ...msg,
+          content: msg.content ? decryptMessage(msg.content) : msg.content,
+          fileUrl: msg.file_url, // Map file_url to fileUrl for frontend consistency
+          messageType: msg.message_type // Ensure messageType is mapped from message_type
+        };
+        
+        console.log(`Mapped message ${msg.id}:`, JSON.stringify({
+          id: mappedMsg.id,
+          messageType: mappedMsg.messageType,
+          fileUrl: mappedMsg.fileUrl
+        }));
+        
+        return mappedMsg;
+      });
       
       res.json(decryptedConversation);
     } catch (error) {

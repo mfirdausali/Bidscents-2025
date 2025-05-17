@@ -621,11 +621,14 @@ export default function MessagesPage() {
                                   : 'bg-background rounded-tl-none shadow-sm'
                               }`}
                             >
+                              {console.log("Message in render:", msg)}
                               {msg.messageType === 'FILE' ? (
                                 <div className="file-message">
+                                  {console.log("Found FILE message, fileUrl:", msg.fileUrl)}
                                   {/* File preview based on file type */}
-                                  {msg.fileUrl && (
+                                  {msg.fileUrl ? (
                                     <>
+                                      {console.log("Rendering file:", msg.fileUrl)}
                                       {msg.fileUrl.toLowerCase().match(/\.(jpeg|jpg|png|gif|webp)$/) ? (
                                         // Image file preview
                                         <a 
