@@ -272,11 +272,26 @@ export default function MessagesPage() {
       
       console.log("Upload response status:", response.status);
       
-      const responseData = await response.json();
-      console.log("Upload response data:", responseData);
+      let responseData;
+      try {
+        const responseText = await response.text();
+        console.log("Raw response text:", responseText);
+        
+        if (responseText.trim()) {
+          try {
+            responseData = JSON.parse(responseText);
+            console.log("Upload response data:", responseData);
+          } catch (parseError) {
+            console.error("Error parsing JSON response:", parseError);
+            // Continue despite parse error
+          }
+        }
+      } catch (readError) {
+        console.error("Error reading response:", readError);
+      }
       
       if (!response.ok) {
-        throw new Error(responseData.message || 'Failed to upload file');
+        throw new Error(responseData?.message || 'Failed to upload file');
       }
       
       toast({
