@@ -776,7 +776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Image upload endpoint - creates a product image and uploads the file
-  app.post("/api/products/:id/images", upload.single('image'), async (req, res, next) => {
+  app.post("/api/products/:id/images", imageUpload.single('image'), async (req, res, next) => {
     try {
       // Check authentication
       let sellerId = 0;
@@ -1245,6 +1245,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Message file upload endpoint
+  app.post("/api/messages/upload-file", messageFileUpload.single('file'), async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized: Please log in to upload files" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file provided" });
+      }
+      
+      if (!req.body.receiverId) {
+        return res.status(400).json({ message: "Receiver ID is required" });
+      }
+      
+      // Upload the file to the message files bucket
+      const uploadResult = await objectStorage.uploadMessageFile(
+        req.file.buffer,
+        req.file.mimetype
+      );
+      
+      if (!uploadResult.success) {
+        return res.status(500).json({ message: "Failed to upload file" });
+      }
+      
+      // Create a new message with type FILE
+      const newMessage = {
+        senderId: req.user.id,
+        receiverId: parseInt(req.body.receiverId),
+        content: null, // Content is null for FILE type messages
+        productId: req.body.productId ? parseInt(req.body.productId) : null,
+        messageType: 'FILE', // Set message type to FILE
+        fileUrl: uploadResult.url
+      };
+      
+      // Save the message to the database
+      const createdMessage = await storage.createMessage(newMessage);
+      
+      // Return the created message with the file URL
+      res.status(201).json({
+        ...createdMessage,
+        fileUrl: objectStorage.getMessageFilePublicUrl(uploadResult.url)
+      });
+    } catch (error) {
+      console.error("Error in message file upload handler:", error);
+      next(error);
+    }
+  });
+  
+  // Endpoint to serve message files
+  app.get('/api/message-files/:fileId', async (req, res, next) => {
+    try {
+      const { fileId } = req.params;
+      
+      console.log(`Attempting to retrieve message file with ID: ${fileId}`);
+
+      // Determine content type based on file extension or default to octet-stream
+      let contentType = 'application/octet-stream';
+      if (fileId.endsWith('.png')) contentType = 'image/png';
+      if (fileId.endsWith('.jpg') || fileId.endsWith('.jpeg')) contentType = 'image/jpeg';
+      if (fileId.endsWith('.gif')) contentType = 'image/gif';
+      if (fileId.endsWith('.webp')) contentType = 'image/webp';
+      if (fileId.endsWith('.pdf')) contentType = 'application/pdf';
+      if (fileId.endsWith('.doc')) contentType = 'application/msword';
+      if (fileId.endsWith('.docx')) contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+      // Get the file from Replit Object Storage
+      const fileBuffer = await objectStorage.getMessageFileFromStorage(fileId);
+
+      if (fileBuffer) {
+        console.log(`Message file ${fileId} found - serving with content type ${contentType}`);
+        // Send the file with the appropriate content type
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+        return res.send(fileBuffer);
+      }
+
+      console.log(`Message file ${fileId} not found in storage`);
+      // If we get here, the file was not found
+      res.status(404).json({ message: 'File not found' });
+    } catch (error) {
+      console.error('Error serving message file:', error);
+      next(error);
+    }
+  });
+  
   // Endpoint to serve images
   app.get('/api/images/:imageId', async (req, res, next) => {
     try {
@@ -1403,7 +1489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Handle the /api/product-images/:id/upload endpoint for backward compatibility
-  app.post("/api/product-images/:id/upload", upload.single('image'), async (req, res, next) => {
+  app.post("/api/product-images/:id/upload", imageUpload.single('image'), async (req, res, next) => {
     try {
       // Check authentication
       let sellerId = 0;

@@ -10,7 +10,12 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, Link } from 'wouter';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, ArrowLeft, RefreshCw, Send, User } from 'lucide-react';
+import { MessageSquare, ArrowLeft, RefreshCw, Send, User, Plus, Upload, File, FileText, Image as ImageIcon } from 'lucide-react';
+import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from '@/components/ui/popover';
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -18,6 +23,8 @@ export default function MessagesPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [messageText, setMessageText] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedConversation, setSelectedConversation] = useState<{
     userId: number;
     username: string;
