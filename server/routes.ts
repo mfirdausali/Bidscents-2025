@@ -1290,17 +1290,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a new message with type FILE
       console.log("Creating message record in database...");
       
+      // Check table columns before inserting
+      console.log("Checking messages table columns...");
+      const { data: tableInfo, error: tableError } = await supabase
+        .from('messages')
+        .select('*')
+        .limit(1);
+        
+      console.log("Table columns:", tableInfo ? Object.keys(tableInfo[0]) : "No records found");
+      if (tableError) {
+        console.error("Error checking table structure:", tableError);
+      }
+      
+      // Prepare message data
+      const messagePayload = {
+        sender_id: req.user.id,
+        receiver_id: parseInt(req.body.receiverId),
+        content: null, // Content is null for FILE type messages
+        product_id: req.body.productId ? parseInt(req.body.productId) : null,
+        message_type: 'FILE', // Set message type to FILE
+        file_url: uploadResult.url
+      };
+      
+      console.log("Inserting message with payload:", messagePayload);
+      
       // Using Supabase direct insert for messages
       const { data: messageData, error: messageError } = await supabase
         .from('messages')
-        .insert({
-          sender_id: req.user.id,
-          receiver_id: parseInt(req.body.receiverId),
-          content: null, // Content is null for FILE type messages
-          product_id: req.body.productId ? parseInt(req.body.productId) : null,
-          message_type: 'FILE', // Set message type to FILE
-          file_url: uploadResult.url
-        })
+        .insert(messagePayload)
         .select()
         .single();
       
@@ -1320,6 +1337,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Message created successfully:", messageData);
       
       // Return the created message with the file URL
+      // Log the actual message data returned from the database
+      console.log("Raw message data from database:", messageData);
+      
       const responseData = {
         id: messageData.id,
         senderId: messageData.sender_id,
@@ -1329,6 +1349,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileUrl: objectStorage.getMessageFilePublicUrl(uploadResult.url),
         createdAt: messageData.created_at
       };
+      
+      console.log("Formatted response data:", responseData);
       
       // Send a simple, clean JSON response 
       return res.status(200).json(responseData);
