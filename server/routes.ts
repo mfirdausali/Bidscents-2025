@@ -1711,25 +1711,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Decrypt message content and prepare file URLs
-      console.log("Raw conversation messages from DB:", JSON.stringify(conversation, null, 2));
+      // Enhanced debug logs - first log complete raw data for a few messages
+      if (conversation.length > 0) {
+        console.log("First message raw data sample:", JSON.stringify(conversation[0], null, 2));
+        console.log("Available fields in first message:", Object.keys(conversation[0]));
+        // Check if the special message we are looking for exists
+        const fileMessage = conversation.find(m => m.id === 142);
+        if (fileMessage) {
+          console.log("File message #142 raw data:", JSON.stringify(fileMessage, null, 2));
+        }
+      }
       
       const decryptedConversation = conversation.map(msg => {
-        // Debug each message conversion
-        console.log(`Processing message ${msg.id}, type: ${msg.message_type}, file_url: ${msg.file_url}`);
+        // Debug each message conversion with enhanced logging
+        console.log(`Processing message ${msg.id}, content null?: ${msg.content === null}, all fields:`, Object.keys(msg));
+        
+        // Explicitly check for file_url to see if it exists in the DB response
+        if (msg.id === 142) {
+          console.log("Message #142 detailed inspection:");
+          for (const [key, value] of Object.entries(msg)) {
+            console.log(`- ${key}: ${value}`);
+          }
+        }
         
         // Create a properly mapped message with fileUrl
         const mappedMsg = {
           ...msg,
           content: msg.content ? decryptMessage(msg.content) : msg.content,
-          fileUrl: msg.file_url, // Map file_url to fileUrl for frontend consistency
-          messageType: msg.message_type // Ensure messageType is mapped from message_type
+          // Always provide a fileUrl property, but only set it if file_url exists
+          fileUrl: typeof msg.file_url !== 'undefined' ? msg.file_url : null,
+          // Always provide a messageType property
+          messageType: typeof msg.message_type !== 'undefined' ? msg.message_type : (msg.content === null ? 'FILE' : 'TEXT')
         };
         
-        console.log(`Mapped message ${msg.id}:`, JSON.stringify({
-          id: mappedMsg.id,
-          messageType: mappedMsg.messageType,
-          fileUrl: mappedMsg.fileUrl
-        }));
+        // Log the fully mapped message for message #142
+        if (msg.id === 142) {
+          console.log(`Fully mapped message #142:`, JSON.stringify(mappedMsg, null, 2));
+        }
         
         return mappedMsg;
       });
