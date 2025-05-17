@@ -236,6 +236,7 @@ export default function MessagesPage() {
   
   // Handle file upload
   const handleFileUpload = useCallback(async (file: File) => {
+    console.log("Handling file upload:", file.name, file.type, file.size);
     if (!user?.id || !selectedConversation) {
       toast({
         title: 'Upload Failed',
@@ -256,6 +257,12 @@ export default function MessagesPage() {
         formData.append('productId', selectedConversation.productId.toString());
       }
       
+      console.log("Sending file to server...");
+      console.log("Receiver ID:", selectedConversation.userId);
+      if (selectedConversation.productId) {
+        console.log("Product ID:", selectedConversation.productId);
+      }
+      
       // Send the file to server
       const response = await fetch('/api/messages/upload-file', {
         method: 'POST',
@@ -263,12 +270,14 @@ export default function MessagesPage() {
         credentials: 'include',
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upload file');
-      }
+      console.log("Upload response status:", response.status);
       
-      const result = await response.json();
+      const responseData = await response.json();
+      console.log("Upload response data:", responseData);
+      
+      if (!response.ok) {
+        throw new Error(responseData.message || 'Failed to upload file');
+      }
       
       toast({
         title: 'File Uploaded',

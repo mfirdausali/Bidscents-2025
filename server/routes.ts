@@ -1248,49 +1248,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Message file upload endpoint
   app.post("/api/messages/upload-file", messageFileUpload.single('file'), async (req, res, next) => {
     try {
+      console.log("File upload request received");
+      
       if (!req.isAuthenticated()) {
+        console.log("Authentication check failed");
         return res.status(401).json({ message: "Unauthorized: Please log in to upload files" });
       }
 
       if (!req.file) {
+        console.log("No file found in request");
         return res.status(400).json({ message: "No file provided" });
       }
+      console.log(`File received: ${req.file.originalname}, size: ${req.file.size}, type: ${req.file.mimetype}`);
       
       if (!req.body.receiverId) {
+        console.log("No receiver ID found in request");
         return res.status(400).json({ message: "Receiver ID is required" });
+      }
+      console.log(`Receiver ID: ${req.body.receiverId}`);
+      
+      if (req.body.productId) {
+        console.log(`Product ID: ${req.body.productId}`);
       }
       
       // Upload the file to the message files bucket
+      console.log("Uploading file to object storage...");
       const uploadResult = await objectStorage.uploadMessageFile(
         req.file.buffer,
         req.file.mimetype
       );
       
       if (!uploadResult.success) {
+        console.log("File upload to object storage failed:", uploadResult);
         return res.status(500).json({ message: "Failed to upload file" });
       }
+      console.log(`File uploaded successfully with ID: ${uploadResult.url}`);
       
       // Create a new message with type FILE
-      const newMessage = {
-        senderId: req.user.id,
-        receiverId: parseInt(req.body.receiverId),
-        content: null, // Content is null for FILE type messages
-        productId: req.body.productId ? parseInt(req.body.productId) : null,
-        messageType: 'FILE', // Set message type to FILE
-        fileUrl: uploadResult.url
-      };
-      
-      // Save the message to the database
-      const createdMessage = await storage.createMessage(newMessage);
-      
-      // Return the created message with the file URL
-      res.status(201).json({
-        ...createdMessage,
-        fileUrl: objectStorage.getMessageFilePublicUrl(uploadResult.url)
-      });
+      console.log("Creating message record in database...");
+      try {
+        // Using Supabase direct insert for messages
+        const { data: messageData, error: messageError } = await supabase
+          .from('messages')
+          .insert({
+            sender_id: req.user.id,
+            receiver_id: parseInt(req.body.receiverId),
+            content: null, // Content is null for FILE type messages
+            product_id: req.body.productId ? parseInt(req.body.productId) : null,
+            message_type: 'FILE', // Set message type to FILE
+            file_url: uploadResult.url
+          })
+          .select()
+          .single();
+        
+        if (messageError) {
+          console.error("Database error while creating message:", messageError);
+          return res.status(500).json({ 
+            message: "Error saving message to database",
+            error: messageError.message
+          });
+        }
+        
+        if (!messageData) {
+          console.log("No data returned from message insert");
+          return res.status(500).json({ message: "No data returned from database" });
+        }
+
+        console.log("Message created successfully:", messageData);
+        
+        // Return the created message with the file URL
+        res.status(200).json({
+          ...messageData,
+          fileUrl: objectStorage.getMessageFilePublicUrl(uploadResult.url)
+        });
+      } catch (dbError) {
+        console.error("Exception during database operation:", dbError);
+        throw dbError;
+      }
     } catch (error) {
       console.error("Error in message file upload handler:", error);
-      next(error);
+      res.status(500).json({ 
+        message: typeof error === 'object' && error !== null && 'message' in error 
+          ? (error as Error).message 
+          : "An unexpected error occurred" 
+      });
     }
   });
   
