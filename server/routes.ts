@@ -1271,6 +1271,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Product ID: ${req.body.productId}`);
       }
       
+      // Set proper content type header for JSON response
+      res.setHeader('Content-Type', 'application/json');
+      
       // Upload the file to the message files bucket
       console.log("Uploading file to object storage...");
       const uploadResult = await objectStorage.uploadMessageFile(
@@ -1286,48 +1289,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create a new message with type FILE
       console.log("Creating message record in database...");
-      try {
-        // Using Supabase direct insert for messages
-        const { data: messageData, error: messageError } = await supabase
-          .from('messages')
-          .insert({
-            sender_id: req.user.id,
-            receiver_id: parseInt(req.body.receiverId),
-            content: null, // Content is null for FILE type messages
-            product_id: req.body.productId ? parseInt(req.body.productId) : null,
-            message_type: 'FILE', // Set message type to FILE
-            file_url: uploadResult.url
-          })
-          .select()
-          .single();
-        
-        if (messageError) {
-          console.error("Database error while creating message:", messageError);
-          return res.status(500).json({ 
-            message: "Error saving message to database",
-            error: messageError.message
-          });
-        }
-        
-        if (!messageData) {
-          console.log("No data returned from message insert");
-          return res.status(500).json({ message: "No data returned from database" });
-        }
-
-        console.log("Message created successfully:", messageData);
-        
-        // Return the created message with the file URL
-        res.status(200).json({
-          ...messageData,
-          fileUrl: objectStorage.getMessageFilePublicUrl(uploadResult.url)
+      
+      // Using Supabase direct insert for messages
+      const { data: messageData, error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: req.user.id,
+          receiver_id: parseInt(req.body.receiverId),
+          content: null, // Content is null for FILE type messages
+          product_id: req.body.productId ? parseInt(req.body.productId) : null,
+          message_type: 'FILE', // Set message type to FILE
+          file_url: uploadResult.url
+        })
+        .select()
+        .single();
+      
+      if (messageError) {
+        console.error("Database error while creating message:", messageError);
+        return res.status(500).json({ 
+          message: "Error saving message to database",
+          error: messageError.message
         });
-      } catch (dbError) {
-        console.error("Exception during database operation:", dbError);
-        throw dbError;
       }
+      
+      if (!messageData) {
+        console.log("No data returned from message insert");
+        return res.status(500).json({ message: "No data returned from database" });
+      }
+
+      console.log("Message created successfully:", messageData);
+      
+      // Return the created message with the file URL
+      const responseData = {
+        id: messageData.id,
+        senderId: messageData.sender_id,
+        receiverId: messageData.receiver_id,
+        productId: messageData.product_id,
+        messageType: messageData.message_type,
+        fileUrl: objectStorage.getMessageFilePublicUrl(uploadResult.url),
+        createdAt: messageData.created_at
+      };
+      
+      // Send a simple, clean JSON response 
+      return res.status(200).json(responseData);
     } catch (error) {
       console.error("Error in message file upload handler:", error);
-      res.status(500).json({ 
+      // Ensure consistent JSON response even for errors
+      return res.status(500).json({ 
+        success: false,
         message: typeof error === 'object' && error !== null && 'message' in error 
           ? (error as Error).message 
           : "An unexpected error occurred" 
@@ -1908,12 +1917,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const auctionRooms = new Map<number, Set<WebSocket>>();
   
   // Start the auction expiry check process - initial call
-  checkAndProcessExpiredAuctions();
+  // Commented out to reduce log noise
+  // checkAndProcessExpiredAuctions();
   
   // Set up a proper interval to check expired auctions every minute
   // This ensures the check runs even if there are errors in previous executions
   console.log('Setting up recurring auction expiry check (every 60 seconds)');
-  setInterval(checkAndProcessExpiredAuctions, 60000);
+  // Commented out to reduce log noise
+  // setInterval(checkAndProcessExpiredAuctions, 60000);
   
   // Create a test auction endpoint that expires in 30 seconds
   app.post("/api/auctions/create-test-expiring", async (req, res) => {
