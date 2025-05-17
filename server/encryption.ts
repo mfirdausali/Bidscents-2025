@@ -55,8 +55,13 @@ export function decryptMessage(encryptedMessage: string): string {
  * @param message The message to check
  * @returns Boolean indicating if the message appears to be encrypted
  */
-export function isEncrypted(message: string): boolean {
+export function isEncrypted(message: string | null): boolean {
   try {
+    // If message is null or empty, it can't be encrypted
+    if (!message) {
+      return false;
+    }
+    
     // Use a more robust method to detect encrypted messages
     // CryptoJS AES encrypted strings:
     // - Always start with 'U2FsdGVk' (which is 'Salted' in base64)
