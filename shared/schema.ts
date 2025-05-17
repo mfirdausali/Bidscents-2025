@@ -1,6 +1,10 @@
-import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Enum types
+export const messageTypeEnum = pgEnum('message_type', ['TEXT', 'ACTION', 'FILE']);
+export const actionTypeEnum = pgEnum('action_type', ['INITIATE', 'CONFIRM_PAYMENT', 'CONFIRM_DELIVERY', 'REVIEW']);
 
 // Users table
 export const users = pgTable("users", {
@@ -106,6 +110,10 @@ export const messages = pgTable("messages", {
   productId: integer("product_id").references(() => products.id), // Optional reference to product
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  messageType: messageTypeEnum("message_type").notNull().default('TEXT'),
+  actionType: actionTypeEnum("action_type"),
+  isClicked: boolean("is_clicked").default(false),
+  fileUrl: text("file_url").default('NULL'),
 });
 
 // Auctions table
@@ -237,6 +245,10 @@ export const insertMessageSchema = createInsertSchema(messages).pick({
   content: true,
   productId: true,
   isRead: true,
+  messageType: true,
+  actionType: true,
+  isClicked: true,
+  fileUrl: true,
 });
 
 // Create the base schema first
