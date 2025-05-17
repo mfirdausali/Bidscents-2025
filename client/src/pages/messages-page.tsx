@@ -443,8 +443,29 @@ export default function MessagesPage() {
         variant: 'default',
       });
       
-      // File messages will be received via the WebSocket connection
-      // No need to manually update the UI
+      // Immediately add the file message to the UI
+      if (responseData && responseData.success && responseData.message) {
+        // Add the new message to the state
+        const newMessage: Message = {
+          id: responseData.message.id,
+          senderId: user?.id || 0,
+          receiverId: selectedConversation.userId,
+          content: null,
+          fileUrl: responseData.message.fileUrl || `/api/message-files/${responseData.message.file_url}`,
+          messageType: 'FILE',
+          createdAt: new Date(),
+          isRead: false,
+          productId: selectedConversation.productId || null
+        };
+        
+        // Update the messages state with the new message
+        setMessages(prevMessages => [newMessage, ...prevMessages]);
+        
+        // Scroll to the bottom to show the new message
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
     } catch (error) {
       console.error('Error uploading file:', error);
       toast({
