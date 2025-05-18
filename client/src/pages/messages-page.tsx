@@ -619,6 +619,7 @@ export default function MessagesPage() {
   // State for review form
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewComment, setReviewComment] = useState<string>('');
+  const [submittingReview, setSubmittingReview] = useState<number | null>(null);
   
   // Handle confirming a purchase (INITIATE action)
   const handleConfirmPurchase = useCallback(async (messageId: number) => {
@@ -1226,7 +1227,10 @@ export default function MessagesPage() {
                       </div>
                       
                       {activeChat.map((msg) => {
-                        const isOwnMessage = msg.senderId === user?.id;
+                        let isOwnMessage = msg.senderId === user?.id;
+                        if (msg.messageType === 'ACTION' && msg.actionType === 'REVIEW') {
+                          isOwnMessage = !isOwnMessage;
+                        }
                         return (
                           <div
                             key={msg.id}
@@ -1391,35 +1395,73 @@ export default function MessagesPage() {
                                     <div className="bg-yellow-100 border border-yellow-200 rounded-lg p-4 w-full">
                                       <div className="text-gray-800 font-medium mb-2 text-center">Rate This Transaction</div>
                                       
-                                      {/* Star Rating */}
-                                      <div className="flex justify-center mb-4">
-                                        {[1, 2, 3, 4, 5].map((star) => (
-                                          <button
-                                            key={star}
-                                            type="button"
-                                            onClick={() => setReviewRating(star)}
-                                            className="text-yellow-400 text-2xl mx-1"
+                                      {msg.isClicked ? (
+                                        <div className="bg-green-100 text-green-700 font-medium p-2 rounded-md text-center mt-2 mb-2">
+                                          ✓ Review submitted - Thank you!
+                                        </div>
+                                      ) : msg.senderId === user?.id ? (
+                                        <>
+                                          {/* Rating Input with Star */}
+                                          <div className="flex items-center justify-center mb-4">
+                                            <div className="flex items-center space-x-2">
+                                              <Button 
+                                                type="button" 
+                                                variant="outline" 
+                                                size="icon"
+                                                onClick={() => setReviewRating(Math.max(0, reviewRating - 0.5))}
+                                                className="h-8 w-8"
+                                                disabled={reviewRating <= 0}
+                                              >
+                                                -
+                                              </Button>
+                                              
+                                              <div className="flex items-center bg-white border rounded-md px-3 py-1 min-w-[100px] justify-center">
+                                                <span className="text-lg font-medium">{reviewRating}</span>
+                                                <span className="text-yellow-400 text-lg ml-1">★</span>
+                                              </div>
+                                              
+                                              <Button 
+                                                type="button" 
+                                                variant="outline" 
+                                                size="icon"
+                                                onClick={() => setReviewRating(Math.min(5, reviewRating + 0.5))}
+                                                className="h-8 w-8"
+                                                disabled={reviewRating >= 5}
+                                              >
+                                                +
+                                              </Button>
+                                            </div>
+                                          </div>
+                                          
+                                          {/* Comment Textarea */}
+                                          <textarea
+                                            className="w-full p-3 border border-gray-300 rounded-md mb-3 resize-none"
+                                            placeholder="Add a comment (optional)"
+                                            rows={3}
+                                            value={reviewComment}
+                                            onChange={(e) => setReviewComment(e.target.value)}
+                                          />
+                                          
+                                          {/* Submit Button */}
+                                          <Button 
+                                            className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                                            onClick={() => handleSubmitReview(msg.id, msg.product?.id || 0)}
+                                            disabled={submittingReview === msg.id}
                                           >
-                                            ★
-                                          </button>
-                                        ))}
-                                      </div>
-                                      
-                                      {/* Comment Textarea */}
-                                      <textarea
-                                        className="w-full p-3 border border-gray-300 rounded-md mb-3 resize-none"
-                                        placeholder="Add a comment (optional)"
-                                        rows={3}
-                                        value={reviewComment}
-                                        onChange={(e) => setReviewComment(e.target.value)}
-                                      />
-                                      
-                                      {/* Submit Button */}
-                                      <Button 
-                                        className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                                      >
-                                        Submit Review
-                                      </Button>
+                                            {submittingReview === msg.id ? (
+                                              <>
+                                                <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                                                Submitting...
+                                              </>
+                                            ) : "Submit Review"}
+                                          </Button>
+                                        </>
+                                      ) : (
+                                        // Seller sees waiting message
+                                        <div className="text-blue-600 text-sm italic p-2 border border-blue-200 bg-blue-50/50 rounded-md text-center mt-2">
+                                          Waiting for buyer to submit a review...
+                                        </div>
+                                      )}
                                       
                                       {/* Timestamp */}
                                       <div className="text-gray-500 text-sm mt-2">
