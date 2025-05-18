@@ -2007,6 +2007,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint to confirm payment received (for sellers)
+  app.post('/api/messages/action/confirm-payment', async (req, res, next) => {
+    try {
+      // Ensure user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(403).json({ message: "Unauthorized: Must be logged in to confirm payment" });
+      }
+      
+      const { messageId } = req.body;
+      const userId = req.user.id;
+      
+      if (!messageId) {
+        return res.status(400).json({ message: "Missing message ID" });
+      }
+      
+      // Get the message details
+      const message = await storage.getMessage(messageId);
+      
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+      
+      // Ensure the current user is the receiver of the message (the seller)
+      if (message.receiverId !== userId) {
+        return res.status(403).json({ message: "Not authorized to confirm this payment" });
+      }
+      
+      // Ensure message is of the correct type
+      if (message.messageType !== 'ACTION' || message.actionType !== 'CONFIRM_PAYMENT') {
+        return res.status(400).json({ message: "Invalid message type for payment confirmation" });
+      }
+      
+      // Ensure there's a product ID
+      if (!message.productId) {
+        return res.status(400).json({ message: "No product associated with this message" });
+      }
+      
+      // Get the product details
+      const product = await storage.getProductById(message.productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      // Begin payment confirmation steps
+      
+      // 1. Update the message to mark it as clicked and read
+      const updatedMessage = await storage.updateMessage(messageId, {
+        isClicked: true,
+        isRead: true
+      });
+      
+      // 2. Find the transaction for this product
+      const transactions = await storage.getTransactionsByProductId(message.productId);
+      const transaction = transactions.find(t => 
+        t.buyerId === message.senderId && t.sellerId === userId
+      );
+      
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      // 3. Update the transaction status to 'COMPLETED'
+      await storage.updateTransaction(transaction.id, {
+        status: 'COMPLETED'
+      });
+      
+      // 4. Update the product status to 'sold'
+      await storage.updateProduct(message.productId, {
+        status: 'sold'
+      });
+      
+      // 5. Notify the buyer through WebSocket
+      if (message.senderId && connectedUsers.has(message.senderId)) {
+        const buyerSocket = connectedUsers.get(message.senderId);
+        if (buyerSocket) {
+          buyerSocket.send(JSON.stringify({
+            type: 'PAYMENT_CONFIRMED',
+            data: {
+              messageId,
+              productId: message.productId,
+              sellerId: userId,
+              transactionId: transaction.id
+            }
+          }));
+          
+          // Also send updated message to reflect the clicked state
+          buyerSocket.send(JSON.stringify({
+            type: 'update_message',
+            message: {
+              ...message,
+              isClicked: true
+            }
+          }));
+        }
+      }
+      
+      return res.json({ 
+        success: true, 
+        message: "Payment confirmation successful",
+        transactionId: transaction.id
+      });
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      next(error);
+    }
+  });
+  
   // Mark messages as read
   app.post("/api/messages/mark-read", async (req, res, next) => {
     try {
