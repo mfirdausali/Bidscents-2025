@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Clock } from 'lucide-react';
 
 interface PaymentCountdownProps {
   createdAt: string | Date;
@@ -6,47 +9,79 @@ interface PaymentCountdownProps {
 }
 
 export function PaymentCountdown({ createdAt, timeLimit = 30 }: PaymentCountdownProps) {
-  const [minutesRemaining, setMinutesRemaining] = useState(calculateRemainingMinutes());
-
-  // Calculate remaining time on component mount and when createdAt changes
-  function calculateRemainingMinutes(): number {
-    const createdDate = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;
-    const expiryTime = new Date(createdDate.getTime() + timeLimit * 60 * 1000);
-    const now = new Date();
-    
-    // Calculate minutes remaining
-    const diffInMs = expiryTime.getTime() - now.getTime();
-    const diffInMinutes = Math.max(0, Math.floor(diffInMs / (1000 * 60)));
-    
-    return diffInMinutes;
-  }
-
-  // Update the countdown every minute
+  const [remainingMinutes, setRemainingMinutes] = useState<number>(calculateRemainingMinutes());
+  const [progress, setProgress] = useState<number>(100);
+  
+  // Calculate remaining time when component mounts and every minute after
   useEffect(() => {
-    const interval = setInterval(() => {
+    const timer = setInterval(() => {
       const remaining = calculateRemainingMinutes();
-      setMinutesRemaining(remaining);
+      setRemainingMinutes(remaining);
+      setProgress((remaining / timeLimit) * 100);
+      
+      // Clear interval if time is up
+      if (remaining <= 0) {
+        clearInterval(timer);
+      }
     }, 60000); // Update every minute
     
-    return () => clearInterval(interval);
+    // Initial calculation
+    const remaining = calculateRemainingMinutes();
+    setRemainingMinutes(remaining);
+    setProgress((remaining / timeLimit) * 100);
+    
+    return () => clearInterval(timer);
   }, [createdAt, timeLimit]);
-
-  // If time is up, show expired message
-  if (minutesRemaining <= 0) {
+  
+  // Calculate minutes remaining from now until expiration
+  function calculateRemainingMinutes(): number {
+    const created = new Date(createdAt);
+    const expiration = new Date(created.getTime() + timeLimit * 60000);
+    const now = new Date();
+    
+    const diffMs = expiration.getTime() - now.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    
+    return Math.max(0, diffMinutes);
+  }
+  
+  // Determine text color based on remaining time
+  const getTextColorClass = () => {
+    if (remainingMinutes <= 5) return 'text-red-500';
+    if (remainingMinutes <= 10) return 'text-amber-500';
+    return 'text-emerald-500';
+  };
+  
+  if (remainingMinutes <= 0) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-center">
-        <span className="text-amber-700 font-medium">
-          ⏰ Payment window has expired
-        </span>
-      </div>
+      <Card className="m-2 border-red-200 bg-red-50">
+        <CardContent className="p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Clock className="mr-2 h-4 w-4 text-red-500" />
+              <span className="text-sm font-medium text-red-700">
+                Payment window expired
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
-
+  
   return (
-    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-center">
-      <span className="text-amber-700 font-medium">
-        ⏰ Payment window: {minutesRemaining} minutes remaining
-      </span>
-    </div>
+    <Card className="m-2 border-blue-200 bg-blue-50">
+      <CardContent className="p-3">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center">
+            <Clock className="mr-2 h-4 w-4 text-blue-500" />
+            <span className="text-sm font-medium">
+              Payment window: <span className={getTextColorClass()}>{remainingMinutes} minutes remaining</span>
+            </span>
+          </div>
+        </div>
+        <Progress value={progress} className="h-1.5" />
+      </CardContent>
+    </Card>
   );
 }
