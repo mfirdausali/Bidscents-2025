@@ -1956,11 +1956,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (transactions && transactions.length > 0) {
               const transaction = transactions[0];
               
-              // Update the transaction status to COMPLETED
+              // Update the transaction status to WAITING_DELIVERY (not COMPLETED yet)
               const { error: updateError } = await supabase
                 .from('transactions')
                 .update({
-                  status: 'COMPLETED',
+                  status: 'WAITING_DELIVERY',
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', transaction.id);
@@ -1970,7 +1970,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 return res.status(500).json({ message: "Failed to update transaction status" });
               }
               
-              console.log(`Updated transaction ${transaction.id} to COMPLETED status`);
+              console.log(`Updated transaction ${transaction.id} to WAITING_DELIVERY status`);
+              
+              // Send a notification message to the buyer
+              try {
+                // Get product details for the notification message
+                const product = await storage.getProductById(message.productId);
+                const productName = product ? product.name : "this item";
+                
+                // Send a text message to the buyer
+                const { data: notificationMsg, error: msgError } = await supabase
+                  .from('messages')
+                  .insert({
+                    sender_id: userId, // Seller (current user) sends the notification
+                    receiver_id: message.senderId, // Buyer receives the notification
+                    content: encryptMessage(`✅ Payment received for "${productName}". Thank you!`),
+                    product_id: message.productId,
+                    is_read: false,
+                    message_type: 'TEXT',
+                    created_at: new Date().toISOString()
+                  })
+                  .select();
+                
+                if (msgError) {
+                  console.error('Error sending payment confirmation notification:', msgError);
+                  // Continue even if notification fails - we don't want to block the main action
+                } else {
+                  console.log('Payment confirmation notification sent to buyer');
+                  
+                  // If the buyer is connected via WebSocket, notify them directly
+                  const buyerWs = connectedUsers.get(message.senderId);
+                  if (buyerWs && buyerWs.readyState === WebSocket.OPEN) {
+                    const notificationData = {
+                      type: 'new_message',
+                      message: {
+                        id: notificationMsg[0].id,
+                        senderId: userId,
+                        receiverId: message.senderId,
+                        content: `✅ Payment received for "${productName}". Thank you!`,
+                        productId: message.productId,
+                        isRead: false,
+                        messageType: 'TEXT',
+                        createdAt: new Date().toISOString()
+                      }
+                    };
+                    buyerWs.send(JSON.stringify(notificationData));
+                  }
+                }
+              } catch (notificationError) {
+                console.error('Error processing payment notification:', notificationError);
+                // Continue even if notification fails
+              }
             } else {
               console.warn(`No WAITING_PAYMENT transaction found for product ${message.productId} between seller ${userId} and buyer ${message.senderId}`);
             }
