@@ -1979,45 +1979,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   status: 'pending'
                 })
                 .eq('id', message.productId);
-                
+
               if (productUpdateError) {
                 console.error('Error updating product status to pending:', productUpdateError);
                 // Don't return an error response here, as the main transaction was successful
                 // Just log the error and continue
-              } else {
-                console.log(`Updated product ${message.productId} status to pending`);
-              }
-              
-              // Send a notification message to the buyer
-              try {
-                // Get product details for the notification message
-                const product = await storage.getProductById(message.productId);
-                const productName = product ? product.name : "this item";
-                
-                // Send a text message to the buyer
-                const { data: notificationMsg, error: msgError } = await supabase
-                  .from('messages')
-                  .insert({
-                    sender_id: userId, // Seller (current user) sends the notification
-                    receiver_id: message.senderId, // Buyer receives the notification
-                    content: encryptMessage(`✅ Payment received for "${productName}". Thank you!`),
-                    product_id: message.productId,
-                    is_read: false,
-                    message_type: 'TEXT',
-                    created_at: new Date().toISOString()
-                  })
-                  .select();
-                
-                if (msgError) {
-                  console.error('Error sending payment confirmation notification:', msgError);
-                  // Continue even if notification fails - we don't want to block the main action
                 } else {
-                  console.log('Payment confirmation notification sent to buyer');
+                  console.log(`Updated product ${message.productId} status to pending`);
                 }
-              } catch (notificationError) {
-                console.error('Error processing payment notification:', notificationError);
-                // Continue even if notification fails
-              }
             } else {
               console.warn(`No WAITING_PAYMENT transaction found for product ${message.productId} between seller ${userId} and buyer ${message.senderId}`);
             }
@@ -2027,6 +1996,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } catch (transError) {
             console.error('Error during payment confirmation:', transError);
             return res.status(500).json({ message: "Error processing payment confirmation" });
+          }
+        }
+      } else if (message.actionType === 'CONFIRM_DELIVERY') {
+        // This is a buyer confirming delivery received
+        if (message.productId) {
+          try {
+            // Find the transaction for this product between these users
+            const { data: transactions, error } = await supabase
+              .from('transactions')
+              .select('*')
+              .eq('product_id', message.productId)
+              .eq('buyer_id', userId) // Current user (buyer) is confirming delivery
+              .eq('status', 'WAITING_DELIVERY')
+              .order('created_at', { ascending: false })
+              .limit(1);
+            
+            if (error) {
+              console.error('Error fetching transaction:', error);
+              return res.status(500).json({ message: "Error processing delivery confirmation" });
+            }
+            
+            if (transactions && transactions.length > 0) {
+              const transaction = transactions[0];
+              
+              // Update the transaction status to WAITING_REVIEW
+              const { error: updateError } = await supabase
+                .from('transactions')
+                .update({
+                  status: 'WAITING_REVIEW',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', transaction.id);
+              
+              if (updateError) {
+                console.error('Error updating transaction status:', updateError);
+                return res.status(500).json({ message: "Failed to update transaction status" });
+              }
+              
+              console.log(`Updated transaction ${transaction.id} to WAITING_REVIEW status`);
+              
+              // Update the product status to 'sold' from 'pending'
+              const { error: productUpdateError } = await supabase
+                .from('products')
+                .update({
+                  status: 'sold'
+                })
+                .eq('id', message.productId);
+
+              if (productUpdateError) {
+                console.error('Error updating product status to sold:', productUpdateError);
+                // Don't return an error response here, as the main transaction was successful
+                // Just log the error and continue
+              } else {
+                console.log(`Updated product ${message.productId} status to sold`);
+              }
+            } else {
+              console.warn(`No WAITING_DELIVERY transaction found for product ${message.productId} for buyer ${userId}`);
+            }
+            
+            // Log delivery confirmation success
+            console.log(`Delivery confirmation successful for message ${messageId}, product ${message.productId}, buyer ${userId}`);
+          } catch (transError) {
+            console.error('Error during delivery confirmation:', transError);
+            return res.status(500).json({ message: "Error processing delivery confirmation" });
           }
         }
       } else {
