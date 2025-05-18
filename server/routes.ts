@@ -1932,13 +1932,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to update message status" });
       }
       
-      // Get product details to include in the confirmation message
+      // Get product details to include in the confirmation message and create transaction
       let productName = "this item";
+      let productPrice = 1; // Default amount for the transaction if price can't be determined
       if (message.productId) {
         try {
           const product = await storage.getProductById(message.productId);
           if (product) {
             productName = product.name;
+            productPrice = product.price;
+            
+            // 3. Create a transaction record
+            try {
+              await supabase
+                .from('transactions')
+                .insert({
+                  product_id: message.productId,
+                  seller_id: message.senderId,
+                  buyer_id: userId,
+                  amount: productPrice,
+                  status: 'WAITING_PAYMENT',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                });
+              
+              console.log(`Created transaction record for product ${message.productId}, seller ${message.senderId}, buyer ${userId}`);
+            } catch (transError) {
+              console.error('Error creating transaction record:', transError);
+              // Continue execution even if transaction creation fails
+              // We don't want to prevent the confirmation message from being sent
+            }
           }
         } catch (err) {
           console.error('Error fetching product details for confirmation message:', err);
