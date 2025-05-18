@@ -298,7 +298,7 @@ export async function getMessageFileFromStorage(fileId: string): Promise<Buffer 
  * @returns The public URL to access the file
  */
 export function getMessageFilePublicUrl(fileId: string): string {
-  console.log(`🔗 Creating public URL for message file: "${fileId}"`);
+  
   
   if (!fileId) {
     console.warn('⚠️ Attempted to get public URL for empty/null fileId');
@@ -307,7 +307,6 @@ export function getMessageFilePublicUrl(fileId: string): string {
   
   // Construct the API endpoint URL that will serve the file
   const url = `/api/message-files/${fileId}`;
-  console.log(`🔗 Generated URL: ${url}`);
   return url;
 }
 
