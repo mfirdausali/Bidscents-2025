@@ -2106,6 +2106,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        // Handle sending an action message (for transactions)
+        if (data.type === 'send_action_message') {
+          try {
+            // Validate action message data
+            const actionMessageSchema = z.object({
+              senderId: z.number(),
+              receiverId: z.number(),
+              productId: z.number(),
+              actionType: z.enum(['INITIATE', 'CONFIRM_PAYMENT', 'CONFIRM_DELIVERY', 'REVIEW']),
+            });
+            
+            // Ensure userId is not null before using it
+            if (userId === null) {
+              throw new Error('User ID is required to send an action message');
+            }
+            
+            const actionMessageData = actionMessageSchema.parse({
+              senderId: userId, // Use authenticated user ID as sender
+              receiverId: data.receiverId,
+              productId: data.productId,
+              actionType: data.actionType,
+            });
+            
+            // Get product info
+            const product = await storage.getProduct(actionMessageData.productId);
+            if (!product) {
+              throw new Error('Product not found');
+            }
+            
+            // Create message with ACTION type
+            const message = await storage.createMessage({
+              senderId: actionMessageData.senderId,
+              receiverId: actionMessageData.receiverId,
+              content: null, // Action messages have null content
+              productId: actionMessageData.productId,
+              messageType: 'ACTION',
+              actionType: actionMessageData.actionType,
+              isClicked: false,
+            });
+            
+            // Get sender and receiver details for the response
+            const sender = await storage.getUser(actionMessageData.senderId);
+            const receiver = await storage.getUser(actionMessageData.receiverId);
+            
+            // Create a detailed message object for the response
+            const detailedMessage = {
+              ...message,
+              sender: sender ? {
+                id: sender.id,
+                username: sender.username,
+                profileImage: sender.profileImage
+              } : undefined,
+              receiver: receiver ? {
+                id: receiver.id,
+                username: receiver.username,
+                profileImage: receiver.profileImage
+              } : undefined,
+              product: product ? {
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                imageUrl: product.imageUrl
+              } : undefined
+            };
+            
+            // Send confirmation to sender
+            ws.send(JSON.stringify({ 
+              type: 'message_sent', 
+              message: detailedMessage
+            }));
+            
+            // Send notification to receiver if they're connected
+            const receiverWs = connectedUsers.get(data.receiverId);
+            if (receiverWs && receiverWs.readyState === WebSocket.OPEN) {
+              receiverWs.send(JSON.stringify({ 
+                type: 'new_message', 
+                message: detailedMessage
+              }));
+            }
+          } catch (error: any) {
+            console.error('Error processing action message:', error);
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              message: 'Failed to send action message: ' + (error.message || 'Unknown error')
+            }));
+          }
+          return;
+        }
+        
         // Handle sending a new message
         if (data.type === 'send_message') {
           try {
