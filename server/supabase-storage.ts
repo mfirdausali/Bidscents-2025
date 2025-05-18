@@ -1746,10 +1746,23 @@ export class SupabaseStorage implements IStorage {
     // If it's an ACTION message with a product, get the product details
     if (message.messageType === 'ACTION' && message.productId) {
       try {
-        // Use the correct method name from our implementation
-        const product = await this.getProductWithDetails(message.productId);
-        if (product) {
-          // Add product details to the message
+        // Just fetch the product directly instead of using a helper method
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', message.productId)
+          .single();
+          
+        if (!error && data) {
+          const product = {
+            id: data.id,
+            name: data.name,
+            brand: data.brand,
+            description: data.description,
+            price: data.price,
+            imageUrl: data.image_url,
+            // Add other properties as needed
+          };
           message.product = product;
         }
       } catch (error) {
