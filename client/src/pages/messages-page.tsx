@@ -983,8 +983,8 @@ export default function MessagesPage() {
                                   : 'bg-background rounded-tl-none shadow-sm'
                               }`}
                             >
-                              {/* File Message Display */}
-                              {msg.messageType === 'FILE' ? (
+                              {/* Handle different message types */}
+                              {msg.messageType === 'FILE' && (
                                 <div className="file-message">
                                   {msg.fileUrl && (
                                     <Dialog>
@@ -1031,10 +1031,10 @@ export default function MessagesPage() {
                                     </Dialog>
                                   )}
                                 </div>
-                              ) : 
+                              )}
                               
-                              {/* Action/Transaction Message Display */}
-                              msg.messageType === 'ACTION' ? (
+                              {/* Transaction Message */}
+                              {msg.messageType === 'ACTION' && (
                                 <div className="transaction-message">
                                   <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
                                     <div className="text-lg font-bold mb-2">Confirm Purchase</div>
@@ -1089,10 +1089,10 @@ export default function MessagesPage() {
                                     )}
                                   </div>
                                 </div>
-                              ) : 
+                              )}
                               
-                              {/* Regular Text Message Display */}
-                              (
+                              {/* Regular Text Message */}
+                              {msg.messageType !== 'FILE' && msg.messageType !== 'ACTION' && (
                                 <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
                               )}
                               <div className="text-xs mt-1 opacity-70 flex justify-end">
