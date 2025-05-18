@@ -1736,7 +1736,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (productId && !isNaN(productId)) {
         conversation = await storage.getConversationForProduct(currentUserId, otherUserId, productId);
       } else {
+        // Get conversation messages with all fields including action type and is_clicked
         conversation = await storage.getConversation(currentUserId, otherUserId);
+        
+        // Add logging for debugging transaction messages
+        conversation.forEach(msg => {
+          if (msg.messageType === 'ACTION') {
+            console.log(`Found action message ID ${msg.id}, is_clicked=${msg.isClicked}, action_type=${msg.actionType}`);
+          }
+        });
       }
       
       // Enhance messages with file URLs and product images
