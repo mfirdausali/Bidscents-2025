@@ -1033,10 +1033,37 @@ export default function MessagesPage() {
                               ) : msg.messageType === 'ACTION' && msg.actionType === 'INITIATE' ? (
                                 <div className="transaction-message">
                                   <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
-                                    <div className="text-lg font-bold mb-1">Confirm Purchase</div>
+                                    <div className="text-lg font-bold mb-2">Confirm Purchase</div>
+                                    
                                     {msg.product && (
-                                      <div className="text-base mb-3">
-                                        {msg.product.name} {msg.product.price && ` - $${Number(msg.product.price).toFixed(2)}`}
+                                      <div className="flex items-start mb-3">
+                                        {/* Product Image */}
+                                        <div className="h-16 w-16 rounded-md overflow-hidden bg-muted mr-3 flex-shrink-0">
+                                          <img
+                                            src={
+                                              msg.product.imageUrl
+                                                ? msg.product.imageUrl.startsWith('/api/images/')
+                                                  ? msg.product.imageUrl
+                                                  : `/api/images/${msg.product.imageUrl}`
+                                                : "/placeholder.jpg"
+                                            }
+                                            alt={msg.product.name}
+                                            onError={(e) => {
+                                              (e.target as HTMLImageElement).src = "/placeholder.jpg";
+                                            }}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </div>
+                                        
+                                        {/* Product Details */}
+                                        <div className="flex-grow">
+                                          <div className="font-medium text-base">{msg.product.name}</div>
+                                          {msg.product.price && (
+                                            <div className="text-sm font-medium text-green-700">
+                                              ${Number(msg.product.price).toFixed(2)}
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     )}
                                     
@@ -1124,8 +1151,11 @@ export default function MessagesPage() {
                             >
                               <div className="flex items-center">
                                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M9 11V17M15 11V17M21 5H3M19 5V19C19 20.1046 18.1046 21 17 21H7C5.89543 21 5 20.1046 5 19V5M16 5V3C16 1.89543 15.1046 1 14 1H10C8.89543 1 8 1.89543 8 3V5" 
+                                  <path d="M21 4H3C1.89543 4 1 4.89543 1 6V18C1 19.1046 1.89543 20 3 20H21C22.1046 20 23 19.1046 23 18V6C23 4.89543 22.1046 4 21 4Z" 
                                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <path d="M1 10H23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <path d="M4 15H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <path d="M12 15H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                                 <span>Create Transaction</span>
                               </div>
