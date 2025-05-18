@@ -783,6 +783,51 @@ export default function MessagesPage() {
     }
   }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage, sendActionMessage]);
   
+  // Handle submitting a review (REVIEW action)
+  const handleSubmitReview = useCallback(async (messageId: number, productId: number) => {
+    try {
+      setSubmittingReview(messageId);
+      
+      const response = await fetch(`/api/messages/submit-review/${messageId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          rating: reviewRating,
+          comment: reviewComment,
+          productId
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to submit review');
+      }
+      
+      // Update the UI to show the review was submitted
+      setActiveChat(prevChat => 
+        prevChat.map(msg => 
+          msg.id === messageId ? { ...msg, isClicked: true } : msg
+        )
+      );
+      
+      toast({
+        title: "Thank you!",
+        description: "Your review has been submitted successfully.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit review. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingReview(null);
+    }
+  }, [toast, setActiveChat, reviewComment, reviewRating]);
+  
   // Handle confirming delivery received (CONFIRM_DELIVERY action)
   const handleConfirmDeliveryReceived = useCallback(async (messageId: number) => {
     try {

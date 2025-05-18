@@ -2113,6 +2113,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Submit a review for a completed transaction
+  app.post("/api/messages/submit-review/:messageId", async (req, res, next) => {
+    try {
+      // Check authentication
+      if (!req.isAuthenticated()) {
+        return res.status(403).json({ message: "Unauthorized: Must be logged in to submit reviews" });
+      }
+      
+      // Validate request parameters and body
+      const messageId = parseInt(req.params.messageId, 10);
+      if (isNaN(messageId)) {
+        return res.status(400).json({ message: "Invalid message ID" });
+      }
+      
+      const schema = z.object({
+        rating: z.number().min(0).max(5),
+        comment: z.string().optional(),
+        productId: z.number()
+      });
+      
+      const validationResult = schema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request", 
+          errors: validationResult.error.errors 
+        });
+      }
+      
+      const { rating, comment, productId } = validationResult.data;
+      const userId = req.user.id;
+      
+      // Fetch the message to verify it's a review action message for this user
+      const message = await storage.getMessageById(messageId);
+      
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+      
+      // Verify this user is the sender of the message (only buyer can submit review)
+      if (message.senderId !== userId) {
+        return res.status(403).json({ message: "Unauthorized: Only the buyer can submit a review" });
+      }
+      
+      // Verify it's a review action message
+      if (message.messageType !== 'ACTION' || message.actionType !== 'REVIEW') {
+        return res.status(400).json({ message: "Not a review message" });
+      }
+      
+      // Update the message to mark it as clicked (review submitted)
+      const updatedMessage = await storage.updateActionMessageStatus(messageId, true);
+      
+      if (!updatedMessage) {
+        return res.status(500).json({ message: "Failed to update message status" });
+      }
+      
+      // Find the transaction for this product between these users
+      const { data: transactions, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('buyer_id', userId) // Current user (buyer) is submitting review
+        .eq('status', 'WAITING_REVIEW')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (error) {
+        console.error('Error fetching transaction:', error);
+        return res.status(500).json({ message: "Error processing review submission" });
+      }
+      
+      if (!transactions || transactions.length === 0) {
+        return res.status(404).json({ message: "No transaction found for this review" });
+      }
+      
+      const transaction = transactions[0];
+      
+      // 1. Add the review to the reviews table
+      const { error: reviewError } = await supabase
+        .from('reviews')
+        .insert({
+          user_id: userId, // Reviewer (buyer)
+          product_id: productId,
+          rating: rating,
+          comment: comment || null,
+          created_at: new Date()
+        });
+      
+      if (reviewError) {
+        console.error('Error adding review:', reviewError);
+        return res.status(500).json({ message: "Failed to create review" });
+      }
+      
+      // 2. Update the transaction status to COMPLETE
+      const { error: updateError } = await supabase
+        .from('transactions')
+        .update({
+          status: 'COMPLETE',
+          updated_at: new Date()
+        })
+        .eq('id', transaction.id);
+      
+      if (updateError) {
+        console.error('Error updating transaction:', updateError);
+        return res.status(500).json({ message: "Failed to update transaction status" });
+      }
+      
+      // Return success
+      res.status(200).json({ 
+        message: "Review submitted successfully",
+        transactionStatus: 'COMPLETE'
+      });
+      
+      // Notify other user through WebSocket
+      const otherUserId = message.receiverId;
+      const socketMessage = {
+        type: 'REVIEW_SUBMITTED',
+        messageId: messageId,
+        productId: productId,
+        userId: userId,
+        rating: rating
+      };
+      
+      notifyUser(otherUserId, socketMessage);
+      
+    } catch (error) {
+      console.error('Error in submit-review endpoint:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Mark messages as read
   app.post("/api/messages/mark-read", async (req, res, next) => {
     try {
