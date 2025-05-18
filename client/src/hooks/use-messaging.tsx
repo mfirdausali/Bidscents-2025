@@ -493,12 +493,68 @@ export function useMessaging() {
     }
   }, [user, toast]);
 
+  // Send an action message (for transactions/confirmations)
+  const sendActionMessage = useCallback((receiverId: number, productId: number, actionType: 'INITIATE' | 'CONFIRM_PAYMENT' | 'CONFIRM_DELIVERY' | 'REVIEW') => {
+    console.log('Attempting to send action message to receiverId:', receiverId, 'for productId:', productId);
+    
+    if (!socketRef.current) {
+      console.error('WebSocket is not initialized');
+      toast({
+        title: 'Connection Error',
+        description: 'WebSocket connection not initialized. Please try again later.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    
+    if (socketRef.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not open. Current state:', socketRef.current.readyState);
+      toast({
+        title: 'Connection Error',
+        description: 'Not connected to messaging server. Please try again.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    if (!user) {
+      console.error('User is not authenticated');
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in to send messages.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    try {
+      const message = {
+        type: 'send_action_message',
+        receiverId,
+        productId,
+        actionType,
+      };
+
+      socketRef.current.send(JSON.stringify(message));
+      return true;
+    } catch (error) {
+      console.error('Failed to send action message:', error);
+      toast({
+        title: 'Message Error',
+        description: 'Failed to send action message. Please try again.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [user, toast]);
+
   return {
     connected,
     messages,
     loading,
     error,
     sendMessage,
+    sendActionMessage,
     markAsRead,
     getConversation,
   };
