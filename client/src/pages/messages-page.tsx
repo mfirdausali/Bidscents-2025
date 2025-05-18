@@ -1369,10 +1369,10 @@ export default function MessagesPage() {
                                         <Button 
                                           variant="outline"
                                           className="w-full bg-white border-blue-300 text-blue-700 hover:bg-blue-100"
-                                          onClick={() => handleConfirmPaymentReceived(msg.id)}
-                                          disabled={confirmingPayment === msg.id}
+                                          onClick={() => handleConfirmDeliveryReceived(msg.id)}
+                                          disabled={confirmingDelivery === msg.id}
                                         >
-                                          {confirmingPayment === msg.id ? (
+                                          {confirmingDelivery === msg.id ? (
                                             <>
                                               <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></span>
                                               Processing...
@@ -1385,6 +1385,46 @@ export default function MessagesPage() {
                                           Waiting for buyer to confirm delivery receipt...
                                         </div>
                                       )}
+                                    </div>
+                                  ) : msg.actionType === 'REVIEW' ? (
+                                    // Review UI - Yellow styling with star rating
+                                    <div className="bg-yellow-100 border border-yellow-200 rounded-lg p-4 w-full">
+                                      <div className="text-gray-800 font-medium mb-2 text-center">Rate This Transaction</div>
+                                      
+                                      {/* Star Rating */}
+                                      <div className="flex justify-center mb-4">
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                          <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => setReviewRating(star)}
+                                            className="text-yellow-400 text-2xl mx-1"
+                                          >
+                                            ★
+                                          </button>
+                                        ))}
+                                      </div>
+                                      
+                                      {/* Comment Textarea */}
+                                      <textarea
+                                        className="w-full p-3 border border-gray-300 rounded-md mb-3 resize-none"
+                                        placeholder="Add a comment (optional)"
+                                        rows={3}
+                                        value={reviewComment}
+                                        onChange={(e) => setReviewComment(e.target.value)}
+                                      />
+                                      
+                                      {/* Submit Button */}
+                                      <Button 
+                                        className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                                      >
+                                        Submit Review
+                                      </Button>
+                                      
+                                      {/* Timestamp */}
+                                      <div className="text-gray-500 text-sm mt-2">
+                                        {format(new Date(msg.createdAt), 'h:mm a')} ✓
+                                      </div>
                                     </div>
                                   ) : (
                                     // Original Purchase Confirmation (INITIATE) UI
