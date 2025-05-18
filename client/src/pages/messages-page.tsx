@@ -578,46 +578,7 @@ export default function MessagesPage() {
     }
   }, [user, selectedConversation, toast, sendActionMessage]);
   
-  // Handle confirming a purchase when buyer clicks the confirm button
-  const handleConfirmPurchase = useCallback(async (messageId: number) => {
-    try {
-      console.log("Confirming purchase for message:", messageId);
-      
-      // Call API to confirm the purchase
-      const response = await fetch('/api/messages/action/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId }),
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to confirm purchase');
-      }
-      
-      // Optimistically update the UI
-      setActiveChat(prev => 
-        prev.map(msg => 
-          msg.id === messageId ? { ...msg, isClicked: true } : msg
-        )
-      );
-      
-      toast({
-        title: 'Purchase Confirmed',
-        description: 'Transaction has been confirmed successfully.',
-        variant: 'default',
-      });
-      
-    } catch (error: any) {
-      console.error("Error confirming purchase:", error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to confirm purchase. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
+
   
   // Handle file selection from input
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -652,24 +613,44 @@ export default function MessagesPage() {
   }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
   // Handle confirming a purchase
-  const handleConfirmPurchase = useCallback((messageId: number) => {
-    // In a real implementation, this would update the message's is_clicked status
-    // and potentially trigger payment processing or other transaction steps
-    
-    // For now, we'll just update the local UI to show the confirmation
-    setActiveChat(prevChat => 
-      prevChat.map(msg => 
-        msg.id === messageId ? { ...msg, isClicked: true } : msg
-      )
-    );
-    
-    toast({
-      title: "Purchase Confirmed",
-      description: "The seller has been notified of your confirmation.",
-    });
-    
-    // In a full implementation, you would add an API call here to update the message status
-  }, [toast]);
+  const handleConfirmPurchase = useCallback(async (messageId: number) => {
+    try {
+      console.log("Confirming purchase for message:", messageId);
+      
+      // Call API to confirm the purchase
+      const response = await fetch('/api/messages/action/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to confirm purchase');
+      }
+      
+      // Update the UI to show confirmation
+      setActiveChat(prevChat => 
+        prevChat.map(msg => 
+          msg.id === messageId ? { ...msg, isClicked: true } : msg
+        )
+      );
+      
+      toast({
+        title: 'Purchase Confirmed',
+        description: 'The seller has been notified of your confirmation.',
+        variant: 'default',
+      });
+    } catch (error: any) {
+      console.error("Error confirming purchase:", error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to confirm purchase. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [toast, setActiveChat]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
