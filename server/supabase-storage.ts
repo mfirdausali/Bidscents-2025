@@ -1565,10 +1565,10 @@ export class SupabaseStorage implements IStorage {
   }
   
   async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
-    // Get messages without trying to join users table
+    // Get all message fields explicitly including action_type and is_clicked
     const { data, error } = await supabase
       .from('messages')
-      .select('*, file_url, message_type') // Explicitly request the file columns
+      .select('id, sender_id, receiver_id, content, is_read, created_at, message_type, action_type, is_clicked, product_id, encrypted_content, attachment_url, attachment_type, file_url')
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
       .eq('product_id', productId)
       .order('created_at', { ascending: true });
