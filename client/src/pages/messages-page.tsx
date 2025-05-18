@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocation, Link } from 'wouter';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, ArrowLeft, RefreshCw, Send, User, Plus, Upload, File, FileText, Image as ImageIcon, FileIcon, PaperclipIcon } from 'lucide-react';
-import { PaymentCountdown } from '@/components/ui/payment-countdown';
 import { 
   Popover, 
   PopoverContent, 
@@ -179,11 +178,6 @@ export default function MessagesPage() {
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
   const [sellerProducts, setSellerProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [activeTransaction, setActiveTransaction] = useState<{
-    createdAt: string;
-    productId: number;
-    transactionId: number;
-  } | null>(null);
   
   // Group messages by conversation (unique user pairs)
   const conversations = React.useMemo(() => {
@@ -617,106 +611,24 @@ export default function MessagesPage() {
   }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
   // Handle confirming a purchase
-  const handleConfirmPurchase = useCallback(async (messageId: number) => {
-    if (!user) return;
+  const handleConfirmPurchase = useCallback((messageId: number) => {
+    // In a real implementation, this would update the message's is_clicked status
+    // and potentially trigger payment processing or other transaction steps
     
-    try {
-      // Call API to update message and create transaction
-      const response = await fetch('/api/messages/action/confirm', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ messageId })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to confirm purchase');
-      }
-      
-      const result = await response.json();
-      
-      // Update the message in the UI to show it's been clicked
-      setActiveChat(prevMessages => 
-        prevMessages.map(msg => 
-          msg.id === messageId 
-            ? { ...msg, isClicked: true } 
-            : msg
-        )
-      );
-      
-      // Set the active transaction for the timer
-      if (result.transactionId) {
-        // Find the product ID from the clicked message
-        const clickedMessage = activeChat.find(msg => msg.id === messageId);
-        if (clickedMessage?.productId) {
-          setActiveTransaction({
-            createdAt: new Date().toISOString(),
-            productId: clickedMessage.productId,
-            transactionId: result.transactionId
-          });
-        }
-      }
-      
-      toast({
-        title: 'Purchase confirmed',
-        description: 'The seller has been notified of your purchase.',
-      });
-      
-    } catch (error) {
-      console.error('Error confirming purchase:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to confirm purchase. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  }, [user, toast, activeChat]);
-  
-  // Handle confirming payment received
-  const handleConfirmPaymentReceived = useCallback(async (messageId: number) => {
-    if (!user) return;
+    // For now, we'll just update the local UI to show the confirmation
+    setActiveChat(prevChat => 
+      prevChat.map(msg => 
+        msg.id === messageId ? { ...msg, isClicked: true } : msg
+      )
+    );
     
-    try {
-      // Call API to update payment confirmation
-      const response = await fetch('/api/messages/action/confirm-payment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ messageId })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to confirm payment');
-      }
-      
-      // Update the message in the UI to show it's been clicked
-      setActiveChat(prevMessages => 
-        prevMessages.map(msg => 
-          msg.id === messageId 
-            ? { ...msg, isClicked: true } 
-            : msg
-        )
-      );
-      
-      toast({
-        title: 'Payment confirmed',
-        description: 'You have confirmed receiving payment for this item.',
-      });
-      
-      // Clear the active transaction since payment is confirmed
-      setActiveTransaction(null);
-      
-    } catch (error) {
-      console.error('Error confirming payment:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to confirm payment. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  }, [user, toast, setActiveChat]);
+    toast({
+      title: "Purchase Confirmed",
+      description: "The seller has been notified of your confirmation.",
+    });
+    
+    // In a full implementation, you would add an API call here to update the message status
+  }, [toast]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
@@ -1005,13 +917,7 @@ export default function MessagesPage() {
                   </div>
                 </div>
                 
-                {/* Payment Timer if there's an active transaction */}
-                {activeTransaction && (
-                  <PaymentCountdown 
-                    createdAt={activeTransaction.createdAt} 
-                    timeLimit={30} 
-                  />
-                )}
+
                 
                 {/* Messages Area - Scrollable */}
                 <div className="flex-1 overflow-y-auto p-4 bg-accent/5">
@@ -1127,20 +1033,25 @@ export default function MessagesPage() {
                                 </div>
                               )}
                               
-                              {/* Transaction Messages */}
+                              {/* Transaction Message */}
                               {msg.messageType === 'ACTION' && (
                                 <div className="transaction-message">
-                                  {/* INITIATE Action - Confirm Purchase Request */}
-                                  {msg.actionType === 'INITIATE' && (
-                                    <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
-                                      <div className="text-lg font-bold mb-2">Confirm Purchase</div>
-                                      
+                                  <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
+                                    <div className="text-lg font-bold mb-2">Confirm Purchase</div>
+                                    
+                                    {msg.product && (
                                       <div className="flex items-start mb-3">
                                         {/* Product Image */}
                                         <div className="h-16 w-16 rounded-md overflow-hidden bg-muted mr-3 flex-shrink-0">
                                           <img
-                                            src={msg.productId ? `/api/images/product/${msg.productId}` : "/placeholder.jpg"}
-                                            alt="Product"
+                                            src={
+                                              msg.product.imageUrl
+                                                ? msg.product.imageUrl.startsWith('/api/images/')
+                                                  ? msg.product.imageUrl
+                                                  : `/api/images/${msg.product.imageUrl}`
+                                                : "/placeholder.jpg"
+                                            }
+                                            alt={msg.product.name}
                                             onError={(e) => {
                                               (e.target as HTMLImageElement).src = "/placeholder.jpg";
                                             }}
@@ -1150,83 +1061,37 @@ export default function MessagesPage() {
                                         
                                         {/* Product Details */}
                                         <div className="flex-grow">
-                                          <div className="font-medium text-base">Product Purchase</div>
-                                          <div className="text-sm text-muted-foreground">
-                                            Click the button below to confirm your purchase
-                                          </div>
+                                          <div className="font-medium text-base">{msg.product.name}</div>
+                                          {msg.product.price && (
+                                            <div className="text-sm font-medium text-green-700">
+                                              ${Number(msg.product.price).toFixed(2)}
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
-                                      
-                                      {/* Show purchase confirmation button only if not clicked */}
-                                      {!msg.isClicked && (
-                                        <Button 
-                                          className="w-full"
-                                          onClick={() => handleConfirmPurchase(msg.id)}
-                                          disabled={msg.receiverId !== user?.id}
-                                        >
-                                          {msg.receiverId === user?.id ? 
-                                            "Confirm Purchase" : 
-                                            "Waiting for Buyer's Confirmation"
-                                          }
-                                        </Button>
-                                      )}
-                                      
-                                      {/* Show status when already clicked */}
-                                      {msg.isClicked && (
-                                        <div className="text-green-600 text-sm mt-1">
-                                          ✓ Purchase confirmed
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* CONFIRM_PAYMENT Action - Payment Received Button */}
-                                  {msg.actionType === 'CONFIRM_PAYMENT' && (
-                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 w-full">
-                                      <div className="flex items-start mb-3">
-                                        {/* Product Image */}
-                                        <div className="h-16 w-16 rounded-md overflow-hidden bg-muted mr-3 flex-shrink-0">
-                                          <img
-                                            src={msg.productId ? `/api/images/product/${msg.productId}` : "/placeholder.jpg"}
-                                            alt="Product"
-                                            onError={(e) => {
-                                              (e.target as HTMLImageElement).src = "/placeholder.jpg";
-                                            }}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        </div>
-                                        
-                                        {/* Product Details */}
-                                        <div className="flex-grow">
-                                          <div className="font-medium text-base">Payment Confirmation</div>
-                                          <div className="text-sm text-muted-foreground">
-                                            Click the button below to confirm you've received payment
-                                          </div>
-                                        </div>
+                                    )}
+                                    
+                                    {/* Always show the confirm button, but only enabled for the buyer */}
+                                    {!msg.isClicked && (
+                                      <Button 
+                                        className="w-full"
+                                        onClick={() => handleConfirmPurchase(msg.id)}
+                                        disabled={msg.receiverId !== user?.id}
+                                      >
+                                        {msg.receiverId === user?.id ? 
+                                          "Confirm Purchase" : 
+                                          "Waiting for Buyer's Confirmation"
+                                        }
+                                      </Button>
+                                    )}
+                                    
+                                    {/* Show status when already clicked */}
+                                    {msg.isClicked && (
+                                      <div className="text-green-600 text-sm mt-1">
+                                        ✓ Purchase confirmed
                                       </div>
-                                      
-                                      {/* Show confirm payment button if not clicked yet */}
-                                      {!msg.isClicked && (
-                                        <Button 
-                                          className="w-full bg-blue-500 hover:bg-blue-600"
-                                          onClick={() => handleConfirmPaymentReceived(msg.id)}
-                                          disabled={msg.receiverId !== user?.id}
-                                        >
-                                          {msg.receiverId === user?.id ? 
-                                            "Confirm Payment Received" : 
-                                            "Waiting for Seller to Confirm Payment"
-                                          }
-                                        </Button>
-                                      )}
-                                      
-                                      {/* Show status when already clicked */}
-                                      {msg.isClicked && (
-                                        <div className="text-green-600 text-sm mt-1 flex items-center justify-center">
-                                          <span className="mr-1">✓</span> Payment received and confirmed
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+                                    )}
+                                  </div>
                                 </div>
                               )}
                               
