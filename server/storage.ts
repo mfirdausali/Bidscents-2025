@@ -134,6 +134,12 @@ export interface IStorage {
   updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment>;
   updatePaymentProductIds(id: number, productIds: string[]): Promise<Payment>;
   
+  // Transaction methods
+  createTransaction(data: InsertTransaction): Promise<Transaction>;
+  getUserTransactions(userId: number): Promise<TransactionWithDetails[]>;
+  getProductTransactions(productId: number): Promise<TransactionWithDetails[]>;
+  updateTransactionStatus(id: number, status: string): Promise<Transaction>;
+  
   // Session storage
   sessionStore: any;
 }
