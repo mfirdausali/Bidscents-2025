@@ -612,16 +612,10 @@ export default function MessagesPage() {
     }
   }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
-  // Track which messages are being confirmed (to show loading state)
-  const [confirmingMessages, setConfirmingMessages] = useState<Record<number, boolean>>({});
-  
   // Handle confirming a purchase
   const handleConfirmPurchase = useCallback(async (messageId: number) => {
     try {
       console.log("Confirming purchase for message:", messageId);
-      
-      // Set loading state for this specific message
-      setConfirmingMessages(prev => ({ ...prev, [messageId]: true }));
       
       // First find the message details to get product info
       const message = activeChat.find(msg => msg.id === messageId);
@@ -629,8 +623,7 @@ export default function MessagesPage() {
         throw new Error('Purchase details not found');
       }
       
-      // Call API to confirm the purchase (update the status in the database)
-      // The server will handle creating the transaction record and sending the confirmation message
+      // 1. Call API to confirm the purchase (update the status in the database)
       const response = await fetch('/api/messages/action/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -643,12 +636,27 @@ export default function MessagesPage() {
         throw new Error(errorData.message || 'Failed to confirm purchase');
       }
       
-      // Update the UI to show confirmation for the action message
+      // 2. Update the UI to show confirmation for the action message
       setActiveChat(prevChat => 
         prevChat.map(msg => 
           msg.id === messageId ? { ...msg, isClicked: true } : msg
         )
       );
+      
+      // 3. Send a confirmation message directly using the message system
+      // This will show up for both parties and use the existing WebSocket mechanism
+      if (selectedConversation) {
+        const confirmationMessage = `✅ Purchase confirmed for "${message.product.name}". Thank you!`;
+        const sent = sendMessage(
+          selectedConversation.userId,
+          confirmationMessage,
+          message.productId || undefined
+        );
+        
+        if (!sent) {
+          console.warn('Confirmation message could not be sent through WebSocket');
+        }
+      }
       
       toast({
         title: 'Purchase Confirmed',
@@ -662,15 +670,8 @@ export default function MessagesPage() {
         description: error.message || 'Failed to confirm purchase. Please try again.',
         variant: 'destructive',
       });
-    } finally {
-      // Clear loading state for this message
-      setConfirmingMessages(prev => {
-        const updated = { ...prev };
-        delete updated[messageId];
-        return updated;
-      });
     }
-  }, [toast, setActiveChat, activeChat]);
+  }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
@@ -1164,21 +1165,12 @@ export default function MessagesPage() {
                                       <Button 
                                         className="w-full"
                                         onClick={() => handleConfirmPurchase(msg.id)}
-                                        disabled={msg.receiverId !== user?.id || confirmingMessages[msg.id]}
+                                        disabled={msg.receiverId !== user?.id}
                                       >
-                                        {confirmingMessages[msg.id] ? (
-                                          <span className="flex items-center justify-center">
-                                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            Processing...
-                                          </span>
-                                        ) : (
-                                          msg.receiverId === user?.id ? 
-                                            "Confirm Purchase" : 
-                                            "Waiting for Buyer's Confirmation"
-                                        )}
+                                        {msg.receiverId === user?.id ? 
+                                          "Confirm Purchase" : 
+                                          "Waiting for Buyer's Confirmation"
+                                        }
                                       </Button>
                                     )}
                                   </div>
