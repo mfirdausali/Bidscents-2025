@@ -612,6 +612,21 @@ export class MemStorage implements IStorage {
     }
   }
   
+  async updateActionMessageStatus(messageId: number, isClicked: boolean): Promise<Message | null> {
+    const message = this.messages.get(messageId);
+    
+    if (!message || message.messageType !== 'ACTION') {
+      console.log(`Message not found or not an action message: ${messageId}`);
+      return null;
+    }
+    
+    const updatedMessage = { ...message, isClicked };
+    this.messages.set(messageId, updatedMessage);
+    console.log(`Updated action message ${messageId} isClicked status to ${isClicked}`);
+    
+    return updatedMessage;
+  }
+  
   async getUnreadMessageCount(userId: number): Promise<number> {
     const unreadMessages = Array.from(this.messages.values()).filter(
       message => message.receiverId === userId && !message.isRead
