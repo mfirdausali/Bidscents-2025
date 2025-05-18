@@ -1732,6 +1732,56 @@ export class SupabaseStorage implements IStorage {
     }
   }
   
+  // Update a message (used for setting is_clicked to true for confirmations)
+  async updateMessage(id: number, updates: Partial<Message>): Promise<Message> {
+    try {
+      // Convert message fields to database column names
+      const dbUpdates: any = {};
+      
+      if (updates.isClicked !== undefined) {
+        dbUpdates.is_clicked = updates.isClicked;
+      }
+      
+      if (updates.isRead !== undefined) {
+        dbUpdates.is_read = updates.isRead;
+      }
+      
+      if (updates.content !== undefined) {
+        dbUpdates.content = updates.content;
+      }
+      
+      const { data, error } = await supabase
+        .from('messages')
+        .update(dbUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error || !data) {
+        console.error('Error updating message:', error);
+        throw new Error('Failed to update message');
+      }
+      
+      // Map to our Message type
+      return {
+        id: data.id,
+        senderId: data.sender_id,
+        receiverId: data.receiver_id,
+        content: data.content,
+        productId: data.product_id,
+        isRead: data.is_read,
+        createdAt: new Date(data.created_at),
+        messageType: data.message_type,
+        actionType: data.action_type,
+        isClicked: data.is_clicked,
+        fileUrl: data.file_url
+      } as Message;
+    } catch (error) {
+      console.error('Exception updating message:', error);
+      throw error;
+    }
+  }
+  
   async getUnreadMessageCount(userId: number): Promise<number> {
     const { data, error, count } = await supabase
       .from('messages')
