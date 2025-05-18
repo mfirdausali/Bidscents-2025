@@ -231,17 +231,24 @@ export function MessagingDialog({
                           {msg.product && (
                             <div className="flex items-center mb-2">
                               <div className="h-10 w-10 rounded bg-muted overflow-hidden mr-2">
-                                {msg.product.imageUrl ? (
-                                  <img 
-                                    src={msg.product.imageUrl} 
-                                    alt={msg.product.name} 
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex items-center justify-center h-full w-full">
-                                    <span className="text-xs">No img</span>
-                                  </div>
-                                )}
+                                <img
+                                  src={
+                                    // Use the imageUrl if provided (which should come from our backend with proper URL formatting)
+                                    msg.product.imageUrl
+                                      ? msg.product.imageUrl.startsWith('/api/images/')
+                                        ? msg.product.imageUrl
+                                        : `/api/images/${msg.product.imageUrl}`
+                                      : // Default placeholder if no images are available
+                                        "/placeholder.jpg"
+                                  }
+                                  alt={msg.product.name}
+                                  onError={(e) => {
+                                    // If image fails to load, use placeholder
+                                    (e.target as HTMLImageElement).src =
+                                      "/placeholder.jpg";
+                                  }}
+                                  className="w-full h-full object-cover"
+                                />
                               </div>
                               <div>
                                 <div className="text-sm font-medium">{msg.product.name}</div>

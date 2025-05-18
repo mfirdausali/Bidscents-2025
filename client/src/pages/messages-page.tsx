@@ -712,23 +712,32 @@ export default function MessagesPage() {
                     }}
                   >
                     <div className="flex-shrink-0 h-16 w-16 rounded-md overflow-hidden bg-muted">
-                      {product.images && product.images.length > 0 ? (
-                        <img 
-                          src={product.images[0].imageUrl} 
-                          alt={product.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : product.imageUrl ? (
-                        <img 
-                          src={product.imageUrl} 
-                          alt={product.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full w-full bg-secondary">
-                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                      )}
+                      <img
+                        src={
+                          // First, try to find an image with imageOrder=0
+                          product.images &&
+                          product.images.find(
+                            (img: any) => img.imageOrder === 0
+                          )
+                            ? `/api/images/${product.images.find((img: any) => img.imageOrder === 0)?.imageUrl}`
+                            : // Then try any available image
+                              product.images &&
+                                product.images.length > 0
+                              ? `/api/images/${product.images[0].imageUrl}`
+                              : // Then try a single imageUrl if present
+                                product.imageUrl
+                                ? `/api/images/${product.imageUrl}`
+                                : // Default placeholder if no images are available
+                                  "/placeholder.jpg"
+                        }
+                        alt={product.name}
+                        onError={(e) => {
+                          // If image fails to load, use placeholder
+                          (e.target as HTMLImageElement).src =
+                            "/placeholder.jpg";
+                        }}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{product.name}</p>
