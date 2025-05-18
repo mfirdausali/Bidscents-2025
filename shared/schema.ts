@@ -1,3 +1,4 @@
+import { float } from "drizzle-orm/mysql-core";
 import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -79,7 +80,7 @@ export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
   productId: integer("product_id").references(() => products.id).notNull(),
-  rating: integer("rating").notNull(),
+  rating: doublePrecision("rating").notNull(),
   comment: text("comment"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -358,6 +359,7 @@ export type ProductWithDetails = Product & {
   averageRating?: number;
   images?: ProductImage[]; // Added images array
   auction?: Auction & { bidCount?: number }; // Added auction data with optional bid count
+  status?: string;
 };
 
 export type OrderWithItems = Order & {
