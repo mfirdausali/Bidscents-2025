@@ -1979,45 +1979,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   status: 'pending'
                 })
                 .eq('id', message.productId);
-                
+
               if (productUpdateError) {
                 console.error('Error updating product status to pending:', productUpdateError);
                 // Don't return an error response here, as the main transaction was successful
                 // Just log the error and continue
-              } else {
-                console.log(`Updated product ${message.productId} status to pending`);
-              }
-              
-              // Send a notification message to the buyer
-              try {
-                // Get product details for the notification message
-                const product = await storage.getProductById(message.productId);
-                const productName = product ? product.name : "this item";
-                
-                // Send a text message to the buyer
-                const { data: notificationMsg, error: msgError } = await supabase
-                  .from('messages')
-                  .insert({
-                    sender_id: userId, // Seller (current user) sends the notification
-                    receiver_id: message.senderId, // Buyer receives the notification
-                    content: encryptMessage(`✅ Payment received for "${productName}". Thank you!`),
-                    product_id: message.productId,
-                    is_read: false,
-                    message_type: 'TEXT',
-                    created_at: new Date().toISOString()
-                  })
-                  .select();
-                
-                if (msgError) {
-                  console.error('Error sending payment confirmation notification:', msgError);
-                  // Continue even if notification fails - we don't want to block the main action
                 } else {
                   console.log('Payment confirmation notification sent to buyer');
                 }
-              } catch (notificationError) {
-                console.error('Error processing payment notification:', notificationError);
-                // Continue even if notification fails
-              }
             } else {
               console.warn(`No WAITING_PAYMENT transaction found for product ${message.productId} between seller ${userId} and buyer ${message.senderId}`);
             }
