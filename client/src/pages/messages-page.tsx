@@ -633,6 +633,71 @@ export default function MessagesPage() {
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+  
+  // Transaction dialog component
+  const TransactionDialog = () => {
+    return (
+      <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Transaction</DialogTitle>
+            <DialogDescription>
+              Select a product to create a purchase confirmation
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {loadingProducts ? (
+              <div className="space-y-2">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : sellerProducts.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground">No active listings found</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                {sellerProducts.map((product) => (
+                  <div 
+                    key={product.id}
+                    className="flex items-center space-x-4 border rounded-md p-3 hover:bg-accent cursor-pointer"
+                    onClick={() => createTransactionMessage(product)}
+                  >
+                    <div className="flex-shrink-0 h-16 w-16 rounded-md overflow-hidden bg-muted">
+                      {product.images && product.images[0] ? (
+                        <img 
+                          src={product.images[0].imageUrl} 
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full w-full bg-secondary">
+                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{product.name}</p>
+                      <p className="text-sm text-muted-foreground">${product.price.toFixed(2)}</p>
+                      <p className="text-xs">{product.remainingPercentage}% remaining</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsTransactionDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -899,6 +964,34 @@ export default function MessagesPage() {
                                       </DialogContent>
                                     </Dialog>
                                   )}
+                                </div>
+                              ) : msg.messageType === 'ACTION' && msg.actionType === 'INITIATE' ? (
+                                <div className="transaction-message">
+                                  <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
+                                    <div className="text-lg font-bold mb-1">Confirm Purchase</div>
+                                    {msg.product && (
+                                      <div className="text-base mb-3">
+                                        {msg.product.name} - ${Number(msg.product.price || 0).toFixed(2)}
+                                      </div>
+                                    )}
+                                    
+                                    {/* Only show confirm button to the receiver (buyer) */}
+                                    {msg.receiverId === user?.id && !msg.isClicked && (
+                                      <Button 
+                                        className="w-full"
+                                        onClick={() => handleConfirmPurchase(msg.id)}
+                                      >
+                                        Confirm Purchase
+                                      </Button>
+                                    )}
+                                    
+                                    {/* Show status when already clicked */}
+                                    {msg.isClicked && (
+                                      <div className="text-green-600 text-sm mt-1">
+                                        ✓ Purchase confirmed
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               ) : (
                                 <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
