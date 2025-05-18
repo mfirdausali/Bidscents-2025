@@ -1071,13 +1071,17 @@ export default function MessagesPage() {
                                       </div>
                                     )}
                                     
-                                    {/* Only show confirm button to the receiver (buyer) */}
-                                    {msg.receiverId === user?.id && !msg.isClicked && (
+                                    {/* Always show the confirm button, but only enabled for the buyer */}
+                                    {!msg.isClicked && (
                                       <Button 
                                         className="w-full"
                                         onClick={() => handleConfirmPurchase(msg.id)}
+                                        disabled={msg.receiverId !== user?.id}
                                       >
-                                        Confirm Purchase
+                                        {msg.receiverId === user?.id ? 
+                                          "Confirm Purchase" : 
+                                          "Waiting for Buyer's Confirmation"
+                                        }
                                       </Button>
                                     )}
                                     
