@@ -233,7 +233,7 @@ export function MessagingDialog({
                               <div className="h-10 w-10 rounded bg-muted overflow-hidden mr-2">
                                 {msg.product.imageUrl ? (
                                   <img 
-                                    src={msg.product.imageUrl} 
+                                    src={`/api/images/${msg.product.imageUrl}`} 
                                     alt={msg.product.name} 
                                     className="h-full w-full object-cover"
                                   />
