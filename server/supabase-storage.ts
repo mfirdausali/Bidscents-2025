@@ -1437,6 +1437,40 @@ export class SupabaseStorage implements IStorage {
   }
   
   // Message methods
+  // Get a specific message by ID
+  async getMessage(id: number): Promise<Message | undefined> {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error || !data) {
+        console.error('Error getting message:', error);
+        return undefined;
+      }
+      
+      // Map message to our type structure
+      return {
+        id: data.id,
+        senderId: data.sender_id,
+        receiverId: data.receiver_id,
+        content: data.content,
+        productId: data.product_id,
+        isRead: data.is_read,
+        createdAt: data.created_at,
+        messageType: data.message_type,
+        actionType: data.action_type,
+        isClicked: data.is_clicked,
+        fileUrl: data.file_url
+      } as Message;
+    } catch (error) {
+      console.error('Exception getting message:', error);
+      return undefined;
+    }
+  }
+
   async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
     // First get all messages without trying to join users
     const { data, error } = await supabase
