@@ -1932,47 +1932,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to update message status" });
       }
       
-      // Get product details to include in the confirmation message and create transaction
-      let productName = "this item";
-      let productPrice = 1; // Default amount for the transaction if price can't be determined
-      if (message.productId) {
-        try {
-          const product = await storage.getProductById(message.productId);
-          if (product) {
-            productName = product.name;
-            productPrice = product.price;
+      // Handle different action types differently
+      if (message.actionType === 'CONFIRM_PAYMENT') {
+        // This is a seller confirming payment received
+        if (message.productId) {
+          try {
+            // Find the transaction for this product between these users
+            const { data: transactions, error } = await supabase
+              .from('transactions')
+              .select('*')
+              .eq('product_id', message.productId)
+              .eq('seller_id', userId) // Current user (seller) is confirming payment
+              .eq('buyer_id', message.senderId) // The sender of this message is the buyer
+              .eq('status', 'WAITING_PAYMENT')
+              .order('created_at', { ascending: false })
+              .limit(1);
             
-            // 3. Create a transaction record
-            try {
-              await supabase
-                .from('transactions')
-                .insert({
-                  product_id: message.productId,
-                  seller_id: message.senderId,
-                  buyer_id: userId,
-                  amount: productPrice,
-                  status: 'WAITING_PAYMENT',
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                });
-              
-              console.log(`Created transaction record for product ${message.productId}, seller ${message.senderId}, buyer ${userId}`);
-            } catch (transError) {
-              console.error('Error creating transaction record:', transError);
-              // Continue execution even if transaction creation fails
-              // We don't want to prevent the confirmation message from being sent
+            if (error) {
+              console.error('Error fetching transaction:', error);
+              return res.status(500).json({ message: "Error processing payment confirmation" });
             }
+            
+            if (transactions && transactions.length > 0) {
+              const transaction = transactions[0];
+              
+              // Update the transaction status to COMPLETED
+              const { error: updateError } = await supabase
+                .from('transactions')
+                .update({
+                  status: 'COMPLETED',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', transaction.id);
+              
+              if (updateError) {
+                console.error('Error updating transaction status:', updateError);
+                return res.status(500).json({ message: "Failed to update transaction status" });
+              }
+              
+              console.log(`Updated transaction ${transaction.id} to COMPLETED status`);
+            } else {
+              console.warn(`No WAITING_PAYMENT transaction found for product ${message.productId} between seller ${userId} and buyer ${message.senderId}`);
+            }
+            
+            // Log payment confirmation success
+            console.log(`Payment confirmation successful for message ${messageId}, product ${message.productId}, seller ${userId}`);
+          } catch (transError) {
+            console.error('Error during payment confirmation:', transError);
+            return res.status(500).json({ message: "Error processing payment confirmation" });
           }
-        } catch (err) {
-          console.error('Error fetching product details for confirmation message:', err);
         }
+      } else {
+        // Default action type (INITIATE) - Buyer confirming purchase
+        // Get product details to include in the confirmation message and create transaction
+        let productName = "this item";
+        let productPrice = 1; // Default amount for the transaction if price can't be determined
+        if (message.productId) {
+          try {
+            const product = await storage.getProductById(message.productId);
+            if (product) {
+              productName = product.name;
+              productPrice = product.price;
+              
+              // Create a transaction record with WAITING_PAYMENT status
+              try {
+                await supabase
+                  .from('transactions')
+                  .insert({
+                    product_id: message.productId,
+                    seller_id: message.senderId,
+                    buyer_id: userId,
+                    amount: productPrice,
+                    status: 'WAITING_PAYMENT',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  });
+                
+                console.log(`Created transaction record for product ${message.productId}, seller ${message.senderId}, buyer ${userId}`);
+              } catch (transError) {
+                console.error('Error creating transaction record:', transError);
+                // Continue execution even if transaction creation fails
+                // We don't want to prevent the confirmation message from being sent
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching product details for confirmation message:', err);
+          }
+        }
+        
+        // Log transaction creation success
+        console.log(`Purchase confirmation successful for message ${messageId}, product ${message.productId}, buyer ${userId}`);
       }
       
-      // Log transaction creation success
-      console.log(`Transaction confirmation successful for message ${messageId}, product ${message.productId}, user ${userId}`);
-      
       // Return success response
-      res.json({ success: true, message: "Transaction confirmed" });
+      res.json({ success: true, message: "Action confirmed successfully" });
     } catch (error) {
       console.error("Error confirming transaction action:", error);
       next(error);
