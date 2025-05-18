@@ -1901,7 +1901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       
       // Fetch the message to verify it's a transaction for this user
-      const message = await storage.getMessageById(messageId);
+      const message = await storage.getMessage(messageId);
       
       if (!message) {
         return res.status(404).json({ message: "Message not found" });
@@ -1912,28 +1912,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized: You cannot confirm this transaction" });
       }
       
-      // Verify it's an action message
-      if (message.messageType !== 'ACTION') {
-        return res.status(400).json({ message: "Not an action message" });
+      // Verify it's an action message with INITIATE type
+      if (message.messageType !== 'ACTION' || message.actionType !== 'INITIATE') {
+        return res.status(400).json({ message: "Not an initiate transaction message" });
       }
       
-      // Update the message to mark it as clicked
-      const updatedMessage = await storage.updateActionMessageStatus(messageId, true);
-      
-      if (!updatedMessage) {
-        return res.status(500).json({ message: "Failed to update message status" });
+      // Ensure there's a product ID
+      if (!message.productId) {
+        return res.status(400).json({ message: "No product associated with this message" });
       }
       
-      // Notify the sender via WebSocket
-      if (wss && message.senderId) {
-        // Create a notification for the sender
-        broadcastToUser(message.senderId, {
-          type: 'action_confirmed',
-          message: updatedMessage
-        });
+      // Get the product details
+      const product = await storage.getProductById(message.productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
       }
       
-      res.json({ success: true, message: "Transaction confirmed" });
+      // Begin transaction steps
+      
+      // 1. Update the message to mark it as clicked and read
+      const updatedMessage = await storage.updateMessage(messageId, {
+        isClicked: true,
+        isRead: true
+      });
+      
+      // 2. Create a transaction record in the database
+      const newTransaction = await storage.createTransaction({
+        productId: message.productId,
+        sellerId: message.senderId, // Seller is the sender of the INITIATE message
+        buyerId: userId, // Buyer is current user (the recipient who clicked confirm)
+        amount: product.price, // Use the product price
+        status: 'WAITING_PAYMENT'
+      });
+      
+      // 3. Update the product status to 'pending'
+      await storage.updateProduct(message.productId, {
+        status: 'pending'
+      });
+      
+      // 4. Create a CONFIRM_PAYMENT message from buyer to seller
+      const confirmPaymentMessage = await storage.createMessage({
+        senderId: userId, // From the buyer
+        receiverId: message.senderId, // To the seller
+        content: null,
+        productId: message.productId,
+        messageType: 'ACTION',
+        actionType: 'CONFIRM_PAYMENT',
+        isRead: false,
+        isClicked: false
+      });
+      
+      // 5. Notify the seller through WebSocket
+      if (message.senderId && connectedUsers.has(message.senderId)) {
+        const sellerSocket = connectedUsers.get(message.senderId);
+        if (sellerSocket) {
+          // Send transaction confirmation notification
+          sellerSocket.send(JSON.stringify({
+            type: 'transaction_confirmed',
+            message: {
+              id: messageId,
+              isClicked: true,
+              transactionId: newTransaction.id
+            }
+          }));
+          
+          // Send new confirm payment message notification
+          sellerSocket.send(JSON.stringify({
+            type: 'new_message',
+            message: confirmPaymentMessage
+          }));
+        }
+      }
+      
+      // Return success response with transaction details
+      res.json({ 
+        success: true, 
+        message: "Transaction confirmed",
+        transactionId: newTransaction.id,
+        confirmMessageId: confirmPaymentMessage.id
+      });
     } catch (error) {
       console.error("Error confirming transaction action:", error);
       next(error);
