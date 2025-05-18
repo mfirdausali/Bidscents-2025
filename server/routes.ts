@@ -1752,23 +1752,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Fetch product images for all products in one batch
           for (const productId of productIdsToFetch) {
             if (productId) {
-              console.log(`🔍 Fetching images for product ID ${productId} for transaction message`);
               const productImages = await storage.getProductImages(productId);
-              console.log(`Found ${productImages.length} images for product ${productId}`);
-              
               if (productImages && productImages.length > 0) {
                 // Find the main image (order 0)
                 const mainImage = productImages.find((img: any) => img.imageOrder === 0);
                 if (mainImage && mainImage.imageUrl) {
-                  // Use the raw imageUrl from product_images directly
-                  // This is the actual image identifier in object storage
-                  console.log(`✅ Found image ID ${mainImage.imageUrl} for product ${productId}`);
-                  productImagesMap.set(productId, mainImage.imageUrl);
-                } else {
-                  console.log(`⚠️ No main image found for product ${productId}`);
+                  productImagesMap.set(productId, objectStorage.getImagePublicUrl(mainImage.imageUrl));
                 }
-              } else {
-                console.log(`⚠️ No images found for product ${productId}`);
               }
             }
           }
@@ -1777,69 +1767,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Process messages
+      // Process each message
       const decryptedConversation = conversation.map(msg => {
-        // Check if this is a file message
+        // Check if this is a file message (has fileUrl and/or message_type is FILE)
         const isFileMessage = msg.messageType === 'FILE' || msg.fileUrl;
         
-        // For file messages, generate a public URL
+        // For file messages, we need to generate a public URL
         let fileUrl = null;
         if (isFileMessage && msg.fileUrl) {
           fileUrl = objectStorage.getMessageFilePublicUrl(msg.fileUrl);
-          console.log(`Generated file URL for message ${msg.id}: ${fileUrl}`);
         }
         
-        // For action messages with products, add the product details
+        // For action messages with products, add the product image URL if we have it
         let productWithImage = msg.product;
-        
-        if (msg.messageType === 'ACTION' && msg.productId) {
-          console.log(`Processing action message ${msg.id} for product ${msg.productId}`);
-          
-          // Get image URL if available
+        if (msg.messageType === 'ACTION' && msg.productId && productImagesMap.has(msg.productId)) {
+          // Get the image URL we fetched earlier
           const imageUrl = productImagesMap.get(msg.productId);
           
-          if (imageUrl) {
-            // Create product info with image
-            if (productWithImage) {
-              // Update existing product with image
-              productWithImage = {
-                ...productWithImage,
-                imageUrl: imageUrl
-              };
-            } else {
-              // Try to get full product details
-              const productDetails = await storage.getProductById(msg.productId);
-              if (productDetails) {
-                productWithImage = {
-                  id: productDetails.id,
-                  name: productDetails.name,
-                  price: productDetails.price,
-                  brand: productDetails.brand,
-                  imageUrl: imageUrl
-                };
-              } else {
-                // Fallback to minimal product info
-                productWithImage = {
-                  id: msg.productId,
-                  name: "Product",
-                  price: 0,
-                  imageUrl: imageUrl
-                };
-              }
-            }
-            console.log(`Added product image for message ${msg.id}: ${imageUrl}`);
+          // Only update if we have both a product and an image URL
+          if (msg.product && imageUrl) {
+            productWithImage = {
+              ...msg.product,
+              imageUrl: imageUrl
+            };
           }
         }
         
-        // Create the final message object
+        // Create a properly mapped message
         const mappedMsg = {
           ...msg,
-          // Decrypt content if needed
+          // Decrypt content if it exists and is encrypted
           content: msg.content ? decryptMessage(msg.content) : msg.content,
+          // Set fileUrl to the properly generated URL if it exists
           fileUrl: fileUrl
         };
         
-        // Add product info if available
+        // Only add the product property if we have product info
         if (productWithImage) {
           mappedMsg.product = productWithImage;
         }
@@ -1853,7 +1816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Add transaction confirmation endpoint
+  // Confirm transaction action
   app.post("/api/messages/action/confirm", async (req, res, next) => {
     try {
       // Check authentication
@@ -1861,25 +1824,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to confirm transactions" });
       }
       
-      const { messageId } = req.body;
+      // Validate request body
+      const schema = z.object({
+        messageId: z.number()
+      });
       
-      if (!messageId) {
-        return res.status(400).json({ message: "Missing required field: messageId" });
+      const validationResult = schema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request", 
+          errors: validationResult.error.errors 
+        });
       }
       
-      // Update the message status to clicked
+      const { messageId } = validationResult.data;
+      const userId = req.user.id;
+      
+      // Fetch the message to verify it's a transaction for this user
+      const message = await storage.getMessageById(messageId);
+      
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+      
+      // Verify this user is the recipient of the message
+      if (message.receiverId !== userId) {
+        return res.status(403).json({ message: "Unauthorized: You cannot confirm this transaction" });
+      }
+      
+      // Verify it's an action message
+      if (message.messageType !== 'ACTION') {
+        return res.status(400).json({ message: "Not an action message" });
+      }
+      
+      // Update the message to mark it as clicked
       const updatedMessage = await storage.updateActionMessageStatus(messageId, true);
       
       if (!updatedMessage) {
-        return res.status(404).json({ message: "Message not found or not an action message" });
+        return res.status(500).json({ message: "Failed to update message status" });
       }
       
-      return res.status(200).json({ 
-        success: true, 
-        message: "Transaction confirmed successfully",
-        isClicked: true 
-      });
+      // Notify the sender via WebSocket
+      if (wss && message.senderId) {
+        // Create a notification for the sender
+        broadcastToUser(message.senderId, {
+          type: 'action_confirmed',
+          message: updatedMessage
+        });
+      }
+      
+      res.json({ success: true, message: "Transaction confirmed" });
     } catch (error) {
+      console.error("Error confirming transaction action:", error);
       next(error);
     }
   });

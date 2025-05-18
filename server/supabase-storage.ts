@@ -48,52 +48,6 @@ type ProductFilter = {
  */
 export class SupabaseStorage implements IStorage {
   sessionStore: any;
-  
-  /**
-   * Updates the clicked status of an action message
-   * Used for transaction confirmations in messaging
-   */
-  async updateActionMessageStatus(messageId: number, isClicked: boolean): Promise<Message | null> {
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .update({ is_clicked: isClicked })
-        .eq('id', messageId)
-        .eq('message_type', 'ACTION')
-        .select('*')
-        .single();
-      
-      if (error) {
-        console.error('Error updating action message status:', error);
-        return null;
-      }
-      
-      if (!data) {
-        console.log(`No action message found with ID ${messageId}`);
-        return null;
-      }
-      
-      console.log(`Updated action message ${messageId} isClicked status to ${isClicked}`);
-      
-      // Map from database format to Message type
-      return {
-        id: data.id,
-        senderId: data.sender_id,
-        receiverId: data.receiver_id,
-        content: data.content,
-        createdAt: new Date(data.created_at),
-        isRead: data.is_read,
-        messageType: data.message_type,
-        fileUrl: data.file_url,
-        productId: data.product_id,
-        actionType: data.action_type,
-        isClicked: data.is_clicked
-      };
-    } catch (err) {
-      console.error('Unexpected error updating action message status:', err);
-      return null;
-    }
-  }
 
   constructor() {
     // Initialize in-memory session store instead of PostgreSQL
