@@ -497,19 +497,42 @@ export default function MessagesPage() {
       return;
     }
     
+    console.log("Opening transaction dialog for seller:", user.id);
     setLoadingProducts(true);
     setIsTransactionDialogOpen(true);
     
     try {
-      // Fetch seller's active products
-      const response = await fetch(`/api/seller/products`);
+      // Fetch seller's active products - try the more specific endpoint with status filter
+      console.log("Fetching seller products...");
+      const sellerId = user.id;
+      const response = await fetch(`/api/sellers/${sellerId}/products?status=active`);
+      
+      console.log("API response status:", response.status);
       
       if (!response.ok) {
         throw new Error('Failed to load products');
       }
       
-      const data = await response.json();
-      setSellerProducts(data.filter((product: any) => product.status === 'active'));
+      const result = await response.json();
+      console.log("API response data:", result);
+      
+      // Check if the response contains a nested 'products' property
+      const data = result.products || result;
+      console.log("Products data extracted:", data);
+      
+      // Filter active products, but don't filter if none have status field
+      // This handles both legacy and new product structures
+      const hasStatusField = data.some((product: any) => product.status !== undefined);
+      const filteredProducts = hasStatusField 
+        ? data.filter((product: any) => product.status === 'active')
+        : data;
+      
+      console.log("Filtered products:", filteredProducts);
+      console.log("Products with active status:", 
+        hasStatusField ? data.filter((product: any) => product.status === 'active').length : 'N/A');
+      console.log("Total products:", data.length);
+      
+      setSellerProducts(filteredProducts);
     } catch (error) {
       console.error('Error loading seller products:', error);
       toast({
@@ -683,12 +706,21 @@ export default function MessagesPage() {
                   <div 
                     key={product.id}
                     className="flex items-center space-x-4 border rounded-md p-3 hover:bg-accent cursor-pointer"
-                    onClick={() => createTransactionMessage(product)}
+                    onClick={() => {
+                      console.log("Selected product for transaction:", product);
+                      createTransactionMessage(product);
+                    }}
                   >
                     <div className="flex-shrink-0 h-16 w-16 rounded-md overflow-hidden bg-muted">
-                      {product.images && product.images[0] ? (
+                      {product.images && product.images.length > 0 ? (
                         <img 
                           src={product.images[0].imageUrl} 
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : product.imageUrl ? (
+                        <img 
+                          src={product.imageUrl} 
                           alt={product.name}
                           className="h-full w-full object-cover"
                         />
@@ -700,8 +732,12 @@ export default function MessagesPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{product.name}</p>
-                      <p className="text-sm text-muted-foreground">${product.price.toFixed(2)}</p>
-                      <p className="text-xs">{product.remainingPercentage}% remaining</p>
+                      <p className="text-sm text-muted-foreground">
+                        ${typeof product.price === 'number' ? product.price.toFixed(2) : 'Price unavailable'}
+                      </p>
+                      {product.remainingPercentage && (
+                        <p className="text-xs">{product.remainingPercentage}% remaining</p>
+                      )}
                     </div>
                   </div>
                 ))}
