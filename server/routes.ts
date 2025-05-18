@@ -1750,13 +1750,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fileUrl = objectStorage.getMessageFilePublicUrl(msg.fileUrl);
         }
         
+        // For action messages with products, fetch the product image if available
+        let productWithImage = msg.product;
+        if (msg.messageType === 'ACTION' && msg.productId) {
+          try {
+            // If we have a productId, try to fetch product image info
+            const productImages = await storage.getProductImagesByProductId(msg.productId);
+            
+            // Find the main product image (image_order = 0)
+            const mainImage = productImages.find(img => img.imageOrder === 0);
+            
+            if (mainImage && mainImage.imageUrl) {
+              // Add the public URL for the image
+              const imagePublicUrl = objectStorage.getImagePublicUrl(mainImage.imageUrl);
+              
+              // Update the product object with image URL
+              productWithImage = {
+                ...msg.product,
+                imageUrl: imagePublicUrl
+              };
+              
+              console.log(`Added image URL ${imagePublicUrl} to product ${msg.productId} in action message`);
+            }
+          } catch (error) {
+            console.error(`Error fetching product image for message ${msg.id}, product ${msg.productId}:`, error);
+          }
+        }
+        
         // Create a properly mapped message
         const mappedMsg = {
           ...msg,
           // Decrypt content if it exists and is encrypted
           content: msg.content ? decryptMessage(msg.content) : msg.content,
           // Set fileUrl to the properly generated URL if it exists
-          fileUrl: fileUrl
+          fileUrl: fileUrl,
+          // Update product with image if available
+          product: productWithImage
         };
         
         return mappedMsg;
