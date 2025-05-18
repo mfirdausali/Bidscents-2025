@@ -578,6 +578,47 @@ export default function MessagesPage() {
     }
   }, [user, selectedConversation, toast, sendActionMessage]);
   
+  // Handle confirming a purchase when buyer clicks the confirm button
+  const handleConfirmPurchase = useCallback(async (messageId: number) => {
+    try {
+      console.log("Confirming purchase for message:", messageId);
+      
+      // Call API to confirm the purchase
+      const response = await fetch('/api/messages/action/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to confirm purchase');
+      }
+      
+      // Optimistically update the UI
+      setActiveChat(prev => 
+        prev.map(msg => 
+          msg.id === messageId ? { ...msg, isClicked: true } : msg
+        )
+      );
+      
+      toast({
+        title: 'Purchase Confirmed',
+        description: 'Transaction has been confirmed successfully.',
+        variant: 'default',
+      });
+      
+    } catch (error: any) {
+      console.error("Error confirming purchase:", error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to confirm purchase. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [toast]);
+  
   // Handle file selection from input
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
