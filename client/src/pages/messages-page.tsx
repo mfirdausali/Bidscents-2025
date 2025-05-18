@@ -612,9 +612,14 @@ export default function MessagesPage() {
     }
   }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
+  // Track loading state for purchase confirmation
+  const [confirmingPurchase, setConfirmingPurchase] = useState<number | null>(null);
+  
   // Handle confirming a purchase
   const handleConfirmPurchase = useCallback(async (messageId: number) => {
     try {
+      // Set loading state for this specific message
+      setConfirmingPurchase(messageId);
       console.log("Confirming purchase for message:", messageId);
       
       // First find the message details to get product info
@@ -624,6 +629,7 @@ export default function MessagesPage() {
       }
       
       // 1. Call API to confirm the purchase (update the status in the database)
+      // The server will handle transaction creation
       const response = await fetch('/api/messages/action/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -670,6 +676,9 @@ export default function MessagesPage() {
         description: error.message || 'Failed to confirm purchase. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      // Clear loading state
+      setConfirmingPurchase(null);
     }
   }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage]);
   
