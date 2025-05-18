@@ -1555,6 +1555,9 @@ export class SupabaseStorage implements IStorage {
         // Add the new fields for file messages
         messageType: msg.message_type || 'TEXT',
         fileUrl: msg.file_url || null,
+        // Add action message fields
+        actionType: msg.action_type || null,
+        isClicked: msg.is_clicked || false,
         // Add sender and receiver details
         sender: msg.sender_id === userId1 ? user1 : user2,
         receiver: msg.receiver_id === userId1 ? user1 : user2
