@@ -1972,6 +1972,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               console.log(`Updated transaction ${transaction.id} to WAITING_DELIVERY status`);
               
+              // Update the product status to 'pending' from 'active'
+              const { error: productUpdateError } = await supabase
+                .from('products')
+                .update({
+                  status: 'pending'
+                })
+                .eq('id', message.productId);
+                
+              if (productUpdateError) {
+                console.error('Error updating product status to pending:', productUpdateError);
+                // Don't return an error response here, as the main transaction was successful
+                // Just log the error and continue
+              } else {
+                console.log(`Updated product ${message.productId} status to pending`);
+              }
+              
               // Send a notification message to the buyer
               try {
                 // Get product details for the notification message
@@ -1997,25 +2013,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   // Continue even if notification fails - we don't want to block the main action
                 } else {
                   console.log('Payment confirmation notification sent to buyer');
-                  
-                  // If the buyer is connected via WebSocket, notify them directly
-                  const buyerWs = connectedUsers.get(message.senderId);
-                  if (buyerWs && buyerWs.readyState === WebSocket.OPEN) {
-                    const notificationData = {
-                      type: 'new_message',
-                      message: {
-                        id: notificationMsg[0].id,
-                        senderId: userId,
-                        receiverId: message.senderId,
-                        content: `✅ Payment received for "${productName}". Thank you!`,
-                        productId: message.productId,
-                        isRead: false,
-                        messageType: 'TEXT',
-                        createdAt: new Date().toISOString()
-                      }
-                    };
-                    buyerWs.send(JSON.stringify(notificationData));
-                  }
                 }
               } catch (notificationError) {
                 console.error('Error processing payment notification:', notificationError);
