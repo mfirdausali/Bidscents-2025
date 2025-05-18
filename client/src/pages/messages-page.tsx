@@ -612,10 +612,11 @@ export default function MessagesPage() {
     }
   }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
-  // Track loading state for purchase confirmation
+  // Track loading state for purchase confirmation and payment receipt confirmation
   const [confirmingPurchase, setConfirmingPurchase] = useState<number | null>(null);
+  const [confirmingPayment, setConfirmingPayment] = useState<number | null>(null);
   
-  // Handle confirming a purchase
+  // Handle confirming a purchase (INITIATE action)
   const handleConfirmPurchase = useCallback(async (messageId: number) => {
     try {
       // Set loading state for this specific message
@@ -696,6 +697,71 @@ export default function MessagesPage() {
       setConfirmingPurchase(null);
     }
   }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage, sendActionMessage]);
+  
+  // Handle confirming payment received (CONFIRM_PAYMENT action)
+  const handleConfirmPaymentReceived = useCallback(async (messageId: number) => {
+    try {
+      // Set loading state for this specific message
+      setConfirmingPayment(messageId);
+      console.log("Confirming payment received for message:", messageId);
+      
+      // Find the message details to get product info
+      const message = activeChat.find(msg => msg.id === messageId);
+      if (!message || !message.product) {
+        throw new Error('Payment details not found');
+      }
+      
+      // 1. Call API to confirm the payment was received (update the transaction status in the database)
+      const response = await fetch('/api/messages/action/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to confirm payment receipt');
+      }
+      
+      // 2. Update the UI to show confirmation for the action message
+      setActiveChat(prevChat => 
+        prevChat.map(msg => 
+          msg.id === messageId ? { ...msg, isClicked: true } : msg
+        )
+      );
+      
+      // 3. Send a payment received notification message directly using the message system
+      if (selectedConversation) {
+        const confirmationMessage = `✅ Payment received for "${message.product.name}". Thank you!`;
+        const sent = sendMessage(
+          selectedConversation.userId,
+          confirmationMessage,
+          message.productId || undefined
+        );
+        
+        if (!sent) {
+          console.warn('Payment confirmation message could not be sent through WebSocket');
+        }
+      }
+      
+      toast({
+        title: 'Payment Confirmed',
+        description: 'You have confirmed receiving payment for this item.',
+        variant: 'default',
+      });
+    } catch (error: any) {
+      console.error("Error confirming payment receipt:", error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to confirm payment receipt. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      // Clear loading state
+      setConfirmingPayment(null);
+    }
+  }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
@@ -1156,17 +1222,17 @@ export default function MessagesPage() {
                                       {/* Show confirmation button or status based on is_clicked */}
                                       {msg.isClicked ? (
                                         <div className="bg-green-100 text-green-700 font-medium p-2 rounded-md text-center mt-2">
-                                          ✓ Payment received - Transaction complete
+                                          ✓ Payment received
                                         </div>
                                       ) : msg.receiverId === user?.id ? (
                                         // Seller sees confirmation button
                                         <Button 
                                           variant="outline"
                                           className="w-full bg-white border-amber-300 text-amber-700 hover:bg-amber-100"
-                                          onClick={() => handleConfirmPurchase(msg.id)}
-                                          disabled={confirmingPurchase === msg.id}
+                                          onClick={() => handleConfirmPaymentReceived(msg.id)}
+                                          disabled={confirmingPayment === msg.id}
                                         >
-                                          {confirmingPurchase === msg.id ? (
+                                          {confirmingPayment === msg.id ? (
                                             <>
                                               <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent"></span>
                                               Processing...
