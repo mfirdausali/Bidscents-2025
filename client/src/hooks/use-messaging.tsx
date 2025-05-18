@@ -58,20 +58,6 @@ type WebSocketOutgoingMessage =
   | WebSocketSendMessage
   | WebSocketMarkReadMessage;
 
-// Interface for file message data
-export interface FileMessageData {
-  id: number;
-  fileUrl: string;
-  senderId: number;
-  receiverId: number;
-  productId?: number | null;
-  sender?: {
-    id: number;
-    username: string;
-    profileImage?: string | null;
-  };
-}
-
 // Use messaging hook
 export function useMessaging() {
   const { user } = useAuth();
@@ -263,47 +249,6 @@ export function useMessaging() {
               detail: data
             });
             window.dispatchEvent(actionEvent);
-          }
-          
-          // Handle file upload notification
-          if (data.type === 'file_uploaded' && data.fileMessage) {
-            console.log('File message notification received:', data.fileMessage);
-            
-            // Add the file message to our state if it doesn't already exist
-            setMessages(prev => {
-              // Check if message already exists in our state
-              const exists = prev.some(msg => msg.id === data.fileMessage.id);
-              if (!exists) {
-                const fileMessage: Message = {
-                  id: data.fileMessage.id,
-                  senderId: data.fileMessage.senderId,
-                  receiverId: data.fileMessage.receiverId,
-                  content: null,
-                  fileUrl: data.fileMessage.fileUrl,
-                  messageType: 'FILE',
-                  createdAt: new Date(),
-                  isRead: false,
-                  productId: data.fileMessage.productId || null,
-                  sender: data.fileMessage.sender
-                };
-                
-                return [fileMessage, ...prev];
-              }
-              return prev;
-            });
-            
-            // Show a toast notification for new file messages
-            toast({
-              title: `New file from ${data.fileMessage.sender?.username || 'someone'}`,
-              description: 'A new file has been shared with you',
-              variant: 'default',
-            });
-            
-            // Dispatch a custom event for other components (like unread count)
-            const messagingEvent = new CustomEvent('messaging:file_uploaded', {
-              detail: data
-            });
-            window.dispatchEvent(messagingEvent);
           }
           
           // Handle errors
@@ -625,50 +570,6 @@ export function useMessaging() {
     }
   }, [user, toast]);
 
-  // Notify about a file message upload via WebSocket
-  const notifyFileUploaded = useCallback((fileData: FileMessageData) => {
-    console.log('Notifying about file upload through WebSocket:', fileData);
-    
-    if (!socketRef.current) {
-      console.error('WebSocket is not initialized');
-      return false;
-    }
-    
-    if (socketRef.current.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not open. Current state:', socketRef.current.readyState);
-      return false;
-    }
-
-    if (!user) {
-      console.error('User is not authenticated');
-      return false;
-    }
-
-    try {
-      // Create the WebSocket notification message
-      const message = {
-        type: 'file_uploaded',
-        fileMessage: {
-          ...fileData,
-          sender: fileData.sender || {
-            id: user.id,
-            username: user.username,
-            profileImage: user.profileImage || null
-          }
-        }
-      };
-
-      console.log('Sending file upload notification:', message);
-      socketRef.current.send(JSON.stringify(message));
-      
-      // Return success
-      return true;
-    } catch (error) {
-      console.error('Error sending file upload notification:', error);
-      return false;
-    }
-  }, [user]);
-
   return {
     connected,
     messages,
@@ -678,6 +579,5 @@ export function useMessaging() {
     sendActionMessage,
     markAsRead,
     getConversation,
-    notifyFileUploaded
   };
 }
