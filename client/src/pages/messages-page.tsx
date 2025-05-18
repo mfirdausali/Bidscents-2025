@@ -500,7 +500,6 @@ export default function MessagesPage() {
     console.log("Opening transaction dialog for seller:", user.id);
     setLoadingProducts(true);
     setIsTransactionDialogOpen(true);
-    x
     try {
       // Fetch seller's active products - try the more specific endpoint with status filter
       console.log("Fetching seller products...");
