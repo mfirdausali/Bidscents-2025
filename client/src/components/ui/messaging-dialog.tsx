@@ -210,6 +210,7 @@ export function MessagingDialog({
                     </div>
                   );
                 } else if (msg.messageType === 'ACTION' && msg.actionType) {
+                  console.log("Action type: ", msg.actionType);
                   // Action message type (transaction)
                   // Different rendering based on action type
                   if (msg.actionType === 'CONFIRM_PAYMENT') {

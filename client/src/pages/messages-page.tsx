@@ -1138,72 +1138,110 @@ export default function MessagesPage() {
                               {/* Transaction Message */}
                               {msg.messageType === 'ACTION' && (
                                 <div className="transaction-message">
-                                  <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
-                                    <div className="text-lg font-bold mb-2">Confirm Purchase</div>
-                                    
-                                    {msg.product && (
-                                      <div className="flex items-start mb-3">
-                                        {/* Product Image */}
-                                        <div className="h-16 w-16 rounded-md overflow-hidden bg-muted mr-3 flex-shrink-0">
-                                          <img
-                                            src={
-                                              msg.product.imageUrl
-                                                ? msg.product.imageUrl.startsWith('/api/images/')
-                                                  ? msg.product.imageUrl
-                                                  : `/api/images/${msg.product.imageUrl}`
-                                                : "/placeholder.jpg"
-                                            }
-                                            alt={msg.product.name}
-                                            onError={(e) => {
-                                              (e.target as HTMLImageElement).src = "/placeholder.jpg";
-                                            }}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        </div>
-                                        
-                                        {/* Product Details */}
-                                        <div className="flex-grow">
-                                          <div className="font-medium text-base">{msg.product.name}</div>
-                                          {msg.product.price && (
-                                            <div className="text-sm font-medium text-green-700">
-                                              ${Number(msg.product.price).toFixed(2)}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    )}
-                                    
-                                    {/* Debug info to check what's happening with isClicked */}
-                                    <div className="hidden">
-                                      Debug: Message ID {msg.id}, Type: {msg.messageType}, Action: {msg.actionType}, 
-                                      isClicked raw: {String(msg.isClicked)},
-                                      isClicked boolean: {String(Boolean(msg.isClicked))}
-                                    </div>
+                                  {/* Different UI for CONFIRM_PAYMENT vs INITIATE action types */}
+                                  {msg.actionType === 'CONFIRM_PAYMENT' ? (
+                                    // Payment Confirmation UI - Simpler without product image
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 w-full">
+                                      <div className="text-amber-800 font-medium mb-2">Payment Confirmation</div>
                                       
-                                    {/* Show purchase confirmation button or status based on is_clicked */}
-                                    {msg.isClicked ? (
-                                      <div className="bg-green-100 text-green-700 font-medium p-2 rounded-md text-center mt-2">
-                                        ✓ Purchase confirmed
-                                      </div>
-                                    ) : (
-                                      <Button 
-                                        className="w-full"
-                                        onClick={() => handleConfirmPurchase(msg.id)}
-                                        disabled={msg.receiverId !== user?.id || confirmingPurchase === msg.id}
-                                      >
-                                        {confirmingPurchase === msg.id ? (
-                                          <>
-                                            <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></span>
-                                            Processing...
-                                          </>
-                                        ) : (
-                                          msg.receiverId === user?.id ? 
-                                            "Confirm Purchase" : 
-                                            "Waiting for Buyer's Confirmation"
-                                        )}
-                                      </Button>
-                                    )}
-                                  </div>
+                                      {msg.product && (
+                                        <div className="text-sm mb-3">
+                                          {msg.senderId === user?.id ? 
+                                            `Please wait for seller to confirm payment for "${msg.product.name}".` :
+                                            `Please confirm when you've received payment for "${msg.product.name}".`
+                                          }
+                                        </div>
+                                      )}
+                                      
+                                      {/* Show confirmation button or status based on is_clicked */}
+                                      {msg.isClicked ? (
+                                        <div className="bg-green-100 text-green-700 font-medium p-2 rounded-md text-center mt-2">
+                                          ✓ Payment received - Transaction complete
+                                        </div>
+                                      ) : msg.receiverId === user?.id ? (
+                                        // Seller sees confirmation button
+                                        <Button 
+                                          variant="outline"
+                                          className="w-full bg-white border-amber-300 text-amber-700 hover:bg-amber-100"
+                                          onClick={() => handleConfirmPurchase(msg.id)}
+                                          disabled={confirmingPurchase === msg.id}
+                                        >
+                                          {confirmingPurchase === msg.id ? (
+                                            <>
+                                              <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent"></span>
+                                              Processing...
+                                            </>
+                                          ) : "Confirm Payment Received"}
+                                        </Button>
+                                      ) : (
+                                        // Buyer sees waiting status
+                                        <div className="text-amber-600 text-sm italic p-2 border border-amber-200 bg-amber-50/50 rounded-md text-center mt-2">
+                                          Waiting for seller to confirm payment receipt...
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    // Original Purchase Confirmation (INITIATE) UI
+                                    <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
+                                      <div className="text-lg font-bold mb-2">Confirm Purchase</div>
+                                      
+                                      {msg.product && (
+                                        <div className="flex items-start mb-3">
+                                          {/* Product Image */}
+                                          <div className="h-16 w-16 rounded-md overflow-hidden bg-muted mr-3 flex-shrink-0">
+                                            <img
+                                              src={
+                                                msg.product.imageUrl
+                                                  ? msg.product.imageUrl.startsWith('/api/images/')
+                                                    ? msg.product.imageUrl
+                                                    : `/api/images/${msg.product.imageUrl}`
+                                                  : "/placeholder.jpg"
+                                              }
+                                              alt={msg.product.name}
+                                              onError={(e) => {
+                                                (e.target as HTMLImageElement).src = "/placeholder.jpg";
+                                              }}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          </div>
+                                          
+                                          {/* Product Details */}
+                                          <div className="flex-grow">
+                                            <div className="font-medium text-base">{msg.product.name}</div>
+                                            {msg.product.price && (
+                                              <div className="text-sm font-medium text-green-700">
+                                                ${Number(msg.product.price).toFixed(2)}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                        
+                                      {/* Show purchase confirmation button or status based on is_clicked */}
+                                      {msg.isClicked ? (
+                                        <div className="bg-green-100 text-green-700 font-medium p-2 rounded-md text-center mt-2">
+                                          ✓ Purchase confirmed
+                                        </div>
+                                      ) : (
+                                        <Button 
+                                          className="w-full"
+                                          onClick={() => handleConfirmPurchase(msg.id)}
+                                          disabled={msg.receiverId !== user?.id || confirmingPurchase === msg.id}
+                                        >
+                                          {confirmingPurchase === msg.id ? (
+                                            <>
+                                              <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></span>
+                                              Processing...
+                                            </>
+                                          ) : (
+                                            msg.receiverId === user?.id ? 
+                                              "Confirm Purchase" : 
+                                              "Waiting for Buyer's Confirmation"
+                                          )}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                               
