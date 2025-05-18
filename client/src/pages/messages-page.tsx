@@ -1093,8 +1093,12 @@ export default function MessagesPage() {
                                       </div>
                                     )}
                                     
-                                    {/* Always show the confirm button, but only enabled for the buyer */}
-                                    {!msg.isClicked && (
+                                    {/* Show purchase confirmation button or status based on is_clicked */}
+                                    {msg.isClicked ? (
+                                      <div className="text-green-600 text-sm mt-1">
+                                        ✓ Purchase confirmed
+                                      </div>
+                                    ) : (
                                       <Button 
                                         className="w-full"
                                         onClick={() => handleConfirmPurchase(msg.id)}
@@ -1105,13 +1109,6 @@ export default function MessagesPage() {
                                           "Waiting for Buyer's Confirmation"
                                         }
                                       </Button>
-                                    )}
-                                    
-                                    {/* Show status when already clicked */}
-                                    {msg.isClicked && (
-                                      <div className="bg-green-100 text-green-700 font-medium p-2 rounded-md text-center mt-2">
-                                        ✓ Purchase confirmed
-                                      </div>
                                     )}
                                   </div>
                                 </div>
