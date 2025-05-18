@@ -1174,12 +1174,18 @@ export default function MessagesPage() {
                                       <Button 
                                         className="w-full"
                                         onClick={() => handleConfirmPurchase(msg.id)}
-                                        disabled={msg.receiverId !== user?.id}
+                                        disabled={msg.receiverId !== user?.id || confirmingPurchase === msg.id}
                                       >
-                                        {msg.receiverId === user?.id ? 
-                                          "Confirm Purchase" : 
-                                          "Waiting for Buyer's Confirmation"
-                                        }
+                                        {confirmingPurchase === msg.id ? (
+                                          <>
+                                            <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></span>
+                                            Processing...
+                                          </>
+                                        ) : (
+                                          msg.receiverId === user?.id ? 
+                                            "Confirm Purchase" : 
+                                            "Waiting for Buyer's Confirmation"
+                                        )}
                                       </Button>
                                     )}
                                   </div>
