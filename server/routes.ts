@@ -1777,84 +1777,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Process the messages - removing previous code with async issues
+      // Process messages
       const decryptedConversation = conversation.map(msg => {
-        // Check if this is a file message (has fileUrl and/or message_type is FILE)
+        // Check if this is a file message
         const isFileMessage = msg.messageType === 'FILE' || msg.fileUrl;
         
-        // For file messages, we need to generate a public URL
+        // For file messages, generate a public URL
         let fileUrl = null;
         if (isFileMessage && msg.fileUrl) {
           fileUrl = objectStorage.getMessageFilePublicUrl(msg.fileUrl);
           console.log(`Generated file URL for message ${msg.id}: ${fileUrl}`);
         }
         
-        // For action messages with products, add the product image URL if we have it
+        // For action messages with products, add the product details
         let productWithImage = msg.product;
         
-        // Handle transaction messages with product images
         if (msg.messageType === 'ACTION' && msg.productId) {
           console.log(`Processing action message ${msg.id} for product ${msg.productId}`);
           
-          // Use the product image URL if we have it
-          if (productImagesMap.has(msg.productId)) {
-            const imageUrl = productImagesMap.get(msg.productId);
-            console.log(`Found image URL for product ${msg.productId}: ${imageUrl}`);
-            
-            // Update the product with the image URL if we have product info
+          // Get image URL if available
+          const imageUrl = productImagesMap.get(msg.productId);
+          
+          if (imageUrl) {
+            // Create product info with image
             if (productWithImage) {
-              console.log(`Adding image URL to existing product info for message ${msg.id}`);
+              // Update existing product with image
               productWithImage = {
                 ...productWithImage,
                 imageUrl: imageUrl
               };
             } else {
-              console.log(`Creating minimal product with image for message ${msg.id}`);
-              // First try to fetch the product details from database
-              try {
-                const productDetails = await storage.getProductById(msg.productId);
-                if (productDetails) {
-                  productWithImage = {
-                    id: productDetails.id,
-                    name: productDetails.name,
-                    price: productDetails.price,
-                    brand: productDetails.brand,
-                    imageUrl: imageUrl
-                  };
-                } else {
-                  // Fallback to minimal info if product not found
-                  productWithImage = {
-                    id: msg.productId,
-                    name: "Product",
-                    price: 0,
-                    imageUrl: imageUrl
-                  };
-                }
-              } catch (err) {
-                console.error(`Error fetching product details for ${msg.productId}:`, err);
-                productWithImage = {
-                  id: msg.productId,
-                  name: "Product",
-                  price: 0,
-                  imageUrl: imageUrl
-                };
-              }
+              // Create minimal product info with image
+              productWithImage = {
+                id: msg.productId,
+                name: "Product",
+                price: 0,
+                imageUrl: imageUrl
+              };
             }
-          } else {
-            console.log(`No image URL found for product ${msg.productId} in message ${msg.id}`);
+            console.log(`Added product image for message ${msg.id}: ${imageUrl}`);
           }
         }
         
-        // Create a properly mapped message
+        // Create the final message object
         const mappedMsg = {
           ...msg,
-          // Decrypt content if it exists and is encrypted
+          // Decrypt content if needed
           content: msg.content ? decryptMessage(msg.content) : msg.content,
-          // Set fileUrl to the properly generated URL if it exists
           fileUrl: fileUrl
         };
         
-        // Only add the product property if we have product info
+        // Add product info if available
         if (productWithImage) {
           mappedMsg.product = productWithImage;
         }
@@ -1868,7 +1841,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Remove the transaction confirmation endpoint that's causing errors
+  // Add transaction confirmation endpoint
+  app.post("/api/messages/action/confirm", async (req, res, next) => {
+    try {
+      // Check authentication
+      if (!req.isAuthenticated()) {
+        return res.status(403).json({ message: "Unauthorized: Must be logged in to confirm transactions" });
+      }
+      
+      const { messageId } = req.body;
+      
+      if (!messageId) {
+        return res.status(400).json({ message: "Missing required field: messageId" });
+      }
+      
+      // Update the message status to clicked
+      const updatedMessage = await storage.updateActionMessageStatus(messageId, true);
+      
+      if (!updatedMessage) {
+        return res.status(404).json({ message: "Message not found or not an action message" });
+      }
+      
+      return res.status(200).json({ 
+        success: true, 
+        message: "Transaction confirmed successfully",
+        isClicked: true 
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
   
   // Mark messages as read
   app.post("/api/messages/mark-read", async (req, res, next) => {

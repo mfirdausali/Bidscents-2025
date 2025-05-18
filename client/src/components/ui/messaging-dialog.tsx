@@ -261,13 +261,34 @@ export function MessagingDialog({
                                 e.stopPropagation();
                                 console.log("Transaction action clicked for message:", msg.id);
                                 
-                                // For now, just update the local state
-                                // Using this simpler approach until the API endpoint is implemented
-                                setConversation(prev => 
-                                  prev.map(m => 
-                                    m.id === msg.id ? { ...m, isClicked: true } : m
-                                  )
-                                );
+                                // Call our API endpoint to confirm the transaction
+                                if (msg.id) {
+                                  fetch(`/api/messages/action/confirm`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ messageId: msg.id })
+                                  })
+                                  .then(response => {
+                                    if (response.ok) {
+                                      // Optimistically update the local state
+                                      setConversation(prev => 
+                                        prev.map(m => 
+                                          m.id === msg.id ? { ...m, isClicked: true } : m
+                                        )
+                                      );
+                                    } else {
+                                      throw new Error('Failed to confirm purchase');
+                                    }
+                                  })
+                                  .catch(error => {
+                                    console.error('Error confirming purchase:', error);
+                                    toast({
+                                      title: 'Error',
+                                      description: 'Could not confirm the purchase. Please try again.',
+                                      variant: 'destructive',
+                                    });
+                                  });
+                                }
                               }}
                             >
                               Confirm Purchase
