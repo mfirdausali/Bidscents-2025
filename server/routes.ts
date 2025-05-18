@@ -1807,13 +1807,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 imageUrl: imageUrl
               };
             } else {
-              // Create minimal product info with image
-              productWithImage = {
-                id: msg.productId,
-                name: "Product",
-                price: 0,
-                imageUrl: imageUrl
-              };
+              // Try to get full product details
+              const productDetails = await storage.getProductById(msg.productId);
+              if (productDetails) {
+                productWithImage = {
+                  id: productDetails.id,
+                  name: productDetails.name,
+                  price: productDetails.price,
+                  brand: productDetails.brand,
+                  imageUrl: imageUrl
+                };
+              } else {
+                // Fallback to minimal product info
+                productWithImage = {
+                  id: msg.productId,
+                  name: "Product",
+                  price: 0,
+                  imageUrl: imageUrl
+                };
+              }
             }
             console.log(`Added product image for message ${msg.id}: ${imageUrl}`);
           }
