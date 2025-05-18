@@ -1745,10 +1745,15 @@ export class SupabaseStorage implements IStorage {
     
     // If it's an ACTION message with a product, get the product details
     if (message.messageType === 'ACTION' && message.productId) {
-      const product = await this.getProduct(message.productId);
-      if (product) {
-        // Add product details to the message
-        message.product = product;
+      try {
+        // Use the correct method name from our implementation
+        const product = await this.getProductWithDetails(message.productId);
+        if (product) {
+          // Add product details to the message
+          message.product = product;
+        }
+      } catch (error) {
+        console.error(`Error fetching product ${message.productId} for action message:`, error);
       }
     }
     
@@ -1787,7 +1792,9 @@ export class SupabaseStorage implements IStorage {
     }
     
     // Get the updated message with all details
-    return this.getMessageById(messageId);
+    // We need to make sure we return the message with updated information
+    const updatedMessage = await this.getMessageById(messageId);
+    return updatedMessage;
   }
   
   async getUnreadMessageCount(userId: number): Promise<number> {
