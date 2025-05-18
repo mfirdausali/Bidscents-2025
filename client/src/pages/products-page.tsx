@@ -107,8 +107,8 @@ export default function ProductsPage() {
   const sortedProducts = () => {
     if (!products) return [];
     
-    // Filter to only show active products
-    let sorted = [...products].filter(product => product.status === 'active');
+    // Filter to only show active products or products without a status (treat as active)
+    let sorted = [...products].filter(product => product.status === 'active' || product.status === undefined || product.status === null);
     
     switch (sortOption) {
       case "low":
