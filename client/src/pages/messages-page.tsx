@@ -158,7 +158,7 @@ const FilePreviewComponent: React.FC<FilePreviewProps> = ({ fileUrl }) => {
 
 export default function MessagesPage() {
   const { user } = useAuth();
-  const { messages, loading, error, sendMessage, sendActionMessage, getConversation, markAsRead } = useMessaging();
+  const { messages, loading, error, sendMessage, sendActionMessage, getConversation, markAsRead, notifyFileUploaded } = useMessaging();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [messageText, setMessageText] = useState('');
@@ -446,19 +446,44 @@ export default function MessagesPage() {
         variant: 'default',
       });
       
-      // Immediately add the file message to the UI
-      if (responseData && responseData.success && responseData.message) {
-        // Add the new message to the state
-        const newMessage: Message = {
-          id: responseData.message.id,
+      // Extract the file message data and send through WebSockets for real-time updates
+      if (responseData) {
+        console.log('File upload response data:', responseData);
+        
+        // Prepare file message data
+        const fileData = {
+          id: responseData.id,
           senderId: user?.id || 0,
           receiverId: selectedConversation.userId,
+          fileUrl: responseData.fileUrl || `/api/message-files/${responseData.file_url}`,
+          productId: selectedConversation.productId || null,
+          sender: {
+            id: user?.id || 0,
+            username: user?.username || 'User',
+            profileImage: user?.profileImage || null
+          }
+        };
+        
+        // Send the file message through WebSocket for real-time notification
+        if (notifyFileUploaded) {
+          console.log('Sending file upload notification via WebSocket:', fileData);
+          notifyFileUploaded(fileData);
+        } else {
+          console.warn('notifyFileUploaded function not available');
+        }
+        
+        // Add message to UI immediately for the sender
+        const newMessage: Message = {
+          id: fileData.id,
+          senderId: fileData.senderId,
+          receiverId: fileData.receiverId,
           content: null,
-          fileUrl: responseData.message.fileUrl || `/api/message-files/${responseData.message.file_url}`,
+          fileUrl: fileData.fileUrl,
           messageType: 'FILE',
           createdAt: new Date(),
           isRead: false,
-          productId: selectedConversation.productId || null
+          productId: fileData.productId,
+          sender: fileData.sender
         };
         
         // Add the new message to the current conversation
