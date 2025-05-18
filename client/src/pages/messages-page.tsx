@@ -612,9 +612,13 @@ export default function MessagesPage() {
     }
   }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
-  // Track loading state for purchase confirmation and payment receipt confirmation
+  // Track loading state for purchase confirmation, payment and delivery confirmations
   const [confirmingPurchase, setConfirmingPurchase] = useState<number | null>(null);
   const [confirmingPayment, setConfirmingPayment] = useState<number | null>(null);
+  const [confirmingDelivery, setConfirmingDelivery] = useState<number | null>(null);
+  // State for review form
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewComment, setReviewComment] = useState<string>('');
   
   // Handle confirming a purchase (INITIATE action)
   const handleConfirmPurchase = useCallback(async (messageId: number) => {
@@ -775,6 +779,86 @@ export default function MessagesPage() {
     } finally {
       // Clear loading state
       setConfirmingPayment(null);
+    }
+  }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage, sendActionMessage]);
+  
+  // Handle confirming delivery received (CONFIRM_DELIVERY action)
+  const handleConfirmDeliveryReceived = useCallback(async (messageId: number) => {
+    try {
+      // Set loading state for this specific message
+      setConfirmingDelivery(messageId);
+      console.log("Confirming delivery received for message:", messageId);
+      
+      // Find the message details to get product info
+      const message = activeChat.find(msg => msg.id === messageId);
+      if (!message || !message.product) {
+        throw new Error('Delivery details not found');
+      }
+      
+      // 1. Call API to confirm the delivery was received (update the transaction status in the database)
+      const response = await fetch('/api/messages/action/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to confirm delivery receipt');
+      }
+      
+      // 2. Update the UI to show confirmation for the action message
+      setActiveChat(prevChat => 
+        prevChat.map(msg => 
+          msg.id === messageId ? { ...msg, isClicked: true } : msg
+        )
+      );
+      
+      // 3. Send a delivery received notification message directly using the message system
+      if (selectedConversation) {
+        const confirmationMessage = `✅ Delivery received for "${message.product.name}". Thank you!`;
+        const sent = sendMessage(
+          selectedConversation.userId,
+          confirmationMessage,
+          message.productId || undefined
+        );
+        
+        if (!sent) {
+          console.warn('Delivery confirmation message could not be sent through WebSocket');
+        }
+        
+        // 4. Send a REVIEW action message to the seller
+        if (message.productId) {
+          const actionSent = sendActionMessage(
+            selectedConversation.userId,
+            message.productId,
+            'REVIEW'
+          );
+          
+          if (!actionSent) {
+            console.warn('Review action message could not be sent');
+          } else {
+            console.log('Review action message sent successfully');
+          }
+        }
+      }
+      
+      toast({
+        title: 'Delivery Confirmed',
+        description: 'You have confirmed receiving your item.',
+        variant: 'default',
+      });
+    } catch (error: any) {
+      console.error("Error confirming delivery receipt:", error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to confirm delivery receipt. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      // Clear loading state
+      setConfirmingDelivery(null);
     }
   }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage, sendActionMessage]);
   
