@@ -176,30 +176,135 @@ export function MessagingDialog({
 
               {conversation.map((msg) => {
                 const isOwnMessage = msg.senderId === user?.id;
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
-                  >
+                
+                // Render different message types
+                if (msg.messageType === 'FILE' && msg.fileUrl) {
+                  // File message type
+                  return (
                     <div
-                      className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                        isOwnMessage
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
-                      }`}
+                      key={msg.id}
+                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
                     >
-                      <div className="text-sm">{msg.content}</div>
-                      <div className="text-xs mt-1 opacity-70">
-                        {formatMessageTime(msg.createdAt)}
-                        {isOwnMessage && (
-                          <span className="ml-2">
-                            {msg.isRead ? '✓✓' : '✓'}
-                          </span>
-                        )}
+                      <div
+                        className={`max-w-[80%] px-4 py-2 rounded-lg ${
+                          isOwnMessage
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        <div className="text-sm">
+                          <a 
+                            href={msg.fileUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            {msg.content || 'Shared a file'}
+                          </a>
+                        </div>
+                        <div className="text-xs mt-1 opacity-70">
+                          {formatMessageTime(msg.createdAt)}
+                          {isOwnMessage && <span className="ml-2">{msg.isRead ? '✓✓' : '✓'}</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
+                  );
+                } else if (msg.messageType === 'ACTION' && msg.actionType) {
+                  // Action message type (transaction)
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
+                    >
+                      <div
+                        className={`max-w-[80%] px-4 py-3 rounded-lg border ${
+                          isOwnMessage
+                            ? 'border-primary/30 bg-primary/10'
+                            : 'border-gray-200 bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <div className="text-sm font-medium mb-2">
+                            {msg.actionType === 'INITIATE' ? 'Purchase This Item' : 'Transaction Action'}
+                          </div>
+                          
+                          {msg.product && (
+                            <div className="flex items-center mb-2">
+                              <div className="h-10 w-10 rounded bg-muted overflow-hidden mr-2">
+                                {msg.product.imageUrl ? (
+                                  <img 
+                                    src={msg.product.imageUrl} 
+                                    alt={msg.product.name} 
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex items-center justify-center h-full w-full">
+                                    <span className="text-xs">No img</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium">{msg.product.name}</div>
+                                {msg.product.price && (
+                                  <div className="text-xs">${msg.product.price.toFixed(2)}</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {!msg.isClicked && msg.receiverId === user?.id && (
+                            <Button 
+                              size="sm" 
+                              className="mt-1" 
+                              onClick={() => {
+                                console.log("Transaction action clicked for message:", msg.id);
+                                // Transaction button click handler would go here
+                              }}
+                            >
+                              Confirm Purchase
+                            </Button>
+                          )}
+                          
+                          {msg.isClicked && (
+                            <div className="text-xs text-green-600 mt-1">
+                              ✓ Purchase confirmed
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-xs mt-2 opacity-70">
+                          {formatMessageTime(msg.createdAt)}
+                          {isOwnMessage && <span className="ml-2">{msg.isRead ? '✓✓' : '✓'}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } else {
+                  // Default text message type
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
+                    >
+                      <div
+                        className={`max-w-[80%] px-4 py-2 rounded-lg ${
+                          isOwnMessage
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        <div className="text-sm">{msg.content}</div>
+                        <div className="text-xs mt-1 opacity-70">
+                          {formatMessageTime(msg.createdAt)}
+                          {isOwnMessage && (
+                            <span className="ml-2">
+                              {msg.isRead ? '✓✓' : '✓'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
               })}
               <div ref={messagesEndRef} />
             </>
