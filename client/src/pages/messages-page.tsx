@@ -1135,37 +1135,27 @@ export default function MessagesPage() {
                                     <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
                                       <div className="text-lg font-bold mb-2">Confirm Purchase</div>
                                       
-                                      {msg.product && (
-                                        <div className="flex items-start mb-3">
-                                          {/* Product Image */}
-                                          <div className="h-16 w-16 rounded-md overflow-hidden bg-muted mr-3 flex-shrink-0">
-                                            <img
-                                              src={
-                                                msg.product.imageUrl
-                                                  ? msg.product.imageUrl.startsWith('/api/images/')
-                                                    ? msg.product.imageUrl
-                                                    : `/api/images/${msg.product.imageUrl}`
-                                                  : "/placeholder.jpg"
-                                              }
-                                              alt={msg.product.name}
-                                              onError={(e) => {
-                                                (e.target as HTMLImageElement).src = "/placeholder.jpg";
-                                              }}
-                                              className="w-full h-full object-cover"
-                                            />
-                                          </div>
-                                          
-                                          {/* Product Details */}
-                                          <div className="flex-grow">
-                                            <div className="font-medium text-base">{msg.product.name}</div>
-                                            {msg.product.price && (
-                                              <div className="text-sm font-medium text-green-700">
-                                                ${Number(msg.product.price).toFixed(2)}
-                                              </div>
-                                            )}
+                                      <div className="flex items-start mb-3">
+                                        {/* Product Image */}
+                                        <div className="h-16 w-16 rounded-md overflow-hidden bg-muted mr-3 flex-shrink-0">
+                                          <img
+                                            src={msg.productId ? `/api/images/product/${msg.productId}` : "/placeholder.jpg"}
+                                            alt="Product"
+                                            onError={(e) => {
+                                              (e.target as HTMLImageElement).src = "/placeholder.jpg";
+                                            }}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </div>
+                                        
+                                        {/* Product Details */}
+                                        <div className="flex-grow">
+                                          <div className="font-medium text-base">Product Purchase</div>
+                                          <div className="text-sm text-muted-foreground">
+                                            Click the button below to confirm your purchase
                                           </div>
                                         </div>
-                                      )}
+                                      </div>
                                       
                                       {/* Show purchase confirmation button only if not clicked */}
                                       {!msg.isClicked && (
@@ -1192,7 +1182,29 @@ export default function MessagesPage() {
                                   
                                   {/* CONFIRM_PAYMENT Action - Payment Received Button */}
                                   {msg.actionType === 'CONFIRM_PAYMENT' && (
-                                    <div className="bg-white border border-blue-100 rounded-lg p-4 w-full">
+                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 w-full">
+                                      <div className="flex items-start mb-3">
+                                        {/* Product Image */}
+                                        <div className="h-16 w-16 rounded-md overflow-hidden bg-muted mr-3 flex-shrink-0">
+                                          <img
+                                            src={msg.productId ? `/api/images/product/${msg.productId}` : "/placeholder.jpg"}
+                                            alt="Product"
+                                            onError={(e) => {
+                                              (e.target as HTMLImageElement).src = "/placeholder.jpg";
+                                            }}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </div>
+                                        
+                                        {/* Product Details */}
+                                        <div className="flex-grow">
+                                          <div className="font-medium text-base">Payment Confirmation</div>
+                                          <div className="text-sm text-muted-foreground">
+                                            Click the button below to confirm you've received payment
+                                          </div>
+                                        </div>
+                                      </div>
+                                      
                                       {/* Show confirm payment button if not clicked yet */}
                                       {!msg.isClicked && (
                                         <Button 
@@ -1209,8 +1221,8 @@ export default function MessagesPage() {
                                       
                                       {/* Show status when already clicked */}
                                       {msg.isClicked && (
-                                        <div className="text-green-600 text-sm mt-1">
-                                          ✓ Payment confirmed
+                                        <div className="text-green-600 text-sm mt-1 flex items-center justify-center">
+                                          <span className="mr-1">✓</span> Payment received and confirmed
                                         </div>
                                       )}
                                     </div>
