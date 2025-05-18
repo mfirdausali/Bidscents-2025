@@ -58,6 +58,20 @@ type WebSocketOutgoingMessage =
   | WebSocketSendMessage
   | WebSocketMarkReadMessage;
 
+// Interface for file message data
+export interface FileMessageData {
+  id: number;
+  fileUrl: string;
+  senderId: number;
+  receiverId: number;
+  productId?: number | null;
+  sender?: {
+    id: number;
+    username: string;
+    profileImage?: string | null;
+  };
+}
+
 // Use messaging hook
 export function useMessaging() {
   const { user } = useAuth();
@@ -570,6 +584,50 @@ export function useMessaging() {
     }
   }, [user, toast]);
 
+  // Notify about a file message upload via WebSocket
+  const notifyFileUploaded = useCallback((fileData: FileMessageData) => {
+    console.log('Notifying about file upload through WebSocket:', fileData);
+    
+    if (!socketRef.current) {
+      console.error('WebSocket is not initialized');
+      return false;
+    }
+    
+    if (socketRef.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not open. Current state:', socketRef.current.readyState);
+      return false;
+    }
+
+    if (!user) {
+      console.error('User is not authenticated');
+      return false;
+    }
+
+    try {
+      // Create the WebSocket notification message
+      const message = {
+        type: 'file_uploaded',
+        fileMessage: {
+          ...fileData,
+          sender: fileData.sender || {
+            id: user.id,
+            username: user.username,
+            profileImage: user.profileImage || null
+          }
+        }
+      };
+
+      console.log('Sending file upload notification:', message);
+      socketRef.current.send(JSON.stringify(message));
+      
+      // Return success
+      return true;
+    } catch (error) {
+      console.error('Error sending file upload notification:', error);
+      return false;
+    }
+  }, [user]);
+
   return {
     connected,
     messages,
@@ -579,5 +637,6 @@ export function useMessaging() {
     sendActionMessage,
     markAsRead,
     getConversation,
+    notifyFileUploaded
   };
 }
