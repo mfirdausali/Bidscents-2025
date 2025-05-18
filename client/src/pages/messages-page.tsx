@@ -1094,8 +1094,8 @@ export default function MessagesPage() {
                                     )}
                                     
                                     {/* Show purchase confirmation button or status based on is_clicked */}
-                                    {msg.isClicked ? (
-                                      <div className="text-green-600 text-sm mt-1">
+                                    {Boolean(msg.isClicked) === true ? (
+                                      <div className="bg-green-100 text-green-700 font-medium p-2 rounded-md text-center mt-2">
                                         ✓ Purchase confirmed
                                       </div>
                                     ) : (
