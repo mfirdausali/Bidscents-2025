@@ -2395,8 +2395,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Updated auction #${auction.id} status to 'pending'`);
             
             // Also update the corresponding product status to pending
-            await storage.updateProduct(auction.productId, { status: 'pending' });
-            console.log(`Updated product #${auction.productId} status to 'pending' for expired auction with winning bid`);
+            const { error: productUpdateError } = await supabase
+              .from('products')
+              .update({
+                status: 'pending'
+              })
+              .eq('id', auction.productId);
+              
+            if (productUpdateError) {
+              console.error(`Error updating product #${auction.productId} status to pending:`, productUpdateError);
+            } else {
+              console.log(`Updated product #${auction.productId} status to 'pending' for expired auction with winning bid`);
+            }
             
             // If no bids were placed, just end the auction
             if (!auction.currentBidderId) {
