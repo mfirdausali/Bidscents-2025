@@ -587,6 +587,26 @@ export default function MessagesPage() {
     }
   }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
+  // Handle confirming a purchase
+  const handleConfirmPurchase = useCallback((messageId: number) => {
+    // In a real implementation, this would update the message's is_clicked status
+    // and potentially trigger payment processing or other transaction steps
+    
+    // For now, we'll just update the local UI to show the confirmation
+    setActiveChat(prevChat => 
+      prevChat.map(msg => 
+        msg.id === messageId ? { ...msg, isClicked: true } : msg
+      )
+    );
+    
+    toast({
+      title: "Purchase Confirmed",
+      description: "The seller has been notified of your confirmation.",
+    });
+    
+    // In a full implementation, you would add an API call here to update the message status
+  }, [toast]);
+  
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -971,7 +991,7 @@ export default function MessagesPage() {
                                     <div className="text-lg font-bold mb-1">Confirm Purchase</div>
                                     {msg.product && (
                                       <div className="text-base mb-3">
-                                        {msg.product.name} - ${Number(msg.product.price || 0).toFixed(2)}
+                                        {msg.product.name} {msg.product.price && ` - $${Number(msg.product.price).toFixed(2)}`}
                                       </div>
                                     )}
                                     
@@ -1097,6 +1117,9 @@ export default function MessagesPage() {
           </div>
         </div>
       )}
+      
+      {/* Transaction Dialog */}
+      <TransactionDialog />
     </div>
   );
 }
