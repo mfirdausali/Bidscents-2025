@@ -1767,6 +1767,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // First, pre-fetch all missing product data for action messages
+      const missingProductIds: number[] = [];
+      for (const msg of conversation) {
+        if (msg.messageType === 'ACTION' && msg.productId && !msg.product) {
+          missingProductIds.push(msg.productId);
+        }
+      }
+      
+      // Create a product data lookup map
+      const productDataMap = new Map<number, any>();
+      if (missingProductIds.length > 0) {
+        try {
+          // Fetch each product data individually
+          for (const productId of missingProductIds) {
+            const productData = await storage.getProductById(productId);
+            if (productData) {
+              // Create a simple object with just the fields we need
+              const simplifiedProduct = {
+                id: productData.id,
+                name: productData.name,
+                price: productData.price || 0,
+                imageUrl: productData.imageUrl || null
+              };
+              productDataMap.set(productId, simplifiedProduct);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching missing product data:', error);
+        }
+      }
+      
       // Process each message
       const decryptedConversation = conversation.map(msg => {
         // Check if this is a file message (has fileUrl and/or message_type is FILE)
@@ -1778,18 +1809,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fileUrl = objectStorage.getMessageFilePublicUrl(msg.fileUrl);
         }
         
-        // For action messages with products, add the product image URL if we have it
+        // For action messages with products, add or enhance the product data
         let productWithImage = msg.product;
-        if (msg.messageType === 'ACTION' && msg.productId && productImagesMap.has(msg.productId)) {
-          // Get the image URL we fetched earlier
-          const imageUrl = productImagesMap.get(msg.productId);
+        if (msg.messageType === 'ACTION' && msg.productId) {
+          // If we don't have product data, get it from our pre-fetched map
+          if (!productWithImage && productDataMap.has(msg.productId)) {
+            productWithImage = productDataMap.get(msg.productId);
+          }
           
-          // Only update if we have both a product and an image URL
-          if (msg.product && imageUrl) {
-            productWithImage = {
-              ...msg.product,
-              imageUrl: imageUrl
-            };
+          // Add the image URL if we have it from our batch fetch
+          if (productImagesMap.has(msg.productId)) {
+            const imageUrl = productImagesMap.get(msg.productId);
+            if (productWithImage && imageUrl) {
+              // Add image URL to existing product data
+              productWithImage = {
+                ...productWithImage,
+                imageUrl: imageUrl
+              };
+            } else if (imageUrl) {
+              // Create a minimal product object with image
+              productWithImage = {
+                id: msg.productId,
+                name: "Product " + msg.productId,
+                price: 0, // Default price
+                brand: "", // Empty brand
+                description: null,
+                imageUrl: imageUrl,
+                stockQuantity: 0,
+                categoryId: null,
+                sellerId: msg.senderId,
+                isNew: null,
+                isFeatured: false,
+                featuredAt: null,
+                featuredUntil: null,
+                createdAt: new Date(),
+                remainingPercentage: null,
+                status: "available",
+                concentrationType: null,
+                volume: null
+              };
+            }
           }
         }
         
