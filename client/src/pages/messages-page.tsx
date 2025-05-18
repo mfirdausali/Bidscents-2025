@@ -1093,8 +1093,15 @@ export default function MessagesPage() {
                                       </div>
                                     )}
                                     
+                                    {/* Debug info to check what's happening with isClicked */}
+                                    <div className="hidden">
+                                      Debug: Message ID {msg.id}, Type: {msg.messageType}, Action: {msg.actionType}, 
+                                      isClicked raw: {String(msg.isClicked)},
+                                      isClicked boolean: {String(Boolean(msg.isClicked))}
+                                    </div>
+                                      
                                     {/* Show purchase confirmation button or status based on is_clicked */}
-                                    {Boolean(msg.isClicked) === true ? (
+                                    {msg.isClicked ? (
                                       <div className="bg-green-100 text-green-700 font-medium p-2 rounded-md text-center mt-2">
                                         ✓ Purchase confirmed
                                       </div>
