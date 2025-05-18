@@ -681,6 +681,41 @@ export default function MessagesPage() {
     }
   }, [messages, selectedConversation, user?.id, activeChat]);
   
+  // Listen for action confirmations via WebSocket and update the active chat in real-time
+  useEffect(() => {
+    // Handler function for transaction action confirmations
+    const handleActionConfirmed = (event: any) => {
+      const data = event.detail;
+      
+      if (data.type === 'action_confirmed' && data.message && selectedConversation && user?.id) {
+        console.log('Action confirmation event received in MessagesPage:', data.message);
+        
+        // Check if this message is part of the active conversation
+        const isActiveConversation = (
+          (data.message.senderId === user.id && data.message.receiverId === selectedConversation.userId) ||
+          (data.message.receiverId === user.id && data.message.senderId === selectedConversation.userId)
+        );
+        
+        if (isActiveConversation) {
+          // Update the message in the active chat
+          setActiveChat(prev => 
+            prev.map(msg => 
+              msg.id === data.message.id ? { ...msg, isClicked: true } : msg
+            )
+          );
+        }
+      }
+    };
+    
+    // Add event listener for action confirmations
+    window.addEventListener('messaging:action_confirmed', handleActionConfirmed);
+    
+    // Clean up when component unmounts
+    return () => {
+      window.removeEventListener('messaging:action_confirmed', handleActionConfirmed);
+    };
+  }, [selectedConversation, user?.id]);
+  
   if (!user) {
     return (
       <div className="container mx-auto py-6 max-w-7xl">
