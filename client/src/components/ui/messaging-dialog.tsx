@@ -260,30 +260,14 @@ export function MessagingDialog({
                                 e.preventDefault();
                                 e.stopPropagation();
                                 console.log("Transaction action clicked for message:", msg.id);
-                                // Handle transaction confirmation here
-                                if (msg.id) {
-                                  // We would call an API endpoint to mark the transaction as confirmed
-                                  fetch(`/api/messages/action/confirm`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ messageId: msg.id })
-                                  })
-                                  .then(response => {
-                                    if (response.ok) {
-                                      // Optimistically update the local state
-                                      setConversation(prev => 
-                                        prev.map(m => 
-                                          m.id === msg.id ? { ...m, isClicked: true } : m
-                                        )
-                                      );
-                                    } else {
-                                      throw new Error('Failed to confirm purchase');
-                                    }
-                                  })
-                                  .catch(error => {
-                                    console.error('Error confirming purchase:', error);
-                                  });
-                                }
+                                
+                                // For now, just update the local state
+                                // Using this simpler approach until the API endpoint is implemented
+                                setConversation(prev => 
+                                  prev.map(m => 
+                                    m.id === msg.id ? { ...m, isClicked: true } : m
+                                  )
+                                );
                               }}
                             >
                               Confirm Purchase
