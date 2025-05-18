@@ -175,6 +175,9 @@ export default function MessagesPage() {
   const [loadingChat, setLoadingChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
+  const [sellerProducts, setSellerProducts] = useState<any[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   
   // Group messages by conversation (unique user pairs)
   const conversations = React.useMemo(() => {
@@ -885,8 +888,22 @@ export default function MessagesPage() {
                               <span>Upload file</span>
                             </div>
                           </Button>
-                          {/* Additional options can be added here, 
-                          like creating a transaction */}
+                          {user?.isSeller && (
+                            <Button 
+                              variant="ghost" 
+                              className="w-full justify-start"
+                              onClick={openCreateTransaction}
+                              disabled={isUploading || !selectedConversation}
+                            >
+                              <div className="flex items-center">
+                                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M9 11V17M15 11V17M21 5H3M19 5V19C19 20.1046 18.1046 21 17 21H7C5.89543 21 5 20.1046 5 19V5M16 5V3C16 1.89543 15.1046 1 14 1H10C8.89543 1 8 1.89543 8 3V5" 
+                                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                                <span>Create Transaction</span>
+                              </div>
+                            </Button>
+                          )}
                         </div>
                       </PopoverContent>
                     </Popover>
