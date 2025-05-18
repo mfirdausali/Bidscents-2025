@@ -625,6 +625,19 @@ export class MemStorage implements IStorage {
     return unreadMessages.length;
   }
   
+  // Update message with partial data (used for setting isClicked to true for confirmations)
+  async updateMessage(id: number, updates: Partial<Message>): Promise<Message> {
+    const message = this.messages.get(id);
+    
+    if (!message) {
+      throw new Error("Message not found");
+    }
+    
+    const updatedMessage = { ...message, ...updates };
+    this.messages.set(id, updatedMessage);
+    return updatedMessage;
+  }
+  
   private async addMessageDetails(messages: Message[]): Promise<MessageWithDetails[]> {
     // Import decryption utility
     const { decryptMessage, isEncrypted } = await import('./encryption');
