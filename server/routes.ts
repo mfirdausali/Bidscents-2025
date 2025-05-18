@@ -1924,10 +1924,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to update message status" });
       }
       
-      // Notify the sender via WebSocket
-      if (wss && message.senderId) {
+      // Notify both the sender and receiver via WebSocket
+      if (wss) {
         // Create a notification for the sender
-        broadcastToUser(message.senderId, {
+        if (message.senderId) {
+          // Function to broadcast to specific user
+          const broadcastToUser = (userId: number, data: any) => {
+            wss.clients.forEach((client: any) => {
+              if (client.userId === userId && client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(data));
+              }
+            });
+          };
+          
+          broadcastToUser(message.senderId, {
+            type: 'action_confirmed',
+            message: updatedMessage
+          });
+        }
+        
+        // Also notify the receiver (which is the current user) for UI consistency
+        broadcastToUser(message.receiverId, {
           type: 'action_confirmed',
           message: updatedMessage
         });
