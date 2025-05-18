@@ -261,13 +261,9 @@ export default function HomePage() {
           </div>
         ) : allProducts && allProducts.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-            {/* Display the 6 most recent active non-auction products */}
+            {/* Display the 6 most recent non-auction products */}
             {[...allProducts]
-              .filter((product) => 
-                // Only show products with status 'active' and not auctions
-                product.listingType !== "auction" && 
-                product.status === "active"
-              )
+              .filter((product) => product.listingType !== "auction")
               .sort((a, b) => {
                 // If createdAt exists, use it for sorting; otherwise, use id
                 if (a.createdAt && b.createdAt) {
