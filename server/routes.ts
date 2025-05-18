@@ -1901,10 +1901,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       
       // Fetch the message to verify it's a transaction for this user
-      const message = await storage.getMessage(messageId);
-      
-      if (!message) {
-        return res.status(404).json({ message: "Message not found" });
+      let message;
+      try {
+        message = await storage.getMessage(messageId);
+        
+        if (!message) {
+          return res.status(404).json({ message: "Message not found" });
+        }
+      } catch (error) {
+        console.error("Error getting message:", error);
+        return res.status(500).json({ message: "Failed to get message", error });
       }
       
       // Verify this user is the recipient of the message
