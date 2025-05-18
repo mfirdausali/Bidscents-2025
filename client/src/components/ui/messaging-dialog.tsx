@@ -233,7 +233,7 @@ export function MessagingDialog({
                               <div className="h-10 w-10 rounded bg-muted overflow-hidden mr-2">
                                 {msg.product.imageUrl ? (
                                   <img 
-                                    src={`/api/images/${msg.product.imageUrl}`} 
+                                    src={msg.product.imageUrl} 
                                     alt={msg.product.name} 
                                     className="h-full w-full object-cover"
                                   />
@@ -260,9 +260,9 @@ export function MessagingDialog({
                                 e.preventDefault();
                                 e.stopPropagation();
                                 console.log("Transaction action clicked for message:", msg.id);
-                                
-                                // Call our API endpoint to confirm the transaction
+                                // Handle transaction confirmation here
                                 if (msg.id) {
+                                  // We would call an API endpoint to mark the transaction as confirmed
                                   fetch(`/api/messages/action/confirm`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -282,11 +282,6 @@ export function MessagingDialog({
                                   })
                                   .catch(error => {
                                     console.error('Error confirming purchase:', error);
-                                    toast({
-                                      title: 'Error',
-                                      description: 'Could not confirm the purchase. Please try again.',
-                                      variant: 'destructive',
-                                    });
                                   });
                                 }
                               }}

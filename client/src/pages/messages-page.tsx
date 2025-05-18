@@ -500,6 +500,7 @@ export default function MessagesPage() {
     console.log("Opening transaction dialog for seller:", user.id);
     setLoadingProducts(true);
     setIsTransactionDialogOpen(true);
+    
     try {
       // Fetch seller's active products - try the more specific endpoint with status filter
       console.log("Fetching seller products...");
@@ -711,27 +712,15 @@ export default function MessagesPage() {
                     }}
                   >
                     <div className="flex-shrink-0 h-16 w-16 rounded-md overflow-hidden bg-muted">
-                      {product.imageUrl ? (
+                      {product.images && product.images.length > 0 ? (
+                        <img 
+                          src={product.images[0].imageUrl} 
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : product.imageUrl ? (
                         <img 
                           src={product.imageUrl} 
-                          alt={product.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : product.image_url ? (
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : product.images && product.images.length > 0 ? (
-                        <img 
-                          src={product.images[0].imageUrl || product.images[0].image_url} 
-                          alt={product.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : product.main_image ? (
-                        <img 
-                          src={product.main_image} 
                           alt={product.name}
                           className="h-full w-full object-cover"
                         />
@@ -1037,22 +1026,8 @@ export default function MessagesPage() {
                                   <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
                                     <div className="text-lg font-bold mb-1">Confirm Purchase</div>
                                     {msg.product && (
-                                      <div className="flex items-center mb-3">
-                                        {msg.product.imageUrl || msg.product.image_url || (msg.product.images && msg.product.images[0]?.imageUrl) ? (
-                                          <div className="h-12 w-12 rounded overflow-hidden mr-3 bg-muted">
-                                            <img 
-                                              src={msg.product.imageUrl || msg.product.image_url || (msg.product.images && msg.product.images[0]?.imageUrl)} 
-                                              alt={msg.product.name}
-                                              className="h-full w-full object-cover"
-                                            />
-                                          </div>
-                                        ) : null}
-                                        <div>
-                                          <div className="font-medium">{msg.product.name}</div>
-                                          {msg.product.price && (
-                                            <div>${Number(msg.product.price).toFixed(2)}</div>
-                                          )}
-                                        </div>
+                                      <div className="text-base mb-3">
+                                        {msg.product.name} {msg.product.price && ` - $${Number(msg.product.price).toFixed(2)}`}
                                       </div>
                                     )}
                                     
@@ -1140,9 +1115,7 @@ export default function MessagesPage() {
                             >
                               <div className="flex items-center">
                                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M21 15.9999V7.9999C21 6.89533 20.1046 5.9999 19 5.9999H5C3.89543 5.9999 3 6.89533 3 7.9999V15.9999C3 17.1046 3.89543 17.9999 5 17.9999H19C20.1046 17.9999 21 17.1046 21 15.9999Z" 
-                                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                  <path d="M7 12H7.01M12 12H12.01M17 12H17.01M3 9.99994H21" 
+                                  <path d="M9 11V17M15 11V17M21 5H3M19 5V19C19 20.1046 18.1046 21 17 21H7C5.89543 21 5 20.1046 5 19V5M16 5V3C16 1.89543 15.1046 1 14 1H10C8.89543 1 8 1.89543 8 3V5" 
                                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                                 <span>Create Transaction</span>
