@@ -711,15 +711,27 @@ export default function MessagesPage() {
                     }}
                   >
                     <div className="flex-shrink-0 h-16 w-16 rounded-md overflow-hidden bg-muted">
-                      {product.images && product.images.length > 0 ? (
+                      {product.imageUrl ? (
                         <img 
-                          src={product.images[0].imageUrl} 
+                          src={product.imageUrl} 
                           alt={product.name}
                           className="h-full w-full object-cover"
                         />
-                      ) : product.imageUrl ? (
+                      ) : product.image_url ? (
                         <img 
-                          src={product.imageUrl} 
+                          src={product.image_url} 
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : product.images && product.images.length > 0 ? (
+                        <img 
+                          src={product.images[0].imageUrl || product.images[0].image_url} 
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : product.main_image ? (
+                        <img 
+                          src={product.main_image} 
                           alt={product.name}
                           className="h-full w-full object-cover"
                         />
@@ -1025,8 +1037,22 @@ export default function MessagesPage() {
                                   <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 w-full">
                                     <div className="text-lg font-bold mb-1">Confirm Purchase</div>
                                     {msg.product && (
-                                      <div className="text-base mb-3">
-                                        {msg.product.name} {msg.product.price && ` - $${Number(msg.product.price).toFixed(2)}`}
+                                      <div className="flex items-center mb-3">
+                                        {msg.product.imageUrl || msg.product.image_url || (msg.product.images && msg.product.images[0]?.imageUrl) ? (
+                                          <div className="h-12 w-12 rounded overflow-hidden mr-3 bg-muted">
+                                            <img 
+                                              src={msg.product.imageUrl || msg.product.image_url || (msg.product.images && msg.product.images[0]?.imageUrl)} 
+                                              alt={msg.product.name}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          </div>
+                                        ) : null}
+                                        <div>
+                                          <div className="font-medium">{msg.product.name}</div>
+                                          {msg.product.price && (
+                                            <div>${Number(msg.product.price).toFixed(2)}</div>
+                                          )}
+                                        </div>
                                       </div>
                                     )}
                                     
