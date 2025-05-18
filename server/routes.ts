@@ -2458,6 +2458,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Map of connected users: userId -> WebSocket connection
   const connectedUsers = new Map<number, WebSocket>();
   
+  // Helper function to send notification to a specific user
+  function notifyUser(userId: number, data: any) {
+    const userSocket = connectedUsers.get(userId);
+    if (userSocket && userSocket.readyState === WebSocket.OPEN) {
+      try {
+        userSocket.send(JSON.stringify(data));
+        console.log(`Notification sent to user ${userId}:`, data.type);
+        return true;
+      } catch (error) {
+        console.error(`Error sending notification to user ${userId}:`, error);
+      }
+    } else {
+      console.log(`User ${userId} is not connected or socket not ready`);
+    }
+    return false;
+  }
+  
   // Map of auction rooms: auctionId -> Set of WebSocket connections
   const auctionRooms = new Map<number, Set<WebSocket>>();
   
