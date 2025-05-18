@@ -1760,9 +1760,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Find the main image (order 0)
                 const mainImage = productImages.find((img: any) => img.imageOrder === 0);
                 if (mainImage && mainImage.imageUrl) {
-                  const imageUrl = objectStorage.getImagePublicUrl(mainImage.imageUrl);
-                  console.log(`✅ Adding image URL ${imageUrl} for product ${productId}`);
-                  productImagesMap.set(productId, imageUrl);
+                  // Use the raw imageUrl from product_images directly
+                  // This is the actual image identifier in object storage
+                  console.log(`✅ Found image ID ${mainImage.imageUrl} for product ${productId}`);
+                  productImagesMap.set(productId, mainImage.imageUrl);
                 } else {
                   console.log(`⚠️ No main image found for product ${productId}`);
                 }
@@ -1809,12 +1810,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
               };
             } else {
               console.log(`Creating minimal product with image for message ${msg.id}`);
-              // Create minimal product info with just the image
-              productWithImage = {
-                id: msg.productId,
-                name: "Product",
-                imageUrl: imageUrl
-              };
+              // First try to fetch the product details from database
+              try {
+                const productDetails = await storage.getProductById(msg.productId);
+                if (productDetails) {
+                  productWithImage = {
+                    id: productDetails.id,
+                    name: productDetails.name,
+                    price: productDetails.price,
+                    brand: productDetails.brand,
+                    imageUrl: imageUrl
+                  };
+                } else {
+                  // Fallback to minimal info if product not found
+                  productWithImage = {
+                    id: msg.productId,
+                    name: "Product",
+                    price: 0,
+                    imageUrl: imageUrl
+                  };
+                }
+              } catch (err) {
+                console.error(`Error fetching product details for ${msg.productId}:`, err);
+                productWithImage = {
+                  id: msg.productId,
+                  name: "Product",
+                  price: 0,
+                  imageUrl: imageUrl
+                };
+              }
             }
           } else {
             console.log(`No image URL found for product ${msg.productId} in message ${msg.id}`);
