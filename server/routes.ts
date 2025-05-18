@@ -1945,41 +1945,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Send a confirmation message to the seller
-      const confirmationMessage = {
-        senderId: userId, // Current user (buyer)
-        receiverId: message.senderId, // Original sender (seller)
-        content: `✅ Purchase confirmed for "${productName}". Thank you!`,
-        isRead: false,
-        messageType: 'TEXT',
-        productId: message.productId
-      };
-      
+      // Send a confirmation message to the seller using the WebSocket message system
       try {
-        // Save the confirmation message
-        await storage.sendMessage(confirmationMessage);
+        // Get the current user's details
+        const currentUser = await storage.getUser(userId);
+        if (!currentUser) {
+          throw new Error('User not found');
+        }
         
-        // Notify sender (seller) via WebSocket if they're online
-        if (wss) {
-          const broadcastToUser = (userId: number, data: any) => {
-            wss.clients.forEach((client: any) => {
-              if (client.userId === userId && client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(data));
-              }
-            });
-          };
+        // Create the confirmation message
+        const confirmationContent = `✅ Purchase confirmed for "${productName}". Thank you!`;
+        
+        // Save the message to the database
+        const newMessage = await storage.sendMessage({
+          senderId: userId, // Current user (buyer)
+          receiverId: message.senderId, // Original sender (seller)
+          content: confirmationContent,
+          isRead: false,
+          messageType: "TEXT", // Use the exact enum value as a literal
+          productId: message.productId
+        });
+        
+        // Broadcast the new message to the seller via WebSocket if they're online
+        if (wss && message.senderId) {
+          const sellerWs = Array.from(wss.clients).find((client: any) => 
+            client.userId === message.senderId && client.readyState === WebSocket.OPEN
+          );
           
-          // Send notification to seller about the new message
-          if (message.senderId) {
-            broadcastToUser(message.senderId, {
+          if (sellerWs) {
+            // Create a properly formatted message for the WebSocket
+            const wsMessage = {
               type: 'new_message',
               message: {
-                ...confirmationMessage,
-                id: -1, // Temporary ID, will be replaced when the client refreshes
-                createdAt: new Date(),
-                sender: { id: userId, username: req.user.username }
+                ...newMessage,
+                sender: {
+                  id: currentUser.id,
+                  username: currentUser.username,
+                  profileImage: currentUser.profileImage || null
+                },
+                receiver: {
+                  id: message.senderId
+                }
               }
-            });
+            };
+            
+            console.log(`Sending real-time confirmation message to seller (${message.senderId})`);
+            sellerWs.send(JSON.stringify(wsMessage));
+          } else {
+            console.log(`Seller (${message.senderId}) is not connected to WebSocket, message will appear on next refresh`);
           }
         }
       } catch (err) {
