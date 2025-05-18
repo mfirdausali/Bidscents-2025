@@ -268,10 +268,10 @@ export function MessagingDialog({
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                console.log("Transaction action clicked for message:", msg.id);
-                                // Handle transaction confirmation here
+                                console.log("Action clicked for message:", msg.id, "type:", msg.actionType);
+                                
                                 if (msg.id) {
-                                  // We would call an API endpoint to mark the transaction as confirmed
+                                  // We call an API endpoint to mark the transaction as confirmed
                                   fetch(`/api/messages/action/confirm`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -286,22 +286,26 @@ export function MessagingDialog({
                                         )
                                       );
                                     } else {
-                                      throw new Error('Failed to confirm purchase');
+                                      throw new Error('Failed to confirm action');
                                     }
                                   })
                                   .catch(error => {
-                                    console.error('Error confirming purchase:', error);
+                                    console.error('Error confirming action:', error);
                                   });
                                 }
                               }}
                             >
-                              Confirm Purchase
+                              {msg.actionType === 'INITIATE' ? 'Confirm Purchase' : 
+                               msg.actionType === 'CONFIRM_PAYMENT' ? 'Confirm Payment Received' : 
+                               'Confirm Action'}
                             </Button>
                           )}
                           
                           {msg.isClicked && (
                             <div className="text-xs text-green-600 mt-1">
-                              ✓ Purchase confirmed
+                              {msg.actionType === 'INITIATE' ? '✓ Purchase confirmed' : 
+                               msg.actionType === 'CONFIRM_PAYMENT' ? '✓ Payment received' : 
+                               '✓ Action confirmed'}
                             </div>
                           )}
                         </div>
