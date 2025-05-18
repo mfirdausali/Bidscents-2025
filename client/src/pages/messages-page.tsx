@@ -500,7 +500,7 @@ export default function MessagesPage() {
     console.log("Opening transaction dialog for seller:", user.id);
     setLoadingProducts(true);
     setIsTransactionDialogOpen(true);
-    
+    x
     try {
       // Fetch seller's active products - try the more specific endpoint with status filter
       console.log("Fetching seller products...");
@@ -1115,7 +1115,9 @@ export default function MessagesPage() {
                             >
                               <div className="flex items-center">
                                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M9 11V17M15 11V17M21 5H3M19 5V19C19 20.1046 18.1046 21 17 21H7C5.89543 21 5 20.1046 5 19V5M16 5V3C16 1.89543 15.1046 1 14 1H10C8.89543 1 8 1.89543 8 3V5" 
+                                  <path d="M21 15.9999V7.9999C21 6.89533 20.1046 5.9999 19 5.9999H5C3.89543 5.9999 3 6.89533 3 7.9999V15.9999C3 17.1046 3.89543 17.9999 5 17.9999H19C20.1046 17.9999 21 17.1046 21 15.9999Z" 
+                                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <path d="M7 12H7.01M12 12H12.01M17 12H17.01M3 9.99994H21" 
                                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                                 <span>Create Transaction</span>
