@@ -265,6 +265,47 @@ export function useMessaging() {
             window.dispatchEvent(actionEvent);
           }
           
+          // Handle file upload notification
+          if (data.type === 'file_uploaded' && data.fileMessage) {
+            console.log('File message notification received:', data.fileMessage);
+            
+            // Add the file message to our state if it doesn't already exist
+            setMessages(prev => {
+              // Check if message already exists in our state
+              const exists = prev.some(msg => msg.id === data.fileMessage.id);
+              if (!exists) {
+                const fileMessage: Message = {
+                  id: data.fileMessage.id,
+                  senderId: data.fileMessage.senderId,
+                  receiverId: data.fileMessage.receiverId,
+                  content: null,
+                  fileUrl: data.fileMessage.fileUrl,
+                  messageType: 'FILE',
+                  createdAt: new Date(),
+                  isRead: false,
+                  productId: data.fileMessage.productId || null,
+                  sender: data.fileMessage.sender
+                };
+                
+                return [fileMessage, ...prev];
+              }
+              return prev;
+            });
+            
+            // Show a toast notification for new file messages
+            toast({
+              title: `New file from ${data.fileMessage.sender?.username || 'someone'}`,
+              description: 'A new file has been shared with you',
+              variant: 'default',
+            });
+            
+            // Dispatch a custom event for other components (like unread count)
+            const messagingEvent = new CustomEvent('messaging:file_uploaded', {
+              detail: data
+            });
+            window.dispatchEvent(messagingEvent);
+          }
+          
           // Handle errors
           if (data.type === 'error') {
             console.error('WebSocket error:', data.message);
