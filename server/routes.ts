@@ -1043,11 +1043,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get all products for this seller
       const products = await storage.getSellerProducts(sellerId);
-
-      // Filter by category if provided
+      
+      // Filter by status if provided (active, pending, sold, etc.)
+      const status = req.query.status as string | undefined;
+      
+      // Filter by category and status if provided
       let filteredProducts = products;
+      
+      if (status) {
+        filteredProducts = filteredProducts.filter(p => {
+          return p.status?.toLowerCase() === status.toLowerCase();
+        });
+      }
+      
       if (category && category !== "all") {
-        filteredProducts = products.filter(p => {
+        filteredProducts = filteredProducts.filter(p => {
           return p.category?.name.toLowerCase() === category.toLowerCase();
         });
       }
