@@ -211,111 +211,198 @@ export function MessagingDialog({
                   );
                 } else if (msg.messageType === 'ACTION' && msg.actionType) {
                   // Action message type (transaction)
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
-                    >
+                  // Different rendering based on action type
+                  if (msg.actionType === 'CONFIRM_PAYMENT') {
+                    // Special UI for payment confirmation
+                    return (
                       <div
-                        className={`max-w-[80%] px-4 py-3 rounded-lg border ${
-                          isOwnMessage
-                            ? 'border-primary/30 bg-primary/10'
-                            : 'border-gray-200 bg-gray-50'
-                        }`}
+                        key={msg.id}
+                        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
                       >
-                        <div className="flex flex-col">
-                          <div className="text-sm font-medium mb-2">
-                            {msg.actionType === 'INITIATE' ? 'Purchase This Item' : 
-                             msg.actionType === 'CONFIRM_PAYMENT' ? 'Confirm Payment Received' : 
-                             'Transaction Action'}
-                          </div>
-                          
-                          {msg.product && (
-                            <div className="flex items-center mb-2">
-                              <div className="h-10 w-10 rounded bg-muted overflow-hidden mr-2">
-                                <img
-                                  src={
-                                    // Use the imageUrl if provided (which should come from our backend with proper URL formatting)
-                                    msg.product.imageUrl
-                                      ? msg.product.imageUrl.startsWith('/api/images/')
-                                        ? msg.product.imageUrl
-                                        : `/api/images/${msg.product.imageUrl}`
-                                      : // Default placeholder if no images are available
-                                        "/placeholder.jpg"
-                                  }
-                                  alt={msg.product.name}
-                                  onError={(e) => {
-                                    // If image fails to load, use placeholder
-                                    (e.target as HTMLImageElement).src =
-                                      "/placeholder.jpg";
-                                  }}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <div>
-                                <div className="text-sm font-medium">{msg.product.name}</div>
-                                {msg.product.price && (
-                                  <div className="text-xs">${msg.product.price.toFixed(2)}</div>
-                                )}
-                              </div>
+                        <div
+                          className={`max-w-[80%] px-4 py-3 rounded-lg border ${
+                            isOwnMessage
+                              ? 'border-amber-200 bg-amber-50'
+                              : 'border-amber-200 bg-amber-50'
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <div className="text-amber-800 text-sm font-medium mb-2">
+                              Payment Confirmation
                             </div>
-                          )}
-                          
-                          {!msg.isClicked && msg.receiverId === user?.id && (
-                            <Button 
-                              size="sm" 
-                              className="mt-1" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                console.log("Action clicked for message:", msg.id, "type:", msg.actionType);
-                                
-                                if (msg.id) {
-                                  // We call an API endpoint to mark the transaction as confirmed
-                                  fetch(`/api/messages/action/confirm`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ messageId: msg.id })
-                                  })
-                                  .then(response => {
-                                    if (response.ok) {
-                                      // Optimistically update the local state
-                                      setConversation(prev => 
-                                        prev.map(m => 
-                                          m.id === msg.id ? { ...m, isClicked: true } : m
-                                        )
-                                      );
-                                    } else {
-                                      throw new Error('Failed to confirm action');
-                                    }
-                                  })
-                                  .catch(error => {
-                                    console.error('Error confirming action:', error);
-                                  });
+                            
+                            {msg.product && (
+                              <div className="text-sm mb-2">
+                                {isOwnMessage ? 
+                                  `Please wait for seller to confirm payment for "${msg.product.name}".` :
+                                  `Please confirm when you've received payment for "${msg.product.name}".`
                                 }
-                              }}
-                            >
-                              {msg.actionType === 'INITIATE' ? 'Confirm Purchase' : 
-                               msg.actionType === 'CONFIRM_PAYMENT' ? 'Confirm Payment Received' : 
-                               'Confirm Action'}
-                            </Button>
-                          )}
-                          
-                          {msg.isClicked && (
-                            <div className="text-xs text-green-600 mt-1">
-                              {msg.actionType === 'INITIATE' ? '✓ Purchase confirmed' : 
-                               msg.actionType === 'CONFIRM_PAYMENT' ? '✓ Payment received' : 
-                               '✓ Action confirmed'}
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-xs mt-2 opacity-70">
-                          {formatMessageTime(msg.createdAt)}
-                          {isOwnMessage && <span className="ml-2">{msg.isRead ? '✓✓' : '✓'}</span>}
+                              </div>
+                            )}
+                            
+                            {/* Show confirmation button only to seller (receiver of this message) */}
+                            {!msg.isClicked && msg.receiverId === user?.id && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="mt-1 bg-white border-amber-300 text-amber-700 hover:bg-amber-100" 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log("Payment confirmation clicked for message:", msg.id);
+                                  
+                                  if (msg.id) {
+                                    // Call the API endpoint to confirm payment
+                                    fetch(`/api/messages/action/confirm`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ messageId: msg.id })
+                                    })
+                                    .then(response => {
+                                      if (response.ok) {
+                                        // Optimistically update the local state
+                                        setConversation(prev => 
+                                          prev.map(m => 
+                                            m.id === msg.id ? { ...m, isClicked: true } : m
+                                          )
+                                        );
+                                      } else {
+                                        throw new Error('Failed to confirm payment receipt');
+                                      }
+                                    })
+                                    .catch(error => {
+                                      console.error('Error confirming payment receipt:', error);
+                                    });
+                                  }
+                                }}
+                              >
+                                Confirm Payment Received
+                              </Button>
+                            )}
+                            
+                            {/* If the buyer is viewing this message and it's not clicked yet */}
+                            {!msg.isClicked && msg.senderId === user?.id && (
+                              <div className="text-xs text-amber-600 mt-1 italic">
+                                Waiting for seller to confirm payment receipt...
+                              </div>
+                            )}
+                            
+                            {/* Show confirmation message if clicked */}
+                            {msg.isClicked && (
+                              <div className="text-xs text-green-600 mt-1 font-medium">
+                                ✓ Payment received - Transaction complete
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-xs mt-2 opacity-70">
+                            {formatMessageTime(msg.createdAt)}
+                            {isOwnMessage && <span className="ml-2">{msg.isRead ? '✓✓' : '✓'}</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
+                    );
+                  } else {
+                    // Original rendering for INITIATE and other action types
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4`}
+                      >
+                        <div
+                          className={`max-w-[80%] px-4 py-3 rounded-lg border ${
+                            isOwnMessage
+                              ? 'border-primary/30 bg-primary/10'
+                              : 'border-gray-200 bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <div className="text-sm font-medium mb-2">
+                              {msg.actionType === 'INITIATE' ? 'Purchase This Item' : 'Transaction Action'}
+                            </div>
+                            
+                            {msg.product && (
+                              <div className="flex items-center mb-2">
+                                <div className="h-10 w-10 rounded bg-muted overflow-hidden mr-2">
+                                  <img
+                                    src={
+                                      // Use the imageUrl if provided (which should come from our backend with proper URL formatting)
+                                      msg.product.imageUrl
+                                        ? msg.product.imageUrl.startsWith('/api/images/')
+                                          ? msg.product.imageUrl
+                                          : `/api/images/${msg.product.imageUrl}`
+                                        : // Default placeholder if no images are available
+                                          "/placeholder.jpg"
+                                    }
+                                    alt={msg.product.name}
+                                    onError={(e) => {
+                                      // If image fails to load, use placeholder
+                                      (e.target as HTMLImageElement).src =
+                                        "/placeholder.jpg";
+                                    }}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium">{msg.product.name}</div>
+                                  {msg.product.price && (
+                                    <div className="text-xs">${msg.product.price.toFixed(2)}</div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {!msg.isClicked && msg.receiverId === user?.id && (
+                              <Button 
+                                size="sm" 
+                                className="mt-1" 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log("Purchase action clicked for message:", msg.id);
+                                  
+                                  if (msg.id) {
+                                    // We call an API endpoint to mark the transaction as confirmed
+                                    fetch(`/api/messages/action/confirm`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ messageId: msg.id })
+                                    })
+                                    .then(response => {
+                                      if (response.ok) {
+                                        // Optimistically update the local state
+                                        setConversation(prev => 
+                                          prev.map(m => 
+                                            m.id === msg.id ? { ...m, isClicked: true } : m
+                                          )
+                                        );
+                                      } else {
+                                        throw new Error('Failed to confirm purchase');
+                                      }
+                                    })
+                                    .catch(error => {
+                                      console.error('Error confirming purchase:', error);
+                                    });
+                                  }
+                                }}
+                              >
+                                Confirm Purchase
+                              </Button>
+                            )}
+                            
+                            {msg.isClicked && (
+                              <div className="text-xs text-green-600 mt-1">
+                                ✓ Purchase confirmed
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-xs mt-2 opacity-70">
+                            {formatMessageTime(msg.createdAt)}
+                            {isOwnMessage && <span className="ml-2">{msg.isRead ? '✓✓' : '✓'}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
                 } else {
                   // Default text message type
                   return (
