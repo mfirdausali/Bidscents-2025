@@ -1,0 +1,54 @@
+Conversation data received:
+Array (26)
+0
+{id: 106, senderId: 42, receiverId: 45, content: "how many messages left", isRead: true, …}
+1
+{id: 107, senderId: 42, receiverId: 45, content: "what", isRead: true, …}
+2
+{id: 108, senderId: 42, receiverId: 45, content: "yea this guy fucked it up", isRead: true, …}
+3
+{id: 116, senderId: 45, receiverId: 42, content: "hi broski", isRead: true, …}
+4
+{id: 117, senderId: 45, receiverId: 42, content: "im messaging from my phone", isRead: true, …}
+5
+{id: 118, senderId: 45, receiverId: 42, content: "baka", isRead: true, …}
+6
+{id: 124, senderId: 45, receiverId: 42, content: "Congratulations! You've won the auction for \"test\"…mplete the purchase. Thank you for participating!", isRead: true, …}
+7
+{id: 126, senderId: 45, receiverId: 42, content: "Congratulations! You've won the auction for \"test\"…mplete the purchase. Thank you for participating!", isRead: true, …}
+8
+{id: 127, senderId: 42, receiverId: 45, content: "Hi ZMCodi, I would like to buy \"test\" at the Buy Now price of $100.00.", isRead: true, …}
+9
+{id: 128, senderId: 45, receiverId: 42, content: "Congratulations! You've won the auction for \"test\"…mplete the purchase. Thank you for participating!", isRead: true, …}
+10
+{id: 129, senderId: 45, receiverId: 42, content: "Congratulations! You've won the auction for \"test\"…mplete the purchase. Thank you for participating!", isRead: true, …}
+11
+{id: 131, senderId: 45, receiverId: 42, content: "ok baka shut up", isRead: true, …}
+12
+{id: 132, senderId: 45, receiverId: 42, content: "Hi broski, I am interested in buying \"test\" from you.", isRead: true, …}
+13
+{id: 141, senderId: 42, receiverId: 45, content: "no", isRead: true, …}
+14
+{id: 142, senderId: 42, receiverId: 45, content: null, isRead: true, …}
+15
+{id: 143, senderId: 42, receiverId: 45, content: null, isRead: true, …}
+16
+{id: 144, senderId: 42, receiverId: 45, content: null, isRead: true, …}
+17
+{id: 145, senderId: 42, receiverId: 45, content: "do you have this perfume", isRead: true, …}
+18
+{id: 146, senderId: 42, receiverId: 45, content: null, isRead: true, …}
+19
+{id: 147, senderId: 42, receiverId: 45, content: "brah why is it not loading", isRead: true, …}
+20
+{id: 148, senderId: 42, receiverId: 45, content: "this better work", isRead: true, …}
+21
+{id: 149, senderId: 42, receiverId: 45, content: null, isRead: true, …}
+22
+{id: 150, senderId: 45, receiverId: 42, content: "Hi broski, I am interested in buying \"test\" from you.", isRead: true, …}
+23
+{id: 151, senderId: 42, receiverId: 45, content: null, isRead: true, …}
+24
+{id: 152, senderId: 45, receiverId: 42, content: null, isRead: true, …}
+25
+{id: 165, senderId: 42, receiverId: 45, content: null, isRead: true, …}
