@@ -1005,7 +1005,13 @@ export default function MessagesPage() {
                   </div>
                 </div>
                 
-
+                {/* Payment Timer if there's an active transaction */}
+                {activeTransaction && (
+                  <PaymentCountdown 
+                    createdAt={activeTransaction.createdAt} 
+                    timeLimit={30} 
+                  />
+                )}
                 
                 {/* Messages Area - Scrollable */}
                 <div className="flex-1 overflow-y-auto p-4 bg-accent/5">

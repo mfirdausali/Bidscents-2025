@@ -1969,6 +1969,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (sellerSocket) {
           // Send transaction confirmation notification
           sellerSocket.send(JSON.stringify({
+            type: 'TRANSACTION_CONFIRMED',
+            data: {
+              messageId,
+              productId: message.productId,
+              buyerId: userId,
+              transactionId: newTransaction.id
+            }
+          }));
+          sellerSocket.send(JSON.stringify({
             type: 'transaction_confirmed',
             message: {
               id: messageId,
