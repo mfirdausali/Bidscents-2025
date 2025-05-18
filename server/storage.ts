@@ -120,6 +120,7 @@ export interface IStorage {
   getUserMessages(userId: number): Promise<MessageWithDetails[]>;
   getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]>;
   getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]>;
+  getMessage(id: number): Promise<Message | undefined>;
   sendMessage(message: InsertMessage): Promise<Message>;
   markMessageAsRead(id: number): Promise<Message>;
   markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void>;
