@@ -2242,10 +2242,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
               actionType: data.actionType,
             });
             
-            // Get product info
+            // Get product info with detailed images
             const product = await storage.getProductById(actionMessageData.productId);
             if (!product) {
               throw new Error('Product not found');
+            }
+            
+            // Get product images for this product
+            let productImageUrl = product.imageUrl;
+            try {
+              // Get the first image as the main product image
+              const productImages = await storage.getProductImages(actionMessageData.productId);
+              if (productImages && productImages.length > 0) {
+                // Find the first image (usually with imageOrder = 0)
+                const primaryImage = productImages.find(img => img.imageOrder === 0) || productImages[0];
+                if (primaryImage) {
+                  // Update the product image URL
+                  productImageUrl = primaryImage.imageUrl;
+                  console.log(`Found primary image for product ${actionMessageData.productId}:`, primaryImage.imageUrl);
+                }
+              }
+            } catch (err) {
+              console.warn(`Failed to get product images for product ${actionMessageData.productId}:`, err);
             }
             
             // Create message record
@@ -2314,7 +2332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 id: product.id,
                 name: product.name,
                 price: product.price,
-                imageUrl: product.imageUrl
+                imageUrl: productImageUrl || product.imageUrl
               } : undefined
             };
             
