@@ -2130,21 +2130,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             
             // Get product info
-            const product = await storage.getProduct(actionMessageData.productId);
+            const product = await storage.getProductById(actionMessageData.productId);
             if (!product) {
               throw new Error('Product not found');
             }
             
-            // Create message with ACTION type
-            const message = await storage.createMessage({
+            // Create message record
+            const newMessage = {
               senderId: actionMessageData.senderId,
               receiverId: actionMessageData.receiverId,
               content: null, // Action messages have null content
               productId: actionMessageData.productId,
+              isRead: false,
               messageType: 'ACTION',
               actionType: actionMessageData.actionType,
               isClicked: false,
-            });
+            };
+            
+            // Insert the message using direct Supabase call
+            const { data: message, error: messageError } = await supabase
+              .from('messages')
+              .insert({
+                sender_id: actionMessageData.senderId,
+                receiver_id: actionMessageData.receiverId,
+                content: null, // Action messages have null content
+                product_id: actionMessageData.productId,
+                is_read: false,
+                message_type: 'ACTION',
+                action_type: actionMessageData.actionType,
+                is_clicked: false,
+              })
+              .select()
+              .single();
+              
+            if (messageError) {
+              throw new Error(`Failed to create action message: ${messageError.message}`);
+            }
+            
+            if (!message) {
+              throw new Error('No message data returned from database');
+            }
             
             // Get sender and receiver details for the response
             const sender = await storage.getUser(actionMessageData.senderId);
@@ -2152,7 +2177,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Create a detailed message object for the response
             const detailedMessage = {
-              ...message,
+              id: message.id,
+              senderId: message.sender_id,
+              receiverId: message.receiver_id,
+              content: message.content,
+              productId: message.product_id,
+              isRead: message.is_read,
+              createdAt: message.created_at,
+              messageType: message.message_type,
+              actionType: message.action_type,
+              isClicked: message.is_clicked,
               sender: sender ? {
                 id: sender.id,
                 username: sender.username,
