@@ -1043,11 +1043,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get all products for this seller
       const products = await storage.getSellerProducts(sellerId);
-
-      // Filter by category if provided
+      
+      // Filter by status if provided (active, pending, sold, etc.)
+      const status = req.query.status as string | undefined;
+      
+      // Filter by category and status if provided
       let filteredProducts = products;
+      
+      if (status) {
+        filteredProducts = filteredProducts.filter(p => {
+          return p.status?.toLowerCase() === status.toLowerCase();
+        });
+      }
+      
       if (category && category !== "all") {
-        filteredProducts = products.filter(p => {
+        filteredProducts = filteredProducts.filter(p => {
           return p.category?.name.toLowerCase() === category.toLowerCase();
         });
       }
@@ -2206,11 +2216,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to create review" });
       }
       
-      // 2. Update the transaction status to COMPLETE
+      // 2. Update the transaction status to COMPLETED
       const { error: updateError } = await supabase
         .from('transactions')
         .update({
-          status: 'COMPLETE',
+          status: 'COMPLETED',
           updated_at: new Date()
         })
         .eq('id', transaction.id);
@@ -2223,7 +2233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return success
       res.status(200).json({ 
         message: "Review submitted successfully",
-        transactionStatus: 'COMPLETE'
+        transactionStatus: 'COMPLETED'
       });
       
       // Notify other user through WebSocket

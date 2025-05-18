@@ -523,6 +523,7 @@ export default function MessagesPage() {
       // Filter active products, but don't filter if none have status field
       // This handles both legacy and new product structures
       const hasStatusField = data.some((product: any) => product.status !== undefined);
+      console.log("Has status field:", hasStatusField);
       const filteredProducts = hasStatusField 
         ? data.filter((product: any) => product.status === 'active')
         : data;
