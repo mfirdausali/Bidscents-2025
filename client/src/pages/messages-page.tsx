@@ -617,7 +617,13 @@ export default function MessagesPage() {
     try {
       console.log("Confirming purchase for message:", messageId);
       
-      // Call API to confirm the purchase
+      // First find the message details to get product info
+      const message = activeChat.find(msg => msg.id === messageId);
+      if (!message || !message.product) {
+        throw new Error('Purchase details not found');
+      }
+      
+      // 1. Call API to confirm the purchase (update the status in the database)
       const response = await fetch('/api/messages/action/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -630,12 +636,27 @@ export default function MessagesPage() {
         throw new Error(errorData.message || 'Failed to confirm purchase');
       }
       
-      // Update the UI to show confirmation
+      // 2. Update the UI to show confirmation for the action message
       setActiveChat(prevChat => 
         prevChat.map(msg => 
           msg.id === messageId ? { ...msg, isClicked: true } : msg
         )
       );
+      
+      // 3. Send a confirmation message directly using the message system
+      // This will show up for both parties and use the existing WebSocket mechanism
+      if (selectedConversation) {
+        const confirmationMessage = `✅ Purchase confirmed for "${message.product.name}". Thank you!`;
+        const sent = sendMessage(
+          selectedConversation.userId,
+          confirmationMessage,
+          message.productId || undefined
+        );
+        
+        if (!sent) {
+          console.warn('Confirmation message could not be sent through WebSocket');
+        }
+      }
       
       toast({
         title: 'Purchase Confirmed',
@@ -650,7 +671,7 @@ export default function MessagesPage() {
         variant: 'destructive',
       });
     }
-  }, [toast, setActiveChat]);
+  }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
