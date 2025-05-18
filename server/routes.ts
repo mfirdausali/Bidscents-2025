@@ -1932,29 +1932,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to update message status" });
       }
       
-      // Notify both the sender and receiver via WebSocket
-      if (wss) {
-        const broadcastToUser = (userId: number, data: any) => {
-          wss.clients.forEach((client: any) => {
-            if (client.userId === userId && client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify(data));
-            }
-          });
-        };
-      
-        // Notify both sender and receiver about the confirmation
-        if (message.senderId) {
-          broadcastToUser(message.senderId, {
-            type: 'action_confirmed',
-            message: updatedMessage
-          });
+      // Get product details to include in the confirmation message
+      let productName = "this item";
+      if (message.productId) {
+        try {
+          const product = await storage.getProductById(message.productId);
+          if (product) {
+            productName = product.name;
+          }
+        } catch (err) {
+          console.error('Error fetching product details for confirmation message:', err);
         }
+      }
+      
+      // Send a confirmation message to the seller
+      const confirmationMessage = {
+        senderId: userId, // Current user (buyer)
+        receiverId: message.senderId, // Original sender (seller)
+        content: `✅ Purchase confirmed for "${productName}". Thank you!`,
+        isRead: false,
+        messageType: 'TEXT',
+        productId: message.productId
+      };
+      
+      try {
+        // Save the confirmation message
+        await storage.sendMessage(confirmationMessage);
         
-        // Also notify the receiver (which is the current user)
-        broadcastToUser(message.receiverId, {
-          type: 'action_confirmed',
-          message: updatedMessage
-        });
+        // Notify sender (seller) via WebSocket if they're online
+        if (wss) {
+          const broadcastToUser = (userId: number, data: any) => {
+            wss.clients.forEach((client: any) => {
+              if (client.userId === userId && client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(data));
+              }
+            });
+          };
+          
+          // Send notification to seller about the new message
+          if (message.senderId) {
+            broadcastToUser(message.senderId, {
+              type: 'new_message',
+              message: {
+                ...confirmationMessage,
+                id: -1, // Temporary ID, will be replaced when the client refreshes
+                createdAt: new Date(),
+                sender: { id: userId, username: req.user.username }
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error sending confirmation message:', err);
+        // Continue even if this fails, as the primary action (updating the status) succeeded
       }
       
       res.json({ success: true, message: "Transaction confirmed" });
