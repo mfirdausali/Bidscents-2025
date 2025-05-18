@@ -179,6 +179,11 @@ export default function MessagesPage() {
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
   const [sellerProducts, setSellerProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [activeTransaction, setActiveTransaction] = useState<{
+    createdAt: string;
+    productId: number;
+    transactionId: number;
+  } | null>(null);
   
   // Group messages by conversation (unique user pairs)
   const conversations = React.useMemo(() => {
@@ -612,24 +617,106 @@ export default function MessagesPage() {
   }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
   // Handle confirming a purchase
-  const handleConfirmPurchase = useCallback((messageId: number) => {
-    // In a real implementation, this would update the message's is_clicked status
-    // and potentially trigger payment processing or other transaction steps
+  const handleConfirmPurchase = useCallback(async (messageId: number) => {
+    if (!user) return;
     
-    // For now, we'll just update the local UI to show the confirmation
-    setActiveChat(prevChat => 
-      prevChat.map(msg => 
-        msg.id === messageId ? { ...msg, isClicked: true } : msg
-      )
-    );
+    try {
+      // Call API to update message and create transaction
+      const response = await fetch('/api/messages/action/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ messageId })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to confirm purchase');
+      }
+      
+      const result = await response.json();
+      
+      // Update the message in the UI to show it's been clicked
+      setActiveChat(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, isClicked: true } 
+            : msg
+        )
+      );
+      
+      // Set the active transaction for the timer
+      if (result.transactionId) {
+        // Find the product ID from the clicked message
+        const clickedMessage = activeChat.find(msg => msg.id === messageId);
+        if (clickedMessage?.productId) {
+          setActiveTransaction({
+            createdAt: new Date().toISOString(),
+            productId: clickedMessage.productId,
+            transactionId: result.transactionId
+          });
+        }
+      }
+      
+      toast({
+        title: 'Purchase confirmed',
+        description: 'The seller has been notified of your purchase.',
+      });
+      
+    } catch (error) {
+      console.error('Error confirming purchase:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to confirm purchase. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [user, toast, activeChat]);
+  
+  // Handle confirming payment received
+  const handleConfirmPaymentReceived = useCallback(async (messageId: number) => {
+    if (!user) return;
     
-    toast({
-      title: "Purchase Confirmed",
-      description: "The seller has been notified of your confirmation.",
-    });
-    
-    // In a full implementation, you would add an API call here to update the message status
-  }, [toast]);
+    try {
+      // Call API to update payment confirmation
+      const response = await fetch('/api/messages/action/confirm-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ messageId })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to confirm payment');
+      }
+      
+      // Update the message in the UI to show it's been clicked
+      setActiveChat(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, isClicked: true } 
+            : msg
+        )
+      );
+      
+      toast({
+        title: 'Payment confirmed',
+        description: 'You have confirmed receiving payment for this item.',
+      });
+      
+      // Clear the active transaction since payment is confirmed
+      setActiveTransaction(null);
+      
+    } catch (error) {
+      console.error('Error confirming payment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to confirm payment. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [user, toast, setActiveChat]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
