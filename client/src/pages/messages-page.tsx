@@ -612,10 +612,16 @@ export default function MessagesPage() {
     }
   }, [messageText, user?.id, selectedConversation, sendMessage, toast]);
   
+  // Track which messages are being confirmed (to show loading state)
+  const [confirmingMessages, setConfirmingMessages] = useState<Record<number, boolean>>({});
+  
   // Handle confirming a purchase
   const handleConfirmPurchase = useCallback(async (messageId: number) => {
     try {
       console.log("Confirming purchase for message:", messageId);
+      
+      // Set loading state for this specific message
+      setConfirmingMessages(prev => ({ ...prev, [messageId]: true }));
       
       // First find the message details to get product info
       const message = activeChat.find(msg => msg.id === messageId);
@@ -623,7 +629,8 @@ export default function MessagesPage() {
         throw new Error('Purchase details not found');
       }
       
-      // 1. Call API to confirm the purchase (update the status in the database)
+      // Call API to confirm the purchase (update the status in the database)
+      // The server will handle creating the transaction record and sending the confirmation message
       const response = await fetch('/api/messages/action/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -636,27 +643,12 @@ export default function MessagesPage() {
         throw new Error(errorData.message || 'Failed to confirm purchase');
       }
       
-      // 2. Update the UI to show confirmation for the action message
+      // Update the UI to show confirmation for the action message
       setActiveChat(prevChat => 
         prevChat.map(msg => 
           msg.id === messageId ? { ...msg, isClicked: true } : msg
         )
       );
-      
-      // 3. Send a confirmation message directly using the message system
-      // This will show up for both parties and use the existing WebSocket mechanism
-      if (selectedConversation) {
-        const confirmationMessage = `✅ Purchase confirmed for "${message.product.name}". Thank you!`;
-        const sent = sendMessage(
-          selectedConversation.userId,
-          confirmationMessage,
-          message.productId || undefined
-        );
-        
-        if (!sent) {
-          console.warn('Confirmation message could not be sent through WebSocket');
-        }
-      }
       
       toast({
         title: 'Purchase Confirmed',
@@ -670,8 +662,15 @@ export default function MessagesPage() {
         description: error.message || 'Failed to confirm purchase. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      // Clear loading state for this message
+      setConfirmingMessages(prev => {
+        const updated = { ...prev };
+        delete updated[messageId];
+        return updated;
+      });
     }
-  }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage]);
+  }, [toast, setActiveChat, activeChat]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
