@@ -544,6 +544,10 @@ export class MemStorage implements IStorage {
   }
 
   // Message methods
+  async getMessage(id: number): Promise<Message | undefined> {
+    return this.messages.get(id);
+  }
+
   async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
     const userMessages = Array.from(this.messages.values()).filter(
       message => message.senderId === userId || message.receiverId === userId
