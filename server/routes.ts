@@ -1776,7 +1776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Process each message
+      // Process the messages - removing previous code with async issues
       const decryptedConversation = conversation.map(msg => {
         // Check if this is a file message (has fileUrl and/or message_type is FILE)
         const isFileMessage = msg.messageType === 'FILE' || msg.fileUrl;
@@ -1785,45 +1785,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let fileUrl = null;
         if (isFileMessage && msg.fileUrl) {
           fileUrl = objectStorage.getMessageFilePublicUrl(msg.fileUrl);
+          console.log(`Generated file URL for message ${msg.id}: ${fileUrl}`);
         }
         
         // For action messages with products, add the product image URL if we have it
         let productWithImage = msg.product;
+        
+        // Handle transaction messages with product images
         if (msg.messageType === 'ACTION' && msg.productId) {
-          // First, ensure we have a product object even if it's minimal
-          if (!productWithImage && msg.productId) {
-            // We have no product info but we do have a productId - fetch basic product info
-            try {
-              const product = await storage.getProductById(msg.productId);
-              if (product) {
-                console.log(`📋 Fetched product info for message ${msg.id}, product ${msg.productId}`);
-                productWithImage = {
-                  id: product.id,
-                  name: product.name,
-                  price: product.price,
-                  // Add other fields as needed
-                };
-              }
-            } catch (err) {
-              console.error(`Error fetching product for message ${msg.id}:`, err);
-            }
-          }
+          console.log(`Processing action message ${msg.id} for product ${msg.productId}`);
           
-          // Now add image URL if we have it
+          // Use the product image URL if we have it
           if (productImagesMap.has(msg.productId)) {
-            // Get the image URL we fetched earlier
             const imageUrl = productImagesMap.get(msg.productId);
+            console.log(`Found image URL for product ${msg.productId}: ${imageUrl}`);
             
-            // Update the product with the image URL
-            if (productWithImage && imageUrl) {
-              console.log(`🖼️ Adding image URL to product ${msg.productId} in message ${msg.id}`);
+            // Update the product with the image URL if we have product info
+            if (productWithImage) {
+              console.log(`Adding image URL to existing product info for message ${msg.id}`);
               productWithImage = {
                 ...productWithImage,
                 imageUrl: imageUrl
               };
-            } else if (imageUrl) {
-              // We have an image but no product object yet
-              console.log(`🖼️ Creating minimal product with image for message ${msg.id}`);
+            } else {
+              console.log(`Creating minimal product with image for message ${msg.id}`);
+              // Create minimal product info with just the image
               productWithImage = {
                 id: msg.productId,
                 name: "Product",
@@ -1831,7 +1817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               };
             }
           } else {
-            console.log(`⚠️ No image URL in map for product ${msg.productId} in message ${msg.id}`);
+            console.log(`No image URL found for product ${msg.productId} in message ${msg.id}`);
           }
         }
         
@@ -1858,70 +1844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Confirm transaction action
-  app.post("/api/messages/action/confirm", async (req, res, next) => {
-    try {
-      // Check authentication
-      if (!req.isAuthenticated()) {
-        return res.status(403).json({ message: "Unauthorized: Must be logged in to confirm transactions" });
-      }
-      
-      // Validate request body
-      const schema = z.object({
-        messageId: z.number()
-      });
-      
-      const validationResult = schema.safeParse(req.body);
-      
-      if (!validationResult.success) {
-        return res.status(400).json({ 
-          message: "Invalid request", 
-          errors: validationResult.error.errors 
-        });
-      }
-      
-      const { messageId } = validationResult.data;
-      const userId = req.user.id;
-      
-      // Fetch the message to verify it's a transaction for this user
-      const message = await storage.getMessageById(messageId);
-      
-      if (!message) {
-        return res.status(404).json({ message: "Message not found" });
-      }
-      
-      // Verify this user is the recipient of the message
-      if (message.receiverId !== userId) {
-        return res.status(403).json({ message: "Unauthorized: You cannot confirm this transaction" });
-      }
-      
-      // Verify it's an action message
-      if (message.messageType !== 'ACTION') {
-        return res.status(400).json({ message: "Not an action message" });
-      }
-      
-      // Update the message to mark it as clicked
-      const updatedMessage = await storage.updateActionMessageStatus(messageId, true);
-      
-      if (!updatedMessage) {
-        return res.status(500).json({ message: "Failed to update message status" });
-      }
-      
-      // Notify the sender via WebSocket
-      if (wss && message.senderId) {
-        // Create a notification for the sender
-        broadcastToUser(message.senderId, {
-          type: 'action_confirmed',
-          message: updatedMessage
-        });
-      }
-      
-      res.json({ success: true, message: "Transaction confirmed" });
-    } catch (error) {
-      console.error("Error confirming transaction action:", error);
-      next(error);
-    }
-  });
+  // Remove the transaction confirmation endpoint that's causing errors
   
   // Mark messages as read
   app.post("/api/messages/mark-read", async (req, res, next) => {
