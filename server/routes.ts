@@ -1931,6 +1931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updatedMessage) {
         return res.status(500).json({ message: "Failed to update message status" });
       }
+      console.log("action type: ", message.actionType);
       
       // Handle different action types differently
       if (message.actionType === 'CONFIRM_PAYMENT') {
