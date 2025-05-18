@@ -158,7 +158,7 @@ const FilePreviewComponent: React.FC<FilePreviewProps> = ({ fileUrl }) => {
 
 export default function MessagesPage() {
   const { user } = useAuth();
-  const { messages, loading, error, sendMessage, getConversation, markAsRead } = useMessaging();
+  const { messages, loading, error, sendMessage, sendActionMessage, getConversation, markAsRead } = useMessaging();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [messageText, setMessageText] = useState('');
@@ -485,6 +485,75 @@ export default function MessagesPage() {
   const triggerFileUpload = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+  
+  // Open transaction dialog
+  const openCreateTransaction = useCallback(async () => {
+    if (!user?.id || !user.isSeller || !selectedConversation) {
+      toast({
+        title: 'Action Not Allowed',
+        description: 'You must be a seller and have a selected conversation to create a transaction.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setLoadingProducts(true);
+    setIsTransactionDialogOpen(true);
+    
+    try {
+      // Fetch seller's active products
+      const response = await fetch(`/api/seller/products`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to load products');
+      }
+      
+      const data = await response.json();
+      setSellerProducts(data.filter((product: any) => product.status === 'active'));
+    } catch (error) {
+      console.error('Error loading seller products:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load your products. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, [user, selectedConversation, toast]);
+  
+  // Create transaction message
+  const createTransactionMessage = useCallback(async (product: any) => {
+    if (!user?.id || !selectedConversation) return;
+    
+    try {
+      // Send action message through our hook
+      const success = sendActionMessage(
+        selectedConversation.userId,
+        product.id,
+        'INITIATE'
+      );
+      
+      if (success) {
+        // Close the transaction dialog
+        setIsTransactionDialogOpen(false);
+        
+        toast({
+          title: 'Transaction Created',
+          description: 'Your purchase confirmation has been sent.',
+        });
+      } else {
+        throw new Error('Failed to send action message');
+      }
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create transaction. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [user, selectedConversation, toast, sendActionMessage]);
   
   // Handle file selection from input
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
