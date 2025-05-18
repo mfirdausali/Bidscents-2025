@@ -2301,7 +2301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Function to check for expired auctions and handle them
   async function checkAndProcessExpiredAuctions() {
     const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Checking for expired auctions...`);
+    // console.log(`[${timestamp}] Checking for expired auctions...`);
     try {
       // Get only active auctions - more efficient
       const auctions = await storage.getActiveAuctions();
@@ -2309,8 +2309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       now.setHours(now.getHours() + 1); // Add 1 hour to match BST
       
-      console.log(`Current server time: ${new Date().toISOString()}`);
-      console.log(`Adjusted time for BST: ${now.toISOString()}`);
+      // console.log(`Current server time: ${new Date().toISOString()}`);
+      // console.log(`Adjusted time for BST: ${now.toISOString()}`);
       
       // Filter for active auctions that have passed their end time
       const expiredAuctions = auctions.filter(auction => {
@@ -2323,7 +2323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isExpired;
       });
       
-      console.log(`[${timestamp}] Found ${expiredAuctions.length} expired auctions to process`);
+      // console.log(`[${timestamp}] Found ${expiredAuctions.length} expired auctions to process`);
       
       // We already logged the auction details in the filter above, no need to do it again
       
@@ -2332,7 +2332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Process each expired auction
       for (const auction of expiredAuctions) {
-        console.log(`Processing expired auction #${auction.id}`);
+        // console.log(`Processing expired auction #${auction.id}`);
         
         try {
           // Check for reserve price
@@ -2344,6 +2344,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Reserve price wasn't met, update status to 'reserve_not_met'
             await storage.updateAuction(auction.id, { status: 'reserve_not_met' });
             console.log(`Updated auction #${auction.id} status to 'reserve_not_met'. Reserve price: ${auction.reservePrice}, Current bid: ${auction.currentBid || 'none'}`);
+            
+            // Update the corresponding product status to pending
+            const { error: productUpdateError } = await supabase
+              .from('products')
+              .update({
+                status: 'pending'
+              })
+              .eq('id', auction.productId);
+              
+            if (productUpdateError) {
+              console.error(`Error updating product #${auction.productId} status to pending:`, productUpdateError);
+            } else {
+              console.log(`Updated product #${auction.productId} status to 'pending' for expired auction with reserve not met`);
+            }
             
             // Get the product and seller details
             const product = await storage.getProductById(auction.productId);
@@ -2360,7 +2374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Send message from admin to seller that reserve wasn't met
-            const messageContent = `The auction for "${product.name}" has ended, but the reserve price of ${auction.reservePrice} was not met. The highest bid was ${auction.currentBid || 'none'}. You can either contact the highest bidder directly or relist the item.`;
+            const messageContent = `The auction for "${product.name}" has ended, but the reserve price of ${auction.reservePrice} was not met. The highest bid was ${auction.currentBid || 'none'}. You can relist the item.`;
             
             await storage.sendMessage({
               senderId: ADMIN_USER_ID,
@@ -2379,6 +2393,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Regular auction completion flow
             await storage.updateAuction(auction.id, { status: 'pending' });
             console.log(`Updated auction #${auction.id} status to 'pending'`);
+            
+            // Also update the corresponding product status to pending
+            await storage.updateProduct(auction.productId, { status: 'pending' });
+            console.log(`Updated product #${auction.productId} status to 'pending' for expired auction with winning bid`);
             
             // If no bids were placed, just end the auction
             if (!auction.currentBidderId) {
@@ -2486,76 +2504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This ensures the check runs even if there are errors in previous executions
   console.log('Setting up recurring auction expiry check (every 60 seconds)');
   // Commented out to reduce log noise
-  // setInterval(checkAndProcessExpiredAuctions, 60000);
-  
-  // Create a test auction endpoint that expires in 30 seconds
-  app.post("/api/auctions/create-test-expiring", async (req, res) => {
-    try {
-      const productId = parseInt(req.body.productId?.toString() || "101");
-      const hasReserve = req.body.hasReserve === 'true';
-      
-      // Create an auction that expires 30 seconds from now
-      const now = new Date();
-      const endsAt = new Date(now.getTime() + 30000); // 30 seconds
-      
-      console.log(`Creating test auction that expires at ${endsAt.toISOString()}, with reserve: ${hasReserve}`);
-      
-      // Create the auction
-      const auction = await storage.createAuction({
-        productId,
-        startingPrice: 10,
-        bidIncrement: 5,
-        reservePrice: hasReserve ? 50 : null, // Set a reserve price if requested
-        currentBid: hasReserve ? 20 : null,   // Set a current bid that's below reserve
-        currentBidderId: hasReserve ? 42 : null, // Assume user 42 is a test bidder
-        endsAt: endsAt.toISOString(),
-        startsAt: now.toISOString(),
-        status: 'active'
-      });
-      
-      res.json({
-        ...auction,
-        message: `Test auction created with ID ${auction.id}. Will expire at ${endsAt.toISOString()}, UTC time: ${now.toISOString()}, with${hasReserve ? '' : 'out'} reserve price.`
-      });
-    } catch (error) {
-      console.error('Error creating test expiring auction:', error);
-      res.status(500).json({ error: 'Failed to create test auction' });
-    }
-  });
-  
-  // Create a test auction with reserve price met
-  app.post("/api/auctions/create-test-reserve-met", async (req, res) => {
-    try {
-      const productId = parseInt(req.body.productId?.toString() || "101");
-      
-      // Create an auction that expires 30 seconds from now
-      const now = new Date();
-      const endsAt = new Date(now.getTime() + 30000); // 30 seconds
-      
-      console.log(`Creating test auction with met reserve price that expires at ${endsAt.toISOString()}`);
-      
-      // Create the auction
-      const auction = await storage.createAuction({
-        productId,
-        startingPrice: 10,
-        bidIncrement: 5,
-        reservePrice: 50, // Set a reserve price
-        currentBid: 55,   // Set a current bid that meets the reserve
-        currentBidderId: 42, // Assume user 42 is a test bidder
-        endsAt: endsAt.toISOString(),
-        startsAt: now.toISOString(),
-        status: 'active'
-      });
-      
-      res.json({
-        ...auction,
-        message: `Test auction created with ID ${auction.id}. Will expire at ${endsAt.toISOString()}, with reserve price MET.`
-      });
-    } catch (error) {
-      console.error('Error creating test reserve met auction:', error);
-      res.status(500).json({ error: 'Failed to create test auction' });
-    }
-  });
+  setInterval(checkAndProcessExpiredAuctions, 60000);
   
   // WebSocket connection handler
   wss.on('connection', (ws: WebSocket) => {
