@@ -1752,13 +1752,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Fetch product images for all products in one batch
           for (const productId of productIdsToFetch) {
             if (productId) {
+              console.log(`🔍 Fetching images for product ID ${productId} for transaction message`);
               const productImages = await storage.getProductImages(productId);
+              console.log(`Found ${productImages.length} images for product ${productId}`);
+              
               if (productImages && productImages.length > 0) {
                 // Find the main image (order 0)
                 const mainImage = productImages.find((img: any) => img.imageOrder === 0);
                 if (mainImage && mainImage.imageUrl) {
-                  productImagesMap.set(productId, objectStorage.getImagePublicUrl(mainImage.imageUrl));
+                  const imageUrl = objectStorage.getImagePublicUrl(mainImage.imageUrl);
+                  console.log(`✅ Adding image URL ${imageUrl} for product ${productId}`);
+                  productImagesMap.set(productId, imageUrl);
+                } else {
+                  console.log(`⚠️ No main image found for product ${productId}`);
                 }
+              } else {
+                console.log(`⚠️ No images found for product ${productId}`);
               }
             }
           }
@@ -1780,16 +1789,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // For action messages with products, add the product image URL if we have it
         let productWithImage = msg.product;
-        if (msg.messageType === 'ACTION' && msg.productId && productImagesMap.has(msg.productId)) {
-          // Get the image URL we fetched earlier
-          const imageUrl = productImagesMap.get(msg.productId);
+        if (msg.messageType === 'ACTION' && msg.productId) {
+          // First, ensure we have a product object even if it's minimal
+          if (!productWithImage && msg.productId) {
+            // We have no product info but we do have a productId - fetch basic product info
+            try {
+              const product = await storage.getProductById(msg.productId);
+              if (product) {
+                console.log(`📋 Fetched product info for message ${msg.id}, product ${msg.productId}`);
+                productWithImage = {
+                  id: product.id,
+                  name: product.name,
+                  price: product.price,
+                  // Add other fields as needed
+                };
+              }
+            } catch (err) {
+              console.error(`Error fetching product for message ${msg.id}:`, err);
+            }
+          }
           
-          // Only update if we have both a product and an image URL
-          if (msg.product && imageUrl) {
-            productWithImage = {
-              ...msg.product,
-              imageUrl: imageUrl
-            };
+          // Now add image URL if we have it
+          if (productImagesMap.has(msg.productId)) {
+            // Get the image URL we fetched earlier
+            const imageUrl = productImagesMap.get(msg.productId);
+            
+            // Update the product with the image URL
+            if (productWithImage && imageUrl) {
+              console.log(`🖼️ Adding image URL to product ${msg.productId} in message ${msg.id}`);
+              productWithImage = {
+                ...productWithImage,
+                imageUrl: imageUrl
+              };
+            } else if (imageUrl) {
+              // We have an image but no product object yet
+              console.log(`🖼️ Creating minimal product with image for message ${msg.id}`);
+              productWithImage = {
+                id: msg.productId,
+                name: "Product",
+                imageUrl: imageUrl
+              };
+            }
+          } else {
+            console.log(`⚠️ No image URL in map for product ${msg.productId} in message ${msg.id}`);
           }
         }
         
