@@ -1511,12 +1511,10 @@ export class SupabaseStorage implements IStorage {
   }
   
   async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
-    console.log(`Fetching conversation between users ${userId1} and ${userId2}`);
-    
-    // Get messages with ALL columns explicitly listed to ensure we get everything
+    // Get messages without trying to join users table
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select('*, file_url, message_type') // Explicitly select the new columns
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
       .order('created_at', { ascending: true });
       
@@ -1565,10 +1563,10 @@ export class SupabaseStorage implements IStorage {
   }
   
   async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
-    // Get all message fields explicitly including action_type and is_clicked
+    // Get messages without trying to join users table
     const { data, error } = await supabase
       .from('messages')
-      .select('id, sender_id, receiver_id, content, is_read, created_at, message_type, action_type, is_clicked, product_id, encrypted_content, attachment_url, attachment_type, file_url')
+      .select('*, file_url, message_type') // Explicitly request the file columns
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
       .eq('product_id', productId)
       .order('created_at', { ascending: true });
@@ -1698,118 +1696,6 @@ export class SupabaseStorage implements IStorage {
       console.error('Error marking all messages as read:', error);
       throw new Error('Failed to mark all messages as read');
     }
-  }
-  
-  /**
-   * Get a specific message by ID
-   */
-  async getMessageById(messageId: number): Promise<MessageWithDetails | null> {
-    console.log(`Getting message with ID ${messageId} from Supabase`);
-    
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('id', messageId)
-      .single();
-      
-    if (error) {
-      console.error('Error getting message by ID:', error);
-      return null;
-    }
-    
-    if (!data) {
-      return null;
-    }
-    
-    // Import decryption utility
-    const { decryptMessage, isEncrypted } = await import('./encryption');
-    
-    // Decrypt the message content if needed
-    let content = data.content;
-    if (content && isEncrypted(content)) {
-      content = decryptMessage(content);
-    }
-    
-    // Map from snake_case to camelCase
-    const message: MessageWithDetails = {
-      id: data.id,
-      senderId: data.sender_id,
-      receiverId: data.receiver_id,
-      content: content,
-      isRead: data.is_read,
-      createdAt: new Date(data.created_at),
-      messageType: data.message_type || 'TEXT',
-      fileUrl: data.file_url || null,
-      actionType: data.action_type || null,
-      isClicked: data.is_clicked || false,
-      productId: data.product_id || null
-    };
-    
-    // If it's an ACTION message with a product, get the product details
-    if (message.messageType === 'ACTION' && message.productId) {
-      try {
-        // Just fetch the product directly instead of using a helper method
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('id', message.productId)
-          .single();
-          
-        if (!error && data) {
-          const product = {
-            id: data.id,
-            name: data.name,
-            brand: data.brand,
-            description: data.description,
-            price: data.price,
-            imageUrl: data.image_url,
-            // Add other properties as needed
-          };
-          message.product = product;
-        }
-      } catch (error) {
-        console.error(`Error fetching product ${message.productId} for action message:`, error);
-      }
-    }
-    
-    return message;
-  }
-  
-  /**
-   * Update an action message status to mark it as clicked/confirmed
-   */
-  async updateActionMessageStatus(messageId: number, isClicked: boolean): Promise<MessageWithDetails | null> {
-    console.log(`Updating action message ${messageId} status, setting isClicked=${isClicked}`);
-    
-    // First, ensure the message exists and is an ACTION type
-    const existingMessage = await this.getMessageById(messageId);
-    
-    if (!existingMessage || existingMessage.messageType !== 'ACTION') {
-      console.error('Message not found or not an ACTION type:', messageId);
-      return null;
-    }
-    
-    // Update the is_clicked field in the database
-    const { data, error } = await supabase
-      .from('messages')
-      .update({ is_clicked: isClicked })
-      .eq('id', messageId)
-      .select()
-      .single();
-      
-    if (error) {
-      console.error('Error updating action message status:', error);
-      return null;
-    }
-    
-    if (!data) {
-      return null;
-    }
-    
-    // Get the updated message with all details
-    // We need to make sure we return the message with updated information
-    const updatedMessage = await this.getMessageById(messageId);
-    return updatedMessage;
   }
   
   async getUnreadMessageCount(userId: number): Promise<number> {
