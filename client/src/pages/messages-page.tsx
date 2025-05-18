@@ -743,6 +743,21 @@ export default function MessagesPage() {
         if (!sent) {
           console.warn('Payment confirmation message could not be sent through WebSocket');
         }
+        
+        // 4. Send a CONFIRM_DELIVERY action message to the buyer
+        if (message.productId) {
+          const actionSent = sendActionMessage(
+            selectedConversation.userId,
+            message.productId,
+            'CONFIRM_DELIVERY'
+          );
+          
+          if (!actionSent) {
+            console.warn('Delivery confirmation action message could not be sent');
+          } else {
+            console.log('Delivery confirmation action message sent successfully');
+          }
+        }
       }
       
       toast({
@@ -761,7 +776,7 @@ export default function MessagesPage() {
       // Clear loading state
       setConfirmingPayment(null);
     }
-  }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage]);
+  }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage, sendActionMessage]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
@@ -1204,7 +1219,7 @@ export default function MessagesPage() {
                               {/* Transaction Message */}
                               {msg.messageType === 'ACTION' && (
                                 <div className="transaction-message">
-                                  {/* Different UI for CONFIRM_PAYMENT vs INITIATE action types */}
+                                  {/* Different UI for different action types */}
                                   {msg.actionType === 'CONFIRM_PAYMENT' ? (
                                     // Payment Confirmation UI - Simpler without product image
                                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 w-full">
@@ -1243,6 +1258,47 @@ export default function MessagesPage() {
                                         // Buyer sees waiting status
                                         <div className="text-amber-600 text-sm italic p-2 border border-amber-200 bg-amber-50/50 rounded-md text-center mt-2">
                                           Waiting for seller to confirm payment receipt...
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : msg.actionType === 'CONFIRM_DELIVERY' ? (
+                                    // Delivery Confirmation UI - Similar to payment confirmation but with blue styling
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 w-full">
+                                      <div className="text-blue-800 font-medium mb-2">Delivery Confirmation</div>
+                                      
+                                      {msg.product && (
+                                        <div className="text-sm mb-3">
+                                          {msg.senderId === user?.id ? 
+                                            `Please wait for buyer to confirm delivery for "${msg.product.name}".` :
+                                            `Please confirm when you've received "${msg.product.name}".`
+                                          }
+                                        </div>
+                                      )}
+                                      
+                                      {/* Show confirmation button or status based on is_clicked */}
+                                      {msg.isClicked ? (
+                                        <div className="bg-green-100 text-green-700 font-medium p-2 rounded-md text-center mt-2">
+                                          ✓ Delivery confirmed
+                                        </div>
+                                      ) : msg.receiverId === user?.id ? (
+                                        // Buyer sees confirmation button
+                                        <Button 
+                                          variant="outline"
+                                          className="w-full bg-white border-blue-300 text-blue-700 hover:bg-blue-100"
+                                          onClick={() => handleConfirmPaymentReceived(msg.id)}
+                                          disabled={confirmingPayment === msg.id}
+                                        >
+                                          {confirmingPayment === msg.id ? (
+                                            <>
+                                              <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></span>
+                                              Processing...
+                                            </>
+                                          ) : "Confirm Delivery Received"}
+                                        </Button>
+                                      ) : (
+                                        // Seller sees waiting status
+                                        <div className="text-blue-600 text-sm italic p-2 border border-blue-200 bg-blue-50/50 rounded-md text-center mt-2">
+                                          Waiting for buyer to confirm delivery receipt...
                                         </div>
                                       )}
                                     </div>
