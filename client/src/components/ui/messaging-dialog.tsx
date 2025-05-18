@@ -225,7 +225,9 @@ export function MessagingDialog({
                       >
                         <div className="flex flex-col">
                           <div className="text-sm font-medium mb-2">
-                            {msg.actionType === 'INITIATE' ? 'Purchase This Item' : 'Transaction Action'}
+                            {msg.actionType === 'INITIATE' ? 'Purchase This Item' : 
+                             msg.actionType === 'CONFIRM_PAYMENT' ? 'Confirm Payment Received' : 
+                             'Transaction Action'}
                           </div>
                           
                           {msg.product && (

@@ -662,6 +662,21 @@ export default function MessagesPage() {
         if (!sent) {
           console.warn('Confirmation message could not be sent through WebSocket');
         }
+        
+        // 4. Send a new CONFIRM_PAYMENT action message for the seller to confirm payment receipt
+        if (message.productId) {
+          const actionSent = sendActionMessage(
+            selectedConversation.userId,
+            message.productId,
+            'CONFIRM_PAYMENT'
+          );
+          
+          if (!actionSent) {
+            console.warn('Payment confirmation action message could not be sent');
+          } else {
+            console.log('Payment confirmation action message sent successfully');
+          }
+        }
       }
       
       toast({
@@ -680,7 +695,7 @@ export default function MessagesPage() {
       // Clear loading state
       setConfirmingPurchase(null);
     }
-  }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage]);
+  }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage, sendActionMessage]);
   
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
