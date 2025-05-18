@@ -1926,24 +1926,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Notify both the sender and receiver via WebSocket
       if (wss) {
-        // Create a notification for the sender
+        const broadcastToUser = (userId: number, data: any) => {
+          wss.clients.forEach((client: any) => {
+            if (client.userId === userId && client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify(data));
+            }
+          });
+        };
+      
+        // Notify both sender and receiver about the confirmation
         if (message.senderId) {
-          // Function to broadcast to specific user
-          const broadcastToUser = (userId: number, data: any) => {
-            wss.clients.forEach((client: any) => {
-              if (client.userId === userId && client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(data));
-              }
-            });
-          };
-          
           broadcastToUser(message.senderId, {
             type: 'action_confirmed',
             message: updatedMessage
           });
         }
         
-        // Also notify the receiver (which is the current user) for UI consistency
+        // Also notify the receiver (which is the current user)
         broadcastToUser(message.receiverId, {
           type: 'action_confirmed',
           message: updatedMessage
