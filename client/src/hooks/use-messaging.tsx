@@ -230,6 +230,27 @@ export function useMessaging() {
             window.dispatchEvent(messagingEvent);
           }
           
+          // Handle transaction action confirmation
+          if (data.type === 'action_confirmed') {
+            console.log('Transaction action confirmed:', data.message);
+            
+            // Update messages state to reflect the confirmed transaction
+            setMessages(prev => {
+              return prev.map(msg => {
+                if (msg.id === data.message.id) {
+                  return { ...msg, isClicked: true };
+                }
+                return msg;
+              });
+            });
+            
+            // Dispatch custom event for any components that need to know
+            const actionEvent = new CustomEvent('messaging:action_confirmed', {
+              detail: data
+            });
+            window.dispatchEvent(actionEvent);
+          }
+          
           // Handle errors
           if (data.type === 'error') {
             console.error('WebSocket error:', data.message);

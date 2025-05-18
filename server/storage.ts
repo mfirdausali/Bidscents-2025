@@ -120,12 +120,10 @@ export interface IStorage {
   getUserMessages(userId: number): Promise<MessageWithDetails[]>;
   getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]>;
   getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]>;
-  getMessage(id: number): Promise<Message | undefined>;
   sendMessage(message: InsertMessage): Promise<Message>;
   markMessageAsRead(id: number): Promise<Message>;
   markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void>;
   getUnreadMessageCount(userId: number): Promise<number>;
-  updateMessage(id: number, updates: Partial<Message>): Promise<Message>;
   
   // Payment methods
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -545,10 +543,6 @@ export class MemStorage implements IStorage {
   }
 
   // Message methods
-  async getMessage(id: number): Promise<Message | undefined> {
-    return this.messages.get(id);
-  }
-
   async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
     const userMessages = Array.from(this.messages.values()).filter(
       message => message.senderId === userId || message.receiverId === userId
@@ -623,19 +617,6 @@ export class MemStorage implements IStorage {
       message => message.receiverId === userId && !message.isRead
     );
     return unreadMessages.length;
-  }
-  
-  // Update message with partial data (used for setting isClicked to true for confirmations)
-  async updateMessage(id: number, updates: Partial<Message>): Promise<Message> {
-    const message = this.messages.get(id);
-    
-    if (!message) {
-      throw new Error("Message not found");
-    }
-    
-    const updatedMessage = { ...message, ...updates };
-    this.messages.set(id, updatedMessage);
-    return updatedMessage;
   }
   
   private async addMessageDetails(messages: Message[]): Promise<MessageWithDetails[]> {
