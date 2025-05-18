@@ -1350,6 +1350,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: messageData.created_at
       };
       
+      // Notify the receiver via WebSocket if they're online
+      if (wss) {
+        try {
+          // Get sender info for the notification
+          const sender = await storage.getUser(req.user.id);
+          
+          // Find recipient's WebSocket connection
+          const recipientWs = Array.from(wss.clients).find((client: any) => 
+            client.userId === parseInt(req.body.receiverId) && 
+            client.readyState === WebSocket.OPEN
+          );
+          
+          if (recipientWs) {
+            console.log(`Sending file upload notification to recipient (${req.body.receiverId}) via WebSocket`);
+            
+            // Prepare message data with sender info
+            const wsNotification = {
+              type: 'file_uploaded',
+              fileMessage: {
+                ...responseData,
+                sender: {
+                  id: sender.id,
+                  username: sender.username,
+                  profileImage: sender.profileImage || null
+                }
+              }
+            };
+            
+            // Send the notification
+            recipientWs.send(JSON.stringify(wsNotification));
+          } else {
+            console.log(`Recipient (${req.body.receiverId}) is not connected to WebSocket`);
+          }
+        } catch (wsError) {
+          console.error('Error sending WebSocket notification for file upload:', wsError);
+          // Continue despite WebSocket error - file is still uploaded
+        }
+      }
+      
       console.log("Formatted response data:", responseData);
       
       // Send a simple, clean JSON response 
