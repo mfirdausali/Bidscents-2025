@@ -3666,9 +3666,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
 
-          // The product status update now happens automatically in updatePaymentStatus
+          // NEW IMPLEMENTATION: Create individual payment records for each product
+          // This ensures each product has its own payment record in the database
+          if (productIds.length > 1) {
+            console.log(`Creating individual payment records for ${productIds.length} products`);
+            
+            // The first product will use the existing payment record
+            // We'll update it with the first product ID
+            const firstProductId = parseInt(productIds[0]);
+            await storage.updateSingleProductPayment(payment.id, firstProductId);
+            
+            // For the remaining products, create new payment records
+            // They will share the same bill_id but have different product_ids
+            const remainingProductIds = productIds.slice(1);
+            
+            for (const pid of remainingProductIds) {
+              const productId = parseInt(pid);
+              
+              try {
+                // Create a new payment record for this product
+                // with the same bill_id, userId, and other details from the original payment
+                await storage.createProductPaymentRecord({
+                  userId: payment.userId,
+                  billId: billId,
+                  productId: productId,
+                  amount: payment.amount / productIds.length, // Split the amount evenly
+                  status: 'paid',
+                  paidAt: paidDate,
+                  paymentType: payment.paymentType,
+                  featureDuration: payment.featureDuration
+                });
+                
+                console.log(`✅ Created individual payment record for product ID ${productId}`);
+              } catch (err) {
+                console.error(`❌ Error creating payment record for product ${productId}:`, err);
+              }
+            }
+          } else if (productIds.length === 1) {
+            // If there's only one product, update the existing payment record
+            const productId = parseInt(productIds[0]);
+            await storage.updateSingleProductPayment(payment.id, productId);
+          }
+
+          // The product status update happens automatically after we create the payment records
           // This is handled by updateProductFeaturedStatusForPayment in SupabaseStorage
-          // It uses the product IDs from the payment record
           
           console.log(`🚀 Payment has been marked as paid, products will be featured automatically`);
           return { 
