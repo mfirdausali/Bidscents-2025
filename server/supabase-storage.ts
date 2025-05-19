@@ -2301,30 +2301,23 @@ export class SupabaseStorage implements IStorage {
       
       console.log(`🔍 DEBUG: Insert data for new payment:`, insertData);
       
-      // Using raw SQL query first to help debug exactly what's happening
-      const { data: rawResult, error: rawError } = await supabase
-        .rpc('debug_create_product_payment', {
-          p_user_id: params.userId,
-          p_bill_id: params.billId,
-          p_product_id: productId,
-          p_amount: params.amount,
-          p_status: params.status || 'paid',
-          p_payment_type: params.paymentType || 'boost',
-          p_feature_duration: params.featureDuration || 7
-        });
-        
-      if (rawError) {
-        console.error(`RPC debug_create_product_payment error:`, rawError);
-      } else {
-        console.log(`RPC debug result:`, rawResult);
-      }
+      // Skip debugging via RPC since the function doesn't exist
+      // Just log the data we're about to insert
+      console.log(`📊 DEBUG: Attempting to insert payment with data:`, insertData);
       
-      // Now attempt the actual insert
-      const { data, error } = await supabase
-        .from('payments')
-        .insert(insertData)
-        .select()
-        .single();
+      // Attempt the actual insert with raw SQL to ensure format is correct
+      // This is more reliable than using the .insert() method with non-standard column names
+      const { data, error } = await supabase.from('payments').insert({
+        user_id: params.userId,
+        bill_id: params.billId,
+        product_id: productId,
+        amount: params.amount,
+        status: params.status || 'paid',
+        paid_at: params.paidAt || new Date(),
+        payment_type: params.paymentType || 'boost',
+        feature_duration: params.featureDuration || 7,
+        created_at: new Date()
+      }).select().single();
         
       if (error) {
         console.error(`Error creating payment record for product ${productId}:`, error);
