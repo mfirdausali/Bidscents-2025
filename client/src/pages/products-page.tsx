@@ -5,7 +5,6 @@ import { ProductWithDetails, Category } from "@shared/schema";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { ProductCard } from "@/components/ui/product-card";
-import { AuctionCard } from "@/components/ui/auction-card";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -292,52 +291,9 @@ export default function ProductsPage() {
                   </div>
                 ) : products && products.length > 0 ? (
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-                    {sortedProducts().map((product) => {
-                      // For auction listings, use AuctionCard
-                      if (product.listingType === "auction" && product.auction) {
-                        return (
-                          <AuctionCard 
-                            key={product.id} 
-                            product={{
-                              id: product.id,
-                              name: product.name,
-                              price: product.price,
-                              brand: product.brand,
-                              imageUrl: product.imageUrl || '',
-                              category: product.category?.name || '',
-                              stockQuantity: product.stockQuantity || 0,
-                              rating: product.averageRating || 0,
-                              reviewCount: product.reviews?.length || 0,
-                              remainingPercentage: product.remainingPercentage,
-                              volume: product.volume,
-                              batchCode: product.batchCode,
-                              sellerId: product.sellerId,
-                              seller: product.seller,
-                              listingType: "auction",
-                              auction: {
-                                // Use actual auction data from the database
-                                id: product.auction.id,
-                                startingPrice: product.auction.startingPrice,
-                                currentBid: product.auction.currentBid,
-                                bidIncrement: product.auction.bidIncrement,
-                                buyNowPrice: product.auction.buyNowPrice,
-                                endsAt: typeof product.auction.endsAt === 'string' ? product.auction.endsAt : product.auction.endsAt.toISOString(),
-                                startsAt: typeof product.auction.startsAt === 'string' ? product.auction.startsAt : product.auction.startsAt.toISOString(),
-                                status: product.auction.status,
-                                bidCount: product.auction.bidCount
-                              }
-                            }}
-                            images={product.images?.map(img => ({
-                              id: img.id,
-                              imageUrl: img.imageUrl
-                            }))}
-                          />
-                        );
-                      }
-                      
-                      // For regular fixed-price listings, use ProductCard
-                      return <ProductCard key={product.id} product={product} />;
-                    })}
+                    {sortedProducts().map((product) => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
                   </div>
                 ) : (
                   <div className="text-center py-16">

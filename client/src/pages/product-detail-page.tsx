@@ -6,7 +6,6 @@ import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ContactSellerButton } from "@/components/ui/contact-seller-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,6 +34,7 @@ export default function ProductDetailPage() {
   
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState("50ml");
+  const [isContacting, setIsContacting] = useState(false);
   const [activeTab, setActiveTab] = useState("description");
   const [selectedRating, setSelectedRating] = useState(0);
 
@@ -120,7 +120,44 @@ export default function ProductDetailPage() {
     return stars;
   };
 
+  // Handle contact seller
+  const handleContactSeller = () => {
+    if (!user) {
+      toast({
+        title: "Please sign in",
+        description: "You need to be signed in to contact sellers",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    if (!product) return;
+
+    setIsContacting(true);
+    try {
+      // In a real app, this would navigate to a messaging page or open a modal
+      toast({
+        title: "Contacting seller",
+        description: `We're connecting you with the seller of ${product.name}`,
+      });
+      
+      // Simulate a delay before showing success message
+      setTimeout(() => {
+        toast({
+          title: "Seller contacted",
+          description: `Your interest in ${product.name} has been sent to the seller`,
+        });
+        setIsContacting(false);
+      }, 1000);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to contact seller",
+        variant: "destructive",
+      });
+      setIsContacting(false);
+    }
+  };
 
   // Handle review submission
   const onSubmitReview = (data: ReviewFormValues) => {
@@ -263,20 +300,9 @@ export default function ProductDetailPage() {
                     <p className="font-medium">Seller: {product.seller?.username}</p>
                     <p className="text-gray-500 text-xs">Trusted Seller</p>
                   </div>
-                  <div className="flex gap-2">
-                    <ContactSellerButton 
-                      sellerId={product.sellerId}
-                      sellerName={product.seller?.username || 'Seller'}
-                      sellerImage={product.seller?.profileImage || null}
-                      productId={product.id}
-                      productName={product.name}
-                      size="sm"
-                      variant="secondary"
-                    />
-                    <Button variant="outline" className="text-xs h-8" asChild>
-                      <Link href={`/sellers/${product.seller?.id}`}>View Seller</Link>
-                    </Button>
-                  </div>
+                  <Button variant="outline" className="text-xs h-8" asChild>
+                    <Link href={`/sellers/${product.seller?.id}`}>View Seller</Link>
+                  </Button>
                 </div>
                 
                 <div className="text-2xl font-semibold mb-4">RM {product.price.toFixed(2)}</div>
@@ -340,15 +366,23 @@ export default function ProductDetailPage() {
                   </Button>
                 </div>
                 
-                <ContactSellerButton 
-                  className="h-12 flex-grow shadow-sm"
-                  sellerId={product.sellerId}
-                  sellerName={product.seller?.username || 'Seller'}
-                  sellerImage={product.seller?.profileImage || null}
-                  productId={product.id}
-                  productName={product.name}
-                  variant="default"
-                />
+                <Button 
+                  className="bg-purple-600 text-white hover:bg-purple-700 h-12 flex-grow shadow-sm"
+                  onClick={handleContactSeller}
+                  disabled={isContacting}
+                >
+                  {isContacting ? (
+                    <span className="flex items-center">
+                      <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-black rounded-full"></span>
+                      Contacting...
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <MessageSquare className="mr-2 h-5 w-5" />
+                      Contact Seller
+                    </span>
+                  )}
+                </Button>
                 
                 <Button 
                   variant="outline" 

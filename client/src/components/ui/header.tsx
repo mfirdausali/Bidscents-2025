@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { Input } from "./input";
 import { Button } from "./button";
 import { useQueryClient } from "@tanstack/react-query";
@@ -18,7 +17,6 @@ import { Search, Heart, MessageCircle, User, LogOut, Package, Shield } from "luc
 export function Header() {
   const [location] = useLocation();
   const { user, logoutMutation } = useAuth();
-  const { unreadCount } = useUnreadMessages();
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const queryClient = useQueryClient();
@@ -95,11 +93,6 @@ export function Header() {
                 aria-label="Messages"
               >
                 <MessageCircle className="h-5 w-5" />
-                {user && unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
               </button>
             </Link>
             

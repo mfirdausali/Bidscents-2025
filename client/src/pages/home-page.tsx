@@ -11,21 +11,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProductCard } from "@/components/ui/product-card";
-import { AuctionCard } from "@/components/ui/auction-card";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Input } from "@/components/ui/input";
-import {
-  Loader2,
-  Star,
-  StarHalf,
-  Diamond,
-  MapPin,
-  Flame,
-  RefreshCw,
-  Search,
-  Lock,
-} from "lucide-react";
+import { Loader2, Star, StarHalf, Diamond, MapPin, Flame } from "lucide-react";
 import { FeaturedProductCarousel } from "@/components/ui/featured-product-carousel";
 
 export default function HomePage() {
@@ -94,10 +83,10 @@ export default function HomePage() {
       </section>
 
       {/* Browse Categories */}
-      <section className="container mx-auto px-6 py-3">
-        <h2 className="text-xl font-bold mb-2">Browse Categories</h2>
+      <section className="container mx-auto px-6 py-6 ">
+        <h2 className="text-xl font-bold mb-4">Browse Categories</h2>
 
-        <div className="grid grid-cols-4 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 md:grid-cols-4 gap-3">
           {/* Designer category (ID: 1) */}
           <Link
             href="/products?category=1"
@@ -150,8 +139,8 @@ export default function HomePage() {
       <FeaturedProductCarousel />
 
       {/* Auction Listings */}
-      <section className="container mx-auto px-6 py-4 bg-gray-50">
-        <div className="flex justify-between items-center mb-3">
+      <section className="container mx-auto px-6 py-8 bg-gray-50">
+        <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Live Auctions</h2>
           <Link
             href="/products?type=auction"
@@ -169,13 +158,9 @@ export default function HomePage() {
           allProducts.length > 0 &&
           allProducts.some((product) => product.listingType === "auction") ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-            {/* Display the 3 active auction products */}
+            {/* Display the 3 auction products */}
             {[...allProducts]
-              .filter((product) => 
-                product.listingType === "auction" && 
-                product.auction?.status === 'active' && 
-                new Date(product.auction.endsAt) > new Date() // Only show auctions that haven't ended
-              )
+              .filter((product) => product.listingType === "auction")
               .sort((a, b) => {
                 // If createdAt exists, use it for sorting; otherwise, use id
                 if (a.createdAt && b.createdAt) {
@@ -188,52 +173,7 @@ export default function HomePage() {
               })
               .slice(0, 3)
               .map((product) => (
-                <AuctionCard 
-                  key={product.id} 
-                  product={{
-                    id: product.id,
-                    name: product.name,
-                    price: product.price,
-                    brand: product.brand,
-                    imageUrl: product.imageUrl || '',
-                    category: product.category?.name || '',
-                    stockQuantity: product.stockQuantity || 0,
-                    rating: product.averageRating || 0,
-                    reviewCount: product.reviews?.length || 0,
-                    remainingPercentage: product.remainingPercentage,
-                    volume: product.volume,
-                    batchCode: product.batchCode,
-                    sellerId: product.sellerId,
-                    seller: product.seller,
-                    listingType: 'auction',
-                    auction: product.auction ? {
-                      // Use actual auction data from the database if available
-                      id: product.auction.id,
-                      startingPrice: product.auction.startingPrice,
-                      currentBid: product.auction.currentBid,
-                      bidIncrement: product.auction.bidIncrement,
-                      buyNowPrice: product.auction.buyNowPrice,
-                      endsAt: typeof product.auction.endsAt === 'string' ? product.auction.endsAt : product.auction.endsAt.toISOString(),
-                      startsAt: typeof product.auction.startsAt === 'string' ? product.auction.startsAt : product.auction.startsAt.toISOString(),
-                      status: product.auction.status,
-                      bidCount: product.auction.bidCount
-                    } : {
-                      // Fallback for backward compatibility
-                      id: product.id,
-                      startingPrice: product.price,
-                      currentBid: null,
-                      bidIncrement: 5,
-                      buyNowPrice: null,
-                      endsAt: new Date(Date.now() + 86400000).toISOString(),
-                      startsAt: new Date().toISOString(),
-                      status: 'active'
-                    }
-                  }}
-                  images={product.images?.map(img => ({
-                    id: img.id,
-                    imageUrl: img.imageUrl
-                  }))}
-                />
+                <ProductCard key={product.id} product={product} />
               ))}
           </div>
         ) : (
@@ -244,8 +184,8 @@ export default function HomePage() {
       </section>
 
       {/* Recent Listings */}
-      <section className="container mx-auto px-6 py-4">
-        <div className="flex justify-between items-center mb-3">
+      <section className="container mx-auto px-6 py-8">
+        <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Recent Listings</h2>
           <Link
             href="/products"
@@ -298,38 +238,78 @@ export default function HomePage() {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Step 1 */}
             <div className="bg-white p-6 rounded-lg shadow-sm text-center">
               <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <RefreshCw className="h-8 w-8" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-8 w-8"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3">Swap market</h3>
+              <h3 className="text-xl font-bold mb-3">Authentication</h3>
               <p className="text-gray-600">
-                Swap your own fragrance with others without spending any money
-                at all
+                Every perfume is verified through batch code validation and
+                expert review before it's listed on our platform.
               </p>
             </div>
 
             {/* Step 2 */}
             <div className="bg-white p-6 rounded-lg shadow-sm text-center">
               <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="h-8 w-8" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-8 w-8"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                  />
+                </svg>
               </div>
               <h3 className="text-xl font-bold mb-3">Secure Payments</h3>
               <p className="text-gray-600">
-                Our escrow payment system protects both buyers and sellers
-                throughout the transaction.
+                Our escrow payment system via Billplz protects both buyers and
+                sellers throughout the transaction.
               </p>
             </div>
 
             {/* Step 3 */}
             <div className="bg-white p-6 rounded-lg shadow-sm text-center">
               <div className="bg-purple-100 text-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="h-8 w-8" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-8 w-8"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                  />
+                </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3">Authentication Guide</h3>
+              <h3 className="text-xl font-bold mb-3">Safe Delivery</h3>
               <p className="text-gray-600">
-                We will show you how to spot fake perfumes through packaging,
-                scent, and price.
+                Track your package every step of the way with our integrated
+                shipping partners across Malaysia.
               </p>
             </div>
           </div>
@@ -436,22 +416,39 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Community Section */}
+      {/* Email Signup */}
       <section className="py-16 bg-purple-100">
         <div className="container mx-auto px-6 text-center">
           <h2 className="text-3xl font-bold mb-4 text-gray-900">
-            Join Malaysian Fragrance Community
+            Join Our Fragrance Community
           </h2>
           <p className="text-gray-600 mb-8 max-w-xl mx-auto">
-            Connect with fellow fragrance enthusiasts in Malaysia, share your collection,
-            discover rare finds, and join discussions about your favorite scents.
+            Subscribe to receive alerts on rare finds, auction endings, price
+            drops on your wishlist items, and trusted seller listings.
           </p>
-          <Button
-            className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full shadow-sm"
-            onClick={() => window.open("https://www.facebook.com/groups/malaysianfragrancecommunity", "_blank")}
+          <form
+            onSubmit={handleSubscribe}
+            className="max-w-md mx-auto flex flex-col sm:flex-row"
           >
-            Join Our Facebook Group
-          </Button>
+            <Input
+              type="email"
+              placeholder="Your email address"
+              className="flex-grow px-4 py-3 rounded-full sm:rounded-r-none mb-3 sm:mb-0"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <Button
+              type="submit"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-full sm:rounded-l-none shadow-sm"
+            >
+              Subscribe
+            </Button>
+          </form>
+          <p className="text-gray-500 text-sm mt-4">
+            By subscribing, you agree to our Privacy Policy and consent to
+            receive updates.
+          </p>
         </div>
       </section>
 

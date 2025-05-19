@@ -35,34 +35,13 @@ export default function ProfilePage() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  
-  // Redirect to /sellers/:id if user is logged in
-  useEffect(() => {
-    if (user?.id) {
-      setLocation(`/sellers/${user.id}`);
-    }
-  }, [user, setLocation]);
-
-  // Add a loading state for the redirect
-  if (user?.id) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirecting to your profile...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Only render the fallback UI if there's no user yet
   const [activeTab, setActiveTab] = useState("overview");
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    address: "",
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    email: user?.email || "",
+    address: user?.address || "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: ""
@@ -221,45 +200,48 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-1">
-                  <Tabs defaultValue="overview" onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-1 h-auto">
-                      <TabsTrigger 
-                        value="overview" 
-                        className="justify-start py-2 px-3"
-                      >
-                        <UserCircle className="mr-2 h-4 w-4" />
-                        <span>Profile Overview</span>
-                      </TabsTrigger>
-                      <TabsTrigger 
-                        value="orders" 
-                        className="justify-start py-2 px-3"
-                      >
-                        <Package className="mr-2 h-4 w-4" />
-                        <span>My Orders</span>
-                      </TabsTrigger>
-                      <TabsTrigger 
-                        value="favorites" 
-                        className="justify-start py-2 px-3"
-                      >
-                        <Heart className="mr-2 h-4 w-4" />
-                        <span>My Favorites</span>
-                      </TabsTrigger>
-                      <TabsTrigger 
-                        value="wallet" 
-                        className="justify-start py-2 px-3"
-                      >
-                        <Wallet className="mr-2 h-4 w-4" />
-                        <span>My Wallet</span>
-                      </TabsTrigger>
-                      <TabsTrigger 
-                        value="settings" 
-                        className="justify-start py-2 px-3"
-                      >
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Account Settings</span>
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
+                  <TabsList className="grid w-full grid-cols-1 h-auto">
+                    <TabsTrigger 
+                      value="overview" 
+                      className={`justify-start py-2 px-3 ${activeTab === "overview" ? "bg-purple-100" : ""}`}
+                      onClick={() => setActiveTab("overview")}
+                    >
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      <span>Profile Overview</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="orders" 
+                      className={`justify-start py-2 px-3 ${activeTab === "orders" ? "bg-purple-100" : ""}`}
+                      onClick={() => setActiveTab("orders")}
+                    >
+                      <Package className="mr-2 h-4 w-4" />
+                      <span>My Orders</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="favorites" 
+                      className={`justify-start py-2 px-3 ${activeTab === "favorites" ? "bg-purple-100" : ""}`}
+                      onClick={() => setActiveTab("favorites")}
+                    >
+                      <Heart className="mr-2 h-4 w-4" />
+                      <span>My Favorites</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="wallet" 
+                      className={`justify-start py-2 px-3 ${activeTab === "wallet" ? "bg-purple-100" : ""}`}
+                      onClick={() => setActiveTab("wallet")}
+                    >
+                      <Wallet className="mr-2 h-4 w-4" />
+                      <span>My Wallet</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="settings" 
+                      className={`justify-start py-2 px-3 ${activeTab === "settings" ? "bg-purple-100" : ""}`}
+                      onClick={() => setActiveTab("settings")}
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Account Settings</span>
+                    </TabsTrigger>
+                  </TabsList>
                 </div>
               </CardContent>
               <CardFooter>

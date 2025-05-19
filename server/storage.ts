@@ -1,15 +1,11 @@
-import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids, payments } from "@shared/schema";
+import { users, products, categories, reviews, orders, orderItems, productImages } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
   Review, InsertReview,
   Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
-  ProductImage, InsertProductImage,
-  Message, InsertMessage, MessageWithDetails,
-  Auction, InsertAuction, AuctionWithDetails,
-  Bid, InsertBid, BidWithDetails,
-  Payment, InsertPayment
+  ProductImage, InsertProductImage
 } from "@shared/schema";
 
 // Define cart types since they're removed from schema but still required by the interface
@@ -71,7 +67,6 @@ export interface IStorage {
   getProductById(id: number): Promise<ProductWithDetails | undefined>;
   getFeaturedProducts(): Promise<ProductWithDetails[]>;
   getSellerProducts(sellerId: number): Promise<ProductWithDetails[]>;
-  getAllProductsWithDetails(): Promise<ProductWithDetails[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: InsertProduct): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
@@ -103,54 +98,6 @@ export interface IStorage {
   createProductImage(productImage: InsertProductImage): Promise<ProductImage>;
   deleteProductImage(id: number): Promise<void>;
   
-  // Auction methods
-  getAuctions(): Promise<Auction[]>;
-  getAuctionById(id: number): Promise<Auction | undefined>;
-  getProductAuctions(productId: number): Promise<Auction[]>;
-  createAuction(auction: InsertAuction): Promise<Auction>;
-  updateAuction(id: number, auction: Partial<InsertAuction>): Promise<Auction>;
-  deleteAuction(id: number): Promise<void>;
-  
-  // Bid methods
-  getBidsForAuction(auctionId: number): Promise<Bid[]>;
-  createBid(bid: InsertBid): Promise<Bid>;
-  updatePreviousBids(auctionId: number, newBidderId: number): Promise<void>;
-  
-  // Message methods
-  getUserMessages(userId: number): Promise<MessageWithDetails[]>;
-  getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]>;
-  getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]>;
-  sendMessage(message: InsertMessage): Promise<Message>;
-  markMessageAsRead(id: number): Promise<Message>;
-  markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void>;
-  getUnreadMessageCount(userId: number): Promise<number>;
-  
-  // Payment methods
-  createPayment(payment: InsertPayment): Promise<Payment>;
-  getPaymentById(id: number): Promise<Payment | undefined>;
-  getPaymentByOrderId(orderId: string): Promise<Payment | undefined>;
-  getPaymentByBillId(billId: string): Promise<Payment | undefined>;
-  getUserPayments(userId: number): Promise<Payment[]>;
-  updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment>;
-  updatePaymentProductIds(id: number, productIds: string[]): Promise<Payment>;
-  updateSingleProductPayment(paymentId: number, productId: number): Promise<void>;
-  createProductPaymentRecord(params: {
-    userId: number;
-    billId: string;
-    productId: number;
-    amount: number;
-    status: string;
-    paidAt?: Date;
-    paymentType: string;
-    featureDuration?: number;
-  }): Promise<any>;
-  
-  // Transaction methods
-  createTransaction(data: InsertTransaction): Promise<Transaction>;
-  getUserTransactions(userId: number): Promise<TransactionWithDetails[]>;
-  getProductTransactions(productId: number): Promise<TransactionWithDetails[]>;
-  updateTransactionStatus(id: number, status: string): Promise<Transaction>;
-  
   // Session storage
   sessionStore: any;
 }
@@ -164,7 +111,6 @@ export class MemStorage implements IStorage {
   private orders: Map<number, Order>;
   private orderItems: Map<number, OrderItem>;
   private productImages: Map<number, ProductImage>;
-  private messages: Map<number, Message>;
   sessionStore: any;
   currentIds: {
     users: number;
@@ -175,7 +121,6 @@ export class MemStorage implements IStorage {
     orders: number;
     orderItems: number;
     productImages: number;
-    messages: number;
   };
 
   constructor() {
@@ -187,7 +132,6 @@ export class MemStorage implements IStorage {
     this.orders = new Map();
     this.orderItems = new Map();
     this.productImages = new Map();
-    this.messages = new Map();
     this.currentIds = {
       users: 1,
       categories: 1,
@@ -196,8 +140,7 @@ export class MemStorage implements IStorage {
       reviews: 1,
       orders: 1,
       orderItems: 1,
-      productImages: 1,
-      messages: 1
+      productImages: 1
     };
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // 1 day
@@ -557,114 +500,6 @@ export class MemStorage implements IStorage {
 
   async deleteProductImage(id: number): Promise<void> {
     this.productImages.delete(id);
-  }
-
-  // Message methods
-  async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
-    const userMessages = Array.from(this.messages.values()).filter(
-      message => message.senderId === userId || message.receiverId === userId
-    );
-    
-    return this.addMessageDetails(userMessages);
-  }
-  
-  async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
-    const conversation = Array.from(this.messages.values()).filter(
-      message => 
-        (message.senderId === userId1 && message.receiverId === userId2) || 
-        (message.senderId === userId2 && message.receiverId === userId1)
-    );
-    
-    return this.addMessageDetails(conversation);
-  }
-  
-  async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
-    const conversation = Array.from(this.messages.values()).filter(
-      message => 
-        ((message.senderId === userId1 && message.receiverId === userId2) || 
-        (message.senderId === userId2 && message.receiverId === userId1)) &&
-        message.productId === productId
-    );
-    
-    return this.addMessageDetails(conversation);
-  }
-  
-  async sendMessage(message: InsertMessage): Promise<Message> {
-    const id = this.currentIds.messages++;
-    const createdAt = new Date();
-    
-    // Import encryption utility
-    const { encryptMessage } = await import('./encryption');
-    
-    // Encrypt the message content
-    const encryptedMessage: Message = {
-      ...message,
-      id,
-      createdAt,
-      isRead: message.isRead || false,
-      // Encrypt the content before storing
-      content: encryptMessage(message.content)
-    };
-    
-    this.messages.set(id, encryptedMessage);
-    return encryptedMessage;
-  }
-  
-  async markMessageAsRead(id: number): Promise<Message> {
-    const message = this.messages.get(id);
-    if (!message) {
-      throw new Error("Message not found");
-    }
-    
-    const updatedMessage: Message = { ...message, isRead: true };
-    this.messages.set(id, updatedMessage);
-    return updatedMessage;
-  }
-  
-  async markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void> {
-    for (const [messageId, message] of this.messages.entries()) {
-      if (message.receiverId === receiverId && message.senderId === senderId) {
-        this.messages.set(messageId, { ...message, isRead: true });
-      }
-    }
-  }
-  
-  async getUnreadMessageCount(userId: number): Promise<number> {
-    const unreadMessages = Array.from(this.messages.values()).filter(
-      message => message.receiverId === userId && !message.isRead
-    );
-    return unreadMessages.length;
-  }
-  
-  private async addMessageDetails(messages: Message[]): Promise<MessageWithDetails[]> {
-    // Import decryption utility
-    const { decryptMessage, isEncrypted } = await import('./encryption');
-    
-    return Promise.all(
-      messages.map(async (message) => {
-        const sender = this.users.get(message.senderId);
-        const receiver = this.users.get(message.receiverId);
-        
-        let product;
-        if (message.productId) {
-          product = await this.getProductById(message.productId);
-        }
-        
-        // Decrypt message content if it's encrypted
-        let content = message.content;
-        if (isEncrypted(content)) {
-          content = decryptMessage(content);
-        }
-        
-        return {
-          ...message,
-          content,  // Replace with decrypted content
-          sender,
-          receiver,
-          product
-        };
-      })
-    );
   }
 
   // Helper methods
@@ -1082,311 +917,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProductImage(id: number): Promise<void> {
     await db.delete(productImages).where(eq(productImages.id, id));
-  }
-
-  // Message methods
-  async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
-    const userMessages = await db.select()
-      .from(messages)
-      .where(
-        or(
-          eq(messages.senderId, userId),
-          eq(messages.receiverId, userId)
-        )
-      )
-      .orderBy(messages.createdAt);
-    
-    return this.addMessageDetails(userMessages);
-  }
-  
-  async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
-    const conversation = await db.select()
-      .from(messages)
-      .where(
-        or(
-          and(
-            eq(messages.senderId, userId1),
-            eq(messages.receiverId, userId2)
-          ),
-          and(
-            eq(messages.senderId, userId2),
-            eq(messages.receiverId, userId1)
-          )
-        )
-      )
-      .orderBy(messages.createdAt);
-    
-    return this.addMessageDetails(conversation);
-  }
-  
-  async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
-    const conversation = await db.select()
-      .from(messages)
-      .where(
-        and(
-          or(
-            and(
-              eq(messages.senderId, userId1),
-              eq(messages.receiverId, userId2)
-            ),
-            and(
-              eq(messages.senderId, userId2),
-              eq(messages.receiverId, userId1)
-            )
-          ),
-          eq(messages.productId, productId)
-        )
-      )
-      .orderBy(messages.createdAt);
-    
-    return this.addMessageDetails(conversation);
-  }
-  
-  async sendMessage(message: InsertMessage): Promise<Message> {
-    // Import encryption utility
-    const { encryptMessage } = await import('./encryption');
-    
-    // Encrypt the message content before storing
-    const encryptedMessage = {
-      ...message,
-      content: encryptMessage(message.content)
-    };
-    
-    const [newMessage] = await db.insert(messages).values(encryptedMessage).returning();
-    return newMessage;
-  }
-  
-  async markMessageAsRead(id: number): Promise<Message> {
-    const [updatedMessage] = await db
-      .update(messages)
-      .set({ isRead: true })
-      .where(eq(messages.id, id))
-      .returning();
-    
-    if (!updatedMessage) {
-      throw new Error("Message not found");
-    }
-    
-    return updatedMessage;
-  }
-  
-  async markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void> {
-    await db
-      .update(messages)
-      .set({ isRead: true })
-      .where(
-        and(
-          eq(messages.receiverId, receiverId),
-          eq(messages.senderId, senderId)
-        )
-      );
-  }
-  
-  // Payment methods
-  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
-    const result = await db
-      .insert(payments)
-      .values({
-        ...insertPayment,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning()
-      .execute();
-      
-    return result[0];
-  }
-  
-  async getPaymentByOrderId(orderId: string): Promise<Payment | undefined> {
-    const result = await db
-      .select()
-      .from(payments)
-      .where(eq(payments.orderId, orderId))
-      .execute();
-      
-    return result[0];
-  }
-  
-  async getPaymentByBillId(billId: string): Promise<Payment | undefined> {
-    const result = await db
-      .select()
-      .from(payments)
-      .where(eq(payments.billId, billId))
-      .execute();
-      
-    return result[0];
-  }
-  
-  async getUserPayments(userId: number): Promise<Payment[]> {
-    const result = await db
-      .select()
-      .from(payments)
-      .where(eq(payments.userId, userId))
-      .orderBy(desc(payments.createdAt))
-      .execute();
-      
-    return result;
-  }
-  
-  async updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment> {
-    const updateValues: Partial<Payment> = {
-      status,
-      updatedAt: new Date(),
-    };
-    
-    if (billId) {
-      updateValues.billId = billId;
-    }
-    
-    if (paymentChannel) {
-      updateValues.paymentChannel = paymentChannel;
-    }
-    
-    if (paidAt) {
-      updateValues.paidAt = paidAt;
-    }
-    
-    const result = await db
-      .update(payments)
-      .set(updateValues)
-      .where(eq(payments.id, id))
-      .returning()
-      .execute();
-      
-    return result[0];
-  }
-  
-  /**
-   * Update payment with product IDs
-   * This ensures product IDs are stored in the payment record
-   * even if they were only sent via the Billplz reference fields
-   */
-  async updatePaymentProductIds(id: number, productIds: string[]): Promise<Payment> {
-    const updateValues: Partial<Payment> = {
-      productIds,
-      updatedAt: new Date(),
-    };
-    
-    const result = await db
-      .update(payments)
-      .set(updateValues)
-      .where(eq(payments.id, id))
-      .returning()
-      .execute();
-      
-    return result[0];
-  }
-  
-  /**
-   * Update a payment record to associate it with a single product
-   * Used for creating individual payment records per product
-   */
-  async updateSingleProductPayment(paymentId: number, productId: number): Promise<void> {
-    console.log(`Updating payment ${paymentId} with single product ID ${productId}`);
-    
-    try {
-      const result = await db
-        .update(payments)
-        .set({ product_id: productId })
-        .where(eq(payments.id, paymentId))
-        .returning()
-        .execute();
-        
-      if (!result || result.length === 0) {
-        throw new Error(`Payment update failed: No result returned`);
-      }
-      
-      console.log(`✅ Successfully updated payment ${paymentId} with product ID ${productId}`);
-    } catch (err) {
-      console.error(`❌ Failed to update payment ${paymentId} with product ID:`, err);
-      throw err;
-    }
-  }
-
-  /**
-   * Create a new payment record for a specific product
-   * Used when multiple products share the same bill_id
-   */
-  async createProductPaymentRecord(params: {
-    userId: number;
-    billId: string;
-    productId: number;
-    amount: number;
-    status: string;
-    paidAt?: Date;
-    paymentType: string;
-    featureDuration?: number;
-  }): Promise<any> {
-    console.log(`Creating new payment record for product ID ${params.productId} with bill_id ${params.billId}`);
-    
-    try {
-      const newPayment = {
-        user_id: params.userId,
-        bill_id: params.billId,
-        product_id: params.productId,
-        amount: params.amount,
-        status: params.status,
-        paid_at: params.paidAt,
-        payment_type: params.paymentType,
-        feature_duration: params.featureDuration,
-        created_at: new Date()
-      };
-      
-      const result = await db
-        .insert(payments)
-        .values(newPayment)
-        .returning()
-        .execute();
-        
-      if (!result || result.length === 0) {
-        throw new Error(`Payment creation failed: No result returned`);
-      }
-      
-      console.log(`✅ Successfully created payment record for product ID ${params.productId}`);
-      return result[0];
-    } catch (err) {
-      console.error(`❌ Failed to create payment record for product ${params.productId}:`, err);
-      throw err;
-    }
-  }
-  
-  private async addMessageDetails(messagesList: Message[]): Promise<MessageWithDetails[]> {
-    // Import decryption utility
-    const { decryptMessage, isEncrypted } = await import('./encryption');
-    
-    return Promise.all(
-      messagesList.map(async (message) => {
-        // Get sender
-        const [sender] = message.senderId ? 
-          await db.select().from(users).where(eq(users.id, message.senderId)) : 
-          [];
-        
-        // Get receiver
-        const [receiver] = message.receiverId ? 
-          await db.select().from(users).where(eq(users.id, message.receiverId)) : 
-          [];
-        
-        // Get product if applicable
-        let product;
-        if (message.productId) {
-          product = await this.getProductById(message.productId);
-        }
-        
-        // Decrypt message content if it's encrypted
-        let content = message.content;
-        if (isEncrypted(content)) {
-          content = decryptMessage(content);
-        }
-        
-        return {
-          ...message,
-          content, // Replace with decrypted content
-          sender,
-          receiver,
-          product
-        };
-      })
-    );
   }
 
   // Helper methods
