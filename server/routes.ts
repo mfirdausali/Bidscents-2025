@@ -3699,20 +3699,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`🔍 BOOST PAYMENT DEBUG: Will create ${remainingProductIds.length} additional payment records for remaining products:`, remainingProductIds);
             
             // Verify bill_id for additional records
-            if (!billId) {
+            let effectiveBillId = billId;
+            if (!effectiveBillId) {
               console.error(`❌ WARNING: billId is missing for additional payment records, using placeholder`);
-              billId = 'missing-' + new Date().getTime();
+              effectiveBillId = 'missing-' + new Date().getTime();
             }
             
             for (const pid of remainingProductIds) {
               const productId = parseInt(pid);
-              console.log(`🔍 BOOST PAYMENT DEBUG: Creating payment record for product ID ${productId} with bill_id ${billId}`);
+              console.log(`🔍 BOOST PAYMENT DEBUG: Creating payment record for product ID ${productId} with bill_id ${effectiveBillId}`);
               
               try {
                 // Create a new payment record for this product with full details
                 const newPaymentParams = {
                   userId: payment.userId,
-                  billId: billId,
+                  billId: effectiveBillId,
                   productId: productId,
                   amount: payment.amount / productIds.length, // Split the amount evenly
                   status: 'paid',
