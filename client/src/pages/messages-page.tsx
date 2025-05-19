@@ -505,7 +505,7 @@ export default function MessagesPage() {
       // Fetch seller's active products - try the more specific endpoint with status filter
       console.log("Fetching seller products...");
       const sellerId = user.id;
-      const response = await fetch(`/api/sellers/${sellerId}/products?status=active`);
+      const response = await fetch(`/api/sellers/${sellerId}/products`);
       
       console.log("API response status:", response.status);
       
