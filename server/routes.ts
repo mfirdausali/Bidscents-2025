@@ -3666,46 +3666,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
 
-          // NEW IMPLEMENTATION: Create individual payment records for each product
+          // ENHANCED IMPLEMENTATION: Create individual payment records for each product
           // This ensures each product has its own payment record in the database
           if (productIds.length > 1) {
-            console.log(`Creating individual payment records for ${productIds.length} products`);
+            console.log(`🔍 BOOST PAYMENT DEBUG: Creating individual payment records for ${productIds.length} products`);
+            console.log(`🔍 BOOST PAYMENT DEBUG: Payment record to update:`, {
+              paymentId: payment.id, 
+              billId: billId || 'NONE',
+              userId: payment.userId,
+              amount: payment.amount,
+              paymentType: payment.paymentType,
+              featureDuration: payment.featureDuration,
+              webhook_payload: payment.webhook_payload ? 'EXISTS' : 'MISSING'
+            });
             
             // The first product will use the existing payment record
             // We'll update it with the first product ID
             const firstProductId = parseInt(productIds[0]);
-            await storage.updateSingleProductPayment(payment.id, firstProductId);
+            console.log(`🔍 BOOST PAYMENT DEBUG: Updating existing payment ${payment.id} with first product ID ${firstProductId}`);
+            
+            try {
+              await storage.updateSingleProductPayment(payment.id, firstProductId);
+              console.log(`✅ Successfully updated payment ${payment.id} with product ID ${firstProductId}`);
+            } catch (err) {
+              console.error(`❌ ERROR updating payment with first product ID:`, err);
+              console.error(`Stack trace:`, err.stack);
+            }
             
             // For the remaining products, create new payment records
             // They will share the same bill_id but have different product_ids
             const remainingProductIds = productIds.slice(1);
+            console.log(`🔍 BOOST PAYMENT DEBUG: Will create ${remainingProductIds.length} additional payment records for remaining products:`, remainingProductIds);
+            
+            // Verify bill_id for additional records
+            if (!billId) {
+              console.error(`❌ WARNING: billId is missing for additional payment records, using placeholder`);
+              billId = 'missing-' + new Date().getTime();
+            }
             
             for (const pid of remainingProductIds) {
               const productId = parseInt(pid);
+              console.log(`🔍 BOOST PAYMENT DEBUG: Creating payment record for product ID ${productId} with bill_id ${billId}`);
               
               try {
-                // Create a new payment record for this product
-                // with the same bill_id, userId, and other details from the original payment
-                await storage.createProductPaymentRecord({
+                // Create a new payment record for this product with full details
+                const newPaymentParams = {
                   userId: payment.userId,
                   billId: billId,
                   productId: productId,
                   amount: payment.amount / productIds.length, // Split the amount evenly
                   status: 'paid',
                   paidAt: paidDate,
-                  paymentType: payment.paymentType,
-                  featureDuration: payment.featureDuration
-                });
+                  paymentType: payment.paymentType || 'boost',
+                  featureDuration: payment.featureDuration || 7
+                };
                 
-                console.log(`✅ Created individual payment record for product ID ${productId}`);
+                console.log(`🔍 BOOST PAYMENT DEBUG: Creating new payment with params:`, newPaymentParams);
+                
+                const newPayment = await storage.createProductPaymentRecord(newPaymentParams);
+                
+                console.log(`✅ Created new payment record:`, {
+                  id: newPayment?.id || 'UNKNOWN',
+                  billId: newPayment?.bill_id || 'MISSING',
+                  productId: newPayment?.product_id || 'MISSING'
+                });
               } catch (err) {
-                console.error(`❌ Error creating payment record for product ${productId}:`, err);
+                console.error(`❌ ERROR creating payment record for product ${productId}:`, err);
+                console.error(`Stack trace:`, err.stack);
               }
             }
           } else if (productIds.length === 1) {
             // If there's only one product, update the existing payment record
             const productId = parseInt(productIds[0]);
-            await storage.updateSingleProductPayment(payment.id, productId);
+            console.log(`🔍 BOOST PAYMENT DEBUG: Single product payment - updating payment ${payment.id} with product ID ${productId}`);
+            
+            try {
+              await storage.updateSingleProductPayment(payment.id, productId);
+              console.log(`✅ Successfully updated payment ${payment.id} with product ID ${productId}`);
+            } catch (err) {
+              console.error(`❌ ERROR updating payment with product ID:`, err);
+              console.error(`Stack trace:`, err.stack);
+            }
           }
 
           // The product status update happens automatically after we create the payment records
