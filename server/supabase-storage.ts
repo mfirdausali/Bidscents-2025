@@ -2237,6 +2237,77 @@ export class SupabaseStorage implements IStorage {
     }
   }
   
+  /**
+   * Update a payment record to associate it with a single product
+   * Used for creating individual payment records per product
+   */
+  async updateSingleProductPayment(paymentId: number, productId: number): Promise<void> {
+    console.log(`Updating payment ${paymentId} with single product ID ${productId}`);
+    
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .update({ product_id: productId })
+        .eq('id', paymentId);
+        
+      if (error) {
+        console.error(`Error updating payment ${paymentId} with product ID:`, error);
+        throw error;
+      }
+      
+      console.log(`✅ Successfully updated payment ${paymentId} with product ID ${productId}`);
+    } catch (err) {
+      console.error(`❌ Failed to update payment ${paymentId} with product ID:`, err);
+      throw err;
+    }
+  }
+
+  /**
+   * Create a new payment record for a specific product
+   * Used when multiple products share the same bill_id
+   */
+  async createProductPaymentRecord(params: {
+    userId: number;
+    billId: string;
+    productId: number;
+    amount: number;
+    status: string;
+    paidAt?: Date;
+    paymentType: string;
+    featureDuration?: number;
+  }): Promise<any> {
+    console.log(`Creating new payment record for product ID ${params.productId} with bill_id ${params.billId}`);
+    
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .insert({
+          user_id: params.userId,
+          bill_id: params.billId,
+          product_id: params.productId,
+          amount: params.amount,
+          status: params.status,
+          paid_at: params.paidAt,
+          payment_type: params.paymentType,
+          feature_duration: params.featureDuration,
+          created_at: new Date()
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        console.error(`Error creating payment record for product ${params.productId}:`, error);
+        throw error;
+      }
+      
+      console.log(`✅ Successfully created payment record for product ID ${params.productId}`);
+      return data;
+    } catch (err) {
+      console.error(`❌ Failed to create payment record for product ${params.productId}:`, err);
+      throw err;
+    }
+  }
+  
   // Helper method to map DB payment to our Payment type
   private mapPaymentFromDb(data: any): Payment {
     // Log the actual data structure from the database for debugging
