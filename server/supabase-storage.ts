@@ -2276,34 +2276,109 @@ export class SupabaseStorage implements IStorage {
     paymentType: string;
     featureDuration?: number;
   }): Promise<any> {
-    console.log(`Creating new payment record for product ID ${params.productId} with bill_id ${params.billId}`);
+    console.log(`📝 Creating new payment record for product ID ${params.productId} with bill_id ${params.billId}`);
     
     try {
+      // Convert productId to ensure it's a valid integer
+      const productId = parseInt(String(params.productId));
+      
+      if (isNaN(productId)) {
+        throw new Error(`Invalid product ID: ${params.productId}`);
+      }
+      
+      // Prepare our insert data with careful type handling
+      const insertData = {
+        user_id: params.userId,
+        bill_id: params.billId,
+        product_id: productId, // Use the parsed integer
+        amount: params.amount,
+        status: params.status || 'paid',
+        paid_at: params.paidAt || new Date(),
+        payment_type: params.paymentType || 'boost',
+        feature_duration: params.featureDuration || 7,
+        created_at: new Date()
+      };
+      
+      console.log(`🔍 DEBUG: Insert data for new payment:`, insertData);
+      
+      // Using raw SQL query first to help debug exactly what's happening
+      const { data: rawResult, error: rawError } = await supabase
+        .rpc('debug_create_product_payment', {
+          p_user_id: params.userId,
+          p_bill_id: params.billId,
+          p_product_id: productId,
+          p_amount: params.amount,
+          p_status: params.status || 'paid',
+          p_payment_type: params.paymentType || 'boost',
+          p_feature_duration: params.featureDuration || 7
+        });
+        
+      if (rawError) {
+        console.error(`RPC debug_create_product_payment error:`, rawError);
+      } else {
+        console.log(`RPC debug result:`, rawResult);
+      }
+      
+      // Now attempt the actual insert
       const { data, error } = await supabase
         .from('payments')
-        .insert({
-          user_id: params.userId,
-          bill_id: params.billId,
-          product_id: params.productId,
-          amount: params.amount,
-          status: params.status,
-          paid_at: params.paidAt,
-          payment_type: params.paymentType,
-          feature_duration: params.featureDuration,
-          created_at: new Date()
-        })
+        .insert(insertData)
         .select()
         .single();
         
       if (error) {
-        console.error(`Error creating payment record for product ${params.productId}:`, error);
+        console.error(`Error creating payment record for product ${productId}:`, error);
+        
+        // Try to get more details about the error
+        if (error.details) {
+          console.error(`Error details:`, error.details);
+        }
+        
+        if (error.hint) {
+          console.error(`Error hint:`, error.hint);
+        }
+        
+        // Let's check if this product ID exists (this might be causing a foreign key error)
+        const { data: productCheck } = await supabase
+          .from('products')
+          .select('id, name')
+          .eq('id', productId)
+          .single();
+          
+        if (!productCheck) {
+          console.error(`⚠️ Product ID ${productId} does not exist, which may be causing a foreign key constraint error`);
+        } else {
+          console.log(`✅ Product ${productId} exists: ${productCheck.name}`);
+        }
+        
         throw error;
       }
       
-      console.log(`✅ Successfully created payment record for product ID ${params.productId}`);
+      console.log(`✅ Successfully created payment record for product ID ${productId}:`, {
+        newPaymentId: data.id,
+        productId: data.product_id,
+        billId: data.bill_id
+      });
+      
+      // Check if the feature_duration was properly set
+      if (data.feature_duration === null && params.featureDuration) {
+        console.warn(`⚠️ feature_duration was not saved correctly, attempting update`);
+        const { error: updateError } = await supabase
+          .from('payments')
+          .update({ feature_duration: params.featureDuration || 7 })
+          .eq('id', data.id);
+          
+        if (updateError) {
+          console.error(`Failed to update feature_duration:`, updateError);
+        } else {
+          console.log(`✅ Updated feature_duration to ${params.featureDuration || 7}`);
+        }
+      }
+      
       return data;
     } catch (err) {
       console.error(`❌ Failed to create payment record for product ${params.productId}:`, err);
+      console.error(`Stack trace:`, err.stack);
       throw err;
     }
   }
