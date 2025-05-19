@@ -2286,86 +2286,79 @@ export class SupabaseStorage implements IStorage {
         throw new Error(`Invalid product ID: ${params.productId}`);
       }
       
-      // Prepare our insert data with careful type handling
-      const insertData = {
-        user_id: params.userId,
-        bill_id: params.billId,
-        product_id: productId, // Use the parsed integer
-        amount: params.amount,
-        status: params.status || 'paid',
-        paid_at: params.paidAt || new Date(),
-        payment_type: params.paymentType || 'boost',
-        feature_duration: params.featureDuration || 7,
-        created_at: new Date()
-      };
+      // First check if product exists
+      const { data: productCheck } = await supabase
+        .from('products')
+        .select('id, name')
+        .eq('id', productId)
+        .single();
+        
+      if (!productCheck) {
+        throw new Error(`Product ID ${productId} does not exist`);
+      }
       
-      console.log(`🔍 DEBUG: Insert data for new payment:`, insertData);
+      console.log(`✅ Verified product ${productId} exists: ${productCheck.name}`);
+
+      // Generate a unique order ID for this payment
+      // The order_id can't be the same as existing payments due to the unique constraint
+      const newOrderId = `boost-${params.billId}-${productId}-${Date.now()}`;
       
-      // Skip debugging via RPC since the function doesn't exist
-      // Just log the data we're about to insert
-      console.log(`📊 DEBUG: Attempting to insert payment with data:`, insertData);
-      
-      // Attempt the actual insert with raw SQL to ensure format is correct
-      // This is more reliable than using the .insert() method with non-standard column names
-      const { data, error } = await supabase.from('payments').insert({
-        user_id: params.userId,
-        bill_id: params.billId,
-        product_id: productId,
-        amount: params.amount,
-        status: params.status || 'paid',
-        paid_at: params.paidAt || new Date(),
-        payment_type: params.paymentType || 'boost',
-        feature_duration: params.featureDuration || 7,
-        created_at: new Date()
-      }).select().single();
+      // Create the payment record with all required fields
+      // Make sure to include order_id which is required and must be unique
+      const { data, error } = await supabase
+        .from('payments')
+        .insert({
+          user_id: params.userId,
+          order_id: newOrderId, // Important! Must be unique
+          bill_id: params.billId,
+          amount: params.amount,
+          status: params.status || 'paid',
+          paid_at: params.paidAt || new Date(),
+          payment_type: params.paymentType || 'boost',
+          feature_duration: params.featureDuration || 7,
+          product_ids: [String(productId)], // Using the array field for consistency
+          created_at: new Date()
+        })
+        .select()
+        .single();
         
       if (error) {
-        console.error(`Error creating payment record for product ${productId}:`, error);
-        
-        // Try to get more details about the error
-        if (error.details) {
-          console.error(`Error details:`, error.details);
-        }
-        
-        if (error.hint) {
-          console.error(`Error hint:`, error.hint);
-        }
-        
-        // Let's check if this product ID exists (this might be causing a foreign key error)
-        const { data: productCheck } = await supabase
-          .from('products')
-          .select('id, name')
-          .eq('id', productId)
-          .single();
-          
-        if (!productCheck) {
-          console.error(`⚠️ Product ID ${productId} does not exist, which may be causing a foreign key constraint error`);
-        } else {
-          console.log(`✅ Product ${productId} exists: ${productCheck.name}`);
-        }
-        
+        console.error(`Error creating payment record:`, error);
+        console.error(`Error details:`, error.details || 'No details');
+        console.error(`Error hint:`, error.hint || 'No hint');
         throw error;
       }
       
-      console.log(`✅ Successfully created payment record for product ID ${productId}:`, {
-        newPaymentId: data.id,
-        productId: data.product_id,
-        billId: data.bill_id
+      console.log(`✅ Successfully created payment record for product ${productId}:`, {
+        paymentId: data.id,
+        orderId: data.order_id,
+        billId: data.bill_id,
+        productIds: data.product_ids
       });
       
-      // Check if the feature_duration was properly set
-      if (data.feature_duration === null && params.featureDuration) {
-        console.warn(`⚠️ feature_duration was not saved correctly, attempting update`);
+      // Now update the existing product record to mark it as featured
+      try {
+        const featureUntil = new Date();
+        featureUntil.setDate(featureUntil.getDate() + (params.featureDuration || 7));
+        
         const { error: updateError } = await supabase
-          .from('payments')
-          .update({ feature_duration: params.featureDuration || 7 })
-          .eq('id', data.id);
-          
+          .from('products')
+          .update({
+            is_featured: true,
+            featured_at: new Date(),
+            featured_until: featureUntil,
+            status: 'featured'
+          })
+          .eq('id', productId);
+        
         if (updateError) {
-          console.error(`Failed to update feature_duration:`, updateError);
+          console.error(`Error updating product featured status:`, updateError);
         } else {
-          console.log(`✅ Updated feature_duration to ${params.featureDuration || 7}`);
+          console.log(`✅ Updated product ${productId} to featured status until ${featureUntil}`);
         }
+      } catch (updateErr) {
+        console.error(`Error in product feature update:`, updateErr);
+        // Don't throw here - we want to return the payment record even if this fails
       }
       
       return data;
