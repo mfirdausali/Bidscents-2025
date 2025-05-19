@@ -1,6 +1,12 @@
-import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp } from "drizzle-orm/pg-core";
+import { float } from "drizzle-orm/mysql-core";
+import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Enum types
+export const messageTypeEnum = pgEnum('message_type', ['TEXT', 'ACTION', 'FILE']);
+export const actionTypeEnum = pgEnum('action_type', ['INITIATE', 'CONFIRM_PAYMENT', 'CONFIRM_DELIVERY', 'REVIEW']);
+export const transactionStatusEnum = pgEnum('transaction_status', ['WAITING_PAYMENT', 'WAITING_DELIVERY', 'WAITING_REVIEW', 'COMPLETED', 'CANCELLED']);
 
 // Users table
 export const users = pgTable("users", {
@@ -12,10 +18,18 @@ export const users = pgTable("users", {
   lastName: text("last_name"),
   address: text("address"),
   profileImage: text("profile_image"),
+  avatarUrl: text("avatar_url"), // Profile photo stored in object storage
+  coverPhoto: text("cover_photo"), // Cover photo stored in object storage
   walletBalance: doublePrecision("wallet_balance").default(0).notNull(),
   isSeller: boolean("is_seller").default(true).notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   isBanned: boolean("is_banned").default(false).notNull(),
+  isVerified: boolean("is_verified").default(false),
+  shopName: text("shop_name"),
+  location: text("location"),
+  bio: text("bio"),
+  providerId: text("provider_id"), // Stores the ID from the auth provider (e.g., Supabase user UUID)
+  provider: text("provider"), // The authentication provider used (e.g., 'supabase', 'facebook')
 });
 
 // Categories table
@@ -38,6 +52,8 @@ export const products = pgTable("products", {
   sellerId: integer("seller_id").references(() => users.id).notNull(),
   isNew: boolean("is_new").default(false), // In secondhand context: like new condition
   isFeatured: boolean("is_featured").default(false),
+  featuredAt: timestamp("featured_at"), // When the product was featured
+  featuredUntil: timestamp("featured_until"), // When the featured status expires
   createdAt: timestamp("created_at").defaultNow(),
   // Secondhand perfume specific fields
   remainingPercentage: integer("remaining_percentage").default(100), // How full is the bottle (1-100%)
@@ -45,6 +61,7 @@ export const products = pgTable("products", {
   purchaseYear: integer("purchase_year"), // When was it originally purchased
   boxCondition: text("box_condition"), // Condition of the box/packaging
   listingType: text("listing_type").default("fixed"), // fixed, negotiable, auction
+  status: text("status").default("active"), // active, featured, sold, archived
   volume: integer("volume") // Bottle size (e.g., "50ml", "100ml", "3.4oz")
 });
 
@@ -63,7 +80,7 @@ export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
   productId: integer("product_id").references(() => products.id).notNull(),
-  rating: integer("rating").notNull(),
+  rating: doublePrecision("rating").notNull(),
   comment: text("comment"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -86,6 +103,78 @@ export const orderItems = pgTable("order_items", {
   price: doublePrecision("price").notNull(),
 });
 
+// Messages table
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  senderId: integer("sender_id").references(() => users.id).notNull(),
+  receiverId: integer("receiver_id").references(() => users.id).notNull(),
+  content: text("content"), // Encrypted message content (nullable)
+  productId: integer("product_id").references(() => products.id), // Optional reference to product
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  messageType: messageTypeEnum("message_type").notNull().default('TEXT'),
+  actionType: actionTypeEnum("action_type"),
+  isClicked: boolean("is_clicked").default(false),
+  fileUrl: text("file_url").default('NULL'),
+});
+
+// Auctions table
+export const auctions = pgTable("auctions", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  startingPrice: doublePrecision("starting_price").notNull(),
+  reservePrice: doublePrecision("reserve_price"),
+  buyNowPrice: doublePrecision("buy_now_price"),
+  currentBid: doublePrecision("current_bid"),
+  currentBidderId: integer("current_bidder_id").references(() => users.id),
+  bidIncrement: doublePrecision("bid_increment").notNull().default(5.0),
+  startsAt: timestamp("starts_at").defaultNow().notNull(),
+  endsAt: timestamp("ends_at").notNull(),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Bids table
+export const bids = pgTable("bids", {
+  id: serial("id").primaryKey(),
+  auctionId: integer("auction_id").references(() => auctions.id).notNull(),
+  bidderId: integer("bidder_id").references(() => users.id).notNull(),
+  amount: doublePrecision("amount").notNull(),
+  placedAt: timestamp("placed_at").defaultNow().notNull(),
+  isWinning: boolean("is_winning").default(false),
+});
+
+// Payments table for Billplz
+export const payments = pgTable("payments", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  orderId: text("order_id").notNull().unique(), // Our internal order ID (UUID)
+  billId: text("bill_id"), // Billplz bill ID
+  amount: integer("amount").notNull(), // Amount in sen (smallest unit)
+  status: text("status").notNull().default("pending"), // pending, paid, failed
+  paymentType: text("payment_type").notNull().default("boost"), // Type of payment (boost, order, etc.)
+  featureDuration: integer("feature_duration"), // Duration in days for featured products
+  productIds: text("product_ids").array(), // Product IDs to boost
+  paymentChannel: text("payment_channel"), // Payment channel used (from Billplz)
+  paidAt: timestamp("paid_at"), // When payment was completed
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  metadata: jsonb("metadata"), // Additional data related to the payment
+});
+
+// Transactions table
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  sellerId: integer("seller_id").references(() => users.id).notNull(),
+  buyerId: integer("buyer_id").references(() => users.id).notNull(),
+  amount: doublePrecision("amount").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  status: transactionStatusEnum("status").notNull().default('WAITING_PAYMENT'),
+});
+
 // Zod schemas for data validation
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -95,10 +184,18 @@ export const insertUserSchema = createInsertSchema(users).pick({
   lastName: true,
   address: true,
   profileImage: true,
+  avatarUrl: true, // New field for avatar/profile picture
+  coverPhoto: true, // New field for cover photo
   walletBalance: true,
   isSeller: true,
   isAdmin: true,
   isBanned: true,
+  isVerified: true,
+  shopName: true,
+  location: true,
+  bio: true,
+  providerId: true, // Auth provider's user ID for secure linking
+  provider: true, // The authentication provider used
 });
 
 export const insertProductSchema = createInsertSchema(products).pick({
@@ -113,11 +210,14 @@ export const insertProductSchema = createInsertSchema(products).pick({
   sellerId: true,
   isNew: true,
   isFeatured: true,
+  featuredAt: true,
+  featuredUntil: true,
   remainingPercentage: true,
   batchCode: true,
   purchaseYear: true,
   boxCondition: true,
   listingType: true,
+  status: true,
   volume: true,
 });
 
@@ -153,6 +253,65 @@ export const insertProductImageSchema = createInsertSchema(productImages).pick({
   imageName: true,
 });
 
+export const insertMessageSchema = createInsertSchema(messages).pick({
+  senderId: true,
+  receiverId: true,
+  content: true,
+  productId: true,
+  isRead: true,
+  messageType: true,
+  actionType: true,
+  isClicked: true,
+  fileUrl: true,
+});
+
+// Create the base schema first
+const baseInsertAuctionSchema = createInsertSchema(auctions).pick({
+  productId: true,
+  startingPrice: true,
+  reservePrice: true,
+  buyNowPrice: true,
+  currentBid: true,
+  currentBidderId: true,
+  bidIncrement: true,
+  startsAt: true,
+  status: true,
+});
+
+// Create a modified schema with string for endsAt to match Supabase's expected format
+export const insertAuctionSchema = baseInsertAuctionSchema.extend({
+  endsAt: z.string(), // Override to expect ISO string format
+});
+
+export const insertBidSchema = createInsertSchema(bids).pick({
+  auctionId: true,
+  bidderId: true,
+  amount: true,
+  isWinning: true,
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).pick({
+  userId: true,
+  orderId: true,
+  billId: true,
+  amount: true,
+  status: true,
+  paymentType: true,
+  featureDuration: true,
+  productIds: true,
+  paymentChannel: true,
+  paidAt: true,
+  metadata: true,
+});
+
+export const insertTransactionSchema = createInsertSchema(transactions).pick({
+  productId: true,
+  sellerId: true,
+  buyerId: true,
+  amount: true,
+  status: true,
+});
+
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -175,6 +334,23 @@ export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type ProductImage = typeof productImages.$inferSelect;
 export type InsertProductImage = z.infer<typeof insertProductImageSchema>;
 
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+
+export type Auction = typeof auctions.$inferSelect;
+export type InsertAuction = z.infer<typeof insertAuctionSchema>;
+
+export type Bid = typeof bids.$inferSelect;
+export type InsertBid = z.infer<typeof insertBidSchema>;
+
+export type Payment = typeof payments.$inferSelect & {
+  product_id?: string | number | null; // Added for compatibility with database structure
+};
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
 // Extended types
 export type ProductWithDetails = Product & {
   category?: Category;
@@ -182,11 +358,36 @@ export type ProductWithDetails = Product & {
   reviews?: Review[];
   averageRating?: number;
   images?: ProductImage[]; // Added images array
+  auction?: Auction & { bidCount?: number }; // Added auction data with optional bid count
+  status?: string;
 };
 
 export type OrderWithItems = Order & {
   items: (OrderItem & { product: Product })[];
   user: User;
+};
+
+export type MessageWithDetails = Message & {
+  sender?: User;
+  receiver?: User;
+  product?: ProductWithDetails;
+};
+
+export type AuctionWithDetails = Auction & {
+  product?: ProductWithDetails;
+  currentBidder?: User;
+  bids?: Bid[];
+};
+
+export type BidWithDetails = Bid & {
+  auction?: Auction;
+  bidder?: User;
+};
+
+export type TransactionWithDetails = Transaction & {
+  product?: Product;
+  seller?: User;
+  buyer?: User;
 };
 
 // Note: Relations are handled through joins in the DatabaseStorage implementation

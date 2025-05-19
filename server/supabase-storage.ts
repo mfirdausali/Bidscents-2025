@@ -1,11 +1,16 @@
-import { users, products, categories, reviews, orders, orderItems, productImages } from "@shared/schema";
+import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids, payments, transactions } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
   Review, InsertReview,
   Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
-  ProductImage, InsertProductImage
+  ProductImage, InsertProductImage,
+  Message, InsertMessage, MessageWithDetails,
+  Auction, InsertAuction,
+  Bid, InsertBid,
+  Payment, InsertPayment,
+  Transaction, InsertTransaction, TransactionWithDetails
 } from "@shared/schema";
 
 // Define cart types since they're removed from schema but still in interface
@@ -65,10 +70,16 @@ export class SupabaseStorage implements IStorage {
       lastName: data.last_name,
       address: data.address,
       profileImage: data.profile_image,
+      avatarUrl: data.avatar_url,
+      coverPhoto: data.cover_photo,
       walletBalance: data.wallet_balance,
       isSeller: data.is_seller,
       isAdmin: data.is_admin,
-      isBanned: data.is_banned
+      isBanned: data.is_banned,
+      isVerified: data.is_verified,
+      shopName: data.shop_name,
+      location: data.location,
+      bio: data.bio
     } as User;
   }
 
@@ -134,11 +145,17 @@ export class SupabaseStorage implements IStorage {
       last_name: user.lastName,
       address: user.address,
       profile_image: user.profileImage,
+      avatar_url: user.avatarUrl,
+      cover_photo: user.coverPhoto,
       // Always provide a default value for wallet_balance if not specified
       wallet_balance: user.walletBalance !== undefined ? user.walletBalance : 0,
       is_seller: user.isSeller !== undefined ? user.isSeller : true,
       is_admin: user.isAdmin !== undefined ? user.isAdmin : false,
-      is_banned: user.isBanned !== undefined ? user.isBanned : false
+      is_banned: user.isBanned !== undefined ? user.isBanned : false,
+      is_verified: user.isVerified !== undefined ? user.isVerified : false,
+      shop_name: user.shopName,
+      location: user.location,
+      bio: user.bio
     };
     
     // Create a new user
@@ -168,10 +185,16 @@ export class SupabaseStorage implements IStorage {
     if (userData.lastName !== undefined) dbUserData.last_name = userData.lastName;
     if (userData.address !== undefined) dbUserData.address = userData.address;
     if (userData.profileImage !== undefined) dbUserData.profile_image = userData.profileImage;
+    if (userData.avatarUrl !== undefined) dbUserData.avatar_url = userData.avatarUrl;
+    if (userData.coverPhoto !== undefined) dbUserData.cover_photo = userData.coverPhoto;
     if (userData.walletBalance !== undefined) dbUserData.wallet_balance = userData.walletBalance;
     if (userData.isSeller !== undefined) dbUserData.is_seller = userData.isSeller;
     if (userData.isAdmin !== undefined) dbUserData.is_admin = userData.isAdmin;
     if (userData.isBanned !== undefined) dbUserData.is_banned = userData.isBanned;
+    if (userData.isVerified !== undefined) dbUserData.is_verified = userData.isVerified;
+    if (userData.shopName !== undefined) dbUserData.shop_name = userData.shopName;
+    if (userData.location !== undefined) dbUserData.location = userData.location;
+    if (userData.bio !== undefined) dbUserData.bio = userData.bio;
     
     const { data, error } = await supabase
       .from('users')
@@ -336,16 +359,48 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getProductById(id: number): Promise<ProductWithDetails | undefined> {
+    console.log(`Looking up product with ID: ${id}`);
+    
+    // Debug - directly query database to see if product exists
+    try {
+      const { count, error: countError } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('id', id);
+        
+      console.log(`Product ID ${id} existence check: ${count} products found`);
+      
+      if (countError) {
+        console.error(`Error checking if product ${id} exists:`, countError);
+      }
+    } catch (err) {
+      console.error(`Error in count query for product ${id}:`, err);
+    }
+    
+    // Main product query
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('id', id)
       .single();
     
-    if (error || !data) {
-      console.error('Error getting product:', error);
+    if (error) {
+      console.error(`Error getting product ${id}:`, error);
+      
+      // Special handling for "No rows found" error - this is common
+      if (error.message.includes('No rows found')) {
+        console.log(`Product ${id} not found in database`);
+      }
+      
       return undefined;
     }
+    
+    if (!data) {
+      console.error(`No data returned for product ${id} but no error was thrown`);
+      return undefined;
+    }
+    
+    console.log(`Found product ${id}: ${data.name}`);
     
     // Convert snake_case to camelCase
     const mappedProduct = this.mapSnakeToCamelCase(data);
@@ -386,6 +441,7 @@ export class SupabaseStorage implements IStorage {
       sellerId: product.seller_id,
       isNew: product.is_new,
       isFeatured: product.is_featured,
+      featuredUntil: product.featured_until,
       createdAt: product.created_at,
       remainingPercentage: product.remaining_percentage,
       batchCode: product.batch_code,
@@ -412,6 +468,24 @@ export class SupabaseStorage implements IStorage {
     
     return this.addProductDetails(mappedProducts as Product[]);
   }
+  
+  async getAllProductsWithDetails(): Promise<ProductWithDetails[]> {
+    // Get all products from the database with no filters
+    const { data, error } = await supabase
+      .from('products')
+      .select('*');
+    
+    if (error) {
+      console.error('Error getting all products for admin:', error);
+      return [];
+    }
+    
+    // Map from snake_case to camelCase for our application logic
+    const mappedProducts = (data || []).map(product => this.mapSnakeToCamelCase(product));
+    
+    // Add seller, category, and other details to each product
+    return this.addProductDetails(mappedProducts as Product[]);
+  }
 
   async createProduct(product: InsertProduct): Promise<Product> {
     // Convert camelCase to snake_case for DB
@@ -426,6 +500,7 @@ export class SupabaseStorage implements IStorage {
       seller_id: product.sellerId,
       is_new: product.isNew,
       is_featured: product.isFeatured,
+      featured_until: product.featuredUntil,
       remaining_percentage: product.remainingPercentage,
       batch_code: product.batchCode,
       purchase_year: product.purchaseYear,
@@ -465,6 +540,7 @@ export class SupabaseStorage implements IStorage {
     if (product.sellerId !== undefined) dbProduct.seller_id = product.sellerId;
     if (product.isNew !== undefined) dbProduct.is_new = product.isNew;
     if (product.isFeatured !== undefined) dbProduct.is_featured = product.isFeatured;
+    if (product.featuredUntil !== undefined) dbProduct.featured_until = product.featuredUntil;
     if (product.remainingPercentage !== undefined) dbProduct.remaining_percentage = product.remainingPercentage;
     if (product.batchCode !== undefined) dbProduct.batch_code = product.batchCode;
     if (product.purchaseYear !== undefined) dbProduct.purchase_year = product.purchaseYear;
@@ -944,6 +1020,48 @@ export class SupabaseStorage implements IStorage {
       // Get product images
       const images = await this.getProductImages(product.id);
       
+      // Get auction data if the product is an auction
+      let auction = undefined;
+      if (product.listingType === 'auction') {
+        // First get the auction details
+        const { data: auctionData, error: auctionError } = await supabase
+          .from('auctions')
+          .select('*')
+          .eq('product_id', product.id)
+          .single();
+          
+        if (!auctionError && auctionData) {
+          // Convert snake_case to camelCase
+          const mappedAuction = {
+            id: auctionData.id,
+            productId: auctionData.product_id,
+            startingPrice: auctionData.starting_price,
+            reservePrice: auctionData.reserve_price,
+            buyNowPrice: auctionData.buy_now_price,
+            currentBid: auctionData.current_bid,
+            currentBidderId: auctionData.current_bidder_id,
+            bidIncrement: auctionData.bid_increment,
+            startsAt: auctionData.starts_at,
+            endsAt: auctionData.ends_at,
+            status: auctionData.status,
+            createdAt: auctionData.created_at,
+            updatedAt: auctionData.updated_at
+          };
+          
+          // Then get the bid count
+          const { count: bidCount, error: bidCountError } = await supabase
+            .from('bids')
+            .select('*', { count: 'exact', head: true })
+            .eq('auction_id', mappedAuction.id);
+            
+          // Add the bid count to the auction object
+          auction = {
+            ...mappedAuction,
+            bidCount: bidCount || 0
+          };
+        }
+      }
+      
       // Calculate average rating
       let averageRating: number | undefined = undefined;
       const reviews = reviewsResult || [];
@@ -959,7 +1077,1356 @@ export class SupabaseStorage implements IStorage {
         reviews: reviews as Review[],
         averageRating,
         images,
+        auction,
       };
     }));
+  }
+  
+  // =========== AUCTION METHODS ===========
+
+  async getAuctions(): Promise<Auction[]> {
+    console.log('Getting all auctions from Supabase');
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('*');
+    
+    if (error) {
+      console.error('Error getting auctions:', error);
+      return [];
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuctions = (data || []).map(auction => ({
+      id: auction.id,
+      productId: auction.product_id,
+      startingPrice: auction.starting_price,
+      reservePrice: auction.reserve_price,
+      buyNowPrice: auction.buy_now_price,
+      currentBid: auction.current_bid,
+      currentBidderId: auction.current_bidder_id,
+      bidIncrement: auction.bid_increment,
+      startsAt: auction.starts_at,
+      endsAt: auction.ends_at,
+      status: auction.status,
+      createdAt: auction.created_at,
+      updatedAt: auction.updated_at,
+    }));
+    
+    console.log(`Retrieved ${mappedAuctions.length} auctions`);
+    return mappedAuctions as Auction[];
+  }
+  
+  async getActiveAuctions(): Promise<Auction[]> {
+    console.log('Getting active auctions from Supabase');
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('status', 'active');
+    
+    if (error) {
+      console.error('Error getting active auctions:', error);
+      return [];
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuctions = (data || []).map(auction => ({
+      id: auction.id,
+      productId: auction.product_id,
+      startingPrice: auction.starting_price,
+      reservePrice: auction.reserve_price,
+      buyNowPrice: auction.buy_now_price,
+      currentBid: auction.current_bid,
+      currentBidderId: auction.current_bidder_id,
+      bidIncrement: auction.bid_increment,
+      startsAt: auction.starts_at,
+      endsAt: auction.ends_at,
+      status: auction.status,
+      createdAt: auction.created_at,
+      updatedAt: auction.updated_at,
+    }));
+    
+    console.log(`Retrieved ${mappedAuctions.length} active auctions`);
+    return mappedAuctions as Auction[];
+  }
+
+  async getAuctionById(id: number): Promise<Auction | undefined> {
+    console.log(`Getting auction with ID: ${id}`);
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error || !data) {
+      console.error('Error getting auction:', error);
+      return undefined;
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuction = {
+      id: data.id,
+      productId: data.product_id,
+      startingPrice: data.starting_price,
+      reservePrice: data.reserve_price,
+      buyNowPrice: data.buy_now_price,
+      currentBid: data.current_bid,
+      currentBidderId: data.current_bidder_id,
+      bidIncrement: data.bid_increment,
+      startsAt: data.starts_at,
+      endsAt: data.ends_at,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+    
+    console.log(`Retrieved auction: ${JSON.stringify(mappedAuction)}`);
+    return mappedAuction as Auction;
+  }
+
+  async getProductAuctions(productId: number): Promise<Auction[]> {
+    console.log(`Getting auctions for product ID: ${productId}`);
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('product_id', productId);
+    
+    if (error) {
+      console.error('Error getting product auctions:', error);
+      return [];
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuctions = (data || []).map(auction => ({
+      id: auction.id,
+      productId: auction.product_id,
+      startingPrice: auction.starting_price,
+      reservePrice: auction.reserve_price,
+      buyNowPrice: auction.buy_now_price,
+      currentBid: auction.current_bid,
+      currentBidderId: auction.current_bidder_id,
+      bidIncrement: auction.bid_increment,
+      startsAt: auction.starts_at,
+      endsAt: auction.ends_at,
+      status: auction.status,
+      createdAt: auction.created_at,
+      updatedAt: auction.updated_at,
+    }));
+    
+    console.log(`Retrieved ${mappedAuctions.length} auctions for product ${productId}`);
+    return mappedAuctions as Auction[];
+  }
+
+  async createAuction(auction: InsertAuction): Promise<Auction> {
+    console.log(`Creating auction with data: ${JSON.stringify(auction)}`);
+    
+    // Convert camelCase to snake_case for DB
+    const dbAuction = {
+      product_id: auction.productId,
+      starting_price: auction.startingPrice,
+      reserve_price: auction.reservePrice,
+      buy_now_price: auction.buyNowPrice,
+      current_bid: auction.currentBid,
+      current_bidder_id: auction.currentBidderId,
+      bid_increment: auction.bidIncrement,
+      // Always set starts_at to current timestamp if not provided
+      starts_at: auction.startsAt || new Date().toISOString(),
+      ends_at: auction.endsAt, // Should be in 'YYYY-MM-DD HH:MM:SS' format
+      status: auction.status || 'active',
+    };
+    
+    console.log(`Prepared DB auction data: ${JSON.stringify(dbAuction)}`);
+    const { data, error } = await supabase
+      .from('auctions')
+      .insert([dbAuction])
+      .select()
+      .single();
+    
+    if (error || !data) {
+      console.error('Error creating auction:', error);
+      throw new Error(`Failed to create auction: ${error?.message}`);
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuction = {
+      id: data.id,
+      productId: data.product_id,
+      startingPrice: data.starting_price,
+      reservePrice: data.reserve_price,
+      buyNowPrice: data.buy_now_price,
+      currentBid: data.current_bid,
+      currentBidderId: data.current_bidder_id,
+      bidIncrement: data.bid_increment,
+      startsAt: data.starts_at,
+      endsAt: data.ends_at,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+    
+    console.log(`Successfully created auction: ${JSON.stringify(mappedAuction)}`);
+    return mappedAuction as Auction;
+  }
+
+  async updateAuction(id: number, auctionData: Partial<InsertAuction>): Promise<Auction> {
+    console.log(`Updating auction ${id} with data: ${JSON.stringify(auctionData)}`);
+    
+    // Convert camelCase to snake_case for DB
+    const dbAuctionData: any = {};
+    
+    if (auctionData.productId !== undefined) dbAuctionData.product_id = auctionData.productId;
+    if (auctionData.startingPrice !== undefined) dbAuctionData.starting_price = auctionData.startingPrice;
+    if (auctionData.reservePrice !== undefined) dbAuctionData.reserve_price = auctionData.reservePrice;
+    if (auctionData.buyNowPrice !== undefined) dbAuctionData.buy_now_price = auctionData.buyNowPrice;
+    if (auctionData.currentBid !== undefined) dbAuctionData.current_bid = auctionData.currentBid;
+    if (auctionData.currentBidderId !== undefined) dbAuctionData.current_bidder_id = auctionData.currentBidderId;
+    if (auctionData.bidIncrement !== undefined) dbAuctionData.bid_increment = auctionData.bidIncrement;
+    if (auctionData.startsAt !== undefined) dbAuctionData.starts_at = auctionData.startsAt;
+    if (auctionData.endsAt !== undefined) dbAuctionData.ends_at = auctionData.endsAt;
+    if (auctionData.status !== undefined) dbAuctionData.status = auctionData.status;
+    
+    // Always update the updated_at timestamp
+    dbAuctionData.updated_at = new Date().toISOString();
+    
+    const { data, error } = await supabase
+      .from('auctions')
+      .update(dbAuctionData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error || !data) {
+      console.error('Error updating auction:', error);
+      throw new Error(`Failed to update auction: ${error?.message}`);
+    }
+    
+    // Map snake_case to camelCase
+    const mappedAuction = {
+      id: data.id,
+      productId: data.product_id,
+      startingPrice: data.starting_price,
+      reservePrice: data.reserve_price,
+      buyNowPrice: data.buy_now_price,
+      currentBid: data.current_bid,
+      currentBidderId: data.current_bidder_id,
+      bidIncrement: data.bid_increment,
+      startsAt: data.starts_at,
+      endsAt: data.ends_at,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+    
+    console.log(`Successfully updated auction: ${JSON.stringify(mappedAuction)}`);
+    return mappedAuction as Auction;
+  }
+
+  async deleteAuction(id: number): Promise<void> {
+    console.log(`Deleting auction with ID: ${id}`);
+    
+    // First delete all bids for this auction
+    try {
+      const { error: bidsError } = await supabase
+        .from('bids')
+        .delete()
+        .eq('auction_id', id);
+      
+      if (bidsError) {
+        console.error('Error deleting auction bids:', bidsError);
+        // Continue with auction deletion anyway
+      }
+    } catch (err) {
+      console.error('Exception deleting auction bids:', err);
+      // Continue with auction deletion anyway
+    }
+    
+    // Then delete the auction
+    const { error } = await supabase
+      .from('auctions')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting auction:', error);
+      throw new Error(`Failed to delete auction: ${error.message}`);
+    }
+    
+    console.log(`Successfully deleted auction ${id}`);
+  }
+
+  // =========== BID METHODS ===========
+
+  async getBidsForAuction(auctionId: number): Promise<Bid[]> {
+    console.log(`Getting bids for auction ID: ${auctionId}`);
+    
+    const { data, error } = await supabase
+      .from('bids')
+      .select('*')
+      .eq('auction_id', auctionId)
+      .order('placed_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error getting auction bids:', error);
+      return [];
+    }
+    
+    // Map snake_case to camelCase
+    const mappedBids = (data || []).map(bid => ({
+      id: bid.id,
+      auctionId: bid.auction_id,
+      bidderId: bid.bidder_id,
+      amount: bid.amount,
+      placedAt: bid.placed_at,
+      isWinning: bid.is_winning,
+    }));
+    
+    console.log(`Retrieved ${mappedBids.length} bids for auction ${auctionId}`);
+    return mappedBids as Bid[];
+  }
+
+  async createBid(bid: InsertBid): Promise<Bid> {
+    console.log(`Creating bid with data: ${JSON.stringify(bid)}`);
+    
+    // Convert camelCase to snake_case for DB
+    const dbBid = {
+      auction_id: bid.auctionId,
+      bidder_id: bid.bidderId,
+      amount: bid.amount,
+      is_winning: bid.isWinning === undefined ? true : bid.isWinning,
+    };
+    
+    const { data, error } = await supabase
+      .from('bids')
+      .insert([dbBid])
+      .select()
+      .single();
+    
+    if (error || !data) {
+      console.error('Error creating bid:', error);
+      throw new Error(`Failed to create bid: ${error?.message}`);
+    }
+    
+    // Map snake_case to camelCase
+    const mappedBid = {
+      id: data.id,
+      auctionId: data.auction_id,
+      bidderId: data.bidder_id,
+      amount: data.amount,
+      placedAt: data.placed_at,
+      isWinning: data.is_winning,
+    };
+    
+    console.log(`Successfully created bid: ${JSON.stringify(mappedBid)}`);
+    return mappedBid as Bid;
+  }
+
+  async updatePreviousBids(auctionId: number, newBidderId: number): Promise<void> {
+    console.log(`Updating previous bids for auction ${auctionId}, new bidder: ${newBidderId}`);
+    
+    // Mark all previous bids as not winning
+    const { error } = await supabase
+      .from('bids')
+      .update({ is_winning: false })
+      .eq('auction_id', auctionId)
+      .neq('bidder_id', newBidderId);
+    
+    if (error) {
+      console.error('Error updating previous bids:', error);
+      throw new Error(`Failed to update previous bids: ${error.message}`);
+    }
+    
+    console.log(`Successfully updated previous bids for auction ${auctionId}`);
+  }
+  
+  // Message methods
+  async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
+    // First get all messages without trying to join users
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('Error getting user messages:', error);
+      throw new Error('Failed to retrieve user messages');
+    }
+    
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    // Create a unique set of user IDs from sender_id and receiver_id
+    const userIds = new Set<number>();
+    data.forEach(msg => {
+      userIds.add(msg.sender_id);
+      userIds.add(msg.receiver_id);
+    });
+    
+    // Fetch user details for all users involved in messages
+    const users: Record<number, any> = {};
+    
+    // We'll use the getUser method to fetch each user since we know it works
+    for (const uid of userIds) {
+      try {
+        const user = await this.getUser(uid);
+        if (user) {
+          users[uid] = user;
+        }
+      } catch (err) {
+        console.warn(`Could not fetch user ${uid}:`, err);
+        // Continue with other users even if one fails
+      }
+    }
+    
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
+    // Map from snake_case to camelCase and decrypt message content
+    const messages = data.map(msg => {
+      // Decrypt the message content if it's encrypted
+      let content = msg.content;
+      if (isEncrypted(content)) {
+        content = decryptMessage(content);
+      }
+      
+      // No need to log raw message fields anymore
+      
+      return {
+        id: msg.id,
+        senderId: msg.sender_id,
+        receiverId: msg.receiver_id,
+        content: content, // Decrypted content
+        isRead: msg.is_read,
+        createdAt: new Date(msg.created_at),
+        productId: msg.product_id,
+        // Add the new fields for file messages
+        messageType: msg.message_type || 'TEXT',
+        fileUrl: msg.file_url || null,
+        // Add sender and receiver details if available
+        sender: users[msg.sender_id],
+        receiver: users[msg.receiver_id]
+      };
+    });
+    
+    return messages as MessageWithDetails[];
+  }
+  
+  async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
+    console.log(`Fetching conversation between users ${userId1} and ${userId2}`);
+    
+    // Get messages with ALL columns explicitly listed to ensure we get everything
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
+      .order('created_at', { ascending: true });
+      
+    if (error) {
+      console.error('Error getting conversation:', error);
+      throw new Error('Failed to retrieve conversation');
+    }
+    
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    // We only need these two users
+    const user1 = await this.getUser(userId1);
+    const user2 = await this.getUser(userId2);
+    
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
+    // Map from snake_case to camelCase and decrypt message content
+    const messages = data.map(msg => {
+      // Decrypt the message content if it's encrypted and not null
+      let content = msg.content;
+      if (content && isEncrypted(content)) {
+        content = decryptMessage(content);
+      }
+      
+      return {
+        id: msg.id,
+        senderId: msg.sender_id,
+        receiverId: msg.receiver_id,
+        content: content, // Decrypted content
+        isRead: msg.is_read,
+        createdAt: new Date(msg.created_at),
+        productId: msg.product_id,
+        // Add the new fields for file messages
+        messageType: msg.message_type || 'TEXT',
+        fileUrl: msg.file_url || null,
+        // Add action message fields
+        actionType: msg.action_type || null,
+        isClicked: msg.is_clicked || false,
+        // Add sender and receiver details
+        sender: msg.sender_id === userId1 ? user1 : user2,
+        receiver: msg.receiver_id === userId1 ? user1 : user2
+      };
+    });
+    
+    return messages as MessageWithDetails[];
+  }
+  
+  async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
+    // Get all message fields explicitly including action_type and is_clicked
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, sender_id, receiver_id, content, is_read, created_at, message_type, action_type, is_clicked, product_id, encrypted_content, attachment_url, attachment_type, file_url')
+      .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
+      .eq('product_id', productId)
+      .order('created_at', { ascending: true });
+      
+    if (error) {
+      console.error('Error getting conversation for product:', error);
+      throw new Error('Failed to retrieve product conversation');
+    }
+    
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    // We only need these two users
+    const user1 = await this.getUser(userId1);
+    const user2 = await this.getUser(userId2);
+    
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
+    // Map from snake_case to camelCase and decrypt message content
+    const messages = data.map(msg => {
+      // Decrypt the message content if it's encrypted and not null
+      let content = msg.content;
+      if (content && isEncrypted(content)) {
+        content = decryptMessage(content);
+      }
+      
+      return {
+        id: msg.id,
+        senderId: msg.sender_id,
+        receiverId: msg.receiver_id,
+        content: content, // Decrypted content
+        isRead: msg.is_read,
+        createdAt: new Date(msg.created_at),
+        productId: msg.product_id,
+        // Add the new fields for file messages
+        messageType: msg.message_type || 'TEXT',
+        fileUrl: msg.file_url || null,
+        // Add sender and receiver details
+        sender: msg.sender_id === userId1 ? user1 : user2,
+        receiver: msg.receiver_id === userId1 ? user1 : user2
+      };
+    });
+    
+    return messages as MessageWithDetails[];
+  }
+  
+  async sendMessage(message: InsertMessage): Promise<Message> {
+    // Import encryption utility
+    const { encryptMessage } = await import('./encryption');
+    
+    // Encrypt the message content before storing
+    const dbMessage = {
+      sender_id: message.senderId,
+      receiver_id: message.receiverId,
+      content: encryptMessage(message.content), // Encrypt the content
+      product_id: message.productId || null,
+      is_read: message.isRead || false
+    };
+    
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([dbMessage])
+      .select()
+      .single();
+      
+    if (error || !data) {
+      console.error('Error sending message:', error);
+      throw new Error('Failed to send message');
+    }
+    
+    // Convert snake_case to camelCase
+    return {
+      id: data.id,
+      senderId: data.sender_id,
+      receiverId: data.receiver_id,
+      content: data.content, // This will be encrypted
+      isRead: data.is_read,
+      createdAt: new Date(data.created_at),
+      productId: data.product_id,
+    } as Message;
+  }
+  
+  async markMessageAsRead(id: number): Promise<Message> {
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error || !data) {
+      console.error('Error marking message as read:', error);
+      throw new Error('Failed to mark message as read');
+    }
+    
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
+    // Decrypt message content if it's encrypted
+    let content = data.content;
+    if (isEncrypted(content)) {
+      content = decryptMessage(content);
+    }
+    
+    // Convert snake_case to camelCase
+    return {
+      id: data.id,
+      senderId: data.sender_id,
+      receiverId: data.receiver_id,
+      content: content, // Use decrypted content
+      isRead: data.is_read,
+      createdAt: new Date(data.created_at),
+      productId: data.product_id,
+    } as Message;
+  }
+  
+  async markAllMessagesAsRead(receiverId: number, senderId: number): Promise<void> {
+    const { error } = await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('receiver_id', receiverId)
+      .eq('sender_id', senderId);
+      
+    if (error) {
+      console.error('Error marking all messages as read:', error);
+      throw new Error('Failed to mark all messages as read');
+    }
+  }
+  
+  /**
+   * Get a specific message by ID
+   */
+  async getMessageById(messageId: number): Promise<MessageWithDetails | null> {
+    console.log(`Getting message with ID ${messageId} from Supabase`);
+    
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('id', messageId)
+      .single();
+      
+    if (error) {
+      console.error('Error getting message by ID:', error);
+      return null;
+    }
+    
+    if (!data) {
+      return null;
+    }
+    
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = await import('./encryption');
+    
+    // Decrypt the message content if needed
+    let content = data.content;
+    if (content && isEncrypted(content)) {
+      content = decryptMessage(content);
+    }
+    
+    // Map from snake_case to camelCase
+    const message: MessageWithDetails = {
+      id: data.id,
+      senderId: data.sender_id,
+      receiverId: data.receiver_id,
+      content: content,
+      isRead: data.is_read,
+      createdAt: new Date(data.created_at),
+      messageType: data.message_type || 'TEXT',
+      fileUrl: data.file_url || null,
+      actionType: data.action_type || null,
+      isClicked: data.is_clicked || false,
+      productId: data.product_id || null
+    };
+    
+    // If it's an ACTION message with a product, get the product details
+    if (message.messageType === 'ACTION' && message.productId) {
+      try {
+        // Just fetch the product directly instead of using a helper method
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', message.productId)
+          .single();
+          
+        if (!error && data) {
+          const product = {
+            id: data.id,
+            name: data.name,
+            brand: data.brand,
+            description: data.description,
+            price: data.price,
+            imageUrl: data.image_url,
+            // Add other properties as needed
+          };
+          message.product = product;
+        }
+      } catch (error) {
+        console.error(`Error fetching product ${message.productId} for action message:`, error);
+      }
+    }
+    
+    return message;
+  }
+  
+  /**
+   * Update an action message status to mark it as clicked/confirmed
+   */
+  async updateActionMessageStatus(messageId: number, isClicked: boolean): Promise<MessageWithDetails | null> {
+    console.log(`Updating action message ${messageId} status, setting isClicked=${isClicked}`);
+    
+    // First, ensure the message exists and is an ACTION type
+    const existingMessage = await this.getMessageById(messageId);
+    
+    if (!existingMessage || existingMessage.messageType !== 'ACTION') {
+      console.error('Message not found or not an ACTION type:', messageId);
+      return null;
+    }
+    
+    // Update the is_clicked field in the database
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ is_clicked: isClicked })
+      .eq('id', messageId)
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Error updating action message status:', error);
+      return null;
+    }
+    
+    if (!data) {
+      return null;
+    }
+    
+    // Get the updated message with all details
+    // We need to make sure we return the message with updated information
+    const updatedMessage = await this.getMessageById(messageId);
+    return updatedMessage;
+  }
+  
+  async getUnreadMessageCount(userId: number): Promise<number> {
+    const { data, error, count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_id', userId)
+      .eq('is_read', false);
+      
+    if (error) {
+      console.error('Error getting unread message count:', error);
+      throw new Error('Failed to get unread message count');
+    }
+    
+    return count || 0;
+  }
+  
+  // Payment methods
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    // Map the payment data to match the actual database schema
+    const paymentData = {
+      order_id: insertPayment.orderId,
+      bill_id: insertPayment.billId,
+      collection_id: process.env.BILLPLZ_COLLECTION_ID || '',
+      amount: insertPayment.amount * 100, // Convert to sen (RM to sen)
+      status: insertPayment.status || 'due',
+      paid_at: insertPayment.paidAt || null,
+      webhook_payload: insertPayment.metadata ? JSON.stringify(insertPayment.metadata) : null
+      // created_at is added automatically by the database
+    };
+    
+    const { data, error } = await supabase
+      .from('payments')
+      .insert(paymentData)
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Error creating payment:', error);
+      throw error;
+    }
+    
+    return this.mapPaymentFromDb(data);
+  }
+  
+  async getPaymentByOrderId(orderId: string): Promise<Payment | undefined> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select()
+      .eq('order_id', orderId)
+      .single();
+      
+    if (error) {
+      if (error.code === 'PGRST116') { // No rows returned
+        return undefined;
+      }
+      console.error('Error getting payment by order ID:', error);
+      throw error;
+    }
+    
+    return this.mapPaymentFromDb(data);
+  }
+  
+  async getPaymentByBillId(billId: string): Promise<Payment | undefined> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select()
+      .eq('bill_id', billId)
+      .single();
+      
+    if (error) {
+      if (error.code === 'PGRST116') { // No rows returned
+        return undefined;
+      }
+      console.error('Error getting payment by bill ID:', error);
+      throw error;
+    }
+    
+    return this.mapPaymentFromDb(data);
+  }
+  
+  // Since our payments table doesn't have user_id, we'll need to join with orders or use metadata
+  // For now, we'll retrieve all payments and filter client-side if needed
+  async getUserPayments(userId: number): Promise<Payment[]> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select()
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('Error getting user payments:', error);
+      throw error;
+    }
+    
+    // We can add filtering logic here once we establish the relationship between payments and users
+    return data.map(this.mapPaymentFromDb);
+  }
+  
+  async updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment> {
+    console.log(`Updating payment ${id} to status '${status}'${paidAt ? ' with paid date ' + paidAt : ''}`);
+    
+    // Only include fields that exist in the actual database schema
+    const updateData: any = { 
+      status
+    };
+    
+    // Add bill_id if provided
+    if (billId) {
+      updateData.bill_id = billId;
+    }
+    
+    // Add payment_channel if provided
+    if (paymentChannel) {
+      updateData.payment_channel = paymentChannel;
+    }
+    
+    // Add paid_at if provided
+    if (paidAt) {
+      updateData.paid_at = paidAt;
+    }
+    
+    // Directly log what's being sent to the database
+    console.log('Sending update to database:', { 
+      table: 'payments',
+      id,
+      updateData
+    });
+    
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error(`Error updating payment ${id}:`, error);
+        throw error;
+      }
+      
+      console.log(`✅ Successfully updated payment ${id} to status '${status}'`);
+      
+      // If status is 'paid', update the product's featured status
+      if (status === 'paid') {
+        await this.updateProductFeaturedStatusForPayment(data.id);
+      }
+      
+      return this.mapPaymentFromDb(data);
+    } catch (err) {
+      console.error(`❌ Failed to update payment ${id}:`, err);
+      throw err;
+    }
+  }
+  
+  /**
+   * Updates product featured status when a payment is completed
+   * This links payments to products by making them featured when payment is successful
+   */
+  private async updateProductFeaturedStatusForPayment(paymentId: number): Promise<void> {
+    try {
+      // Get the payment to extract product IDs
+      const payment = await this.getPaymentById(paymentId);
+      if (!payment) {
+        console.error(`Cannot update product featured status: Payment ${paymentId} not found`);
+        return;
+      }
+      
+      console.log('🔍 DEBUGGING: Looking for product IDs in payment record:', {
+        paymentId,
+        hasProductId: payment.hasOwnProperty('product_id') && payment.product_id !== null,
+        productId: payment.product_id,
+        hasProductIds: payment.hasOwnProperty('productIds') && payment.productIds !== null,
+        productIds: payment.productIds,
+        hasMetadata: payment.hasOwnProperty('metadata') && payment.metadata !== null
+      });
+      
+      // Extract product IDs from the payment
+      let productIds: number[] = [];
+      
+      // First check the product_id column (singular)
+      if (payment.product_id !== null && payment.product_id !== undefined) {
+        console.log('✅ Found product_id in direct column:', payment.product_id);
+        productIds = [Number(payment.product_id)];
+      } 
+      // Then check productIds array
+      else if (payment.productIds) {
+        console.log('✅ Found product IDs in productIds array:', payment.productIds);
+        productIds = Array.isArray(payment.productIds)
+          ? payment.productIds.map(id => Number(id))
+          : [Number(payment.productIds)];
+      }
+      // Then check metadata
+      else if (payment.metadata && payment.metadata.productIds) {
+        // If product IDs are stored in the metadata directly
+        console.log('✅ Found product IDs in metadata.productIds:', payment.metadata.productIds);
+        productIds = Array.isArray(payment.metadata.productIds) 
+          ? payment.metadata.productIds.map(id => Number(id)) 
+          : [Number(payment.metadata.productIds)];
+      } else if (payment.metadata && payment.metadata.product_id) {
+        // Alternative: product_id in metadata
+        console.log('✅ Found product_id in metadata.product_id:', payment.metadata.product_id);
+        productIds = [Number(payment.metadata.product_id)];
+      } else if (payment.metadata && payment.metadata.product_ids) {
+        // Alternative: product_ids as string in metadata
+        console.log('✅ Found product_ids in metadata.product_ids:', payment.metadata.product_ids);
+        const ids = typeof payment.metadata.product_ids === 'string'
+          ? payment.metadata.product_ids.split(',')
+          : payment.metadata.product_ids;
+        productIds = ids.map(id => Number(id));
+      }
+      
+      if (productIds.length === 0) {
+        console.warn(`Payment ${paymentId} has no associated product IDs, cannot update featured status`);
+        return;
+      }
+      
+      console.log(`Updating featured status for ${productIds.length} products from payment ${paymentId}`);
+      
+      // Feature duration in days (default to 7 if not specified)
+      const featureDuration = payment.metadata && payment.metadata.featureDuration
+        ? Number(payment.metadata.featureDuration)
+        : 7;
+      
+      // Calculate the featured until date
+      const now = new Date();
+      const featuredUntil = new Date(now);
+      featuredUntil.setDate(now.getDate() + featureDuration);
+      
+      // Update each product
+      for (const productId of productIds) {
+        console.log(`Setting product ${productId} as featured until ${featuredUntil.toISOString()}`);
+        
+        // Update the product
+        const { error } = await supabase
+          .from('products')
+          .update({
+            is_featured: true,
+            featured_at: now.toISOString(),
+            featured_until: featuredUntil.toISOString(),
+            status: 'featured'
+          })
+          .eq('id', productId);
+          
+        if (error) {
+          console.error(`Failed to update featured status for product ${productId}:`, error);
+        } else {
+          console.log(`✅ Successfully featured product ${productId}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error in updateProductFeaturedStatusForPayment:', err);
+    }
+  }
+  
+  /**
+   * Get a payment by ID
+   */
+  async getPaymentById(id: number): Promise<Payment | undefined> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select()
+      .eq('id', id)
+      .single();
+      
+    if (error) {
+      if (error.code === 'PGRST116') { // No rows returned
+        return undefined;
+      }
+      console.error('Error getting payment by ID:', error);
+      throw error;
+    }
+    
+    return this.mapPaymentFromDb(data);
+  }
+  
+  /**
+   * Update payment with product IDs
+   * This ensures product IDs are stored in the payment record
+   * even if they were only sent via the Billplz reference fields
+   */
+  async updatePaymentProductIds(id: number, productIds: string[]): Promise<Payment> {
+    console.log(`Updating payment ${id} with product IDs: ${productIds.join(', ')}`);
+    
+    // DEBUGGING: Check database schema first
+    console.log('🔍 DEBUGGING: Checking database schema for payments table');
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('payments')
+      .select('*')
+      .limit(1);
+      
+    if (tableError) {
+      console.error('Error getting table schema:', tableError);
+    } else {
+      console.log('Available columns in payments table:', Object.keys(tableInfo[0] || {}));
+    }
+    
+    // DEBUGGING: Get the first product ID if available
+    const firstProductId = productIds.length > 0 ? productIds[0] : null;
+    
+    // Convert product IDs to JSON string for webhook_payload storage
+    // Store both as array in metadata and as string in webhook_payload for backward compatibility
+    const productDetails = productIds.map(pid => ({ id: pid }));
+    const metadata = {
+      productIds,
+      productDetails,
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Store in multiple places to see which one works
+    const updateData: any = {
+      webhook_payload: JSON.stringify(metadata),
+      product_ids: productIds,              // Try as array
+      product_id: firstProductId,           // Try as single value
+      metadata: metadata                    // Also store in metadata column
+    };
+    
+    console.log('🔍 DEBUGGING: Sending product ID update to database:', {
+      table: 'payments',
+      id,
+      productCount: productIds.length,
+      updateFields: Object.keys(updateData),
+      productIds,
+      firstProductId,
+      productIdType: typeof firstProductId
+    });
+    
+    try {
+      // Get the current payment first to ensure we have access to all fields
+      const { data: existingPayment, error: fetchError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+      if (fetchError) {
+        console.error('Error fetching existing payment:', fetchError);
+        throw fetchError;
+      }
+      
+      if (!existingPayment) {
+        throw new Error(`Payment with ID ${id} not found`);
+      }
+      
+      console.log('🔍 DEBUGGING: Existing payment:', {
+        id: existingPayment.id,
+        availableFields: Object.keys(existingPayment),
+        currentProductId: existingPayment.product_id || 'none',
+        currentProductIds: existingPayment.product_ids || 'none'
+      });
+      
+      // Try different methods to see what works
+      // 1. First try with basic update
+      console.log('🔍 DEBUGGING: Attempting update method #1 (basic update)');
+      const { data, error } = await supabase
+        .from('payments')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('Error updating payment status:', error);
+        // Log the fields we tried to update
+        console.error('Fields attempted to update:', Object.keys(updateData).join(', '));
+        console.error('Error details:', error.details, error.message, error.hint);
+        
+        // Let's try a different method - just update the product_id field
+        console.log('🔍 DEBUGGING: Attempting update method #2 (individual field update)');
+        const simpleUpdateData = { product_id: firstProductId };
+        
+        const { data: data2, error: error2 } = await supabase
+          .from('payments')
+          .update(simpleUpdateData)
+          .eq('id', id)
+          .select()
+          .single();
+          
+        if (error2) {
+          console.error('Second update attempt also failed:', error2);
+          throw error; // Throw the original error
+        }
+        
+        console.log('🎉 Second update attempt succeeded!', {
+          id: data2.id,
+          product_id: data2.product_id,
+          updated_at: data2.updated_at
+        });
+        
+        return this.mapPaymentFromDb(data2);
+      }
+      
+      console.log('🎉 Payment updated successfully:', {
+        id: data.id,
+        product_id: data.product_id,
+        product_ids: data.product_ids,
+        updated_at: data.updated_at
+      });
+      
+      return this.mapPaymentFromDb(data);
+    } catch (err) {
+      console.error('Database error updating payment:', err);
+      
+      // Try to get the payment to check if it exists
+      const { data } = await supabase
+        .from('payments')
+        .select()
+        .eq('id', id)
+        .single();
+        
+      if (!data) {
+        console.error(`Payment with ID ${id} not found`);
+      } else {
+        console.log('Payment exists but could not be updated:', {
+          availableFields: Object.keys(data).join(', '),
+          product_ids_field_exists: Object.keys(data).includes('product_ids')
+        });
+      }
+      
+      throw err;
+    }
+  }
+  
+  /**
+   * Update a payment record to associate it with a single product
+   * Used for creating individual payment records per product
+   */
+  async updateSingleProductPayment(paymentId: number, productId: number): Promise<void> {
+    console.log(`Updating payment ${paymentId} with single product ID ${productId}`);
+    
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .update({ product_id: productId })
+        .eq('id', paymentId);
+        
+      if (error) {
+        console.error(`Error updating payment ${paymentId} with product ID:`, error);
+        throw error;
+      }
+      
+      console.log(`✅ Successfully updated payment ${paymentId} with product ID ${productId}`);
+    } catch (err) {
+      console.error(`❌ Failed to update payment ${paymentId} with product ID:`, err);
+      throw err;
+    }
+  }
+
+  /**
+   * Create a new payment record for a specific product
+   * Used when multiple products share the same bill_id
+   */
+  async createProductPaymentRecord(params: {
+    userId: number;
+    billId: string;
+    productId: number;
+    amount: number;
+    status: string;
+    paidAt?: Date;
+    paymentType: string;
+    featureDuration?: number;
+  }): Promise<any> {
+    console.log(`📝 Creating new payment record for product ID ${params.productId} with bill_id ${params.billId}`);
+    
+    try {
+      // Convert productId to ensure it's a valid integer
+      const productId = parseInt(String(params.productId));
+      
+      if (isNaN(productId)) {
+        throw new Error(`Invalid product ID: ${params.productId}`);
+      }
+      
+      // First check if product exists
+      const { data: productCheck } = await supabase
+        .from('products')
+        .select('id, name')
+        .eq('id', productId)
+        .single();
+        
+      if (!productCheck) {
+        throw new Error(`Product ID ${productId} does not exist`);
+      }
+      
+      console.log(`✅ Verified product ${productId} exists: ${productCheck.name}`);
+
+      // Generate a unique order ID for this payment
+      // The order_id can't be the same as existing payments due to the unique constraint
+      const newOrderId = `boost-${params.billId}-${productId}-${Date.now()}`;
+      
+      // Create the payment record with all required fields
+      // Make sure to include order_id which is required and must be unique
+      const { data, error } = await supabase
+        .from('payments')
+        .insert({
+          user_id: params.userId,
+          order_id: newOrderId, // Important! Must be unique
+          bill_id: params.billId,
+          amount: params.amount,
+          status: params.status || 'paid',
+          paid_at: params.paidAt || new Date(),
+          payment_type: params.paymentType || 'boost',
+          feature_duration: params.featureDuration || 7,
+          product_ids: [String(productId)], // Using the array field for consistency
+          created_at: new Date()
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        console.error(`Error creating payment record:`, error);
+        console.error(`Error details:`, error.details || 'No details');
+        console.error(`Error hint:`, error.hint || 'No hint');
+        throw error;
+      }
+      
+      console.log(`✅ Successfully created payment record for product ${productId}:`, {
+        paymentId: data.id,
+        orderId: data.order_id,
+        billId: data.bill_id,
+        productIds: data.product_ids
+      });
+      
+      // Now update the existing product record to mark it as featured
+      try {
+        const featureUntil = new Date();
+        featureUntil.setDate(featureUntil.getDate() + (params.featureDuration || 7));
+        
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({
+            is_featured: true,
+            featured_at: new Date(),
+            featured_until: featureUntil,
+            status: 'featured'
+          })
+          .eq('id', productId);
+        
+        if (updateError) {
+          console.error(`Error updating product featured status:`, updateError);
+        } else {
+          console.log(`✅ Updated product ${productId} to featured status until ${featureUntil}`);
+        }
+      } catch (updateErr) {
+        console.error(`Error in product feature update:`, updateErr);
+        // Don't throw here - we want to return the payment record even if this fails
+      }
+      
+      return data;
+    } catch (err) {
+      console.error(`❌ Failed to create payment record for product ${params.productId}:`, err);
+      console.error(`Stack trace:`, err.stack);
+      throw err;
+    }
+  }
+  
+  // Helper method to map DB payment to our Payment type
+  private mapPaymentFromDb(data: any): Payment {
+    // Log the actual data structure from the database for debugging
+    console.log('Mapping payment data from DB:', {
+      availableFields: Object.keys(data),
+      dataTypes: Object.entries(data).reduce((acc, [key, val]) => {
+        acc[key] = typeof val;
+        return acc;
+      }, {})
+    });
+    
+    // Parse webhook payload if it exists
+    let webhookPayload = null;
+    if (data.webhook_payload) {
+      try {
+        webhookPayload = typeof data.webhook_payload === 'string' 
+          ? JSON.parse(data.webhook_payload)
+          : data.webhook_payload;
+      } catch (e) {
+        console.warn('Failed to parse webhook payload:', e);
+      }
+    }
+    
+    // Check for product_id and add it to product_ids if needed
+    let productIds = data.product_ids || null;
+    
+    // If we have a product_id but no product_ids, use that
+    if (!productIds && data.product_id) {
+      console.log('Found product_id in database record, converting to productIds array:', data.product_id);
+      productIds = [data.product_id];
+    }
+    
+    // Use optional chaining to safely handle missing fields
+    // Use default values for required fields in our schema
+    const payment: Payment = {
+      id: data.id,
+      userId: data.user_id || 0, // Default to 0 if missing
+      orderId: data.order_id || '',
+      billId: data.bill_id || null,
+      amount: data.amount || 0,
+      status: data.status || 'unknown',
+      paymentType: data.payment_type || 'unknown',
+      featureDuration: data.feature_duration || null,
+      productIds: productIds,
+      product_id: data.product_id || null, // Add this field even though it's not in the schema
+      paymentChannel: data.payment_channel || null,
+      paidAt: data.paid_at ? new Date(data.paid_at) : null,
+      createdAt: data.created_at ? new Date(data.created_at) : null,
+      updatedAt: data.updated_at ? new Date(data.updated_at) : null,
+      metadata: data.metadata || null
+    };
+    
+    console.log('Mapped payment:', {
+      id: payment.id,
+      status: payment.status,
+      productIds: payment.productIds,
+      product_id: payment.product_id
+    });
+    return payment;
   }
 }

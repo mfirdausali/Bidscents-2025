@@ -1,0 +1,125 @@
+Privacy Policy for BidScents 
+
+Effective Date: [Insert Date] 
+
+At BidScents, accessible at [www.bidscents.com], we take your privacy seriously. This Privacy Policy outlines how we collect, use, store, and protect your personal data in accordance with applicable data protection laws. By using our website, you agree to the terms outlined below. 
+
+ 
+
+🔐 1. Information We Collect 
+
+We collect the following types of data: 
+
+a. Account Information: 
+
+Name 
+Email address 
+Username 
+Password (hashed and encrypted) 
+Phone number (if provided) 
+b. Transaction & Listing Data: 
+
+Product listings, bids, watchlists, purchase history 
+Payment status (no card details are stored on our servers) 
+Communication history with other users 
+c. Technical Data: 
+
+IP address 
+Browser type and version 
+Device type 
+Operating system 
+Log data and usage patterns (for analytics and improvements) 
+d. Cookies & Tracking: 
+ We use cookies and similar technologies for user authentication, improving user experience, and analytics. 
+
+ 
+
+✅ 2. How We Use Your Data 
+
+We use your personal data for the following purposes: 
+
+To create and manage your user account 
+To facilitate transactions, including bidding and purchases 
+To provide customer support and resolve disputes 
+To send you notifications related to your activity on the platform 
+To improve our services and personalize user experience 
+To comply with legal obligations 
+ 
+
+🚫 3. No Selling of User Data 
+
+BidScents does not sell, rent, or trade your personal information to third parties. Any data sharing is limited to services required to operate the platform (e.g., payment processing, analytics, fraud protection). 
+
+ 
+
+🧾 4. Data Retention 
+
+We retain your data for as long as your account is active or as necessary for legitimate business purposes. If you delete your account, your personal information will be permanently removed from our active systems within 14 days, unless legally required to retain it. 
+
+ 
+
+🗑 5. Your Data Rights 
+
+You have the right to: 
+
+Access your personal data 
+Correct inaccurate or incomplete data 
+Request deletion of your account and data 
+Request a copy of your data in a portable format 
+Withdraw consent for data processing (where applicable) 
+To make a request, please email us at admin@bidscents.com with the subject “Data Request”. 
+
+ 
+
+🧠 6. User Account & Deletion 
+
+Users can view, update, or delete their data anytime by: 
+
+Logging into your account and accessing the Account Settings page 
+Clicking “Delete My Account” to permanently erase your data 
+Or emailing admin@bidscents.com for manual removal requests 
+ 
+
+🔒 7. Data Security 
+
+We use industry-standard security measures to protect your data, including: 
+
+HTTPS (SSL) encryption 
+Password hashing 
+Two-factor authentication (coming soon) 
+Role-based access controls 
+Encrypted storage of sensitive user data 
+Despite our efforts, no online transmission or storage method is 100% secure. We encourage you to protect your own account with strong passwords and secure devices. 
+
+ 
+
+🌍 8. Third-Party Services 
+
+We may use trusted third-party providers such as: 
+
+Stripe / Payex / SenangPay for payment processing 
+Firebase / Supabase for authentication and database services 
+Google Analytics / Meta Pixel for understanding user behavior 
+Each third-party service has its own privacy policy. 
+
+ 
+
+📱 9. Facebook & Third-Party Login 
+
+If you choose to log in via Facebook, we only request essential permissions (e.g., email address, name). No posting will be made without your explicit consent. You can revoke access at any time via your Facebook account settings. 
+
+ 
+
+📝 10. Changes to This Policy 
+
+We may update this policy from time to time. Any major changes will be communicated via email or notification on our website. The updated policy will always be available at [www.bidscents.com/privacy-policy]. 
+
+ 
+
+📬 11. Contact Us 
+
+If you have any questions or concerns about this Privacy Policy, or if you'd like to delete or access your data, contact us at: 
+
+BidScents Support 
+ Email: admin@bidscents.com 
+ Website: [www.bidscents.com] 

@@ -67,31 +67,6 @@ export function Footer() {
                   About Us
                 </a>
               </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-600 hover:text-purple-600 transition-colors"
-                >
-                  Blog
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-600 hover:text-purple-600 transition-colors"
-                >
-                  FAQs
-                </a>
-              </li>
-              <li></li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-600 hover:text-purple-600 transition-colors"
-                >
-                  Help Center
-                </a>
-              </li>
             </ul>
           </div>
 
@@ -101,19 +76,19 @@ export function Footer() {
             </h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <a
-                  href="#"
+                <Link
+                  href="/buying-guide"
                   className="text-gray-600 hover:text-purple-600 transition-colors"
                 >
                   Buying Guide
-                </a>
+                </Link>
               </li>
               <li>
                 <Link
                   href="/seller/dashboard"
                   className="text-gray-600 hover:text-purple-600 transition-colors"
                 >
-                  Seller Dashboard
+                  Seller Guide
                 </Link>
               </li>
               <li>
@@ -121,7 +96,7 @@ export function Footer() {
                   href="#"
                   className="text-gray-600 hover:text-purple-600 transition-colors"
                 >
-                  Authentication Process
+                  Authentication Guide
                 </a>
               </li>
               <li>
@@ -171,6 +146,12 @@ export function Footer() {
                 className="text-gray-500 text-xs hover:text-purple-600 transition-colors"
               >
                 Terms of Service
+              </Link>
+              <Link
+                href="/privacy-policy"
+                className="text-gray-500 text-xs hover:text-purple-600 transition-colors"
+              >
+                Privacy Policy
               </Link>
             </div>
           </div>

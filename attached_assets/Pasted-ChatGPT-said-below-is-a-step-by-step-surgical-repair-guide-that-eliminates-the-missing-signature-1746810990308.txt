@@ -1,0 +1,65 @@
+ChatGPT said:
+below is a step-by-step “surgical” repair guide that eliminates the “missing signature” error on your /api/payments/process-redirect route and guarantees that the browser redirect is verified exactly the same way as the server-to-server webhook.
+
+1. understand the two different payload shapes
+flow	raw query/body sent by billplz	what express gives you (req.body or req.query)
+callback (POST callback_url)	id=…&paid=true&…&x_signature=…	{ id:'…', paid:'true', …, x_signature:'…' }
+browser redirect (GET redirect_url)	billplz[id]=…&billplz[paid]=true&…&billplz[x_signature]=…	(express 4.18+) { billplz:{ id:'…', paid:'true', …, x_signature:'…' } }
+(older express or custom query parser → keys remain flat: { 'billplz[id]':'…', … })
+
+your 400 happens because the code looks for req.query.x_signature (callback shape) but, on redirects, the signature is nested at req.query.billplz.x_signature (or, with the legacy parser, at the literal key billplz[x_signature]).
+
+2. extraction logic that always finds the signature
+js
+Copy
+Edit
+// 1️⃣ pick the right container
+const qp = req.query.billplz                 // new express (object)
+          || req.query                       // fallback to flat structure
+
+// 2️⃣ locate the signature
+const xsig = qp.x_signature                  // nested object form
+          || req.query['billplz[x_signature]'] // flat key form (rare)
+3. rebuild the exact source-string to hash
+billplz’s doc (under “X Signature – Callback and Redirect”) says:
+
+remove x_signature from the set.
+
+sort all remaining keys in ascending ASCII.
+
+concatenate each key + value with no separators, then join them with a single pipe |.
+
+so, with the nested object:
+
+js
+Copy
+Edit
+const { x_signature, ...fields } = qp                // ① strip sig
+const source = Object.keys(fields)
+  .sort()
+  .map(k => k + fields[k])
+  .join('|')
+(if you started from the flat structure, first de-nest it or build the string by following the original order list in the docs.)
+
+4. hmac & constant-time compare
+js
+Copy
+Edit
+import crypto from 'crypto'
+const calc = crypto
+  .createHmac('sha256', process.env.BILLPLZ_XSIGN_KEY)
+  .update(source)
+  .digest('hex')
+
+const valid = crypto.timingSafeEqual(Buffer.from(calc), Buffer.from(xsig))
+never use === for hashes; always do a timing-safe compare.
+
+5. recommended complete flow inside /process-redirect
+extract params & signature exactly as above.
+
+if signature missing → 400 with clear error.
+
+verify; if bad → 400 / show “unable to confirm payment”.
+
+respond 200 (or redirect to a nice ui) when verified, but do not mark anything as paid here—wait for the webhook to do that; the redirect is just for UX.
+

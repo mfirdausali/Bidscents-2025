@@ -1,0 +1,64 @@
+1. Billplz Client (server/billplz.ts Refinements based on routes.ts usage):
+
+Content-Type for createBill:
+
+As predicted, createBill sends JSON. The Billplz V3 Create a Bill API expects application/x-www-form-urlencoded.
+
+Suggestion: Modify billplz.createBill to send data as URLSearchParams and set the Content-Type header accordingly for this specific call.
+
+TypeScript
+
+// In billplz.ts, inside createBill function
+// ...
+// const payload = { ... }; // your existing payload object
+
+const formData = new URLSearchParams();
+for (const key in payload) {
+    if (payload[key] !== undefined && payload[key] !== null) {
+        formData.append(key, payload[key].toString());
+    }
+}
+
+// And when calling billplzRequest, make sure it can handle FormData or set Content-Type appropriately
+return billplzRequest(
+    '/v3/bills',
+    'POST',
+    formData, // Send URLSearchParams
+    'application/x-www-form-urlencoded' // Specify content type
+);
+
+// billplzRequest function needs to be adapted:
+async function billplzRequest(
+  endpoint: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+  body?: any,
+  contentType: string = 'application/json' // Add contentType parameter
+): Promise<any> {
+  const url = `<span class="math-inline">\{BILLPLZ\_BASE\_URL\}</span>{endpoint}`;
+  const headers: Record<string, string> = {
+    'Authorization': createAuthHeader(),
+    'Content-Type': contentType, // Use the provided contentType
+  };
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers,
+      body: contentType === 'application/json' && body ? JSON.stringify(body) : body, // Adjust body based on CT
+    });
+    // ... rest of the function
+// ...
+getBillURL Function:
+
+The function billplz.getBillURL(bill.id) constructs the URL for the user to pay.
+Suggestion: Ensure this uses a configurable base URL for viewing bills (sandbox vs. production), similar to how BILLPLZ_BASE_URL is used for API calls. The view URL typically doesn't have /api.
+TypeScript
+
+// In billplz.ts
+const BILLPLZ_VIEW_BASE_URL = process.env.NODE_ENV === 'production'
+    ? 'https://www.billplz.com'
+    : 'https://www.billplz-sandbox.com';
+
+export function getBillURL(billId: string): string {
+  return `<span class="math-inline">\{BILLPLZ\_VIEW\_BASE\_URL\}/bills/</span>{billId}`;
+}

@@ -7,6 +7,7 @@ import { Heart, Star, StarHalf, MessageSquare } from "lucide-react";
 import { Badge } from "./badge";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { ContactSellerButton } from "./contact-seller-button";
 
 interface ProductCardProps {
   product: ProductWithDetails;
@@ -15,8 +16,8 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isContacting, setIsContacting] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  // No longer need isContacting state since we're using the ContactSellerButton component
 
   // Function to render star ratings
   const renderStars = (rating: number | undefined) => {
@@ -44,43 +45,6 @@ export function ProductCard({ product }: ProductCardProps) {
     return stars;
   };
 
-  // Handle contact seller
-  const handleContactSeller = () => {
-    if (!user) {
-      toast({
-        title: "Please sign in",
-        description: "You need to be signed in to contact sellers",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsContacting(true);
-    try {
-      // In a real app, this would navigate to a messaging page or open a modal
-      toast({
-        title: "Contacting seller",
-        description: `We're connecting you with the seller of ${product.name}`,
-      });
-      
-      // Simulate a delay before showing success message
-      setTimeout(() => {
-        toast({
-          title: "Seller contacted",
-          description: `Your interest in ${product.name} has been sent to the seller`,
-        });
-        setIsContacting(false);
-      }, 1000);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to contact seller",
-        variant: "destructive",
-      });
-      setIsContacting(false);
-    }
-  };
-
   return (
     <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 border flex flex-col h-full">
       <div className="relative">
@@ -99,7 +63,7 @@ export function ProductCard({ product }: ProductCardProps) {
                     : '/placeholder.jpg' // Default placeholder
             }
             alt={product.name}
-            className="w-full h-48 object-cover"
+            className="w-full h-36 md:h-48 object-cover"
             onError={(e) => {
               e.currentTarget.src = '/placeholder.jpg';
               e.currentTarget.onerror = null; // Prevent infinite loop
@@ -141,41 +105,41 @@ export function ProductCard({ product }: ProductCardProps) {
         </Badge>
       </div>
       
-      <div className="p-4 flex flex-col flex-grow">
+      <div className="p-3 md:p-4 flex flex-col flex-grow">
         {/* Product name */}
         <Link href={`/products/${product.id}`}>
-          <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-1 mb-1">
+          <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-1 mb-0.5 md:mb-1">
             {product.name}
           </h3>
         </Link>
         
         {/* Product subtitle */}
-        <div className="text-sm font-medium text-gray-600 mb-1 line-clamp-1">
+        <div className="text-sm font-medium text-gray-600 mb-0.5 md:mb-1 line-clamp-1">
           {product.brand} {product.volume && 
             (product.isNew 
               ? `(${product.volume})` 
-              : `(${Math.round((product.remainingPercentage || 100) * parseInt(product.volume) / 100)}ml/${product.volume})`
+              : `(${Math.round((product.remainingPercentage || 100) * (typeof product.volume === 'number' ? product.volume : parseFloat(String(product.volume))) / 100)}ml/${product.volume})`
             )
           }
         </div>
         
-        {/* Batch code and year */}
-        <div className="text-xs text-gray-500 mb-2">
+        {/* Batch code and year - hide on mobile */}
+        <div className="text-xs text-gray-500 mb-1 md:mb-2 hidden md:block">
           {product.batchCode && `Batch ${product.batchCode}`}
         </div>
         
         {/* Location and seller */}
-        <div className="flex items-center text-xs text-gray-500 mb-1">
+        <div className="flex items-center text-xs text-gray-500 mb-0.5 md:mb-1">
           <span className="inline-block mr-1">
             {product.seller?.username || 'Seller'}
           </span>
         </div>
         
         {/* Divider */}
-        <div className="border-t border-gray-100 my-2"></div>
+        <div className="border-t border-gray-100 my-1 md:my-2"></div>
         
         {/* Price section */}
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-2 md:mb-3">
           <span className="font-semibold text-purple-600">
             RM {product.price.toFixed(0)}
           </span>
@@ -193,16 +157,19 @@ export function ProductCard({ product }: ProductCardProps) {
         {/* Action buttons based on listing type */}
         {product.listingType === 'negotiable' ? (
           <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={handleContactSeller}
-              disabled={isContacting}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded-md"
-            >
-              <MessageSquare className="mr-1 h-3 w-3" /> Contact
-            </Button>
+            <ContactSellerButton 
+              sellerId={product.sellerId}
+              sellerName={product.seller?.username || 'Seller'}
+              sellerImage={product.seller?.profileImage || null}
+              productId={product.id}
+              productName={product.name}
+              variant="secondary"
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-1.5 md:py-2 rounded-md"
+            />
             <Button
               variant="outline"
-              className="border-purple-600 text-purple-600 hover:bg-purple-50 text-xs py-2 rounded-md"
+              className="border-purple-600 text-purple-600 hover:bg-purple-50 text-xs py-1.5 md:py-2 rounded-md"
             >
               Make Offer
             </Button>
@@ -212,31 +179,28 @@ export function ProductCard({ product }: ProductCardProps) {
             <div className="text-xs text-gray-600 mb-1">
               <span>Current Bid: RM {product.price.toFixed(0)}</span>
             </div>
-            <Button
-              onClick={handleContactSeller}
-              disabled={isContacting}
+            <ContactSellerButton 
+              sellerId={product.sellerId}
+              sellerName={product.seller?.username || 'Seller'}
+              sellerImage={product.seller?.profileImage || null}
+              productId={product.id}
+              productName={product.name}
+              variant="secondary"
+              size="default"
               className="bg-amber-500 hover:bg-amber-600 text-white text-xs py-2 w-full rounded-md"
-            >
-              {isContacting ? 'Processing...' : 'Bid Now'}
-            </Button>
+            />
           </div>
         ) : (
-          <Button
-            onClick={handleContactSeller}
-            disabled={isContacting}
+          <ContactSellerButton 
+            sellerId={product.sellerId}
+            sellerName={product.seller?.username || 'Seller'}
+            sellerImage={product.seller?.profileImage || null}
+            productId={product.id}
+            productName={product.name}
+            variant="secondary"
+            size="default"
             className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 w-full rounded-md"
-          >
-            {isContacting ? (
-              <span className="flex items-center justify-center">
-                <span className="animate-spin mr-2 h-3 w-3 border-b-2 border-white rounded-full"></span>
-                Contacting...
-              </span>
-            ) : (
-              <span className="flex items-center justify-center">
-                <MessageSquare className="mr-1 h-3 w-3" /> Contact Seller
-              </span>
-            )}
-          </Button>
+          />
         )}
       </div>
     </div>

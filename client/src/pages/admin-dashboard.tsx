@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { Header } from "@/components/ui/header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,24 +11,31 @@ import {
 } from "@/components/ui/table";
 import { 
   Dialog, DialogContent, DialogDescription, 
-  DialogHeader, DialogTitle 
+  DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { User, Order } from "@shared/schema";
+import { User, Order, ProductWithDetails } from "@shared/schema";
 import { 
   Users, Package, Truck, AlertCircle, CheckCircle, 
-  UserX, UserCheck, ShoppingBag 
+  UserX, UserCheck, ShoppingBag, MessageSquare,
+  XCircle, Tag, CircleAlert
 } from "lucide-react";
+import { ListingsTab } from "./admin-dashboard-listings";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("users");
   const [userToAction, setUserToAction] = useState<User | null>(null);
+  const [productToAction, setProductToAction] = useState<ProductWithDetails | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [dialogAction, setDialogAction] = useState<"ban" | "unban" | null>(null);
+  const [dialogAction, setDialogAction] = useState<"ban" | "unban" | "removeListing" | null>(null);
+  const [actionReason, setActionReason] = useState("");
   
   // Fetch all users
   const { data: users = [] } = useQuery<User[]>({
@@ -41,6 +49,13 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/orders"],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!user?.isAdmin && activeTab === "orders",
+  });
+  
+  // Fetch all products/listings
+  const { data: products = [] } = useQuery<ProductWithDetails[]>({
+    queryKey: ["/api/products/all"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!user?.isAdmin && activeTab === "listings",
   });
   
   // Ban/unban user mutation
@@ -88,6 +103,30 @@ export default function AdminDashboard() {
     },
   });
   
+  // Remove listing mutation
+  const removeListingMutation = useMutation({
+    mutationFn: async ({ productId, reason }: { productId: number, reason: string }) => {
+      const res = await apiRequest("POST", `/api/admin/products/${productId}/remove`, { reason });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products/all"] });
+      setIsDialogOpen(false);
+      setActionReason("");
+      toast({
+        title: "Success",
+        description: "Listing has been removed and seller has been notified",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
   // Redirect if not admin
   useEffect(() => {
     if (user && !user.isAdmin) {
@@ -111,8 +150,37 @@ export default function AdminDashboard() {
     }
   };
   
+  const handleRemoveListing = (product: ProductWithDetails) => {
+    setProductToAction(product);
+    setDialogAction("removeListing");
+    setActionReason("");
+    setIsDialogOpen(true);
+  };
+  
+  const confirmRemoveListing = () => {
+    if (productToAction && actionReason.trim()) {
+      removeListingMutation.mutate({
+        productId: productToAction.id,
+        reason: actionReason.trim()
+      });
+    }
+  };
+  
   const handleUpdateOrderStatus = (orderId: number, status: string) => {
     updateOrderStatusMutation.mutate({ orderId, status });
+  };
+
+  // Handler for messaging a user
+  const handleMessageUser = (targetUser: User) => {
+    // Store user data in sessionStorage to be accessed by the messages page
+    sessionStorage.setItem("selectedConversation", JSON.stringify({
+      userId: targetUser.id,
+      username: targetUser.username,
+      isAdmin: targetUser.isAdmin
+    }));
+    
+    // Redirect to messages page
+    setLocation("/messages");
   };
   
   // Calculate stats
@@ -183,6 +251,7 @@ export default function AdminDashboard() {
             <TabsList className="mb-6">
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="orders">Orders</TabsTrigger>
+              <TabsTrigger value="listings">Listings</TabsTrigger>
             </TabsList>
             
             <TabsContent value="users">
@@ -224,7 +293,7 @@ export default function AdminDashboard() {
                               <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Active</span>
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="space-x-2">
                             <Button 
                               variant="outline" 
                               size="sm"
@@ -243,6 +312,15 @@ export default function AdminDashboard() {
                                   Ban
                                 </>
                               )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleMessageUser(user)}
+                              className="text-blue-600"
+                            >
+                              <MessageSquare className="h-4 w-4 mr-1" />
+                              Message
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -342,6 +420,14 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+            
+            <TabsContent value="listings">
+              <ListingsTab 
+                products={products} 
+                handleRemoveListing={handleRemoveListing} 
+                handleMessageUser={handleMessageUser} 
+              />
+            </TabsContent>
           </Tabs>
         </div>
       </main>
@@ -351,26 +437,63 @@ export default function AdminDashboard() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {dialogAction === "ban" ? "Ban User" : "Unban User"}
+              {dialogAction === "ban" ? "Ban User" : 
+               dialogAction === "unban" ? "Unban User" : 
+               "Remove Listing"}
             </DialogTitle>
             <DialogDescription>
               {dialogAction === "ban"
                 ? "Are you sure you want to ban this user? They will no longer be able to make purchases."
-                : "Are you sure you want to unban this user? They will be able to use the platform again."}
+                : dialogAction === "unban"
+                ? "Are you sure you want to unban this user? They will be able to use the platform again."
+                : "Are you sure you want to remove this listing? The seller will be notified."}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end space-x-2 mt-4">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          
+          {dialogAction === "removeListing" && (
+            <div className="py-4">
+              <Label htmlFor="reason" className="block mb-2">Reason for removal:</Label>
+              <Textarea 
+                id="reason"
+                placeholder="Please provide a reason for removing this listing..."
+                className="min-h-[100px]"
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+              />
+            </div>
+          )}
+          
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDialogOpen(false);
+                if (dialogAction === "removeListing") {
+                  setActionReason("");
+                }
+              }}
+            >
               Cancel
             </Button>
-            <Button 
-              variant="default" 
-              onClick={confirmBanUser}
-              className={dialogAction === "ban" ? "bg-red-600 hover:bg-red-700" : ""}
-            >
-              {dialogAction === "ban" ? "Ban User" : "Unban User"}
-            </Button>
-          </div>
+            {dialogAction === "ban" || dialogAction === "unban" ? (
+              <Button 
+                variant="default" 
+                onClick={confirmBanUser}
+                className={dialogAction === "ban" ? "bg-red-600 hover:bg-red-700" : ""}
+              >
+                {dialogAction === "ban" ? "Ban User" : "Unban User"}
+              </Button>
+            ) : (
+              <Button 
+                variant="default"
+                onClick={confirmRemoveListing}
+                disabled={!actionReason.trim()}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Remove Listing
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

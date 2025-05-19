@@ -1,0 +1,67 @@
+[Error] TypeError: null is not an object (evaluating 'content.length')
+	truncateMessage (messages-page.tsx:166)
+	(anonymous function) (messages-page.tsx:494)
+	map
+	MessagesPage (messages-page.tsx:435:202)
+	renderWithHooks (chunk-276SZO74.js:11548)
+	updateFunctionComponent (chunk-276SZO74.js:14582)
+	callCallback2 (chunk-276SZO74.js:3674)
+	dispatchEvent
+	invokeGuardedCallbackDev (chunk-276SZO74.js:3699)
+	invokeGuardedCallback (chunk-276SZO74.js:3733)
+	beginWork$1 (chunk-276SZO74.js:19765)
+	performUnitOfWork (chunk-276SZO74.js:19198)
+	workLoopSync (chunk-276SZO74.js:19137)
+	renderRootSync (chunk-276SZO74.js:19116)
+	performConcurrentWorkOnRoot (chunk-276SZO74.js:18678:98)
+	workLoop (chunk-276SZO74.js:197)
+	flushWork (chunk-276SZO74.js:176)
+	performWorkUntilDeadline (chunk-276SZO74.js:384)
+[Error] TypeError: null is not an object (evaluating 'content.length')
+	truncateMessage (messages-page.tsx:166)
+	(anonymous function) (messages-page.tsx:494)
+	map
+	MessagesPage (messages-page.tsx:435:202)
+	renderWithHooks (chunk-276SZO74.js:11548)
+	updateFunctionComponent (chunk-276SZO74.js:14582)
+	callCallback2 (chunk-276SZO74.js:3674)
+	dispatchEvent
+	invokeGuardedCallbackDev (chunk-276SZO74.js:3699)
+	invokeGuardedCallback (chunk-276SZO74.js:3733)
+	beginWork$1 (chunk-276SZO74.js:19765)
+	performUnitOfWork (chunk-276SZO74.js:19198)
+	workLoopSync (chunk-276SZO74.js:19137)
+	renderRootSync (chunk-276SZO74.js:19116)
+	recoverFromConcurrentError (chunk-276SZO74.js:18736)
+	performConcurrentWorkOnRoot (chunk-276SZO74.js:18684)
+	workLoop (chunk-276SZO74.js:197)
+	flushWork (chunk-276SZO74.js:176)
+	performWorkUntilDeadline (chunk-276SZO74.js:384)
+[Error] The above error occurred in the <MessagesPage> component:
+
+MessagesPage@https://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/src/pages/messages-page.tsx:36:27
+Route@https://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:323:20
+ProtectedRoute@https://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/src/lib/protected-route.tsx:22:7
+Switch@https://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js:379:25
+Router
+AuthProvider@https://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/src/hooks/use-auth.tsx:28:40
+QueryClientProvider@https://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js:2805:9
+App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+	logCapturedError (chunk-276SZO74.js:14032)
+	(anonymous function) (chunk-276SZO74.js:14052)
+	callCallback (chunk-276SZO74.js:11248)
+	commitUpdateQueue (chunk-276SZO74.js:11265)
+	commitLayoutEffectOnFiber (chunk-276SZO74.js:17093)
+	commitLayoutMountEffects_complete (chunk-276SZO74.js:17980)
+	commitLayoutEffects_begin (chunk-276SZO74.js:17969)
+	commitLayoutEffects (chunk-276SZO74.js:17920)
+	commitRootImpl (chunk-276SZO74.js:19353)
+	commitRoot (chunk-276SZO74.js:19277)
+	finishConcurrentRender (chunk-276SZO74.js:18760)
+	performConcurrentWorkOnRoot (chunk-276SZO74.js:18718)
+	workLoop (chunk-276SZO74.js:197)
+	flushWork (chunk-276SZO74.js:176)
+	performWorkUntilDeadline (chunk-276SZO74.js:384)

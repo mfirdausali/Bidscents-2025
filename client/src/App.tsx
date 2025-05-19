@@ -7,16 +7,20 @@ import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
 import ProductsPage from "@/pages/products-page";
 import ProductDetailPage from "@/pages/product-detail-page";
+import AuctionDetailPage from "@/pages/auction-detail-page";
 import SellerDashboard from "@/pages/seller-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import ProfilePage from "@/pages/profile-page";
 import SellerProfilePage from "@/pages/seller-profile-page";
+import MessagesPage from "@/pages/messages-page";
 import VerifyEmailPage from "@/pages/verify-email";
 import ResetPasswordPage from "@/pages/reset-password";
 import AuthCallback from "@/pages/auth-callback";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import TermsOfServicePage from "./pages/terms-of-service";
+import PrivacyPolicyPage from "./pages/privacy-policy";
+import BuyingGuidePage from "@/pages/buying-guide"; // Import the new component
 
 function Router() {
   return (
@@ -30,11 +34,16 @@ function Router() {
       <Route path="/auth-callback" component={AuthCallback} />
       <Route path="/products" component={ProductsPage} />
       <Route path="/products/:id" component={ProductDetailPage} />
+      <Route path="/auction/:id" component={AuctionDetailPage} />
+      <Route path="/auctions/:id" component={AuctionDetailPage} />
       <Route path="/sellers/:id" component={SellerProfilePage} />
       <ProtectedRoute path="/profile" component={ProfilePage} />
+      <ProtectedRoute path="/messages" component={MessagesPage} />
       <ProtectedRoute path="/seller/dashboard" component={SellerDashboard} />
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} />
       <Route path="/terms-of-service" component={TermsOfServicePage} />
+      <Route path="/privacy-policy" component={PrivacyPolicyPage} />
+      <Route path="/buying-guide" component={BuyingGuidePage} /> {/* Added Buying Guide route */}
       <Route component={NotFound} />
     </Switch>
   );
