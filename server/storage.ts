@@ -133,6 +133,17 @@ export interface IStorage {
   getUserPayments(userId: number): Promise<Payment[]>;
   updatePaymentStatus(id: number, status: string, billId?: string, paymentChannel?: string, paidAt?: Date): Promise<Payment>;
   updatePaymentProductIds(id: number, productIds: string[]): Promise<Payment>;
+  updateSingleProductPayment(paymentId: number, productId: number): Promise<void>;
+  createProductPaymentRecord(params: {
+    userId: number;
+    billId: string;
+    productId: number;
+    amount: number;
+    status: string;
+    paidAt?: Date;
+    paymentType: string;
+    featureDuration?: number;
+  }): Promise<any>;
   
   // Transaction methods
   createTransaction(data: InsertTransaction): Promise<Transaction>;
@@ -1264,6 +1275,79 @@ export class DatabaseStorage implements IStorage {
       .execute();
       
     return result[0];
+  }
+  
+  /**
+   * Update a payment record to associate it with a single product
+   * Used for creating individual payment records per product
+   */
+  async updateSingleProductPayment(paymentId: number, productId: number): Promise<void> {
+    console.log(`Updating payment ${paymentId} with single product ID ${productId}`);
+    
+    try {
+      const result = await db
+        .update(payments)
+        .set({ product_id: productId })
+        .where(eq(payments.id, paymentId))
+        .returning()
+        .execute();
+        
+      if (!result || result.length === 0) {
+        throw new Error(`Payment update failed: No result returned`);
+      }
+      
+      console.log(`✅ Successfully updated payment ${paymentId} with product ID ${productId}`);
+    } catch (err) {
+      console.error(`❌ Failed to update payment ${paymentId} with product ID:`, err);
+      throw err;
+    }
+  }
+
+  /**
+   * Create a new payment record for a specific product
+   * Used when multiple products share the same bill_id
+   */
+  async createProductPaymentRecord(params: {
+    userId: number;
+    billId: string;
+    productId: number;
+    amount: number;
+    status: string;
+    paidAt?: Date;
+    paymentType: string;
+    featureDuration?: number;
+  }): Promise<any> {
+    console.log(`Creating new payment record for product ID ${params.productId} with bill_id ${params.billId}`);
+    
+    try {
+      const newPayment = {
+        user_id: params.userId,
+        bill_id: params.billId,
+        product_id: params.productId,
+        amount: params.amount,
+        status: params.status,
+        paid_at: params.paidAt,
+        payment_type: params.paymentType,
+        feature_duration: params.featureDuration,
+        created_at: new Date()
+      };
+      
+      const result = await db
+        .insert(payments)
+        .values(newPayment)
+        .returning()
+        .execute();
+        
+      if (!result || result.length === 0) {
+        throw new Error(`Payment creation failed: No result returned`);
+      }
+      
+      console.log(`✅ Successfully created payment record for product ID ${params.productId}`);
+      return result[0];
+    } catch (err) {
+      console.error(`❌ Failed to create payment record for product ${params.productId}:`, err);
+      throw err;
+    }
   }
   
   private async addMessageDetails(messagesList: Message[]): Promise<MessageWithDetails[]> {
