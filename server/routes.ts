@@ -3432,6 +3432,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate a proper UUID for order ID
       const orderId = crypto.randomUUID();
       
+      // Prepare the metadata with product IDs in multiple formats for redundancy
+      const paymentMetadata = {
+        paymentType: 'boost',
+        productCount: validProducts.length,
+        productIds: productIds, // Array of product IDs
+        product_ids: productIds.join(','), // As CSV string
+        productId: productIds.length === 1 ? productIds[0] : null, // Single ID if only one product
+        productDetails: validProducts.map(p => ({ id: p.id, name: p.name }))
+      };
+      
+      console.log('📦 Creating payment with enhanced product ID storage:', {
+        productIds: productIds,
+        productCount: validProducts.length,
+        orderId: orderId
+      });
+      
       // Create a new payment record
       const payment = await storage.createPayment({
         userId: req.user.id,
@@ -3442,11 +3458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentType: 'boost',
         featureDuration: 7, // 7 days boost
         productIds: productIds,
-        metadata: {
-          paymentType: 'boost',
-          productCount: validProducts.length,
-          productDetails: validProducts.map(p => ({ id: p.id, name: p.name }))
-        }
+        metadata: paymentMetadata
       });
       
       // Create product names list for description
@@ -3732,8 +3744,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          if (productIds.length === 0) {
-            console.warn('No product IDs found in payment for boosting');
+          // Special handling for direct database check
+        if (productIds.length === 0) {
+            console.log('🔍 No product IDs found in payment metadata, checking webhook_payload directly');
+            try {
+              // Try to extract product IDs from webhook_payload JSON
+              const { data } = await supabase
+                .from('payments')
+                .select('webhook_payload')
+                .eq('id', payment.id)
+                .single();
+                
+              if (data && data.webhook_payload) {
+                let webhookData;
+                if (typeof data.webhook_payload === 'string') {
+                  try {
+                    webhookData = JSON.parse(data.webhook_payload);
+                  } catch (e) {
+                    console.error('Failed to parse webhook_payload string', e);
+                  }
+                } else {
+                  webhookData = data.webhook_payload;
+                }
+                
+                if (webhookData) {
+                  console.log('📦 Extracted webhook data:', webhookData);
+                  
+                  // Look for product IDs in various formats
+                  if (webhookData.productIds && webhookData.productIds.length > 0) {
+                    productIds = webhookData.productIds.map(id => String(id));
+                    console.log(`✅ Found product IDs in webhook_payload.productIds: ${productIds.join(', ')}`);
+                  } else if (webhookData.product_ids && webhookData.product_ids.length > 0) {
+                    productIds = webhookData.product_ids.map(id => String(id));
+                    console.log(`✅ Found product IDs in webhook_payload.product_ids: ${productIds.join(', ')}`);
+                  } else if (webhookData.productId) {
+                    productIds = [String(webhookData.productId)];
+                    console.log(`✅ Found single product ID in webhook_payload.productId: ${productIds[0]}`);
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('Error extracting product IDs from webhook_payload:', err);
+            }
+        }
+        
+        if (productIds.length === 0) {
+            console.warn('No product IDs found in payment for boosting after all attempts');
             return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
 
@@ -3741,6 +3797,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Based on the actual database schema (single product_id per record)
           console.log(`🔍 BOOST PAYMENT DEBUG: Creating ${productIds.length} payment records (one per product)`);
           console.log(`🔍 BOOST PAYMENT DEBUG: Product IDs to process:`, productIds);
+          
+          // First, update the original payment record to include product IDs for better tracking
+          try {
+            const enhancedMetadata = {
+              productIds: productIds,
+              product_ids: productIds.join(','),
+              productCount: productIds.length,
+              productId: productIds.length === 1 ? productIds[0] : null,
+              processedAt: new Date().toISOString(),
+              type: 'boost_payment'
+            };
+            
+            // Update the original payment record with this enhanced metadata
+            const { error: updateError } = await supabase
+              .from('payments')
+              .update({
+                webhook_payload: JSON.stringify(enhancedMetadata),
+                product_id: productIds.length === 1 ? Number(productIds[0]) : null
+              })
+              .eq('id', payment.id);
+              
+            if (updateError) {
+              console.error(`❌ Error updating original payment with enhanced metadata:`, updateError);
+            } else {
+              console.log(`✅ Updated original payment #${payment.id} with enhanced product IDs metadata`);
+            }
+          } catch (enhanceErr) {
+            console.error(`❌ Error during payment metadata enhancement:`, enhanceErr);
+            // Continue processing even if this update fails
+          }
           
           // Verify bill_id is present
           let effectiveBillId = billId;

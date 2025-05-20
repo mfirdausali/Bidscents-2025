@@ -1833,8 +1833,16 @@ export class SupabaseStorage implements IStorage {
   
   // Payment methods
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    console.log('Creating payment with full data:', JSON.stringify({
+      orderId: insertPayment.orderId,
+      productIds: insertPayment.productIds || [],
+      amount: insertPayment.amount,
+      status: insertPayment.status || 'due',
+      metadata: insertPayment.metadata || {}
+    }, null, 2));
+    
     // Map the payment data to match the actual database schema
-    const paymentData = {
+    const paymentData: any = {
       order_id: insertPayment.orderId,
       bill_id: insertPayment.billId,
       collection_id: process.env.BILLPLZ_COLLECTION_ID || '',
@@ -1845,6 +1853,23 @@ export class SupabaseStorage implements IStorage {
       // created_at is added automatically by the database
     };
     
+    // Add the product_id field if only one product
+    if (insertPayment.productIds && insertPayment.productIds.length === 1) {
+      const productId = Number(insertPayment.productIds[0]);
+      if (!isNaN(productId)) {
+        console.log(`Setting product_id field directly to ${productId} for single product boost`);
+        paymentData.product_id = productId;
+      }
+    }
+    
+    // Add user_id field
+    if (insertPayment.userId) {
+      paymentData.user_id = insertPayment.userId;
+      console.log(`Setting user_id field to ${insertPayment.userId}`);
+    }
+    
+    console.log('Final payment data being inserted:', JSON.stringify(paymentData, null, 2));
+    
     const { data, error } = await supabase
       .from('payments')
       .insert(paymentData)
@@ -1853,8 +1878,15 @@ export class SupabaseStorage implements IStorage {
       
     if (error) {
       console.error('Error creating payment:', error);
+      console.error('Error details:', error.details || 'No details available');
       throw error;
     }
+    
+    // Check if product_id was stored correctly
+    console.log(`Payment created with ID ${data.id}`, {
+      product_id: data.product_id,
+      has_product_id: data.product_id !== null && data.product_id !== undefined
+    });
     
     return this.mapPaymentFromDb(data);
   }
