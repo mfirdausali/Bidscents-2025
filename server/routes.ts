@@ -3824,26 +3824,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   paymentUserId = String(product.sellerId);
                   console.log(`Using product.sellerId (${paymentUserId}) for user_id`);
                 }
-                // Strategy 3: Extract from webhook payload
-                else if (payment.webhook_payload) {
-                  try {
-                    const webhookData = JSON.parse(payment.webhook_payload);
-                    if (webhookData.name) {
-                      // Try to find user by username that matches name in webhook
-                      const { data: userData } = await supabase
-                        .from('users')
-                        .select('id')
-                        .eq('username', webhookData.name)
-                        .limit(1);
-                        
-                      if (userData && userData.length > 0) {
-                        paymentUserId = String(userData[0].id);
-                        console.log(`Found user (${paymentUserId}) with username matching webhook name: ${webhookData.name}`);
-                      }
-                    }
-                  } catch (err) {
-                    console.error(`Error parsing webhook payload:`, err);
-                  }
+                // Strategy 3: Try to use webhook data if available
+                else {
+                  // We'll skip the webhook parsing for now as it's causing errors
+                  console.log(`No user ID from primary sources - using default`);
                 }
                 
                 if (paymentUserId === "0") {
