@@ -3727,11 +3727,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.log(`📦 Found product: "${product.name}" (ID: ${productId})`);
                 
                 // Create a payment record for this product
-                // Following the ACTUAL database schema (product_id is a single integer field)
+                // Following the ACTUAL database schema from the screenshot
+                // With product_id as an INTEGER field (not an array)
                 const { data: newPayment, error } = await supabase.from('payments').insert({
                   order_id: uniqueOrderId,
                   bill_id: effectiveBillId,
-                  product_id: productId,
+                  product_id: productId,  // INTEGER field, not an array
                   amount: Math.floor(payment.amount / productIds.length), // Split amount evenly
                   user_id: String(payment.userId),
                   status: 'paid',
@@ -3754,17 +3755,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 createdPayments.push(newPayment);
                 
-                // Now update the product to mark it as featured
+                // Now update the product to mark it as featured directly in database
                 const featureDuration = 7; // Default to 7 days
                 const featureUntil = new Date();
                 featureUntil.setDate(featureUntil.getDate() + featureDuration);
                 
-                await storage.updateProduct(productId, {
-                  isFeatured: true,
-                  featuredAt: new Date(),
-                  featuredUntil: featureUntil,
-                  status: 'featured'
-                });
+                // Update product status using exact column names from database
+                const { error: productUpdateError } = await supabase
+                  .from('products')
+                  .update({
+                    is_featured: true,
+                    featured_at: new Date(),
+                    featured_until: featureUntil,
+                    status: 'featured'
+                  })
+                  .eq('id', productId);
+                  
+                if (productUpdateError) {
+                  console.error(`❌ Error updating product featured status:`, productUpdateError);
+                }
                 
                 console.log(`✅ Updated product #${productId} to featured status until ${featureUntil}`);
               } catch (err) {
