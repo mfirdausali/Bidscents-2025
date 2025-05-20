@@ -3677,6 +3677,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Payment status updated to ${status}`);
       
+      // Helper function to update product feature status
+      async function updateProductFeatureStatus(productId: number | string, payment: any) {
+        try {
+          // Default feature duration is 7 days if not specified
+          const featureDuration = payment?.metadata?.featureDuration || 7;
+          
+          // Create feature expiry date
+          const featuredUntil = new Date();
+          featuredUntil.setDate(featuredUntil.getDate() + Number(featureDuration));
+          
+          // Update the product status in the database
+          const { data: updatedProduct, error: productError } = await supabase
+            .from('products')
+            .update({
+              is_featured: true,
+              featured_at: new Date(),
+              featured_until: featuredUntil
+            })
+            .eq('id', Number(productId))
+            .select()
+            .single();
+          
+          if (productError) {
+            console.error(`❌ Error updating product ${productId} featured status:`, productError);
+            return false;
+          } else {
+            console.log(`✅ Updated product #${productId} to featured status until ${featuredUntil.toISOString()}`);
+            return true;
+          }
+        } catch (productErr) {
+          console.error(`❌ Error while updating product featured status: ${productErr}`);
+          return false;
+        }
+      }
+      
       // CRITICAL: If payment is successful, process boost for all products
       // Also runs if payment._forceProductBoostProcessing was set earlier during diagnostic
       if (status === 'paid' || payment._forceProductBoostProcessing) {
