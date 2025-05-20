@@ -3930,7 +3930,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   user_id: paymentUserId,
                   status: 'paid',
                   paid_at: paidDate || new Date(),
-                  created_at: new Date()
+                  created_at: new Date(),
+                  // Add a webhook_payload with product details for better tracking
+                  webhook_payload: JSON.stringify({
+                    productId: productId,
+                    productIds: [productId],
+                    type: 'product_boost',
+                    processedAt: new Date().toISOString(),
+                    originalPaymentId: payment.id,
+                    billId: effectiveBillId
+                  })
                 };
                 
                 // Log the exact object being inserted
