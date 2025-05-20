@@ -3836,13 +3836,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           try {
-            // Update the original payment record with paid status
+            // Update the original payment record with paid status and enhanced metadata
+            const enhancedMetadata = {
+              productIds: productIds,
+              product_ids: productIds.join(','),
+              productCount: productIds.length,
+              processedAt: new Date().toISOString(),
+              type: 'boost_payment'
+            };
+            
+            // First, make sure the original payment has the complete metadata
             const { data: updatedPayment, error: updateError } = await supabase
               .from('payments')
               .update({
                 status: 'paid',
                 bill_id: effectiveBillId,
-                paid_at: paidDate || new Date()
+                paid_at: paidDate || new Date(),
+                webhook_payload: JSON.stringify(enhancedMetadata)
               })
               .eq('id', payment.id)
               .select()
@@ -3854,7 +3864,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             console.log(`✅ Updated original payment record #${payment.id} to 'paid' status`);
             
-            // Process each product individually - create separate payment records
+            // Get the original payment user_id using a direct query
+            let paymentUserId = "0";
+            try {
+              const { data: paymentData } = await supabase
+                .from('payments')
+                .select('user_id')
+                .eq('id', payment.id)
+                .single();
+                
+              if (paymentData && paymentData.user_id) {
+                paymentUserId = String(paymentData.user_id);
+                console.log(`✅ Retrieved user_id ${paymentUserId} from original payment record`);
+              }
+            } catch (userIdError) {
+              console.error(`❌ Error retrieving user_id from payment:`, userIdError);
+            }
+            
+            // Process each product individually - create separate payment records with forced execution
             const createdPayments = [];
             
             console.log(`🔬 DIAGNOSTIC: Beginning product loop with ${productIds.length} products`);
@@ -3883,9 +3910,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`🔄 Processing product #${productId} (${i+1} of ${productIds.length})`);
               
               try {
-                // Generate a unique order ID for this specific product
-                // Each payment record must have a unique order_id
-                const uniqueOrderId = `boost-${effectiveBillId}-${productId}-${Date.now()}-${i}`;
+                // Generate a proper UUID for this specific product's payment record
+                // Each payment record must have a unique order_id in UUID format
+                const uniqueOrderId = crypto.randomUUID();
                 
                 // Query the database to confirm product exists
                 const product = await storage.getProductById(productId);
