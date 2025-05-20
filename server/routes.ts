@@ -3666,89 +3666,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
 
-          // ENHANCED IMPLEMENTATION: Create individual payment records for each product
-          // This ensures each product has its own payment record in the database
-          if (productIds.length > 1) {
-            console.log(`🔍 BOOST PAYMENT DEBUG: Creating individual payment records for ${productIds.length} products`);
-            console.log(`🔍 BOOST PAYMENT DEBUG: Payment record to update:`, {
-              paymentId: payment.id, 
-              billId: billId || 'NONE',
-              userId: payment.userId,
-              amount: payment.amount,
-              paymentType: payment.paymentType,
-              featureDuration: payment.featureDuration,
-              webhook_payload: payment.webhook_payload ? 'EXISTS' : 'MISSING'
-            });
+          // FIXED IMPLEMENTATION: Create individual payment records for EACH product
+          // Treating all products equally to ensure consistency
+          console.log(`🔍 BOOST PAYMENT DEBUG: Creating individual payment records for ${productIds.length} products`);
+          console.log(`🔍 BOOST PAYMENT DEBUG: Payment record info:`, {
+            paymentId: payment.id, 
+            billId: billId || 'NONE',
+            userId: payment.userId,
+            amount: payment.amount,
+            paymentType: payment.paymentType,
+            featureDuration: payment.featureDuration,
+            productIdsType: typeof productIds,
+            productIdsIsArray: Array.isArray(productIds),
+            productIdsLength: productIds.length
+          });
+          
+          // Verify bill_id for records
+          let effectiveBillId = billId;
+          if (!effectiveBillId) {
+            console.log(`❌ WARNING: billId is missing for payment records, using placeholder`);
+            effectiveBillId = 'missing-' + new Date().getTime();
+          }
+          
+          // Process all products individually (do not reuse the original payment record)
+          // This ensures consistent handling for all products
+          const individualResults = [];
+          
+          for (let i = 0; i < productIds.length; i++) {
+            const pid = productIds[i];
+            const productId = parseInt(pid);
             
-            // The first product will use the existing payment record
-            // We'll update it with the first product ID
-            const firstProductId = parseInt(productIds[0]);
-            console.log(`🔍 BOOST PAYMENT DEBUG: Updating existing payment ${payment.id} with first product ID ${firstProductId}`);
+            if (isNaN(productId)) {
+              console.error(`❌ ERROR: Invalid product ID '${pid}' - skipping`);
+              continue;
+            }
+            
+            console.log(`🔍 BOOST PAYMENT DEBUG: Creating payment record for product ID ${productId}`);
+            
+            // Generate a unique order ID for this product boost payment
+            const uniqueOrderId = `boost-${effectiveBillId}-${productId}-${Date.now()}-${i}`;
             
             try {
-              await storage.updateSingleProductPayment(payment.id, firstProductId);
-              console.log(`✅ Successfully updated payment ${payment.id} with product ID ${firstProductId}`);
-            } catch (err) {
-              console.error(`❌ ERROR updating payment with first product ID:`, err);
-              console.error(`Stack trace:`, err.stack);
-            }
-            
-            // For the remaining products, create new payment records
-            // They will share the same bill_id but have different product_ids
-            const remainingProductIds = productIds.slice(1);
-            console.log(`🔍 BOOST PAYMENT DEBUG: Will create ${remainingProductIds.length} additional payment records for remaining products:`, remainingProductIds);
-            
-            // Verify bill_id for additional records
-            let effectiveBillId = billId;
-            if (!effectiveBillId) {
-              console.error(`❌ WARNING: billId is missing for additional payment records, using placeholder`);
-              effectiveBillId = 'missing-' + new Date().getTime();
-            }
-            
-            for (const pid of remainingProductIds) {
-              const productId = parseInt(pid);
-              console.log(`🔍 BOOST PAYMENT DEBUG: Creating payment record for product ID ${productId} with bill_id ${effectiveBillId}`);
+              // Create a new payment record for this product with full details
+              const newPaymentParams = {
+                userId: payment.userId,
+                billId: effectiveBillId,
+                productId: productId,
+                orderId: uniqueOrderId, // CRITICAL: Must be unique
+                amount: payment.amount / productIds.length, // Split the amount evenly
+                status: 'paid',
+                paidAt: paidDate,
+                paymentType: payment.paymentType || 'boost',
+                featureDuration: payment.featureDuration || 7
+              };
               
-              try {
-                // Create a new payment record for this product with full details
-                const newPaymentParams = {
-                  userId: payment.userId,
-                  billId: effectiveBillId,
-                  productId: productId,
-                  amount: payment.amount / productIds.length, // Split the amount evenly
-                  status: 'paid',
-                  paidAt: paidDate,
-                  paymentType: payment.paymentType || 'boost',
-                  featureDuration: payment.featureDuration || 7
-                };
-                
-                console.log(`🔍 BOOST PAYMENT DEBUG: Creating new payment with params:`, newPaymentParams);
-                
-                const newPayment = await storage.createProductPaymentRecord(newPaymentParams);
-                
-                console.log(`✅ Created new payment record:`, {
-                  id: newPayment?.id || 'UNKNOWN',
-                  billId: newPayment?.bill_id || 'MISSING',
-                  productId: newPayment?.product_id || 'MISSING'
-                });
-              } catch (err) {
-                console.error(`❌ ERROR creating payment record for product ${productId}:`, err);
-                console.error(`Stack trace:`, err.stack);
-              }
-            }
-          } else if (productIds.length === 1) {
-            // If there's only one product, update the existing payment record
-            const productId = parseInt(productIds[0]);
-            console.log(`🔍 BOOST PAYMENT DEBUG: Single product payment - updating payment ${payment.id} with product ID ${productId}`);
-            
-            try {
-              await storage.updateSingleProductPayment(payment.id, productId);
-              console.log(`✅ Successfully updated payment ${payment.id} with product ID ${productId}`);
+              console.log(`🔍 Creating boost payment with params:`, {
+                userId: newPaymentParams.userId,
+                billId: newPaymentParams.billId,
+                productId: newPaymentParams.productId,
+                orderId: newPaymentParams.orderId,
+                status: newPaymentParams.status
+              });
+              
+              const newPayment = await storage.createProductPaymentRecord(newPaymentParams);
+              
+              individualResults.push({
+                success: true,
+                productId: productId,
+                paymentId: newPayment?.id,
+                orderId: newPayment?.order_id
+              });
+              
+              console.log(`✅ Successfully created payment for product #${productId}:`, {
+                id: newPayment?.id || 'UNKNOWN',
+                billId: newPayment?.bill_id || 'MISSING',
+                productIds: newPayment?.product_ids || 'MISSING',
+                orderId: newPayment?.order_id || 'MISSING'
+              });
             } catch (err) {
-              console.error(`❌ ERROR updating payment with product ID:`, err);
+              console.error(`❌ ERROR creating payment record for product ${productId}:`, err);
               console.error(`Stack trace:`, err.stack);
+              
+              individualResults.push({
+                success: false,
+                productId: productId,
+                error: err.message || 'Unknown error'
+              });
             }
           }
+          
+          console.log(`📊 Payment processing results summary:`, {
+            totalProducts: productIds.length,
+            successCount: individualResults.filter(r => r.success).length,
+            failureCount: individualResults.filter(r => !r.success).length
+          });
 
           // The product status update happens automatically after we create the payment records
           // This is handled by updateProductFeaturedStatusForPayment in SupabaseStorage
