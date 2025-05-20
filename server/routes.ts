@@ -3666,7 +3666,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Payment status updated to ${status}`);
       
       // CRITICAL: If payment is successful, process boost for all products
-      if (status === 'paid') {
+      // Also runs if payment._forceProductBoostProcessing was set earlier during diagnostic
+      if (status === 'paid' || payment._forceProductBoostProcessing) {
         try {
           // Extract product IDs from payment metadata or from reference_2
           let productIds: string[] = [];
@@ -3675,6 +3676,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (payment.productIds && payment.productIds.length > 0) {
             productIds = payment.productIds;
             console.log(`Using productIds from payment record: ${productIds.join(', ')}`);
+          }
+          // Check if there's a single product_id stored directly in the payment record
+          else if (payment.product_id) {
+            productIds = [String(payment.product_id)];
+            console.log(`Using single product_id from payment record: ${payment.product_id}`);
           }
           // Then check if reference_2 contains comma-separated product IDs
           else if (productId && typeof productId === 'string' && productId.includes(',')) {
@@ -3704,6 +3710,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } catch (err) {
                 console.error(`❌ Error updating payment with product ID:`, err);
               }
+            }
+          }
+          
+          // If we still don't have product IDs, try to find some from related payments
+          if (productIds.length === 0 && billId) {
+            console.log(`🔍 Attempting to find product IDs from related payments with billId: ${billId}`);
+            try {
+              const { data: relatedPayments } = await supabase
+                .from('payments')
+                .select('product_id')
+                .eq('bill_id', billId)
+                .not('product_id', 'is', null);
+                
+              if (relatedPayments && relatedPayments.length > 0) {
+                productIds = relatedPayments.map(p => String(p.product_id));
+                console.log(`✅ Found ${productIds.length} product IDs from related payments:`, productIds);
+              }
+            } catch (err) {
+              console.error(`❌ Error finding related payments:`, err);
             }
           }
           
@@ -3802,6 +3827,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // Create a payment record for this product with VERY explicit type conversions
                 // Following the ACTUAL database schema from the screenshot
+                
+                // Get user ID from multiple possible sources with fallbacks
+                let effectiveUserId = '';
+                
+                // Priority 1: Original payment's userId
+                if (payment.userId && payment.userId !== 0) {
+                  effectiveUserId = String(payment.userId);
+                  console.log(`Using payment.userId (${effectiveUserId}) for user_id`);
+                }
+                // Priority 2: If the product has a sellerId, use that 
+                else if (product && product.sellerId) {
+                  effectiveUserId = String(product.sellerId);
+                  console.log(`Using product.sellerId (${effectiveUserId}) for user_id`);
+                }
+                // Priority 3: Use the webhook payload's name field if all else fails
+                else if (payment.webhook_payload) {
+                  try {
+                    const webhookData = JSON.parse(payment.webhook_payload);
+                    if (webhookData.name) {
+                      // Try to find user by username that matches name in webhook
+                      const { data: userData } = await supabase
+                        .from('users')
+                        .select('id')
+                        .eq('username', webhookData.name)
+                        .limit(1);
+                        
+                      if (userData && userData.length > 0) {
+                        effectiveUserId = String(userData[0].id);
+                        console.log(`Found user (${effectiveUserId}) with username matching webhook name: ${webhookData.name}`);
+                      }
+                    }
+                  } catch (err) {
+                    console.error(`Error parsing webhook payload:`, err);
+                  }
+                }
+                
+                if (!effectiveUserId) {
+                  console.error(`❌ CRITICAL: Could not determine user_id for payment!`);
+                  console.log(`Using "0" as a last resort to prevent database errors`);
+                  effectiveUserId = "0";
+                }
+                
+                // Now create the record with all critical fields explicitly set
                 const insertData = {
                   order_id: uniqueOrderId,
                   bill_id: effectiveBillId,
