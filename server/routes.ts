@@ -3857,9 +3857,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Process each product individually - create separate payment records
             const createdPayments = [];
             
+            console.log(`🔬 DIAGNOSTIC: Beginning product loop with ${productIds.length} products`);
+            console.log(`🔬 DIAGNOSTIC: Raw productIds array:`, JSON.stringify(productIds));
+            console.log(`🔬 DIAGNOSTIC: Types of elements:`, productIds.map(id => typeof id));
+            
             for (let i = 0; i < productIds.length; i++) {
               const pid = productIds[i];
-              const productId = parseInt(pid);
+              console.log(`🔬 DIAGNOSTIC: Processing product #${i+1} with ID '${pid}' (type: ${typeof pid})`);
+              
+              // Ensure robust parsing of product ID
+              let productId;
+              try {
+                productId = Number(pid);
+                console.log(`🔬 DIAGNOSTIC: Parsed productId = ${productId}, isNaN = ${isNaN(productId)}`);
+              } catch (parseErr) {
+                console.error(`❌ Error parsing product ID '${pid}':`, parseErr);
+                productId = NaN;
+              }
               
               if (isNaN(productId)) {
                 console.error(`❌ Invalid product ID '${pid}' - skipping`);
@@ -3944,7 +3958,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // Log the exact object being inserted
                 console.log(`📝 INSERT DATA:`, JSON.stringify(insertData, null, 2));
+                console.log(`🔬 DIAGNOSTIC: product_id type = ${typeof insertData.product_id}, value = ${insertData.product_id}`);
                 
+                try {
+                  // Attempt to extract the column types from the database
+                  const { data: columnInfo, error: schemaError } = await supabase.rpc('get_column_types', {
+                    table_name: 'payments'
+                  }).maybeSingle();
+                  
+                  if (!schemaError && columnInfo) {
+                    console.log(`🔬 DIAGNOSTIC: 'payments' table column types:`, columnInfo);
+                  }
+                } catch (schemaErr) {
+                  console.log(`🔬 DIAGNOSTIC: Unable to get column types (this is expected if the RPC doesn't exist)`);
+                }
+                
+                // Try direct SQL command with explicit typing as fallback
+                try {
+                  const { data: directResult, error: directError } = await supabase.rpc('insert_payment_record', {
+                    p_order_id: insertData.order_id,
+                    p_bill_id: insertData.bill_id,
+                    p_product_id: insertData.product_id,
+                    p_user_id: insertData.user_id,
+                    p_amount: insertData.amount,
+                    p_status: insertData.status
+                  });
+                  
+                  if (directError) {
+                    console.log(`🔬 DIAGNOSTIC: Direct insert failed (this is expected if the RPC doesn't exist):`, directError);
+                  } else {
+                    console.log(`🔬 DIAGNOSTIC: Direct insert succeeded:`, directResult);
+                  }
+                } catch (directErr) {
+                  console.log(`🔬 DIAGNOSTIC: Direct insert error (this is expected if the RPC doesn't exist)`);
+                }
+                
+                // Try the original supabase builder approach
+                console.log(`🔬 DIAGNOSTIC: Attempting standard Supabase insert operation`);
                 const { data: newPayment, error } = await supabase
                   .from('payments')
                   .insert(insertData)
@@ -3954,8 +4004,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (error) {
                   console.error(`❌ Error creating payment record:`, error);
                   console.error(`Error details:`, error.details || 'No details');
+                  console.error(`Error hint:`, error.hint || 'No hint');
                   throw error;
                 }
+                
+                console.log(`🔬 DIAGNOSTIC: Insert successful! New payment:`, {
+                  id: newPayment.id,
+                  product_id: newPayment.product_id,
+                  product_id_type: typeof newPayment.product_id,
+                  order_id: newPayment.order_id
+                });
                 
                 console.log(`✅ Created payment record for product #${productId}:`, {
                   paymentId: newPayment.id,
