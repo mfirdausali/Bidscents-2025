@@ -3726,19 +3726,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 console.log(`📦 Found product: "${product.name}" (ID: ${productId})`);
                 
-                // Create a payment record for this product
+                // DETAILED DEBUGGING: Log all values before creating payment record
+                console.log(`🔍 BOOST PAYMENT DETAIL [Product #${productId}]:`, {
+                  uniqueOrderId,
+                  billId: effectiveBillId,
+                  productId: productId,
+                  productIdType: typeof productId,
+                  amount: Math.floor(payment.amount / productIds.length),
+                  originalUserId: payment.userId,
+                  userIdType: typeof payment.userId,
+                  userIdValue: String(payment.userId),
+                  paidAt: paidDate || new Date()
+                });
+                
+                // Ensure userId is properly set (critical)
+                let effectiveUserId = String(payment.userId);
+                if (!effectiveUserId || effectiveUserId === 'undefined' || effectiveUserId === 'null') {
+                  console.error(`❌ CRITICAL ERROR: Invalid userId '${effectiveUserId}'`);
+                  // Attempt to get user ID from another source if available
+                  if (product && product.sellerId) {
+                    effectiveUserId = String(product.sellerId);
+                    console.log(`🔄 Using product.sellerId (${effectiveUserId}) as fallback for user_id`);
+                  } else {
+                    // Last resort (not ideal)
+                    console.error(`❌ No valid user ID found - logging current request user if available`);
+                    if (req.user) {
+                      console.log(`ℹ️ Current request user:`, req.user);
+                    }
+                  }
+                }
+                
+                // Create a payment record for this product with VERY explicit type conversions
                 // Following the ACTUAL database schema from the screenshot
-                // With product_id as an INTEGER field (not an array)
-                const { data: newPayment, error } = await supabase.from('payments').insert({
+                const insertData = {
                   order_id: uniqueOrderId,
                   bill_id: effectiveBillId,
-                  product_id: productId,  // INTEGER field, not an array
-                  amount: Math.floor(payment.amount / productIds.length), // Split amount evenly
-                  user_id: String(payment.userId),
+                  product_id: Number(productId),  // Explicit conversion to number
+                  amount: Math.floor(payment.amount / productIds.length), 
+                  user_id: effectiveUserId,
                   status: 'paid',
                   paid_at: paidDate || new Date(),
                   created_at: new Date()
-                }).select().single();
+                };
+                
+                // Log the exact object being inserted
+                console.log(`📝 INSERT DATA:`, JSON.stringify(insertData, null, 2));
+                
+                const { data: newPayment, error } = await supabase
+                  .from('payments')
+                  .insert(insertData)
+                  .select()
+                  .single();
                 
                 if (error) {
                   console.error(`❌ Error creating payment record:`, error);
