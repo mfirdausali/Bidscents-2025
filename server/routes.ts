@@ -3587,6 +3587,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if payment already processed to prevent duplicate processing
       if (payment.status === 'paid') {
         console.log(`Payment ${payment.id} already marked as paid, skipping status update`);
+        
+        // DIAGNOSTIC: Check if we need to process product boosts even for already-paid payments
+        console.log(`🔍 DIAGNOSTIC: Checking if already-paid payment needs product boost processing`);
+        console.log(`Payment product_id:`, payment.product_id);
+        console.log(`Payment productIds:`, payment.productIds);
+        
+        // DIAGNOSTIC: Check database for existing product-specific payment records
+        console.log(`🔍 DIAGNOSTIC: Checking for existing product-specific payment records with bill_id: ${billId}`);
+        
+        try {
+          const { data: existingPayments, error } = await supabase
+            .from('payments')
+            .select('id, product_id, order_id, user_id')
+            .eq('bill_id', billId);
+            
+          if (error) {
+            console.error(`❌ Error checking for existing payments:`, error);
+          } else {
+            console.log(`Found ${existingPayments ? existingPayments.length : 0} payment records with bill_id ${billId}:`);
+            if (existingPayments && existingPayments.length > 0) {
+              existingPayments.forEach(p => {
+                console.log(`- Payment #${p.id}: product_id=${p.product_id}, order_id=${p.order_id}, user_id=${p.user_id}`);
+              });
+            } else {
+              console.log(`❗ No product-specific payment records found for bill_id ${billId}`);
+              
+              // CRITICAL: We should still process product boosts if no product-specific records exist!
+              // This indicates that we never processed the individual product records during initial payment.
+              if ((payment.productIds && payment.productIds.length > 0) || payment.product_id) {
+                console.log(`🔄 CRITICAL: Need to process product boost records even though payment is already paid`);
+                // Continue to product boost processing below rather than returning early
+                // We'll set this flag and check it later in the code
+                payment._forceProductBoostProcessing = true;
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`❌ Error during diagnostic check:`, err);
+        }
+        
         // Even if already paid, we'll update the bill_id if it wasn't set before
         if (!payment.billId && billId) {
           await storage.updatePaymentStatus(
@@ -3598,7 +3638,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           console.log(`Updated bill_id for payment ${payment.id} to ${billId}`);
         }
-        return { success: true, message: 'Payment already processed', payment };
+        
+        // Only exit early if we don't need to force product boost processing
+        if (!payment._forceProductBoostProcessing) {
+          return { success: true, message: 'Payment already processed', payment };
+        } else {
+          console.log(`🔄 Continuing to product boost processing despite payment being already paid`);
+        }
       }
       
       // Determine payment status - handle both string and boolean values from Billplz
@@ -3749,10 +3795,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     console.log(`🔄 Using product.sellerId (${effectiveUserId}) as fallback for user_id`);
                   } else {
                     // Last resort (not ideal)
-                    console.error(`❌ No valid user ID found - logging current request user if available`);
-                    if (req.user) {
-                      console.log(`ℹ️ Current request user:`, req.user);
-                    }
+                    console.error(`❌ No valid user ID found - no fallback available`);
+                    // We don't have access to req.user in this context
                   }
                 }
                 
