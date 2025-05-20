@@ -3723,15 +3723,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Extract product IDs from payment metadata or from reference_2
           let productIds: string[] = [];
           
+          // DIAGNOSTIC: Log all potential sources of product IDs
+          console.log(`🔎 [PRODUCT ID SOURCES] Examining payment record for product IDs:`);
+          console.log(`- payment.id: ${payment.id}`);
+          console.log(`- productIds property: ${payment.productIds ? JSON.stringify(payment.productIds) : 'Missing'}`);
+          console.log(`- product_id property: ${payment.product_id || 'Missing'}`);
+          console.log(`- reference_2: ${payment.reference_2 || 'Missing'}`);
+          console.log(`- reference_1: ${payment.reference_1 || 'Missing'}`);
+          console.log(`- webhook_payload: ${payment.webhook_payload ? (typeof payment.webhook_payload === 'string' ? 'Present (string)' : 'Present (object)') : 'Missing'}`);
+          
           // First check the payment record for productIds
           if (payment.productIds && payment.productIds.length > 0) {
             productIds = payment.productIds;
-            console.log(`Using productIds from payment record: ${productIds.join(', ')}`);
+            console.log(`✅ Using productIds from payment record: ${productIds.join(', ')}`);
           }
           // Check if there's a single product_id stored directly in the payment record
           else if (payment.product_id) {
             productIds = [String(payment.product_id)];
-            console.log(`Using single product_id from payment record: ${payment.product_id}`);
+            console.log(`✅ Using single product_id from payment record: ${payment.product_id}`);
           }
           // Then check if reference_2 contains comma-separated product IDs
           else if (productId && typeof productId === 'string' && productId.includes(',')) {
@@ -4190,46 +4199,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   
                 console.log(`⭐ [DB CHECK] Found ${existingRecords?.length || 0} existing records for product #${productId} with bill_id ${essentialData.bill_id}`);
                 
-                // ======== GUARANTEED DIRECT INSERTION METHOD ========
-                // Use a completely direct approach that guarantees product_id is properly set
-                const insertSQL = `
-                  INSERT INTO payments 
-                  (order_id, bill_id, collection_id, product_id, amount, user_id, status, paid_at) 
-                  VALUES 
-                  ('${essentialData.order_id}', 
-                   '${essentialData.bill_id}', 
-                   '5dkdgtmo', 
-                   ${Number(productId)}, 
-                   ${Math.floor(payment.amount / productIds.length)}, 
-                   ${typeof userId === 'string' ? parseInt(userId, 10) : userId}, 
-                   'paid', 
-                   '${new Date().toISOString()}')
-                  RETURNING *;
-                `;
+                // CRITICAL FIX: Ensure product_id is properly set and correctly typed
+                console.log(`🔧 [FIX] Creating payment record for product #${productId} with explicit type handling`);
                 
-                console.log(`🔥 [DIRECT SQL] Executing direct insertion for product #${productId}`);
-                const { data: sqlResult, error: sqlError } = await supabase.rpc('execute_sql', { 
-                  query: insertSQL 
+                // Explicitly cast the product ID to a number to match database column type
+                const productIdNumber = Number(productId);
+                if (isNaN(productIdNumber)) {
+                  console.error(`❌ [TYPE ERROR] Product ID "${productId}" could not be converted to a number!`);
+                  continue; // Skip this product
+                }
+                
+                // Log the exact data being used to create the payment record
+                console.log(`📋 [DATA] Payment record data:`, {
+                  ...essentialData,
+                  product_id: productIdNumber,
+                  product_id_type: typeof productIdNumber
                 });
                 
-                let newPayment = null;
-                let error = sqlError;
+                // CRITICAL FIX: Force-set product_id as a number to match database schema
+                // Create a clean record with ONLY the properties we need
+                const finalData = {
+                  order_id: essentialData.order_id,
+                  bill_id: essentialData.bill_id,
+                  collection_id: '5dkdgtmo',
+                  product_id: productIdNumber, // Clean, number-type product ID
+                  amount: essentialData.amount,
+                  user_id: essentialData.user_id,
+                  status: 'paid',
+                  paid_at: essentialData.paid_at
+                };
                 
-                if (sqlError) {
-                  console.log(`⚠️ Direct SQL insert failed, falling back to builder approach`);
-                  // Fallback to the regular builder approach
-                  const { data, error: builderError } = await supabase
-                    .from('payments')
-                    .insert(essentialData)
-                    .select()
-                    .single();
-                    
-                  newPayment = data;
-                  error = builderError;
-                } else if (sqlResult && sqlResult.length > 0) {
-                  console.log(`✅ Direct SQL insert succeeded!`);
-                  newPayment = sqlResult[0];
-                }
+                // Use a direct database insertion with focused error handling
+                const { data: newPayment, error } = await supabase
+                  .from('payments')
+                  .insert(finalData)
+                  .select()
+                  .single();
                 
                 if (error) {
                   console.error(`❌ [CRITICAL ERROR] Failed to create payment record for product #${productId}:`, error);
