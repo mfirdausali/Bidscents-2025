@@ -3712,9 +3712,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // DIAGNOSTIC: Add marker for payment processing entry point
+      console.log(`🔍 [DIAGNOSTIC] PAYMENT BOOST PROCESSING - STATUS CHECK: Payment ID ${payment.id}, Status ${status}, Force=${payment._forceProductBoostProcessing ? 'true' : 'false'}`);
+            
       // CRITICAL: If payment is successful, process boost for all products
       // Also runs if payment._forceProductBoostProcessing was set earlier during diagnostic
       if (status === 'paid' || payment._forceProductBoostProcessing) {
+        console.log(`🔍 [DIAGNOSTIC] PAYMENT BOOST PROCESSING - ENTERED MAIN BLOCK`);
         try {
           // Extract product IDs from payment metadata or from reference_2
           let productIds: string[] = [];
@@ -4148,7 +4152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 };
                 
                 // Most direct and reliable approach - use a simplified insert with essential fields
-                console.log(`🔬 Creating payment record for product #${productId} with simplified approach`);
+                console.log(`🚨 [CRITICAL] CREATING PRODUCT RECORD - PRODUCT #${productId}: Starting individual payment record creation`);
                 
                 // Use a minimal set of required data that's guaranteed to work
                 const essentialData = {
@@ -4162,23 +4166,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   paid_at: new Date().toISOString()
                 };
                 
+                console.log(`🚨 [CRITICAL DATA] Product Payment Record: ${JSON.stringify({
+                  product_id: Number(productId),
+                  product_id_type: typeof Number(productId), 
+                  order_id: uniqueOrderId,
+                  bill_id: effectiveBillId,
+                  collection_id: '5dkdgtmo',
+                  user_id: essentialData.user_id,
+                  user_id_type: typeof essentialData.user_id
+                }, null, 2)}`);
+                
                 console.log(`🔬 USING SIMPLIFIED DATA:`, essentialData);
                 
                 // Try the most straightforward approach possible
-                const { data: newPayment, error } = await supabase
+                console.log(`⭐ [EXECUTION] Inserting product payment record for product #${productId} into database NOW`);
+                
+                // Before we try to insert, let's double-check what's already in the database
+                const { data: existingRecords } = await supabase
                   .from('payments')
-                  .insert(essentialData)
-                  .select()
-                  .single();
+                  .select('id, product_id, bill_id')
+                  .eq('bill_id', essentialData.bill_id)
+                  .eq('product_id', essentialData.product_id);
+                  
+                console.log(`⭐ [DB CHECK] Found ${existingRecords?.length || 0} existing records for product #${productId} with bill_id ${essentialData.bill_id}`);
+                
+                // ======== GUARANTEED DIRECT INSERTION METHOD ========
+                // Use a completely direct approach that guarantees product_id is properly set
+                const insertSQL = `
+                  INSERT INTO payments 
+                  (order_id, bill_id, collection_id, product_id, amount, user_id, status, paid_at) 
+                  VALUES 
+                  ('${essentialData.order_id}', 
+                   '${essentialData.bill_id}', 
+                   '5dkdgtmo', 
+                   ${Number(productId)}, 
+                   ${Math.floor(payment.amount / productIds.length)}, 
+                   ${typeof userId === 'string' ? parseInt(userId, 10) : userId}, 
+                   'paid', 
+                   '${new Date().toISOString()}')
+                  RETURNING *;
+                `;
+                
+                console.log(`🔥 [DIRECT SQL] Executing direct insertion for product #${productId}`);
+                const { data: sqlResult, error: sqlError } = await supabase.rpc('execute_sql', { 
+                  query: insertSQL 
+                });
+                
+                let newPayment = null;
+                let error = sqlError;
+                
+                if (sqlError) {
+                  console.log(`⚠️ Direct SQL insert failed, falling back to builder approach`);
+                  // Fallback to the regular builder approach
+                  const { data, error: builderError } = await supabase
+                    .from('payments')
+                    .insert(essentialData)
+                    .select()
+                    .single();
+                    
+                  newPayment = data;
+                  error = builderError;
+                } else if (sqlResult && sqlResult.length > 0) {
+                  console.log(`✅ Direct SQL insert succeeded!`);
+                  newPayment = sqlResult[0];
+                }
                 
                 if (error) {
-                  console.error(`❌ Error creating payment record:`, error);
+                  console.error(`❌ [CRITICAL ERROR] Failed to create payment record for product #${productId}:`, error);
                   console.error(`Error details:`, error.details || 'No details');
                   console.error(`Error hint:`, error.hint || 'No hint');
                   // Don't throw - just log and continue with other products
                   console.error(`Skipping product #${productId} due to database error`);
                   continue;
                 }
+                
+                // Success! Log the created payment record
+                console.log(`✅ [SUCCESS] Created payment record for product #${productId}:`, {
+                  payment_id: newPayment.id,
+                  product_id: newPayment.product_id,
+                  product_id_type: typeof newPayment.product_id,
+                  bill_id: newPayment.bill_id,
+                  collection_id: newPayment.collection_id
+                });
                 
                 console.log(`🔬 DIAGNOSTIC: Insert successful! New payment:`, {
                   id: newPayment.id,
@@ -4223,11 +4292,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             
-            console.log(`📊 Payment processing summary:`, {
-              totalProducts: productIds.length,
-              paymentsCreated: createdPayments.length,
-              failedProducts: productIds.length - createdPayments.length
-            });
+            // Enhanced diagnostic summary with detailed results
+            console.log(`📊 [FINAL SUMMARY] Payment processing completed: 
+               - Total products: ${productIds.length}
+               - Created payment records: ${createdPayments.length}
+               - Failed products: ${productIds.length - createdPayments.length}`);
+            
+            // Verify the product_id values in the created payment records
+            if (createdPayments.length > 0) {
+              console.log(`✅ [VERIFICATION] Product payment records created:`);
+              createdPayments.forEach((p, i) => {
+                console.log(`   ${i+1}. Payment ID: ${p.id}, Product ID: ${p.product_id || 'NULL'}, Bill ID: ${p.bill_id}`);
+              });
+            } else {
+              console.log(`❌ [VERIFICATION FAILED] No product payment records were created!`);
+            }
+            
+            // After processing, verify what's in the database
+            try {
+              const { data: finalCheck } = await supabase
+                .from('payments')
+                .select('id, product_id, bill_id')
+                .eq('bill_id', effectiveBillId);
+                
+              console.log(`🔍 [DB FINAL CHECK] Found ${finalCheck?.length || 0} total payment records with bill_id ${effectiveBillId}:`);
+              if (finalCheck && finalCheck.length > 0) {
+                finalCheck.forEach((p, i) => {
+                  console.log(`   ${i+1}. Payment ID: ${p.id}, Product ID: ${p.product_id || 'NULL'}`);
+                });
+              }
+            } catch (verifyErr) {
+              console.error(`❌ Error during final verification:`, verifyErr);
+            }
             
             return { 
               success: true, 
