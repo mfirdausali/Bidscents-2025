@@ -13,8 +13,94 @@ import path from "path"; // Added import for path
 import { supabase } from "./supabase"; // Import Supabase for server-side operations
 import { createClient } from '@supabase/supabase-js';
 import { users } from "@shared/schema"; // Import the users schema for database updates
+import { WebSocketServer, WebSocket } from 'ws'; // Import WebSocket for real-time communication
+import crypto from 'crypto'; // Import crypto for generating secure IDs
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Create HTTP server to attach both Express and WebSocket
+  const server = createServer(app);
+  
+  // Initialize WebSocket server on a distinct path to avoid conflicts with Vite's HMR
+  const wss = new WebSocketServer({ server, path: '/ws' });
+  
+  // Store active connections by user ID
+  const connections = new Map<number, Set<WebSocket>>();
+  
+  // Handle WebSocket connections
+  wss.on('connection', (ws: WebSocket) => {
+    console.log('New WebSocket connection established');
+    let userId: number | null = null;
+    
+    // Handle incoming messages from clients
+    ws.on('message', async (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        // Handle authentication message to identify the user
+        if (data.type === 'auth') {
+          userId = parseInt(data.userId);
+          if (!isNaN(userId)) {
+            // Store connection for this user
+            if (!connections.has(userId)) {
+              connections.set(userId, new Set());
+            }
+            connections.get(userId)?.add(ws);
+            console.log(`User ${userId} authenticated on WebSocket`);
+            
+            // Acknowledge successful authentication
+            ws.send(JSON.stringify({
+              type: 'auth_success',
+              userId: userId
+            }));
+          }
+        }
+        // Handle message sending
+        else if (data.type === 'message' && userId !== null) {
+          // Process and relay the message
+          console.log(`Message from user ${userId} to ${data.recipientId}: ${data.content}`);
+          
+          // You can implement message saving to database here
+          
+          // Notify recipient if online
+          notifyUser(parseInt(data.recipientId), {
+            type: 'new_message',
+            senderId: userId,
+            content: data.content,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    });
+    
+    // Handle disconnection
+    ws.on('close', () => {
+      console.log('WebSocket connection closed');
+      if (userId) {
+        // Remove this connection from the user's set
+        connections.get(userId)?.delete(ws);
+        // If no more connections for this user, clean up
+        if (connections.get(userId)?.size === 0) {
+          connections.delete(userId);
+        }
+      }
+    });
+  });
+  
+  // Function to send notification to a specific user
+  function notifyUser(userId: number, data: any) {
+    const userConnections = connections.get(userId);
+    if (userConnections) {
+      const message = JSON.stringify(data);
+      userConnections.forEach(connection => {
+        if (connection.readyState === WebSocket.OPEN) {
+          connection.send(message);
+        }
+      });
+    }
+  }
+  
   // Set up authentication routes
   setupAuth(app);
 
@@ -1001,6 +1087,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  // Return the HTTP server with WebSocket support
+  return server;
 }
