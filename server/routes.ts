@@ -3841,8 +3841,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
 
-          // CRITICAL FIX: Create MULTIPLE payment records directly to Supabase
-          // The database expects a single product_id per record
+          // DIAGNOSTIC: Add detailed logs to trace product payment processing
+          console.log(`🔍 [DIAGNOSTIC] PAYMENT PROCESSING VALIDATION:`);
+          console.log(`- Payment record ID: ${payment.id}`);
+          console.log(`- Payment bill_id: ${payment.bill_id}`);
+          console.log(`- Number of products: ${productIds.length}`);
+          console.log(`- Product IDs to process: ${productIds.join(', ')}`);
+          
+          // Check if we have the constraint issue - look for existing product-specific records
+          console.log(`🔍 [DIAGNOSTIC] Checking for existing product-specific payment records with bill_id: ${payment.bill_id}`);
+          
+          try {
+            const { data: existingProductPayments } = await supabase
+              .from('payments')
+              .select('id, product_id, order_id, user_id')
+              .eq('bill_id', payment.bill_id);
+              
+            if (existingProductPayments && existingProductPayments.length > 0) {
+              console.log(`Found ${existingProductPayments.length} payment records with bill_id ${payment.bill_id}:`);
+              existingProductPayments.forEach((p, i) => {
+                console.log(`- Payment #${p.id}: product_id=${p.product_id || 'NULL'}, order_id=${p.order_id}, user_id=${p.user_id}`);
+              });
+              
+              // If we already have product-specific records, skip creation
+              if (existingProductPayments.length > 1 || 
+                  (existingProductPayments.length === 1 && existingProductPayments[0].product_id !== null)) {
+                console.log(`⚠️ [CONSTRAINT CHECK] Payment already has product-specific records. Skipping creation.`);
+                
+                // Return the existing records instead of creating new ones
+                return {
+                  success: true,
+                  message: 'Payment already processed',
+                  payment: payment
+                };
+              }
+            } else {
+              console.log(`No existing product-specific payment records found for bill_id ${payment.bill_id}`);
+            }
+          } catch (checkErr) {
+            console.error(`Error checking for existing product payments:`, checkErr);
+          }
+          
+          // Continue with payment record creation
           console.log(`🔧 [FIX] Creating ${productIds.length} individual payment records in Supabase`);
           console.log(`📋 Product IDs to process: ${productIds.join(', ')}`);
           
@@ -4238,11 +4278,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // CRITICAL FIX: Force-set product_id as a number to match database schema
                 // Create a clean record with ONLY the properties we need
-                // PRODUCT ID FIX: Focus solely on setting the correct product_id
-                // Ensure product_id is properly set as an integer in the database
+                // MULTI-PRODUCT FIX: Create a unique bill_id for each product
+                // This is necessary to work around the database's unique constraint on bill_id
+                const uniqueBillId = `${essentialData.bill_id}_product_${productIdNumber}`;
+                
+                // Create a record with explicit product_id and unique bill_id
                 const finalData = {
                   order_id: essentialData.order_id,
-                  bill_id: essentialData.bill_id,
+                  bill_id: uniqueBillId, // CRITICAL: Use a unique bill_id for each product
                   collection_id: '5dkdgtmo',
                   product_id: productIdNumber, // Clean, number-type product ID
                   amount: essentialData.amount,
@@ -4251,8 +4294,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   paid_at: essentialData.paid_at
                 };
                 
-                // Log the exact product_id value and type
-                console.log(`🔍 [PRODUCT ID] Setting product_id=${productIdNumber} (${typeof productIdNumber}) for payment`);
+                // Log the exact values being used
+                console.log(`🔧 [MULTI-PRODUCT FIX] Creating payment record for product #${productIdNumber}:`);
+                console.log(`- Product ID: ${productIdNumber} (${typeof productIdNumber})`);
+                console.log(`- Original bill_id: ${essentialData.bill_id}`);
+                console.log(`- Unique bill_id: ${uniqueBillId}`);
                 
                 // DIRECT INSERT WITH PRODUCT ID: Use explicit SQL-style insert to guarantee the product_id is set
                 console.log(`⚙️ Creating payment for product #${productIdNumber} with direct insert`);
