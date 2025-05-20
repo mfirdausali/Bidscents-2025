@@ -3666,40 +3666,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
 
-          // SIMPLIFIED IMPLEMENTATION: Create a SINGLE payment record with all products
-          // This approach uses the array field productIds correctly
-          console.log(`🔍 BOOST PAYMENT DEBUG: Creating payment record for ${productIds.length} products`);
-          console.log(`🔍 BOOST PAYMENT DEBUG: Product IDs:`, productIds);
+          // CORRECT IMPLEMENTATION: Create MULTIPLE payment records (one per product)
+          // Based on the actual database schema (single product_id per record)
+          console.log(`🔍 BOOST PAYMENT DEBUG: Creating ${productIds.length} payment records (one per product)`);
+          console.log(`🔍 BOOST PAYMENT DEBUG: Product IDs to process:`, productIds);
           
-          // Verify bill_id
+          // Verify bill_id is present
           let effectiveBillId = billId;
           if (!effectiveBillId) {
-            console.log(`❌ WARNING: billId is missing, using placeholder`);
+            console.error(`❌ WARNING: billId is missing, using placeholder`);
             effectiveBillId = 'missing-' + new Date().getTime();
           }
           
-          // Convert all product IDs to strings for consistency
-          const stringProductIds = productIds.map(pid => String(pid));
-          
-          // Generate a unique order ID for this boost payment
-          const uniqueOrderId = `boost-${effectiveBillId}-${Date.now()}`;
-          
           try {
-            // Update the original payment record with the new status and products
-            const updatedPayment = await storage.updatePayment(
-              payment.id,
-              'paid',
-              effectiveBillId,
-              paymentChannel || null,
-              paidDate
-            );
+            // Update the original payment record with paid status
+            const { data: updatedPayment, error: updateError } = await supabase
+              .from('payments')
+              .update({
+                status: 'paid',
+                bill_id: effectiveBillId,
+                paid_at: paidDate || new Date()
+              })
+              .eq('id', payment.id)
+              .select()
+              .single();
+              
+            if (updateError) {
+              console.error(`❌ Error updating original payment:`, updateError);
+            }
             
             console.log(`✅ Updated original payment record #${payment.id} to 'paid' status`);
             
-            // Now update each product to mark it as featured
-            const productUpdateResults = [];
+            // Process each product individually - create separate payment records
+            const createdPayments = [];
             
-            for (const pid of productIds) {
+            for (let i = 0; i < productIds.length; i++) {
+              const pid = productIds[i];
               const productId = parseInt(pid);
               
               if (isNaN(productId)) {
@@ -3707,11 +3709,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 continue;
               }
               
+              console.log(`🔄 Processing product #${productId} (${i+1} of ${productIds.length})`);
+              
               try {
-                const featureUntil = new Date();
-                featureUntil.setDate(featureUntil.getDate() + (payment.featureDuration || 7));
+                // Generate a unique order ID for this specific product
+                // Each payment record must have a unique order_id
+                const uniqueOrderId = `boost-${effectiveBillId}-${productId}-${Date.now()}-${i}`;
                 
-                // Update the product directly in the database
+                // Query the database to confirm product exists
+                const product = await storage.getProductById(productId);
+                
+                if (!product) {
+                  console.error(`❌ Product #${productId} does not exist - skipping`);
+                  continue;
+                }
+                
+                console.log(`📦 Found product: "${product.name}" (ID: ${productId})`);
+                
+                // Create a payment record for this product
+                // Following the ACTUAL database schema (product_id is a single integer field)
+                const { data: newPayment, error } = await supabase.from('payments').insert({
+                  order_id: uniqueOrderId,
+                  bill_id: effectiveBillId,
+                  product_id: productId,
+                  amount: Math.floor(payment.amount / productIds.length), // Split amount evenly
+                  user_id: String(payment.userId),
+                  status: 'paid',
+                  paid_at: paidDate || new Date(),
+                  created_at: new Date()
+                }).select().single();
+                
+                if (error) {
+                  console.error(`❌ Error creating payment record:`, error);
+                  console.error(`Error details:`, error.details || 'No details');
+                  throw error;
+                }
+                
+                console.log(`✅ Created payment record for product #${productId}:`, {
+                  paymentId: newPayment.id,
+                  orderId: newPayment.order_id,
+                  billId: newPayment.bill_id,
+                  productId: newPayment.product_id
+                });
+                
+                createdPayments.push(newPayment);
+                
+                // Now update the product to mark it as featured
+                const featureDuration = 7; // Default to 7 days
+                const featureUntil = new Date();
+                featureUntil.setDate(featureUntil.getDate() + featureDuration);
+                
                 await storage.updateProduct(productId, {
                   isFeatured: true,
                   featuredAt: new Date(),
@@ -3720,35 +3767,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
                 
                 console.log(`✅ Updated product #${productId} to featured status until ${featureUntil}`);
-                
-                productUpdateResults.push({
-                  success: true,
-                  productId: productId
-                });
               } catch (err) {
-                console.error(`❌ Error updating featured status for product ${productId}:`, err);
-                
-                productUpdateResults.push({
-                  success: false,
-                  productId: productId,
-                  error: err.message || 'Unknown error'
-                });
+                console.error(`❌ Error processing product #${productId}:`, err);
+                console.error(`Stack trace:`, err.stack);
               }
             }
             
-            console.log(`📊 Product update results summary:`, {
+            console.log(`📊 Payment processing summary:`, {
               totalProducts: productIds.length,
-              successCount: productUpdateResults.filter(r => r.success).length,
-              failureCount: productUpdateResults.filter(r => !r.success).length
+              paymentsCreated: createdPayments.length,
+              failedProducts: productIds.length - createdPayments.length
             });
             
             return { 
               success: true, 
-              message: `Payment processed and ${productUpdateResults.filter(r => r.success).length} products featured`, 
-              payment: updatedPayment 
+              message: `Payment processed and ${createdPayments.length} product payments created`, 
+              payment: updatedPayment,
+              productPayments: createdPayments.map(p => ({
+                id: p.id,
+                productId: p.product_id,
+                billId: p.bill_id
+              }))
             };
           } catch (err) {
-            console.error(`❌ ERROR processing payment:`, err);
+            console.error(`❌ ERROR in main payment processing:`, err);
             console.error(`Stack trace:`, err.stack);
             
             return { 
