@@ -3912,7 +3912,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               try {
                 // Generate a proper UUID for this specific product's payment record
                 // Each payment record must have a unique order_id in UUID format
-                const uniqueOrderId = crypto.randomUUID();
+                // Generate a proper UUID that satisfies PostgreSQL's uuid type requirements
+                let uniqueOrderId = '';
+                try {
+                    uniqueOrderId = crypto.randomUUID(); 
+                    console.log(`🔑 Generated UUID for product #${productId}: ${uniqueOrderId}`);
+                } catch (uuidErr) {
+                    console.error(`❌ Error generating UUID:`, uuidErr);
+                    // Skip this product if we can't generate a valid UUID
+                    continue;
+                }
                 
                 // Query the database to confirm product exists
                 const product = await storage.getProductById(productId);
@@ -3962,13 +3971,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.log(`Using "0" as a last resort to prevent database errors`);
                 }
                 
+                // Convert user ID to a number if it's not already
+                let userId = paymentUserId;
+                // Try to parse the user ID as a number if it's a string
+                if (typeof paymentUserId === 'string') {
+                  try {
+                    const numericUserId = parseInt(paymentUserId, 10);
+                    if (!isNaN(numericUserId)) {
+                      userId = numericUserId;
+                      console.log(`🔄 Converted user ID from string "${paymentUserId}" to number ${userId}`);
+                    }
+                  } catch (parseErr) {
+                    console.error(`❌ Error parsing user ID:`, parseErr);
+                  }
+                }
+                
                 // Now create the record with all critical fields explicitly set
                 const insertData = {
-                  order_id: uniqueOrderId,
+                  order_id: uniqueOrderId,  // Now using proper UUID format
                   bill_id: effectiveBillId,
                   product_id: Number(productId),  // Explicit conversion to number
                   amount: Math.floor(payment.amount / productIds.length), 
-                  user_id: paymentUserId,
+                  user_id: userId,  // Using potentially converted user ID
                   status: 'paid',
                   paid_at: paidDate || new Date(),
                   created_at: new Date(),
