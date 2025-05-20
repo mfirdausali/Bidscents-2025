@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './use-auth';
 import { useToast } from './use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { useWebSocket } from './use-websocket';
 
 // Message type definition
 export interface Message {
