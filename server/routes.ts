@@ -4021,10 +4021,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   }
                 }
                 
-                // Now create the record with all critical fields explicitly set
+                // First, get the collection_id from the original payment
+                let collectionId = '';
+                
+                // Try to get collection_id from the original payment
+                if (payment.collection_id) {
+                  collectionId = payment.collection_id;
+                  console.log(`Using collection_id ${collectionId} from original payment`);
+                } else {
+                  // Try to get it from directly querying the database
+                  try {
+                    const { data: paymentData } = await supabase
+                      .from('payments')
+                      .select('collection_id')
+                      .eq('id', payment.id)
+                      .single();
+                      
+                    if (paymentData && paymentData.collection_id) {
+                      collectionId = paymentData.collection_id;
+                      console.log(`Retrieved collection_id ${collectionId} from database query`);
+                    }
+                  } catch (collectionErr) {
+                    console.error(`❌ Error getting collection_id:`, collectionErr);
+                  }
+                }
+                
+                // As a fallback, use the environment variable
+                if (!collectionId) {
+                  collectionId = process.env.BILLPLZ_COLLECTION_ID || '';
+                  console.log(`Using collection_id ${collectionId} from environment variable`);
+                }
+                
+                // If still empty, use a hardcoded default (last resort)
+                if (!collectionId) {
+                  collectionId = '5dkdgtmo'; // Default collection ID for sandbox
+                  console.log(`Using hardcoded default collection_id ${collectionId}`);
+                }
+                
+                // Now create the record with ALL required fields explicitly set
                 const insertData = {
                   order_id: uniqueOrderId,  // Now using proper UUID format
                   bill_id: effectiveBillId,
+                  collection_id: collectionId, // CRITICAL: This was missing before
                   product_id: Number(productId),  // Explicit conversion to number
                   amount: Math.floor(payment.amount / productIds.length), 
                   user_id: userId,  // Using potentially converted user ID
