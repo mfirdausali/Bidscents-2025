@@ -3798,6 +3798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.log(`📦 Found product: "${product.name}" (ID: ${productId})`);
                 
                 // DETAILED DEBUGGING: Log all values before creating payment record
+                // Determine best user ID for payment record
                 console.log(`🔍 BOOST PAYMENT DETAIL [Product #${productId}]:`, {
                   uniqueOrderId,
                   billId: effectiveBillId,
@@ -3806,42 +3807,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   amount: Math.floor(payment.amount / productIds.length),
                   originalUserId: payment.userId,
                   userIdType: typeof payment.userId,
-                  userIdValue: String(payment.userId),
                   paidAt: paidDate || new Date()
                 });
                 
-                // Ensure userId is properly set (critical)
-                let effectiveUserId = String(payment.userId);
-                if (!effectiveUserId || effectiveUserId === 'undefined' || effectiveUserId === 'null') {
-                  console.error(`❌ CRITICAL ERROR: Invalid userId '${effectiveUserId}'`);
-                  // Attempt to get user ID from another source if available
-                  if (product && product.sellerId) {
-                    effectiveUserId = String(product.sellerId);
-                    console.log(`🔄 Using product.sellerId (${effectiveUserId}) as fallback for user_id`);
-                  } else {
-                    // Last resort (not ideal)
-                    console.error(`❌ No valid user ID found - no fallback available`);
-                    // We don't have access to req.user in this context
-                  }
-                }
+                // ----- USER ID DETERMINATION LOGIC -----
+                // Try multiple strategies to get a valid user ID for the payment
+                let paymentUserId = "0"; // Default fallback
                 
-                // Create a payment record for this product with VERY explicit type conversions
-                // Following the ACTUAL database schema from the screenshot
-                
-                // Get user ID from multiple possible sources with fallbacks
-                let effectiveUserId = '';
-                
-                // Priority 1: Original payment's userId
+                // Strategy 1: Use payment.userId if valid
                 if (payment.userId && payment.userId !== 0) {
-                  effectiveUserId = String(payment.userId);
-                  console.log(`Using payment.userId (${effectiveUserId}) for user_id`);
+                  paymentUserId = String(payment.userId);
+                  console.log(`Using payment.userId (${paymentUserId}) for user_id`);
                 }
-                // Priority 2: If the product has a sellerId, use that 
+                // Strategy 2: Use product's sellerId if available
                 else if (product && product.sellerId) {
-                  effectiveUserId = String(product.sellerId);
-                  console.log(`Using product.sellerId (${effectiveUserId}) for user_id`);
+                  paymentUserId = String(product.sellerId);
+                  console.log(`Using product.sellerId (${paymentUserId}) for user_id`);
                 }
-                // Priority 3: Use the webhook payload's name field if all else fails
+                // Strategy 3: Extract from webhook payload
                 else if (payment.webhook_payload) {
                   try {
                     const webhookData = JSON.parse(payment.webhook_payload);
@@ -3854,8 +3837,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         .limit(1);
                         
                       if (userData && userData.length > 0) {
-                        effectiveUserId = String(userData[0].id);
-                        console.log(`Found user (${effectiveUserId}) with username matching webhook name: ${webhookData.name}`);
+                        paymentUserId = String(userData[0].id);
+                        console.log(`Found user (${paymentUserId}) with username matching webhook name: ${webhookData.name}`);
                       }
                     }
                   } catch (err) {
@@ -3863,10 +3846,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   }
                 }
                 
-                if (!effectiveUserId) {
+                if (paymentUserId === "0") {
                   console.error(`❌ CRITICAL: Could not determine user_id for payment!`);
                   console.log(`Using "0" as a last resort to prevent database errors`);
-                  effectiveUserId = "0";
                 }
                 
                 // Now create the record with all critical fields explicitly set
@@ -3875,7 +3857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   bill_id: effectiveBillId,
                   product_id: Number(productId),  // Explicit conversion to number
                   amount: Math.floor(payment.amount / productIds.length), 
-                  user_id: effectiveUserId,
+                  user_id: paymentUserId,
                   status: 'paid',
                   paid_at: paidDate || new Date(),
                   created_at: new Date()
