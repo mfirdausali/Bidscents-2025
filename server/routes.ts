@@ -3841,10 +3841,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return { success: true, message: 'Payment processed but no products to boost', payment: updatedPayment };
           }
 
-          // CORRECT IMPLEMENTATION: Create MULTIPLE payment records (one per product)
-          // Based on the actual database schema (single product_id per record)
-          console.log(`🔍 BOOST PAYMENT DEBUG: Creating ${productIds.length} payment records (one per product)`);
-          console.log(`🔍 BOOST PAYMENT DEBUG: Product IDs to process:`, productIds);
+          // CRITICAL FIX: Create MULTIPLE payment records directly to Supabase
+          // The database expects a single product_id per record
+          console.log(`🔧 [FIX] Creating ${productIds.length} individual payment records in Supabase`);
+          console.log(`📋 Product IDs to process: ${productIds.join(', ')}`);
+          
+          // First, update the original payment record to correctly track product IDs
+          const { data: updatedMainPayment, error: mainUpdateError } = await supabase
+            .from('payments')
+            .update({
+              webhook_payload: JSON.stringify({
+                productIds: productIds,
+                product_ids: productIds.join(','),
+                productCount: productIds.length,
+                type: 'boost_payment_parent'
+              })
+            })
+            .eq('id', payment.id)
+            .select();
+            
+          if (mainUpdateError) {
+            console.error(`❌ Error updating main payment record:`, mainUpdateError);
+          } else {
+            console.log(`✅ Updated main payment record with ${productIds.length} product IDs`);
+          }
           
           // First, update the original payment record to include product IDs for better tracking
           try {
@@ -4218,13 +4238,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // CRITICAL FIX: Force-set product_id as a number to match database schema
                 // Create a clean record with ONLY the properties we need
-                // CRITICAL FIX: Create a unique bill_id for each product to avoid constraint violation
-                // The database has a unique constraint on bill_id, so we need to make each one unique
-                const uniqueBillId = `${essentialData.bill_id}_product_${productIdNumber}`;
-                
+                // PRODUCT ID FIX: Focus solely on setting the correct product_id
+                // Ensure product_id is properly set as an integer in the database
                 const finalData = {
                   order_id: essentialData.order_id,
-                  bill_id: uniqueBillId, // FIXED: Using a unique bill_id for each product
+                  bill_id: essentialData.bill_id,
                   collection_id: '5dkdgtmo',
                   product_id: productIdNumber, // Clean, number-type product ID
                   amount: essentialData.amount,
@@ -4233,14 +4251,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   paid_at: essentialData.paid_at
                 };
                 
-                console.log(`🔑 [UNIQUENESS FIX] Created unique bill_id: "${uniqueBillId}" for product #${productIdNumber}`);
+                // Log the exact product_id value and type
+                console.log(`🔍 [PRODUCT ID] Setting product_id=${productIdNumber} (${typeof productIdNumber}) for payment`);
                 
-                // Use a direct database insertion with focused error handling
-                const { data: newPayment, error } = await supabase
+                // DIRECT INSERT WITH PRODUCT ID: Use explicit SQL-style insert to guarantee the product_id is set
+                console.log(`⚙️ Creating payment for product #${productIdNumber} with direct insert`);
+                
+                // First check if a record with this bill_id already exists (to avoid duplication)
+                const { data: existingPayment } = await supabase
                   .from('payments')
-                  .insert(finalData)
-                  .select()
+                  .select('id, product_id')
+                  .eq('bill_id', finalData.bill_id)
                   .single();
+                  
+                if (existingPayment) {
+                  console.log(`⚠️ Payment record already exists for this bill_id, updating product_id instead`);
+                  
+                  // Update the existing record with the correct product_id
+                  const { data: updatedPayment, error: updateError } = await supabase
+                    .from('payments')
+                    .update({ product_id: productIdNumber })
+                    .eq('id', existingPayment.id)
+                    .select()
+                    .single();
+                    
+                  if (updateError) {
+                    console.error(`❌ Failed to update existing payment with product_id:`, updateError);
+                  } else {
+                    console.log(`✅ Updated existing payment #${updatedPayment.id} with product_id=${productIdNumber}`);
+                  }
+                  
+                  // Use the updated payment as our result
+                  var newPayment = updatedPayment;
+                  var error = updateError;
+                } else {
+                  // No existing record, create a new one with explicit product_id
+                  const { data: insertedPayment, error: insertError } = await supabase
+                    .from('payments')
+                    .insert({
+                      ...finalData,
+                      product_id: productIdNumber  // Explicitly set product_id again for emphasis
+                    })
+                    .select()
+                    .single();
+                    
+                  var newPayment = insertedPayment;
+                  var error = insertError;
+                }
                 
                 if (error) {
                   console.error(`❌ [CRITICAL ERROR] Failed to create payment record for product #${productId}:`, error);
