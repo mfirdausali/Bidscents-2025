@@ -4218,9 +4218,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // CRITICAL FIX: Force-set product_id as a number to match database schema
                 // Create a clean record with ONLY the properties we need
+                // CRITICAL FIX: Create a unique bill_id for each product to avoid constraint violation
+                // The database has a unique constraint on bill_id, so we need to make each one unique
+                const uniqueBillId = `${essentialData.bill_id}_product_${productIdNumber}`;
+                
                 const finalData = {
                   order_id: essentialData.order_id,
-                  bill_id: essentialData.bill_id,
+                  bill_id: uniqueBillId, // FIXED: Using a unique bill_id for each product
                   collection_id: '5dkdgtmo',
                   product_id: productIdNumber, // Clean, number-type product ID
                   amount: essentialData.amount,
@@ -4228,6 +4232,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   status: 'paid',
                   paid_at: essentialData.paid_at
                 };
+                
+                console.log(`🔑 [UNIQUENESS FIX] Created unique bill_id: "${uniqueBillId}" for product #${productIdNumber}`);
                 
                 // Use a direct database insertion with focused error handling
                 const { data: newPayment, error } = await supabase
