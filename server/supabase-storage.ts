@@ -2270,13 +2270,17 @@ export class SupabaseStorage implements IStorage {
     userId: number;
     billId: string;
     productId: number;
+    orderId: string; // Required parameter for unique constraint
     amount: number;
     status: string;
     paidAt?: Date;
     paymentType: string;
     featureDuration?: number;
   }): Promise<any> {
-    console.log(`📝 Creating new payment record for product ID ${params.productId} with bill_id ${params.billId}`);
+    console.log(`📝 Creating new payment record for product ID ${params.productId}:`);
+    console.log(`  - Bill ID: ${params.billId}`);
+    console.log(`  - Order ID: ${params.orderId}`);
+    console.log(`  - User ID: ${params.userId}`);
     
     try {
       // Convert productId to ensure it's a valid integer
@@ -2299,34 +2303,74 @@ export class SupabaseStorage implements IStorage {
       
       console.log(`✅ Verified product ${productId} exists: ${productCheck.name}`);
 
-      // Generate a unique order ID for this payment
-      // The order_id can't be the same as existing payments due to the unique constraint
-      const newOrderId = `boost-${params.billId}-${productId}-${Date.now()}`;
+      // CRITICAL: Dump table schema to verify column names
+      console.log(`🔍 DEBUG: Verifying payments table schema`);
+      const { data: tableInfo, error: tableError } = await supabase
+        .from('payments')
+        .select('*')
+        .limit(1);
+        
+      if (tableError) {
+        console.error(`Error fetching table schema:`, tableError);
+      } else if (tableInfo && tableInfo.length > 0) {
+        console.log(`Available columns in payments table:`, Object.keys(tableInfo[0] || {}));
+      }
       
       // Create the payment record with all required fields
-      // Make sure to include order_id which is required and must be unique
+      // The critical fields are order_id (must be unique) and product_ids (array)
+      const insertData = {
+        user_id: params.userId,
+        order_id: params.orderId, // REQUIRED and must be unique
+        bill_id: params.billId,
+        amount: params.amount,
+        status: params.status || 'paid',
+        paid_at: params.paidAt || new Date(),
+        payment_type: params.paymentType || 'boost',
+        feature_duration: params.featureDuration || 7,
+        product_ids: [String(productId)], // CORRECT FORMAT: Array of strings
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+      
+      console.log(`🔍 DEBUG: Insert data with correct types:`, {
+        order_id: insertData.order_id + ' (type: ' + typeof insertData.order_id + ')',
+        product_ids: JSON.stringify(insertData.product_ids) + ' (type: ' + typeof insertData.product_ids + ')',
+        user_id: insertData.user_id + ' (type: ' + typeof insertData.user_id + ')',
+        amount: insertData.amount + ' (type: ' + typeof insertData.amount + ')'
+      });
+      
+      // Insert the record
       const { data, error } = await supabase
         .from('payments')
-        .insert({
-          user_id: params.userId,
-          order_id: newOrderId, // Important! Must be unique
-          bill_id: params.billId,
-          amount: params.amount,
-          status: params.status || 'paid',
-          paid_at: params.paidAt || new Date(),
-          payment_type: params.paymentType || 'boost',
-          feature_duration: params.featureDuration || 7,
-          product_ids: [String(productId)], // Using the array field for consistency
-          created_at: new Date()
-        })
+        .insert(insertData)
         .select()
         .single();
         
       if (error) {
-        console.error(`Error creating payment record:`, error);
+        console.error(`❌ ERROR creating payment record:`, error);
         console.error(`Error details:`, error.details || 'No details');
         console.error(`Error hint:`, error.hint || 'No hint');
-        throw error;
+        
+        // Try an alternative approach with RPC if insert fails
+        console.log(`🔄 Trying alternative approach via plain SQL...`);
+        const { data: rpcData, error: rpcError } = await supabase.rpc('create_payment_record', {
+          p_user_id: params.userId,
+          p_order_id: params.orderId,
+          p_bill_id: params.billId,
+          p_amount: params.amount,
+          p_status: params.status || 'paid',
+          p_product_ids: [String(productId)],
+          p_payment_type: params.paymentType || 'boost',
+          p_feature_duration: params.featureDuration || 7
+        });
+        
+        if (rpcError) {
+          console.error(`❌ RPC method also failed:`, rpcError);
+          throw error; // Throw the original error
+        }
+        
+        console.log(`✅ Created payment record via RPC:`, rpcData);
+        return rpcData;
       }
       
       console.log(`✅ Successfully created payment record for product ${productId}:`, {
@@ -2363,8 +2407,8 @@ export class SupabaseStorage implements IStorage {
       
       return data;
     } catch (err) {
-      console.error(`❌ Failed to create payment record for product ${params.productId}:`, err);
-      console.error(`Stack trace:`, err.stack);
+      console.error(`❌ CRITICAL ERROR: Failed to create payment record for product ${params.productId}:`, err);
+      console.error(`Full error stack:`, err.stack);
       throw err;
     }
   }

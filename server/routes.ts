@@ -3708,6 +3708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             try {
               // Create a new payment record for this product with full details
+              // Ensure all required parameters are included and properly formatted
               const newPaymentParams = {
                 userId: payment.userId,
                 billId: effectiveBillId,
