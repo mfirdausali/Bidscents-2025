@@ -362,6 +362,14 @@ export type ProductWithDetails = Product & {
   images?: ProductImage[]; // Added images array
   auction?: Auction & { bidCount?: number }; // Added auction data with optional bid count
   status?: string;
+  
+  // Support both database field names and TypeScript conventions for featured status
+  // This ensures compatibility between database and frontend code
+  is_featured?: boolean;  // Database field name
+  featured_at?: Date | string | null;  // Database field name
+  featured_until?: Date | string | null;  // Database field name
+  featured_duration_hours?: number | null;  // Database field name
+  boost_option_id?: number | null;  // Database field name
 };
 
 export type OrderWithItems = Order & {

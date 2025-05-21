@@ -883,29 +883,35 @@ export default function SellerDashboard() {
       const nowDate = new Date();
       console.log("Checking featured products status. Total products:", products.length);
       
-      // Look for products with is_featured=true first (matches database field name)
-      const featuredByFlag = products
-        .filter(p => p.is_featured === true)
-        .map(p => p.id);
+      // Comprehensive check for all possible featured flags and dates
+      // This ensures compatibility with both database field names and code field names
+      const featuredProducts = products.filter(p => {
+        // Check all possible "featured" flags
+        const isFeaturedByFlag = (p.is_featured === true) || (p.isFeatured === true);
+        
+        // Check all possible "featured until" dates
+        const now = new Date();
+        const hasFutureDate = (
+          (p.featured_until && new Date(p.featured_until) > now) ||
+          (p.featuredUntil && new Date(p.featuredUntil) > now)
+        );
+        
+        // Product is featured if either the flag is true or the date is valid
+        return isFeaturedByFlag || hasFutureDate;
+      });
       
-      console.log("Products with is_featured=true:", featuredByFlag);
+      const allBoostedIds = featuredProducts.map(p => p.id);
       
-      // For backward compatibility, also check isFeatured and featuredUntil
-      const featuredByOldFlag = products
-        .filter(p => p.isFeatured === true && p.featuredUntil && new Date(p.featuredUntil) > nowDate)
-        .map(p => p.id);
-      
-      console.log("Products with isFeatured=true and valid featuredUntil:", featuredByOldFlag);
-      
-      // Check featured_until database field
-      const featuredByDate = products
-        .filter(p => p.featured_until && new Date(p.featured_until) > nowDate)
-        .map(p => p.id);
-      
-      console.log("Products with valid featured_until date:", featuredByDate);
-      
-      // Combine all approaches for maximum compatibility
-      const allBoostedIds = [...new Set([...featuredByFlag, ...featuredByOldFlag, ...featuredByDate])];
+      console.log("Found featured products: ", 
+        featuredProducts.map(p => ({
+          id: p.id, 
+          name: p.name, 
+          is_featured: p.is_featured, 
+          isFeatured: p.isFeatured, 
+          featured_until: p.featured_until, 
+          featuredUntil: p.featuredUntil
+        }))
+      );
       
       console.log("Final list of featured product IDs:", allBoostedIds);
       setBoostedProductIds(allBoostedIds);
