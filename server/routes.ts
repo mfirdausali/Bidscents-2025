@@ -3792,9 +3792,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payment._forceProductBoostProcessing = true;
         console.log(`🔄 Forcing product boost processing for already-paid payment ${payment.id}`);
         
+        // MEGA DIAGNOSTIC: Investigate if the webhook payload exists in the payment record
+        console.log("🔬 MEGA DIAGNOSTIC: Payment Object Structure:");
+        console.log("- Has webhook_payload:", !!payment.webhook_payload);
+        console.log("- Payment record fields:", Object.keys(payment).join(", "));
+        console.log("- Product IDs:", payment.productIds);
+        
+        // Attempt to extract boost information from the original webhook payload
+        if (payment.webhook_payload) {
+          try {
+            console.log("🔬 MEGA DIAGNOSTIC: Found webhook_payload in payment record");
+            console.log("- Webhook payload type:", typeof payment.webhook_payload);
+            
+            // Try parsing it to extract boost options
+            const webhookData = JSON.parse(payment.webhook_payload);
+            console.log("- Parsed webhook data keys:", Object.keys(webhookData).join(", "));
+            console.log("- Contains boostOption?", !!webhookData.boostOption);
+            
+            if (webhookData.boostOption) {
+              console.log("- Boost Option Structure:", JSON.stringify(webhookData.boostOption, null, 2));
+              console.log("- Boost Duration Hours:", webhookData.boostOption.duration_hours);
+            }
+          } catch (e) {
+            console.error("Error parsing webhook_payload:", e.message);
+          }
+        } else {
+          console.log("🔬 MEGA DIAGNOSTIC: No webhook_payload found in payment record");
+        }
+        
         // Check if product is already boosted
         if (payment.productIds && payment.productIds.length > 0) {
           for (const prodId of payment.productIds) {
+            // MEGA DIAGNOSTIC: Check database schema for this product
+            console.log(`🔬 MEGA DIAGNOSTIC: Fetching complete product #${prodId} record to check all fields`);
+            const { data: fullProduct, error: fullProductError } = await supabase
+              .from('products')
+              .select('*')
+              .eq('id', prodId)
+              .single();
+              
+            if (fullProductError) {
+              console.error(`Error fetching full product #${prodId}:`, fullProductError);
+            } else if (fullProduct) {
+              console.log(`- Full product record fields:`, Object.keys(fullProduct).join(", "));
+              console.log(`- Featured status fields:`, {
+                is_featured: fullProduct.is_featured,
+                featured_at: fullProduct.featured_at,
+                featured_until: fullProduct.featured_until,
+                featured_at_type: typeof fullProduct.featured_at,
+                featured_until_type: typeof fullProduct.featured_until
+              });
+            }
+              
             const { data: product } = await supabase
               .from('products')
               .select('id, name, is_featured, featured_until')
@@ -3894,6 +3943,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let durationHours = 168; // Default 7 days (in hours)
           let boostOptionId = null;
           
+          console.log(`🧪 SUPER DIAGNOSTIC - Product Boost Flow START 🧪`);
+          console.log(`🧪 Function input parameters:`);
+          console.log(`- productId: ${productId} (type: ${typeof productId})`);
+          console.log(`- payment object available: ${!!payment}`);
+          
+          if (payment) {
+            console.log(`- payment.id: ${payment.id}`);
+            console.log(`- payment object keys: ${Object.keys(payment).join(', ')}`);
+            console.log(`- payment.metadata exists: ${!!payment.metadata}`);
+            console.log(`- payment.webhook_payload exists: ${!!payment.webhook_payload}`);
+            
+            // Try to extract boost info directly from webhook_payload as a fix
+            if (payment.webhook_payload && typeof payment.webhook_payload === 'string') {
+              try {
+                const payloadData = JSON.parse(payment.webhook_payload);
+                console.log(`🧪 Extracted data from webhook_payload:`, {
+                  keys: Object.keys(payloadData),
+                  hasBoostOption: !!payloadData.boostOption
+                });
+                
+                if (payloadData.boostOption && payloadData.boostOption.duration_hours) {
+                  console.log(`🧪 Found boost option in webhook_payload:`, payloadData.boostOption);
+                  console.log(`🧪 Setting duration from webhook_payload: ${payloadData.boostOption.duration_hours} hours`);
+                  
+                  // SET DURATION FROM WEBHOOK PAYLOAD - Critical fix
+                  durationHours = Number(payloadData.boostOption.duration_hours);
+                  boostOptionId = payloadData.boostOption.id || null;
+                }
+              } catch (parseErr) {
+                console.error(`🧪 Error parsing webhook_payload:`, parseErr);
+              }
+            }
+          }
+          
           console.log(`🔍 Attempting to update featured status for product #${productId}`);
           
           // First verify if the product exists
@@ -3980,22 +4063,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const updateData = {
             // Boolean fields
             is_featured: true,
-            isFeatured: true,
             
             // Timestamps - featured_at is numeric in DB schema
             featured_at: Math.floor(featuredAt.getTime() / 1000), // Unix timestamp in seconds
-            featuredAt: Math.floor(featuredAt.getTime() / 1000),
             
             // featured_until is timestamp type in DB schema
             featured_until: featuredUntil,
-            featuredUntil: featuredUntil,
             
             // Duration and reference fields
             featured_duration_hours: durationHours,
             boost_option_id: boostOptionId
           };
           
-          console.log("DIAGNOSTIC - Final update data being sent to database:", updateData);
+          console.log("🧪 CRITICAL - Final update data being sent to database:", updateData);
+          
+          // SUPER DIAGNOSTIC - Check exact column names in the products table
+          try {
+            const { data: columnInfo, error: columnError } = await supabase
+              .rpc('get_column_names', { table_name: 'products' });
+              
+            if (columnError) {
+              console.error("🧪 Error fetching column names:", columnError);
+            } else if (columnInfo) {
+              console.log("🧪 Actual columns in products table:", columnInfo);
+              
+              // Adjust update data to match exact column names if needed
+              const updateKeys = Object.keys(updateData);
+              for (const key of updateKeys) {
+                if (!columnInfo.includes(key)) {
+                  console.log(`🧪 WARNING: Column '${key}' might not exist in products table`);
+                }
+              }
+            }
+          } catch (e) {
+            console.error("🧪 Error in column check:", e);
+          }
           
           const { data: updatedProduct, error: productError } = await supabase
             .from('products')
@@ -4015,6 +4117,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (productError.message && productError.message.includes("invalid input syntax")) {
               console.log("- TYPE MISMATCH DETECTED: Schema vs. code field type mismatch");
               console.log("- Check the Supabase database schema vs. what we're sending");
+              
+              // EMERGENCY FALLBACK - Try with different data types
+              console.log("🧪 EMERGENCY FALLBACK - Trying with adjusted data types");
+              const fallbackData = {
+                is_featured: true,
+                featured_at: Math.floor(featuredAt.getTime() / 1000),
+                featured_until: featuredUntil.toISOString(),
+                featured_duration_hours: Math.floor(durationHours)
+              };
+              
+              console.log("🧪 Fallback update data:", fallbackData);
+              
+              const { data: fallbackResult, error: fallbackError } = await supabase
+                .from('products')
+                .update(fallbackData)
+                .eq('id', Number(productId))
+                .select()
+                .single();
+                
+              if (fallbackError) {
+                console.error("🧪 Fallback update also failed:", fallbackError);
+                return false;
+              } else {
+                console.log("🧪 FALLBACK UPDATE WORKED!", fallbackResult);
+                return true;
+              }
             }
             return false;
           } else {
