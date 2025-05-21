@@ -2597,22 +2597,69 @@ export default function SellerDashboard() {
       {boostedProducts.length > 0 && (
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-fadeIn">
           <Button 
-            onClick={handleBoostCheckout}
+            onClick={openBoostDialog}
             className="bg-gradient-to-r from-gold to-metallic-gold text-rich-black hover:from-metallic-gold hover:to-gold shadow-lg px-6 py-6 rounded-full flex items-center space-x-2 transition-all duration-300 ease-in-out"
           >
             <span className="font-semibold">Boost Selected ({boostedProducts.length})</span>
             <span className="mx-2 text-xs bg-white/20 px-2 py-1 rounded">
-              {boostedProducts.length === 1 
-                ? "RM10 for 7 days" 
-                : `RM${10 * boostedProducts.length} total for 7 days`
-              }
+              Select boost options
             </span>
             <span className="flex items-center">
-              Checkout →
+              Continue →
             </span>
           </Button>
         </div>
       )}
+      
+      {/* Boost Options Dialog */}
+      <Dialog open={isBoostDialogOpen} onOpenChange={setIsBoostDialogOpen}>
+        <DialogContent className="sm:max-w-md md:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Boost Your Products</DialogTitle>
+            <DialogDescription>
+              Selected products will appear at the top of search results and be highlighted in product listings.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {/* Product count summary */}
+            <div className="flex items-center mb-4 p-3 bg-slate-50 rounded-md border">
+              <Package className="h-5 w-5 text-slate-600 mr-3" />
+              <div>
+                <span className="font-medium">
+                  {boostedProducts.length} {boostedProducts.length === 1 ? 'product' : 'products'} selected
+                </span>
+                <p className="text-sm text-muted-foreground">
+                  Boost all selected products with the same duration
+                </p>
+              </div>
+            </div>
+            
+            {/* Boost Option Selector */}
+            <BoostOptionSelector 
+              value={selectedBoostOption} 
+              onChange={setSelectedBoostOption}
+              className="mt-4"
+            />
+          </div>
+          
+          <DialogFooter className="flex-col sm:flex-row sm:justify-between sm:space-x-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsBoostDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleBoostCheckout}
+              className="bg-[#F5A623] hover:bg-[#E59400] text-white"
+              disabled={!selectedBoostOption}
+            >
+              Proceed to Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Footer />
     </div>
   );
