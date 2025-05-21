@@ -3926,12 +3926,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Updating payment ${payment.id} status to '${status}'${paidDate ? ' with paid date ' + paidDate : ''}`);
       
-      // Update payment with complete data
+      // Update payment with complete data - ONLY include columns that exist in database
+      // Remove payment_channel since it doesn't exist in our schema
       const updatedPayment = await storage.updatePaymentStatus(
         payment.id,
         status,
         billId,                    // Bill ID from Billplz
-        payment_channel || null,   // Payment method
+        null,                      // Payment method removed to avoid errors 
         paidDate                  // Payment date
       );
       
@@ -5018,6 +5019,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(401).json({ message: 'Invalid signature' });
         } else if (!isValid) {
           console.warn('⚠️ SANDBOX MODE: Invalid signature but continuing for testing');
+        }
+      }
+      
+      // CRITICAL FIX: Direct boost processing for products
+      // This ensures boost is applied even if the payment update fails due to schema issues
+      if (req.body.paymentType === 'boost' && req.body.productIds) {
+        try {
+          console.log('🚀 DIRECT BOOST: Detected boost payment, applying product boost directly');
+          console.log('- Product IDs:', req.body.productIds);
+          console.log('- Boost option:', req.body.boostOption);
+          
+          // Process each product to ensure boost is applied
+          const productIds = Array.isArray(req.body.productIds) 
+            ? req.body.productIds 
+            : [req.body.productId || req.body.reference_2].filter(Boolean);
+            
+          console.log('- Processing boost for products:', productIds);
+          
+          for (const productId of productIds) {
+            console.log(`- Directly boosting product #${productId}`);
+            
+            // Directly call updateProductFeatureStatus with the boost information
+            const boostResult = await updateProductFeatureStatus(productId, {
+              id: req.body.id,
+              metadata: {
+                boostOption: req.body.boostOption
+              },
+              // Add the full webhook payload for reference
+              webhook_payload: JSON.stringify(req.body)
+            });
+            
+            if (boostResult) {
+              console.log(`✅ DIRECT BOOST: Successfully applied boost to product #${productId}`);
+            } else {
+              console.log(`❌ DIRECT BOOST: Failed to apply boost to product #${productId}`);
+            }
+          }
+        } catch (boostError) {
+          console.error('Error in direct boost processing:', boostError);
         }
       }
       
