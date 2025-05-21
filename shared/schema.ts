@@ -154,7 +154,8 @@ export const payments = pgTable("payments", {
   amount: integer("amount").notNull(), // Amount in sen (smallest unit)
   status: text("status").notNull().default("pending"), // pending, paid, failed
   paymentType: text("payment_type").notNull().default("boost"), // Type of payment (boost, order, etc.)
-  featureDuration: integer("feature_duration"), // Duration in days for featured products
+  featureDuration: integer("feature_duration"), // Duration in days for featured products (legacy)
+  boost_option_id: integer("boost_option_id"), // Reference to the selected boost option
   productIds: text("product_ids").array(), // Product IDs to boost
   paymentChannel: text("payment_channel"), // Payment channel used (from Billplz)
   paidAt: timestamp("paid_at"), // When payment was completed
@@ -298,6 +299,7 @@ export const insertPaymentSchema = createInsertSchema(payments).pick({
   status: true,
   paymentType: true,
   featureDuration: true,
+  boost_option_id: true,
   productIds: true,
   paymentChannel: true,
   paidAt: true,
