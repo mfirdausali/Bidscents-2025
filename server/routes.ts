@@ -2526,6 +2526,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Commented out to reduce log noise
   setInterval(checkAndProcessExpiredAuctions, 60000);
   
+  // Function to check for expired featured products
+  async function checkAndUpdateExpiredFeaturedProducts() {
+    console.log("Running featured products expiration check...");
+    
+    // Get current time
+    const currentTime = new Date().toISOString();
+    
+    try {
+      // Find products where:
+      // 1. is_featured is true
+      // 2. featured_until exists and is earlier than current time
+      const { data: expiredProducts, error } = await supabase
+        .from('products')
+        .select('id, name, featured_until, featured_duration_hours')
+        .eq('is_featured', true)
+        .lt('featured_until', currentTime);
+        
+      if (error) {
+        console.error("Error checking for expired featured products:", error);
+        return;
+      }
+      
+      if (!expiredProducts || expiredProducts.length === 0) {
+        console.log("No expired featured products found");
+        return;
+      }
+      
+      console.log(`Found ${expiredProducts.length} products with expired featured status`);
+      
+      // Update each expired product
+      for (const product of expiredProducts) {
+        console.log(`Expiring featured status for product #${product.id} "${product.name}" (expired at ${product.featured_until}, duration: ${product.featured_duration_hours || 'unknown'} hours)`);
+        
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({
+            is_featured: false
+          })
+          .eq('id', product.id);
+          
+        if (updateError) {
+          console.error(`Error updating product #${product.id}:`, updateError);
+        } else {
+          console.log(`✅ Successfully expired featured status for product #${product.id}`);
+        }
+      }
+      
+      console.log("Completed featured products expiration check");
+    } catch (err) {
+      console.error("Error in featured products expiration check:", err);
+    }
+  }
+  
+  // Run the initial check
+  checkAndUpdateExpiredFeaturedProducts();
+  
+  // Set up recurring check for featured product expiration (every 30 minutes)
+  setInterval(checkAndUpdateExpiredFeaturedProducts, 30 * 60 * 1000);
+  
   // WebSocket connection handler
   wss.on('connection', (ws: WebSocket) => {
     console.log('New WebSocket connection established');
@@ -3757,12 +3816,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Helper function to update product feature status
       async function updateProductFeatureStatus(productId: number | string, payment: any) {
         try {
-          // Default feature duration is 7 days if not specified
-          const featureDuration = payment?.metadata?.featureDuration || 7;
+          let durationHours = 168; // Default 7 days (in hours)
           
-          // Create feature expiry date
+          // First try to get duration from boost option in payment metadata
+          if (payment?.metadata?.boostOption?.duration_hours) {
+            console.log(`Found duration_hours in payment metadata: ${payment.metadata.boostOption.duration_hours}`);
+            durationHours = Number(payment.metadata.boostOption.duration_hours);
+          } 
+          // Then try to get from boost_option_id if available
+          else if (payment?.boost_option_id) {
+            try {
+              console.log(`Looking up boost option with ID: ${payment.boost_option_id}`);
+              const { data: boostOption, error: boostOptionError } = await supabase
+                .from('boost_options')
+                .select('duration_hours')
+                .eq('id', payment.boost_option_id)
+                .single();
+                
+              if (!boostOptionError && boostOption) {
+                console.log(`Found boost option, duration: ${boostOption.duration_hours} hours`);
+                durationHours = Number(boostOption.duration_hours);
+              } else {
+                console.warn(`Could not find boost option with ID ${payment.boost_option_id}, using default duration`);
+              }
+            } catch (err) {
+              console.error('Error fetching boost option:', err);
+            }
+          }
+          // Fallback to featureDuration in days for backward compatibility
+          else if (payment?.metadata?.featureDuration) {
+            console.log(`Using legacy featureDuration: ${payment.metadata.featureDuration} days`);
+            durationHours = Number(payment.metadata.featureDuration) * 24;
+          }
+          
+          console.log(`Setting feature duration to ${durationHours} hours for product ${productId}`);
+          
+          // Create feature expiry date - add hours instead of days
           const featuredUntil = new Date();
-          featuredUntil.setDate(featuredUntil.getDate() + Number(featureDuration));
+          featuredUntil.setHours(featuredUntil.getHours() + durationHours);
           
           // Update the product status in the database
           const { data: updatedProduct, error: productError } = await supabase
@@ -3770,7 +3861,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .update({
               is_featured: true,
               featured_at: new Date(),
-              featured_until: featuredUntil
+              featured_until: featuredUntil,
+              featured_duration_hours: durationHours // Store duration in hours for consistency
             })
             .eq('id', Number(productId))
             .select()
