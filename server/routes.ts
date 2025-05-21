@@ -3810,6 +3810,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } else {
                 console.log(`⚠️ Product #${prodId} needs boost reprocessing: featured=${isAlreadyFeatured}, validUntil=${hasValidFeatureDate}`);
                 payment._forceProductBoostProcessing = true;
+                
+                // Critical fix: Immediately process the boost for this product
+                if (payment.webhook_payload) {
+                  try {
+                    // Parse webhook payload to get boost option information
+                    const payloadData = JSON.parse(payment.webhook_payload);
+                    console.log("🔄 DIRECT BOOST: Extracted webhook payload data:", payloadData);
+                    
+                    // Execute product boost directly 
+                    const boostResult = await updateProductFeatureStatus(prodId, {
+                      ...payment,
+                      metadata: {
+                        ...payment.metadata,
+                        boostOption: payloadData.boostOption
+                      }
+                    });
+                    
+                    if (boostResult) {
+                      console.log(`✅ DIRECT BOOST: Successfully boosted product #${prodId}`);
+                    } else {
+                      console.log(`❌ DIRECT BOOST: Failed to boost product #${prodId}`);
+                    }
+                  } catch (parseErr) {
+                    console.error("Error parsing webhook payload for direct boost:", parseErr);
+                  }
+                } else {
+                  console.log(`⚠️ No webhook payload available for direct boost of product #${prodId}`);
+                }
               }
             }
           }
