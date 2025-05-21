@@ -3881,12 +3881,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Feature timeframe: ${featuredAt.toISOString()} to ${featuredUntil.toISOString()}`);
           
           // Update the product status in the database - make sure all fields are set correctly
+          // Need to update both database field names (is_featured) and code field names (isFeatured)
           const { data: updatedProduct, error: productError } = await supabase
             .from('products')
             .update({
               is_featured: true,
+              isFeatured: true, // Also update TypeScript property name
               featured_at: featuredAt,
+              featuredAt: featuredAt, // Also update TypeScript property name
               featured_until: featuredUntil,
+              featuredUntil: featuredUntil, // Also update TypeScript property name
               featured_duration_hours: durationHours, // Store duration in hours for consistency
               boost_option_id: boostOptionId // Store the boost option ID for reference
             })
