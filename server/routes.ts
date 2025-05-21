@@ -3532,7 +3532,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'due',
         billId: null,
         paymentType: 'boost',
-        featureDuration: 7, // 7 days boost
+        boost_option_id: boostOptionId || undefined, // Store the selected boost option ID
+        featureDuration: Math.floor(durationHours / 24), // For backward compatibility (days)
         productIds: productIds,
         metadata: paymentMetadata
       });
