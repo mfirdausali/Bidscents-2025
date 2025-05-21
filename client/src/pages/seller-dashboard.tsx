@@ -877,15 +877,38 @@ export default function SellerDashboard() {
       product.brand.toLowerCase().includes(searchQuery.toLowerCase()),
   );
   
-  // Track boosted products based on featuredUntil date
+  // Track boosted products based on database featured status fields
   useEffect(() => {
     if (products) {
       const nowDate = new Date();
-      const boosted = products
-        .filter(p => p.isFeatured && p.featuredUntil && new Date(p.featuredUntil) > nowDate)
+      console.log("Checking featured products status. Total products:", products.length);
+      
+      // Look for products with is_featured=true first (matches database field name)
+      const featuredByFlag = products
+        .filter(p => p.is_featured === true)
         .map(p => p.id);
       
-      setBoostedProductIds(boosted);
+      console.log("Products with is_featured=true:", featuredByFlag);
+      
+      // For backward compatibility, also check isFeatured and featuredUntil
+      const featuredByOldFlag = products
+        .filter(p => p.isFeatured === true && p.featuredUntil && new Date(p.featuredUntil) > nowDate)
+        .map(p => p.id);
+      
+      console.log("Products with isFeatured=true and valid featuredUntil:", featuredByOldFlag);
+      
+      // Check featured_until database field
+      const featuredByDate = products
+        .filter(p => p.featured_until && new Date(p.featured_until) > nowDate)
+        .map(p => p.id);
+      
+      console.log("Products with valid featured_until date:", featuredByDate);
+      
+      // Combine all approaches for maximum compatibility
+      const allBoostedIds = [...new Set([...featuredByFlag, ...featuredByOldFlag, ...featuredByDate])];
+      
+      console.log("Final list of featured product IDs:", allBoostedIds);
+      setBoostedProductIds(allBoostedIds);
     }
   }, [products]);
 
@@ -1157,7 +1180,7 @@ export default function SellerDashboard() {
                           {filteredProducts.map((product) => (
                             <TableRow 
                               key={product.id}
-                              className={boostedProductIds.includes(product.id) ? "bg-yellow-50" : ""}
+                              className={boostedProductIds.includes(product.id) ? "bg-[#FFF9E6]" : ""}
                             >
                               <TableCell className="bg-[#FFF9E6]">
                                 {boostedProductIds.includes(product.id) ? (
