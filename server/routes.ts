@@ -3383,6 +3383,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // No imports needed here - moved to the top of the file
   
+  // GET /api/boost-options - Get all active boost options
+  app.get('/api/boost-options', async (req, res) => {
+    try {
+      // Get all active boost options
+      const { data, error } = await supabase
+        .from('boost_options')
+        .select('*')
+        .eq('is_active', true)
+        .order('price');
+      
+      if (error) {
+        console.error('Error fetching boost options:', error);
+        return res.status(500).json({ error: 'Failed to fetch boost options' });
+      }
+      
+      // Add formatted values for display
+      const formattedOptions = data.map(option => ({
+        ...option,
+        duration_days: Math.floor(option.duration_hours / 24),  // Convert hours to days for display
+        duration_formatted: formatDuration(option.duration_hours)
+      }));
+      
+      return res.json(formattedOptions);
+    } catch (error) {
+      console.error('Error in boost options endpoint:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+  
+  // Helper function to format duration in a human-readable way
+  function formatDuration(hours: number): string {
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    
+    if (hours < 24) {
+      return `${hours} hour${hours !== 1 ? 's' : ''}`;
+    } else if (remainingHours === 0) {
+      return `${days} day${days !== 1 ? 's' : ''}`;
+    } else {
+      return `${days} day${days !== 1 ? 's' : ''} and ${remainingHours} hour${remainingHours !== 1 ? 's' : ''}`;
+    }
+  }
+
   // POST /api/payments/create-boost - Create a boost payment for one or more products
   app.post('/api/payments/create-boost', async (req, res) => {
     try {
@@ -3390,13 +3433,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'Unauthorized: Please log in to make payments' });
       }
       
-      // Validate request body - now supporting multiple product IDs
+      // Validate request body - now supporting multiple product IDs and boost options
       const paymentSchema = z.object({
         productIds: z.array(z.string()).min(1),
+        boostOptionId: z.number().optional(), // Add boost option ID support
         returnUrl: z.string().url()
       });
       
-      const { productIds, returnUrl } = paymentSchema.parse(req.body);
+      const { productIds, boostOptionId, returnUrl } = paymentSchema.parse(req.body);
       
       // Check if all products exist and belong to the user
       const productValidations = await Promise.all(
@@ -3425,8 +3469,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(p => p.valid)
         .map(p => p.product);
       
-      // Fixed boost amount per product in sen (RM10 = 1000 sen)
-      const boostAmountPerProduct = 1000;
+      // Get the boost option if provided, otherwise use default pricing
+      let boostAmountPerProduct = 1000; // Default: RM10 per product (1000 sen)
+      let durationHours = 168; // Default: 7 days in hours
+      let boostOptionName = "7 Day Boost"; // Default option name
+      
+      // If a boost option ID was provided, fetch that option
+      if (boostOptionId) {
+        try {
+          const { data: boostOption, error: boostOptionError } = await supabase
+            .from('boost_options')
+            .select('*')
+            .eq('id', boostOptionId)
+            .eq('is_active', true)
+            .single();
+          
+          if (boostOptionError || !boostOption) {
+            console.warn(`Boost option ID ${boostOptionId} not found or not active, using default pricing`);
+          } else {
+            console.log(`Using boost option: ${boostOption.name}, duration: ${boostOption.duration_hours} hours, price: ${boostOption.price} sen`);
+            boostAmountPerProduct = boostOption.price;
+            durationHours = boostOption.duration_hours;
+            boostOptionName = boostOption.name;
+          }
+        } catch (err) {
+          console.error('Error fetching boost option:', err);
+          // Continue with default pricing
+        }
+      }
+      
       const totalAmount = boostAmountPerProduct * validProducts.length;
       
       // Generate a proper UUID for order ID
@@ -3439,7 +3510,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productIds: productIds, // Array of product IDs
         product_ids: productIds.join(','), // As CSV string
         productId: productIds.length === 1 ? productIds[0] : null, // Single ID if only one product
-        productDetails: validProducts.map(p => ({ id: p.id, name: p.name }))
+        productDetails: validProducts.map(p => ({ id: p.id, name: p.name })),
+        boostOption: {
+          id: boostOptionId || null,
+          name: boostOptionName,
+          duration_hours: durationHours
+        }
       };
       
       console.log('📦 Creating payment with enhanced product ID storage:', {
