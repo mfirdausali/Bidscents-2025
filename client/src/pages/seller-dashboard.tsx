@@ -7,6 +7,7 @@ import {
   Category,
   InsertAuction,
 } from "@shared/schema";
+import BoostOptionSelector from "@/components/boost-option-selector";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
@@ -202,6 +203,8 @@ export default function SellerDashboard() {
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [boostedProducts, setBoostedProducts] = useState<number[]>([]);
   const [boostedProductIds, setBoostedProductIds] = useState<number[]>([]);
+  const [selectedBoostOption, setSelectedBoostOption] = useState<string | null>(null);
+  const [isBoostDialogOpen, setIsBoostDialogOpen] = useState(false);
 
   // Check for payment redirect parameters
   useEffect(() => {
@@ -899,12 +902,35 @@ export default function SellerDashboard() {
     });
   };
 
-  // Handle boost checkout - now supporting multiple products
+  // Open boost dialog to select boost options
+  const openBoostDialog = () => {
+    if (boostedProducts.length === 0) {
+      toast({
+        title: "No products selected",
+        description: "Please select at least one product to boost",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsBoostDialogOpen(true);
+  };
+
+  // Handle boost checkout - now supporting multiple products and configurable boost options
   const handleBoostCheckout = async () => {
     if (boostedProducts.length === 0) {
       toast({
         title: "No products selected",
         description: "Please select at least one product to boost",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!selectedBoostOption) {
+      toast({
+        title: "No boost option selected",
+        description: "Please select a boost duration",
         variant: "destructive"
       });
       return;
@@ -927,6 +953,7 @@ export default function SellerDashboard() {
         },
         body: JSON.stringify({
           productIds, // Send all selected product IDs
+          boostOptionId: selectedBoostOption ? parseInt(selectedBoostOption) : undefined, // Add selected boost option
           returnUrl: window.location.href, // Return to the seller dashboard after payment
         }),
         credentials: 'include',
