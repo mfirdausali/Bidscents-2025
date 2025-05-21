@@ -3787,11 +3787,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Updated bill_id for payment ${payment.id} to ${billId}`);
         }
         
-        // Only exit early if we don't need to force product boost processing
-        if (!payment._forceProductBoostProcessing) {
-          return { success: true, message: 'Payment already processed', payment };
-        } else {
-          console.log(`🔄 Continuing to product boost processing despite payment being already paid`);
+        // IMPORTANT: Always force product boost processing for already-paid payments
+        // This ensures that even if a webhook is triggered multiple times, the boost will be applied
+        payment._forceProductBoostProcessing = true;
+        console.log(`🔄 Forcing product boost processing for already-paid payment ${payment.id}`);
+        
+        // Check if product is already boosted
+        if (payment.productIds && payment.productIds.length > 0) {
+          for (const prodId of payment.productIds) {
+            const { data: product } = await supabase
+              .from('products')
+              .select('id, name, is_featured, featured_until')
+              .eq('id', prodId)
+              .single();
+              
+            if (product) {
+              const isAlreadyFeatured = product.is_featured === true;
+              const hasValidFeatureDate = product.featured_until && new Date(product.featured_until) > new Date();
+              
+              if (isAlreadyFeatured && hasValidFeatureDate) {
+                console.log(`✅ Product #${prodId} already properly boosted until ${product.featured_until}`);
+              } else {
+                console.log(`⚠️ Product #${prodId} needs boost reprocessing: featured=${isAlreadyFeatured}, validUntil=${hasValidFeatureDate}`);
+                payment._forceProductBoostProcessing = true;
+              }
+            }
+          }
         }
       }
       
@@ -3824,7 +3845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // First verify if the product exists
           const { data: product, error: productCheckError } = await supabase
             .from('products')
-            .select('id, name, is_featured')
+            .select('id, name, is_featured, featured_until')
             .eq('id', Number(productId))
             .single();
             
@@ -3834,6 +3855,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           console.log(`✅ Found product #${productId} - ${product.name} (currently featured: ${product.is_featured ? 'Yes' : 'No'})`);
+          
+          // Check if product is already featured with a valid expiration date
+          const now = new Date();
+          const isAlreadyFeatured = product.is_featured === true;
+          const hasValidFeatureDate = product.featured_until && new Date(product.featured_until) > now;
+          
+          if (isAlreadyFeatured && hasValidFeatureDate) {
+            console.log(`⚠️ Product #${productId} is already featured until ${product.featured_until}`);
+            console.log(`Would you like to extend the feature duration? Proceeding with update...`);
+            // Continue with update to extend feature duration
+          }
           
           // First try to get duration from boost option in payment metadata
           if (payment?.metadata?.boostOption?.duration_hours) {
@@ -3892,17 +3924,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Update the product status in the database
           // Based on database schema: featured_at is numeric, featured_until is timestamp
           const updateData = {
+            // Boolean fields
             is_featured: true,
             isFeatured: true,
             
-            // Convert Date to epoch timestamp for numeric field
+            // Timestamps - featured_at is numeric in DB schema
             featured_at: Math.floor(featuredAt.getTime() / 1000), // Unix timestamp in seconds
             featuredAt: Math.floor(featuredAt.getTime() / 1000),
             
-            // Keep as Date object for timestamp field
+            // featured_until is timestamp type in DB schema
             featured_until: featuredUntil,
             featuredUntil: featuredUntil,
             
+            // Duration and reference fields
             featured_duration_hours: durationHours,
             boost_option_id: boostOptionId
           };
