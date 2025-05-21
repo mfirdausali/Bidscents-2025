@@ -3817,24 +3817,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       async function updateProductFeatureStatus(productId: number | string, payment: any) {
         try {
           let durationHours = 168; // Default 7 days (in hours)
+          let boostOptionId = null;
+          
+          console.log(`🔍 Attempting to update featured status for product #${productId}`);
+          
+          // First verify if the product exists
+          const { data: product, error: productCheckError } = await supabase
+            .from('products')
+            .select('id, name, is_featured')
+            .eq('id', Number(productId))
+            .single();
+            
+          if (productCheckError || !product) {
+            console.error(`❌ Cannot find product #${productId} to update featured status:`, productCheckError);
+            return false;
+          }
+          
+          console.log(`✅ Found product #${productId} - ${product.name} (currently featured: ${product.is_featured ? 'Yes' : 'No'})`);
           
           // First try to get duration from boost option in payment metadata
           if (payment?.metadata?.boostOption?.duration_hours) {
             console.log(`Found duration_hours in payment metadata: ${payment.metadata.boostOption.duration_hours}`);
             durationHours = Number(payment.metadata.boostOption.duration_hours);
+            
+            if (payment.metadata.boostOption.id) {
+              boostOptionId = payment.metadata.boostOption.id;
+            }
           } 
           // Then try to get from boost_option_id if available
           else if (payment?.boost_option_id) {
             try {
+              boostOptionId = payment.boost_option_id;
               console.log(`Looking up boost option with ID: ${payment.boost_option_id}`);
               const { data: boostOption, error: boostOptionError } = await supabase
                 .from('boost_options')
-                .select('duration_hours')
+                .select('*')
                 .eq('id', payment.boost_option_id)
                 .single();
                 
               if (!boostOptionError && boostOption) {
-                console.log(`Found boost option, duration: ${boostOption.duration_hours} hours`);
+                console.log(`Found boost option "${boostOption.name}", duration: ${boostOption.duration_hours} hours`);
                 durationHours = Number(boostOption.duration_hours);
               } else {
                 console.warn(`Could not find boost option with ID ${payment.boost_option_id}, using default duration`);
@@ -3852,17 +3874,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Setting feature duration to ${durationHours} hours for product ${productId}`);
           
           // Create feature expiry date - add hours instead of days
-          const featuredUntil = new Date();
+          const featuredAt = new Date();
+          const featuredUntil = new Date(featuredAt);
           featuredUntil.setHours(featuredUntil.getHours() + durationHours);
           
-          // Update the product status in the database
+          console.log(`Feature timeframe: ${featuredAt.toISOString()} to ${featuredUntil.toISOString()}`);
+          
+          // Update the product status in the database - make sure all fields are set correctly
           const { data: updatedProduct, error: productError } = await supabase
             .from('products')
             .update({
               is_featured: true,
-              featured_at: new Date(),
+              featured_at: featuredAt,
               featured_until: featuredUntil,
-              featured_duration_hours: durationHours // Store duration in hours for consistency
+              featured_duration_hours: durationHours, // Store duration in hours for consistency
+              boost_option_id: boostOptionId // Store the boost option ID for reference
             })
             .eq('id', Number(productId))
             .select()
@@ -3872,7 +3898,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error(`❌ Error updating product ${productId} featured status:`, productError);
             return false;
           } else {
-            console.log(`✅ Updated product #${productId} to featured status until ${featuredUntil.toISOString()}`);
+            console.log(`✅ SUCCESSFULLY updated product #${productId} to featured status until ${featuredUntil.toISOString()}`);
             return true;
           }
         } catch (productErr) {
@@ -3895,15 +3921,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // DIAGNOSTIC: Log all potential sources of product IDs
           console.log(`🔎 [PRODUCT ID SOURCES] Examining payment record for product IDs:`);
           console.log(`- payment.id: ${payment.id}`);
+          
+          // Get the full payment record from the database to ensure we have all data
+          const { data: fullPayment, error: paymentError } = await supabase
+            .from('payments')
+            .select('*')
+            .eq('id', payment.id)
+            .single();
+            
+          if (paymentError) {
+            console.error('❌ Error fetching full payment record:', paymentError);
+          } else if (fullPayment) {
+            console.log('✅ Retrieved full payment record from database');
+            // Use full payment data for processing
+            payment = { ...payment, ...fullPayment };
+          }
+          
+          // Log all possible sources of product IDs
           console.log(`- productIds property: ${payment.productIds ? JSON.stringify(payment.productIds) : 'Missing'}`);
           console.log(`- product_id property: ${payment.product_id || 'Missing'}`);
           console.log(`- reference_2: ${payment.reference_2 || 'Missing'}`);
           console.log(`- reference_1: ${payment.reference_1 || 'Missing'}`);
+          console.log(`- metadata: ${payment.metadata ? JSON.stringify(payment.metadata) : 'Missing'}`);
           console.log(`- webhook_payload: ${payment.webhook_payload ? (typeof payment.webhook_payload === 'string' ? 'Present (string)' : 'Present (object)') : 'Missing'}`);
           
-          // First check the payment record for productIds
-          if (payment.productIds && payment.productIds.length > 0) {
-            productIds = payment.productIds;
+          // First check for productIds in metadata which is the most reliable source
+          if (payment.metadata && payment.metadata.productIds && payment.metadata.productIds.length > 0) {
+            productIds = Array.isArray(payment.metadata.productIds) 
+              ? payment.metadata.productIds.map(id => String(id))
+              : [String(payment.metadata.productIds)];
+            console.log(`✅ Using productIds from payment metadata: ${productIds.join(', ')}`);
+          }
+          // Then check the payment record for productIds array
+          else if (payment.productIds && payment.productIds.length > 0) {
+            // Ensure productIds is treated as an array
+            productIds = Array.isArray(payment.productIds) 
+              ? payment.productIds.map(id => String(id))
+              : [String(payment.productIds)];
             console.log(`✅ Using productIds from payment record: ${productIds.join(', ')}`);
           }
           // Check if there's a single product_id stored directly in the payment record
