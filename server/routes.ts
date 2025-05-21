@@ -3880,29 +3880,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log(`Feature timeframe: ${featuredAt.toISOString()} to ${featuredUntil.toISOString()}`);
           
-          // Update the product status in the database - make sure all fields are set correctly
-          // Need to update both database field names (is_featured) and code field names (isFeatured)
+          // DIAGNOSTIC LOGS - Product field values and types
+          console.log("SCHEMA DEBUG - Product boost update details:");
+          console.log("- Product ID:", productId, "(JS type:", typeof productId, ")");
+          console.log("- Field values and types being sent:");
+          console.log("  • featured_at:", featuredAt, "(JS type:", typeof featuredAt, ")");
+          console.log("  • featured_until:", featuredUntil, "(JS type:", typeof featuredUntil, ")");
+          console.log("  • is_featured:", true, "(JS type: boolean)");
+          console.log("  • featured_duration_hours:", durationHours, "(JS type:", typeof durationHours, ")");
+          
+          // Update the product status in the database
+          // Based on database schema: featured_at is numeric, featured_until is timestamp
+          const updateData = {
+            is_featured: true,
+            isFeatured: true,
+            
+            // Convert Date to epoch timestamp for numeric field
+            featured_at: Math.floor(featuredAt.getTime() / 1000), // Unix timestamp in seconds
+            featuredAt: Math.floor(featuredAt.getTime() / 1000),
+            
+            // Keep as Date object for timestamp field
+            featured_until: featuredUntil,
+            featuredUntil: featuredUntil,
+            
+            featured_duration_hours: durationHours,
+            boost_option_id: boostOptionId
+          };
+          
+          console.log("DIAGNOSTIC - Final update data being sent to database:", updateData);
+          
           const { data: updatedProduct, error: productError } = await supabase
             .from('products')
-            .update({
-              is_featured: true,
-              isFeatured: true, // Also update TypeScript property name
-              featured_at: featuredAt,
-              featuredAt: featuredAt, // Also update TypeScript property name
-              featured_until: featuredUntil,
-              featuredUntil: featuredUntil, // Also update TypeScript property name
-              featured_duration_hours: durationHours, // Store duration in hours for consistency
-              boost_option_id: boostOptionId // Store the boost option ID for reference
-            })
+            .update(updateData)
             .eq('id', Number(productId))
             .select()
             .single();
           
           if (productError) {
             console.error(`❌ Error updating product ${productId} featured status:`, productError);
+            // Additional diagnostic details for errors
+            console.log("- Error code:", productError.code);
+            console.log("- Error details:", productError.details);
+            console.log("- Error message:", productError.message);
+            console.log("- Error hint:", productError.hint);
+            
+            if (productError.message && productError.message.includes("invalid input syntax")) {
+              console.log("- TYPE MISMATCH DETECTED: Schema vs. code field type mismatch");
+              console.log("- Check the Supabase database schema vs. what we're sending");
+            }
             return false;
           } else {
             console.log(`✅ SUCCESSFULLY updated product #${productId} to featured status until ${featuredUntil.toISOString()}`);
+            // Print the actual updated values from the database to verify
+            console.log("- Updated product data from database:", updatedProduct);
             return true;
           }
         } catch (productErr) {
