@@ -3814,18 +3814,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Critical fix: Immediately process the boost for this product
                 if (payment.webhook_payload) {
                   try {
+                    // DIAGNOSTIC: Detailed logging about the webhook payload
+                    console.log("🔎 DIAGNOSTIC: Webhook payload type:", typeof payment.webhook_payload);
+                    console.log("🔎 DIAGNOSTIC: Webhook payload raw value:", payment.webhook_payload);
+                    
                     // Parse webhook payload to get boost option information
                     const payloadData = JSON.parse(payment.webhook_payload);
                     console.log("🔄 DIRECT BOOST: Extracted webhook payload data:", payloadData);
+                    console.log("🔎 DIAGNOSTIC: Does payloadData have boostOption?", !!payloadData.boostOption);
+                    if (payloadData.boostOption) {
+                      console.log("🔎 DIAGNOSTIC: boostOption structure:", JSON.stringify(payloadData.boostOption, null, 2));
+                    }
                     
-                    // Execute product boost directly 
-                    const boostResult = await updateProductFeatureStatus(prodId, {
+                    // DIAGNOSTIC: Create an enhanced payment object for debugging
+                    const enhancedPayment = {
                       ...payment,
+                      _originalMetadata: payment.metadata,
                       metadata: {
-                        ...payment.metadata,
+                        ...(payment.metadata || {}),
                         boostOption: payloadData.boostOption
                       }
+                    };
+                    
+                    console.log("🔎 DIAGNOSTIC: Enhanced payment object:", {
+                      id: enhancedPayment.id,
+                      product_id: enhancedPayment.product_id,
+                      metadata: enhancedPayment.metadata,
+                      _originalMetadata: enhancedPayment._originalMetadata
                     });
+                    
+                    // Execute product boost directly 
+                    console.log(`🔎 DIAGNOSTIC: Calling updateProductFeatureStatus for product #${prodId}`);
+                    const boostResult = await updateProductFeatureStatus(prodId, enhancedPayment);
+                    
+                    console.log(`🔎 DIAGNOSTIC: Boost result returned: ${boostResult}`);
                     
                     if (boostResult) {
                       console.log(`✅ DIRECT BOOST: Successfully boosted product #${prodId}`);
@@ -3834,6 +3856,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     }
                   } catch (parseErr) {
                     console.error("Error parsing webhook payload for direct boost:", parseErr);
+                    console.error("Error details:", parseErr.message);
+                    if (parseErr.stack) {
+                      console.error("Stack trace:", parseErr.stack);
+                    }
                   }
                 } else {
                   console.log(`⚠️ No webhook payload available for direct boost of product #${prodId}`);
