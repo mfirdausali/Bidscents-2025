@@ -2424,7 +2424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const { rating, comment, productId } = validationResult.data;
+      const { rating, comment, productId, sellerId } = validationResult.data;
       const userId = req.user.id;
       
       // Fetch the message to verify it's a review action message for this user
@@ -2472,12 +2472,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const transaction = transactions[0];
       
+      // If sellerId wasn't provided in the request, try to get it from the transaction
+      let actualSellerId = sellerId;
+      if (!actualSellerId && transaction) {
+        actualSellerId = transaction.seller_id;
+      }
+      
       // 1. Add the review to the reviews table
       const { error: reviewError } = await supabase
         .from('reviews')
         .insert({
           user_id: userId, // Reviewer (buyer)
           product_id: productId,
+          seller_id: actualSellerId, // Add the seller ID
           rating: rating,
           comment: comment || null,
           created_at: new Date()

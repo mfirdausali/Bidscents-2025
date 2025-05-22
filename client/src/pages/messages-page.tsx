@@ -785,9 +785,13 @@ export default function MessagesPage() {
   }, [toast, setActiveChat, activeChat, selectedConversation, sendMessage, sendActionMessage]);
   
   // Handle submitting a review (REVIEW action)
-  const handleSubmitReview = useCallback(async (messageId: number, productId: number) => {
+  const handleSubmitReview = useCallback(async (messageId: number, productId: number, sellerId?: number) => {
     try {
       setSubmittingReview(messageId);
+      
+      // Find the message to get the seller ID if not provided
+      const message = activeChat.find(msg => msg.id === messageId);
+      const actualSellerId = sellerId || message?.receiverId;
       
       const response = await fetch(`/api/messages/submit-review/${messageId}`, {
         method: 'POST',
@@ -797,7 +801,8 @@ export default function MessagesPage() {
         body: JSON.stringify({
           rating: reviewRating,
           comment: reviewComment,
-          productId
+          productId,
+          sellerId: actualSellerId
         })
       });
       
@@ -827,7 +832,7 @@ export default function MessagesPage() {
     } finally {
       setSubmittingReview(null);
     }
-  }, [toast, setActiveChat, reviewComment, reviewRating]);
+  }, [toast, setActiveChat, reviewComment, reviewRating, activeChat]);
   
   // Handle confirming delivery received (CONFIRM_DELIVERY action)
   const handleConfirmDeliveryReceived = useCallback(async (messageId: number) => {
@@ -1491,7 +1496,7 @@ export default function MessagesPage() {
                                           {/* Submit Button */}
                                           <Button 
                                             className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                                            onClick={() => handleSubmitReview(msg.id, msg.product?.id || 0)}
+                                            onClick={() => handleSubmitReview(msg.id, msg.product?.id || 0, msg.receiverId)}
                                             disabled={submittingReview === msg.id}
                                           >
                                             {submittingReview === msg.id ? (
