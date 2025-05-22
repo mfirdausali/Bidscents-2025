@@ -69,6 +69,7 @@ import {
   Timer,
   Tag,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -908,7 +909,7 @@ export default function SellerDashboard() {
         
         // Determine boost type based on package ID
         if (p.boost_package_id || p.boostPackageId) {
-          const packageId = p.boost_package_id || p.boostPackageId;
+          const packageId = p.boost_package_id || p.boostPackageId || 0;
           // Package IDs 5-8 are Premium packages based on our package structure
           boostType = packageId >= 5 ? "Premium" : "Standard";
         }
@@ -1598,10 +1599,9 @@ export default function SellerDashboard() {
                               const now = new Date();
                               const timeRemaining = featuredUntilDate ? Math.max(0, Math.floor((featuredUntilDate.getTime() - now.getTime()) / (1000 * 60 * 60))) : 0;
                               
-                              // Determine boost type based on duration or other properties
-                              const boostType = product.boost_package_id ? 
-                                  (product.boost_package_id >= 5 ? "Premium" : "Standard") : 
-                                  "Standard";
+                              // Determine boost type based on package ID - Premium packages have IDs 5-8
+                              const packageId = product.boost_package_id || product.boostPackageId || 0;
+                              const boostType = packageId >= 5 ? "Premium" : "Standard";
                               
                               return (
                                 <TableRow key={product.id} className="bg-purple-50/30">

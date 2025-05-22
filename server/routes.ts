@@ -35,6 +35,114 @@ function isBillplzSandbox(): boolean {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Create HTTP server for both Express and WebSocket
+  const httpServer = createServer(app);
+  
+  // Initialize WebSocket server on a different path than Vite's HMR
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Connected clients map with user information
+  const clients = new Map<WebSocket, { userId: number; username: string }>();
+  
+  // WebSocket connection handler
+  wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
+    
+    // Handle messages from client
+    ws.on('message', async (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        console.log('Received WebSocket message:', data);
+        
+        // Handle different message types
+        switch (data.type) {
+          case 'auth':
+            // Authenticate and store user info with the connection
+            if (data.userId && data.username) {
+              clients.set(ws, { userId: data.userId, username: data.username });
+              console.log(`User authenticated: ${data.username} (ID: ${data.userId})`);
+              ws.send(JSON.stringify({ type: 'auth_success' }));
+            }
+            break;
+            
+          case 'chat_message':
+            // Handle, store, and broadcast chat messages
+            if (data.senderId && data.receiverId && data.content) {
+              // Store message in database with encryption
+              const encryptedContent = encryptMessage(data.content);
+              const messageData = {
+                senderId: data.senderId,
+                receiverId: data.receiverId,
+                content: encryptedContent,
+                read: false,
+                sentAt: new Date().toISOString(),
+              };
+              
+              // Save message to database
+              const savedMessage = await storage.addMessage(messageData);
+              
+              // Broadcast to receiver if they're online
+              clients.forEach((clientInfo, client) => {
+                if (client.readyState === WebSocket.OPEN && clientInfo.userId === data.receiverId) {
+                  // Send message to the recipient
+                  client.send(JSON.stringify({
+                    type: 'new_message',
+                    message: {
+                      ...savedMessage,
+                      content: data.content // Send decrypted content to client
+                    }
+                  }));
+                }
+              });
+              
+              // Confirm message delivery to sender
+              ws.send(JSON.stringify({
+                type: 'message_sent',
+                messageId: savedMessage.id
+              }));
+            }
+            break;
+            
+          case 'status_update':
+            // Handle transaction status updates and broadcast to relevant users
+            if (data.transactionId && data.status && data.updatedBy) {
+              // Update transaction status in database
+              const updatedTransaction = await storage.updateTransactionStatus(
+                data.transactionId, 
+                data.status, 
+                data.updatedBy
+              );
+              
+              if (updatedTransaction) {
+                // Notify both buyer and seller about the status change
+                const notifyUserIds = [updatedTransaction.buyerId, updatedTransaction.sellerId];
+                
+                clients.forEach((clientInfo, client) => {
+                  if (client.readyState === WebSocket.OPEN && notifyUserIds.includes(clientInfo.userId)) {
+                    client.send(JSON.stringify({
+                      type: 'transaction_updated',
+                      transaction: updatedTransaction
+                    }));
+                  }
+                });
+              }
+            }
+            break;
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+      }
+    });
+    
+    // Handle disconnection
+    ws.on('close', () => {
+      console.log('WebSocket client disconnected');
+      // Remove client from connected clients map
+      clients.delete(ws);
+    });
+  });
+  
   // Set up authentication routes
   setupAuth(app);
   
