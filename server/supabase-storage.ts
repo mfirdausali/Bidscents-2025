@@ -321,6 +321,9 @@ export class SupabaseStorage implements IStorage {
     // Start with a base query
     let query = supabase.from('products').select('*');
     
+    // Always filter for active products
+    query = query.eq('status', 'active');
+    
     // Apply filters if provided
     if (filters) {
       if (filters.categoryId) {
@@ -414,7 +417,8 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('is_featured', true);
+      .eq('is_featured', true)
+      .eq('status', 'active');
     
     if (error) {
       console.error('Error getting featured products:', error);
@@ -456,7 +460,8 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('seller_id', sellerId);
+      .eq('seller_id', sellerId)
+      .eq('status', 'active');
     
     if (error) {
       console.error('Error getting seller products:', error);
