@@ -2,7 +2,15 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertProductSchema, insertReviewSchema, insertProductImageSchema, insertMessageSchema, insertPaymentSchema } from "@shared/schema";
+import { 
+  insertProductSchema, 
+  insertReviewSchema, 
+  insertProductImageSchema, 
+  insertMessageSchema, 
+  insertPaymentSchema,
+  insertBoostPackageSchema,
+  boostPackages
+} from "@shared/schema";
 import { productImages } from "@shared/schema";
 import { db } from "./db";
 import { z } from "zod";
@@ -435,6 +443,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(categories);
     } catch (error) {
       next(error);
+    }
+  });
+  
+  // Get all boost packages
+  app.get("/api/boost/packages", async (req, res) => {
+    try {
+      console.log("Fetching boost packages");
+      const { data, error } = await supabase
+        .from('boost_packages')
+        .select('*')
+        .eq('is_active', true)
+        .order('package_type', { ascending: true })
+        .order('item_count', { ascending: true });
+        
+      if (error) {
+        console.error('Error fetching boost packages:', error);
+        return res.status(500).json({ message: 'Error fetching boost packages', error });
+      }
+      
+      return res.json(data);
+    } catch (err) {
+      console.error('Error fetching boost packages:', err);
+      return res.status(500).json({ message: 'Server error fetching boost packages' });
     }
   });
 
