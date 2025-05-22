@@ -594,19 +594,21 @@ export default function SellerProfilePage() {
                         Retry
                       </Button>
                     </div>
-                  ) : productsData?.products.length === 0 ? (
+                  ) : productsData?.products.filter(p => p.status === 'active').length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-muted-foreground">
-                        No products found in this category.
+                        No active products found.
                       </p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                      {productsData?.products.map((product) => (
-                        <ProductCard 
-                          key={product.id} product={product}
-                        />
-                      ))}
+                      {productsData?.products
+                        .filter(product => product.status === 'active')
+                        .map((product) => (
+                          <ProductCard 
+                            key={product.id} product={product}
+                          />
+                        ))}
                     </div>
                   )}
                 </TabsContent>
