@@ -355,30 +355,40 @@ export default function ProductDetailPage() {
                 </p>
               </div>
               
-              {/* Quantity and add to cart */}
+              {/* Voting controls */}
               <div className="flex flex-col sm:flex-row items-stretch gap-4 mb-8">
-                <div className="flex border rounded h-12">
-                  <Button 
-                    variant="ghost" 
-                    className="px-3" 
-                    onClick={() => handleQuantityChange(-1)}
-                    disabled={quantity <= 1}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <input 
-                    type="text" 
-                    value={quantity} 
-                    readOnly 
-                    className="w-12 text-center flex-1"
-                  />
-                  <Button 
-                    variant="ghost" 
-                    className="px-3" 
-                    onClick={() => handleQuantityChange(1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center border rounded h-12 px-3 gap-3">
+                  <div className="font-medium">{localVotes !== null ? localVotes : (product?.votes || 0)} votes</div>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={() => upvoteMutation.mutate()}
+                      disabled={upvoteMutation.isPending || !user}
+                      variant="ghost" 
+                      size="sm"
+                      className="h-8 px-2 hover:bg-green-50 hover:text-green-600"
+                    >
+                      <ThumbsUp className="h-4 w-4 mr-1" />
+                      <span className="text-xs">Upvote</span>
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => downvoteMutation.mutate()}
+                      disabled={downvoteMutation.isPending || !user || (localVotes !== null && localVotes <= 0)}
+                      variant="ghost" 
+                      size="sm"
+                      className="h-8 px-2 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <ThumbsDown className="h-4 w-4 mr-1" />
+                      <span className="text-xs">Downvote</span>
+                    </Button>
+                  </div>
+                  
+                  {votesChanged && (
+                    <div className="text-green-600 text-xs flex items-center ml-1">
+                      <Check className="h-3 w-3 mr-1" />
+                      <span>Saved</span>
+                    </div>
+                  )}
                 </div>
                 
                 <ContactSellerButton 
@@ -430,12 +440,9 @@ export default function ProductDetailPage() {
           {/* Product details tabs */}
           <div className="mt-16">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="description">Description</TabsTrigger>
                 <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="reviews">
-                  Votes ({product?.votes || 0})
-                </TabsTrigger>
               </TabsList>
               
               <TabsContent value="description" className="p-6 bg-white rounded-lg shadow mt-6">
