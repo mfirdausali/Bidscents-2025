@@ -939,18 +939,59 @@ export default function SellerDashboard() {
 
     try {
       console.log(auctionData);
-      // Create product and auction
-      const result = await createAuctionMutation.mutateAsync({
-        product: productData,
-        auction: auctionData,
-      });
-
-      // After auction is created, register and upload images
-      if (uploadedImages.length > 0) {
-        await registerImagesMutation.mutateAsync({
-          productId: result.product.id,
-          images: uploadedImages,
+      
+      // Check if we're editing an existing auction or creating a new one
+      if (isEditMode && currentProductId) {
+        console.log("Editing existing auction for product:", currentProductId);
+        
+        // First fetch the auction data to get the auction ID
+        const response = await fetch(`/api/auctions/product/${currentProductId}`);
+        
+        if (response.ok) {
+          const existingAuction = await response.json();
+          console.log("Found existing auction:", existingAuction);
+          
+          if (existingAuction && existingAuction.id) {
+            // Update both the product and auction
+            const result = await updateAuctionMutation.mutateAsync({
+              auctionId: existingAuction.id,
+              product: {
+                ...productData,
+                id: currentProductId
+              },
+              auction: {
+                ...auctionData,
+                productId: currentProductId
+              }
+            });
+            
+            // Update images if needed
+            if (uploadedImages.length > 0) {
+              await registerImagesMutation.mutateAsync({
+                productId: currentProductId,
+                images: uploadedImages,
+              });
+            }
+          } else {
+            throw new Error("Failed to find auction data for this product");
+          }
+        } else {
+          throw new Error("Failed to fetch auction data for update");
+        }
+      } else {
+        // Create a new product and auction
+        const result = await createAuctionMutation.mutateAsync({
+          product: productData,
+          auction: auctionData,
         });
+
+        // After auction is created, register and upload images
+        if (uploadedImages.length > 0) {
+          await registerImagesMutation.mutateAsync({
+            productId: result.product.id,
+            images: uploadedImages,
+          });
+        }
       }
 
       // Close dialog after successful submission
@@ -958,7 +999,7 @@ export default function SellerDashboard() {
     } catch (error) {
       console.error("Error in auction submission:", error);
       toast({
-        title: "Error creating auction",
+        title: isEditMode ? "Error updating auction" : "Error creating auction",
         description:
           error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
