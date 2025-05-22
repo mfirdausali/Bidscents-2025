@@ -202,8 +202,8 @@ export default function SellerDashboard() {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
-  const [existingImages, setExistingImages] = useState<any[]>([]);
-  const [imagesToDelete, setImagesToDelete] = useState<number[]>([]);
+  const [existingImages, setExistingImages] = useState<{id: string, url: string}[]>([]);
+  const [imagesToDelete, setImagesToDelete] = useState<string[]>([]);
   const [boostedProducts, setBoostedProducts] = useState<number[]>([]);
   const [boostedProductIds, setBoostedProductIds] = useState<number[]>([]);
   const [selectedBoostOption, setSelectedBoostOption] = useState<string | null>(null);
@@ -516,6 +516,28 @@ export default function SellerDashboard() {
           product: productWithSellerId,
         });
         productId = updatedProduct.id;
+        
+        // Process any images marked for deletion
+        if (imagesToDelete.length > 0) {
+          console.log("Deleting images:", imagesToDelete);
+          
+          // Delete each image one by one
+          for (const imageId of imagesToDelete) {
+            try {
+              await apiRequest(
+                "DELETE",
+                `/api/products/${currentProductId}/images/${imageId}?sellerId=${user?.id || 0}`,
+                null
+              );
+              console.log(`Successfully deleted image ${imageId}`);
+            } catch (error) {
+              console.error(`Failed to delete image ${imageId}:`, error);
+            }
+          }
+          
+          // Clear the deletion list after processing
+          setImagesToDelete([]);
+        }
       } else {
         const newProduct =
           await createProductMutation.mutateAsync(productWithSellerId);
@@ -529,6 +551,11 @@ export default function SellerDashboard() {
           images: uploadedImages,
         });
       }
+
+      // Clear image states
+      setUploadedImages([]);
+      setImagePreviewUrls([]);
+      setExistingImages([]);
 
       // Close dialog after successful submission
       setIsDialogOpen(false);
@@ -734,20 +761,30 @@ export default function SellerDashboard() {
     const files = e.target.files;
     if (!files) return;
 
-    // Limit to 5 images
-    const newFiles: File[] = Array.from(files).slice(0, 5);
+    // Limit to 5 images total (existing + new)
+    const maxNewImages = 5 - (isEditMode ? existingImages.length : 0);
+    const newFiles: File[] = Array.from(files).slice(0, maxNewImages);
 
-    // Create preview URLs
-    const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
+    // Create preview URLs for new files
+    const newFilePreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
 
-    setUploadedImages(newFiles);
-    setImagePreviewUrls(newPreviewUrls);
+    // If in edit mode, keep existing images and add new ones
+    if (isEditMode) {
+      // Append new files to existing uploaded files list
+      setUploadedImages([...uploadedImages, ...newFiles]);
+      
+      // Keep existing image previews and add new ones
+      // (Existing image previews should already be in imagePreviewUrls from the product images query)
+      setImagePreviewUrls([...imagePreviewUrls, ...newFilePreviewUrls]);
+    } else {
+      // For new products, just set the uploads directly
+      setUploadedImages(newFiles);
+      setImagePreviewUrls(newFilePreviewUrls);
+    }
 
     // Update form with first image URL as a placeholder
-    // In a real implementation, we would properly handle multiple images
-    if (newFiles.length > 0) {
-      form.setValue("imageUrl", newPreviewUrls[0]);
-    }
+    const firstImageUrl = imagePreviewUrls[0] || newFilePreviewUrls[0] || "";
+    form.setValue("imageUrl", firstImageUrl);
   };
 
   // Remove image from preview
@@ -1062,6 +1099,12 @@ export default function SellerDashboard() {
         }
       }
 
+      // Clear image states
+      setUploadedImages([]);
+      setImagePreviewUrls([]);
+      setExistingImages([]);
+      setImagesToDelete([]);
+      
       // Close dialog after successful submission
       setIsDialogOpen(false);
     } catch (error) {
