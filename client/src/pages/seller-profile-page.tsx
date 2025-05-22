@@ -443,9 +443,6 @@ export default function SellerProfilePage() {
                 <MessageSquare className="mr-2 h-4 w-4" />
                 Contact
               </Button>
-              <Button variant="outline" className="flex-1">
-                Follow Store
-              </Button>
             </div>
           </div>
 
