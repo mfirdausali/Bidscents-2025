@@ -334,6 +334,29 @@ export default function MessagesPage() {
     }
   }, [user, toast, setLocation, loadConversation]);
   
+  // Handle responsive behavior for mobile/desktop views
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      // On mobile: show conversation list by default, unless a conversation is selected
+      if (isMobile) {
+        setIsMobileMenuOpen(!selectedConversation);
+      } else {
+        // On desktop: always show the conversation list sidebar
+        setIsMobileMenuOpen(false);
+      }
+    };
+    
+    // Set initial state
+    handleResize();
+    
+    // Add resize listener
+    window.addEventListener('resize', handleResize);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', handleResize);
+  }, [selectedConversation]);
+  
   // Format timestamp for messages
   const formatMessageTime = (timestamp: string | Date) => {
     try {
@@ -379,6 +402,11 @@ export default function MessagesPage() {
     });
     
     loadConversation(conversation.userId, conversation.productInfo?.id);
+    
+    // On mobile, close the menu when a conversation is selected
+    if (window.innerWidth < 768) {
+      setIsMobileMenuOpen(false);
+    }
   }, [loadConversation]);
   
   // Handle file upload
