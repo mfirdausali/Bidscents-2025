@@ -2452,7 +2452,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Find the transaction for this product between these users
-      const { data: transactions, error } = await supabase
+      // First try to find a transaction in WAITING_REVIEW status
+      let { data: transactions, error } = await supabase
         .from('transactions')
         .select('*')
         .eq('product_id', productId)
@@ -2461,13 +2462,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .order('created_at', { ascending: false })
         .limit(1);
       
+      // If no transaction found in WAITING_REVIEW, try to find any transaction for this product and buyer
+      if (!transactions || transactions.length === 0) {
+        const { data: anyTransactions, error: anyError } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('product_id', productId)
+          .eq('buyer_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        if (!anyError && anyTransactions && anyTransactions.length > 0) {
+          transactions = anyTransactions;
+        }
+      }
+      
       if (error) {
         console.error('Error fetching transaction:', error);
         return res.status(500).json({ message: "Error processing review submission" });
       }
       
+      // If we still can't find a transaction, proceed anyway but log a warning
+      let transaction = null;
       if (!transactions || transactions.length === 0) {
-        return res.status(404).json({ message: "No transaction found for this review" });
+        console.log(`Warning: No transaction found for review. ProductID: ${productId}, UserID: ${userId}. Proceeding without transaction.`);
+      } else {
+        transaction = transactions[0];
       }
       
       const transaction = transactions[0];
