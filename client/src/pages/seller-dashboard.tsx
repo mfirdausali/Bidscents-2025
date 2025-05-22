@@ -752,20 +752,42 @@ export default function SellerDashboard() {
 
   // Remove image from preview
   const removeImage = (index: number) => {
-    const newImages = [...uploadedImages];
+    // Check if we're in edit mode and if this is an existing image
+    if (isEditMode && index < existingImages.length) {
+      // Add the image ID to imagesToDelete for server-side deletion on save
+      const imageToDelete = existingImages[index];
+      setImagesToDelete(prev => [...prev, imageToDelete.id]);
+      
+      // Remove from existing images
+      const newExistingImages = [...existingImages];
+      newExistingImages.splice(index, 1);
+      setExistingImages(newExistingImages);
+    } else {
+      // This is a newly uploaded image, remove it from uploadedImages
+      const adjustedIndex = isEditMode ? index - existingImages.length : index;
+      const newImages = [...uploadedImages];
+      newImages.splice(adjustedIndex, 1);
+      setUploadedImages(newImages);
+    }
+    
+    // Update preview URLs in both cases
     const newPreviewUrls = [...imagePreviewUrls];
-
+    
     // Revoke object URL to prevent memory leaks
-    URL.revokeObjectURL(newPreviewUrls[index]);
-
-    newImages.splice(index, 1);
+    if (newPreviewUrls[index] && newPreviewUrls[index].startsWith('blob:')) {
+      URL.revokeObjectURL(newPreviewUrls[index]);
+    }
+    
     newPreviewUrls.splice(index, 1);
-
-    setUploadedImages(newImages);
     setImagePreviewUrls(newPreviewUrls);
 
     // Update form with first remaining image or empty string
-    form.setValue("imageUrl", newPreviewUrls[0] || "");
+    const remainingPreview = newPreviewUrls[0] || "";
+    if (isAuctionForm) {
+      auctionForm.setValue("imageUrl", remainingPreview);
+    } else {
+      form.setValue("imageUrl", remainingPreview);
+    }
   };
 
   // Handle image upload for auction form
@@ -773,19 +795,30 @@ export default function SellerDashboard() {
     const files = e.target.files;
     if (!files) return;
 
-    // Limit to 5 images
-    const newFiles: File[] = Array.from(files).slice(0, 5);
+    // Limit to 5 images total (existing + new)
+    const maxNewImages = 5 - (isEditMode ? existingImages.length : 0);
+    const newFiles: File[] = Array.from(files).slice(0, maxNewImages);
 
-    // Create preview URLs
-    const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
+    // Create preview URLs for new files
+    const newFilePreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
 
-    setUploadedImages(newFiles);
-    setImagePreviewUrls(newPreviewUrls);
+    // If in edit mode, keep existing images and add new ones
+    if (isEditMode) {
+      // Append new files to existing uploaded files list
+      setUploadedImages([...uploadedImages, ...newFiles]);
+      
+      // Keep existing image previews and add new ones
+      // (Existing image previews should already be in imagePreviewUrls from the product images query)
+      setImagePreviewUrls([...imagePreviewUrls, ...newFilePreviewUrls]);
+    } else {
+      // For new products, just set the uploads directly
+      setUploadedImages(newFiles);
+      setImagePreviewUrls(newFilePreviewUrls);
+    }
 
     // Update auction form with first image URL as a placeholder
-    if (newFiles.length > 0) {
-      auctionForm.setValue("imageUrl", newPreviewUrls[0]);
-    }
+    const firstImageUrl = imagePreviewUrls[0] || newFilePreviewUrls[0] || "";
+    auctionForm.setValue("imageUrl", firstImageUrl);
   };
 
   // Create auction mutation
@@ -978,7 +1011,29 @@ export default function SellerDashboard() {
               }
             });
             
-            // Update images if needed
+            // Process any images marked for deletion
+            if (imagesToDelete.length > 0) {
+              console.log("Deleting images:", imagesToDelete);
+              
+              // Delete each image one by one
+              for (const imageId of imagesToDelete) {
+                try {
+                  await apiRequest(
+                    "DELETE",
+                    `/api/products/${currentProductId}/images/${imageId}?sellerId=${user?.id || 0}`,
+                    null
+                  );
+                  console.log(`Successfully deleted image ${imageId}`);
+                } catch (error) {
+                  console.error(`Failed to delete image ${imageId}:`, error);
+                }
+              }
+              
+              // Clear the deletion list after processing
+              setImagesToDelete([]);
+            }
+            
+            // Upload any new images
             if (uploadedImages.length > 0) {
               await registerImagesMutation.mutateAsync({
                 productId: currentProductId,
