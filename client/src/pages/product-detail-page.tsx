@@ -248,14 +248,7 @@ export default function ProductDetailPage() {
                 </div>
                 <h1 className="font-playfair text-2xl md:text-3xl font-bold mb-3">{product.name}</h1>
                 
-                <div className="flex items-center mb-3">
-                  <div className="flex">
-                    {renderStars(product.averageRating)}
-                  </div>
-                  <span className="text-sm text-gray-500 ml-2">
-                    ({product.reviews?.length || 0} reviews)
-                  </span>
-                </div>
+                {/* Removed stars and review count */}
                 
                 {/* Seller information */}
                 <div className="flex items-center mb-4 text-sm bg-gray-50 p-3 rounded-md">
@@ -314,32 +307,8 @@ export default function ProductDetailPage() {
                 </p>
               </div>
               
-              {/* Quantity and add to cart */}
-              <div className="flex flex-col sm:flex-row items-stretch gap-4 mb-8">
-                <div className="flex border rounded h-12">
-                  <Button 
-                    variant="ghost" 
-                    className="px-3" 
-                    onClick={() => handleQuantityChange(-1)}
-                    disabled={quantity <= 1}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <input 
-                    type="text" 
-                    value={quantity} 
-                    readOnly 
-                    className="w-12 text-center flex-1"
-                  />
-                  <Button 
-                    variant="ghost" 
-                    className="px-3" 
-                    onClick={() => handleQuantityChange(1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                
+              {/* Contact seller button */}
+              <div className="flex mb-8">
                 <ContactSellerButton 
                   className="h-12 flex-grow shadow-sm"
                   sellerId={product.sellerId}
@@ -349,13 +318,6 @@ export default function ProductDetailPage() {
                   productName={product.name}
                   variant="default"
                 />
-                
-                <Button 
-                  variant="outline" 
-                  className="border-purple-600 text-purple-600 hover:bg-purple-100 h-12 px-4"
-                >
-                  <Heart className="h-5 w-5" />
-                </Button>
               </div>
               
               {/* Product meta */}
@@ -389,12 +351,9 @@ export default function ProductDetailPage() {
           {/* Product details tabs */}
           <div className="mt-16">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="description">Description</TabsTrigger>
                 <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="reviews">
-                  Reviews ({product.reviews?.length || 0})
-                </TabsTrigger>
               </TabsList>
               
               <TabsContent value="description" className="p-6 bg-white rounded-lg shadow mt-6">
