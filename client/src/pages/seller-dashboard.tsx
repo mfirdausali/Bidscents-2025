@@ -2566,15 +2566,15 @@ export default function SellerDashboard() {
                   <Button
                     type="submit"
                     className="bg-gold text-rich-black hover:bg-metallic-gold"
-                    disabled={createAuctionMutation.isPending}
+                    disabled={createAuctionMutation.isPending || updateAuctionMutation.isPending}
                   >
-                    {createAuctionMutation.isPending ? (
+                    {createAuctionMutation.isPending || updateAuctionMutation.isPending ? (
                       <span className="flex items-center">
                         <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
-                        Creating...
+                        {isEditMode ? "Updating..." : "Creating..."}
                       </span>
                     ) : (
-                      "Create Auction"
+                      isEditMode ? "Update Auction" : "Create Auction"
                     )}
                   </Button>
                 </DialogFooter>
