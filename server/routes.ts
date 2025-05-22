@@ -1335,13 +1335,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rating: review.rating,
         comment: review.comment,
         createdAt: review.created_at,
-        user: review.users ? {
-          username: review.users.username,
-          profileImage: review.users.profile_image
-        } : undefined,
-        product: review.products ? {
-          name: review.products.name
-        } : undefined
+        user: {
+          username: review.users?.username,
+          profileImage: review.users?.profile_image
+        },
+        product: {
+          name: review.products?.name
+        }
       }));
       
       // Calculate average rating
