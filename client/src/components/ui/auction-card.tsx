@@ -1,10 +1,16 @@
 import React from "react";
 import { Link } from "wouter";
-import { Clock, Heart, Tag } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { Gavel, Clock } from "lucide-react";
+
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/utils";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ProductWithDetails } from "@shared/schema";
 
 interface AuctionCardProps {
@@ -12,108 +18,100 @@ interface AuctionCardProps {
 }
 
 export function AuctionCard({ product }: AuctionCardProps) {
-  // Format auction end time
-  const formatTimeRemaining = (endTime?: string) => {
-    if (!endTime) return "Auction ended";
+  // Determine if auction is active
+  const isActive = product.auction && product.auction.status === "active";
+  
+  // Format end date
+  const formatEndDate = () => {
+    if (!product.auction?.endsAt) return "No end date";
     
-    const endDate = new Date(endTime);
-    const now = new Date();
-    
-    if (endDate <= now) return "Auction ended";
-    
-    const diffInMillis = endDate.getTime() - now.getTime();
-    const diffInDays = Math.floor(diffInMillis / (1000 * 60 * 60 * 24));
-    const diffInHours = Math.floor((diffInMillis % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const diffInMinutes = Math.floor((diffInMillis % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (diffInDays > 0) {
-      return `${diffInDays}d ${diffInHours}h left`;
-    } else if (diffInHours > 0) {
-      return `${diffInHours}h ${diffInMinutes}m left`;
-    } else {
-      return `${diffInMinutes}m left`;
+    try {
+      const endDate = new Date(product.auction.endsAt);
+      return formatDistanceToNow(endDate, { addSuffix: true });
+    } catch (error) {
+      console.error("Date formatting error:", error);
+      return "Invalid date";
     }
   };
 
-  // Check if auction has bids
-  const hasBids = product.auction?.currentBid && product.auction.currentBid > 0;
-  
-  // Get current bid or starting price
-  const currentPrice = hasBids 
-    ? product.auction?.currentBid 
-    : product.auction?.startingPrice || product.price;
-  
-  // Get auction end time
-  const timeRemaining = formatTimeRemaining(product.auction?.endsAt);
-  
+  // Format current bid price or starting price
+  const formatPrice = () => {
+    if (product.auction?.currentBid) {
+      return `Current Bid: RM${product.auction.currentBid.toFixed(2)}`;
+    }
+    return `Starting: RM${product.auction?.startingPrice.toFixed(2) || product.price.toFixed(2)}`;
+  };
+
+  // Determine number of bids
+  const bidCount = product.auction?.bids?.length || 0;
+
   return (
-    <Card className="overflow-hidden group h-full flex flex-col">
-      <div className="aspect-square relative overflow-hidden">
-        <Link href={`/auctions/${product.id}`}>
+    <Card className="overflow-hidden h-full flex flex-col group transition-all hover:shadow-md">
+      <div className="relative h-48 overflow-hidden bg-gray-100">
+        {/* Auction badge */}
+        <div className="absolute top-2 left-2 z-10">
+          <Badge className="bg-primary text-white flex items-center gap-1">
+            <Gavel className="h-3 w-3" />
+            <span>Auction</span>
+          </Badge>
+        </div>
+        
+        {/* Time remaining badge */}
+        {isActive && (
+          <div className="absolute top-2 right-2 z-10">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    <span>Ends {formatEndDate()}</span>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Auction ends {product.auction?.endsAt ? new Date(product.auction.endsAt).toLocaleString() : 'soon'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
+        
+        {/* Product image with link */}
+        <Link href={`/products/${product.id}`} className="block h-full">
           <img
-            src={product.imageUrl || "/placeholder.jpg"}
+            src={product.imageUrl || product.images?.[0]?.imageUrl || "/placeholder.jpg"}
             alt={product.name}
-            className="object-cover w-full h-full transition-transform group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform group-hover:scale-105"
             loading="lazy"
           />
         </Link>
-        
-        {/* Auction Badge */}
-        <Badge className="absolute top-2 left-2 bg-amber-500 hover:bg-amber-600">
-          Auction
-        </Badge>
-        
-        {/* Percentage Badge (if applicable) */}
-        {product.remainingPercentage && product.remainingPercentage < 100 && (
-          <Badge className="absolute top-2 right-2 bg-purple-500 hover:bg-purple-600">
-            {product.remainingPercentage}% left
-          </Badge>
-        )}
       </div>
-      
-      <CardContent className="p-4 flex-grow">
-        <div className="mb-1">
-          <Link href={`/auctions/${product.id}`} className="hover:underline">
-            <h3 className="font-medium text-base leading-tight line-clamp-2">{product.name}</h3>
-          </Link>
-        </div>
-        
-        <p className="text-sm text-muted-foreground">{product.brand}</p>
-        
-        {/* Auction info */}
-        <div className="mt-2">
-          <div className="flex items-center text-sm text-amber-600 font-medium">
-            <Clock className="h-3.5 w-3.5 mr-1" />
-            <span>{timeRemaining}</span>
-          </div>
-          
-          {hasBids ? (
-            <div className="flex items-center justify-between mt-1">
-              <div>
-                <p className="text-xs text-muted-foreground">Current bid:</p>
-                <p className="font-semibold">{formatCurrency(currentPrice)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground">Bids:</p>
-                <p className="font-medium">{product.auction?.bidCount || 0}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-1">
-              <p className="text-xs text-muted-foreground">Starting at:</p>
-              <p className="font-semibold">{formatCurrency(currentPrice)}</p>
-            </div>
-          )}
+
+      <CardContent className="py-4 flex-grow">
+        <Link href={`/products/${product.id}`} className="hover:underline">
+          <h3 className="font-semibold text-lg line-clamp-1 mb-1">
+            {product.name}
+          </h3>
+        </Link>
+        <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
+          {product.brand}
+        </p>
+        <div className="flex justify-between items-center">
+          <p className="font-medium">
+            {formatPrice()}
+          </p>
+          <span className="text-sm text-muted-foreground">
+            {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+          </span>
         </div>
       </CardContent>
-      
-      <CardFooter className="p-4 pt-0 mt-auto">
-        <div className="flex w-full gap-2">
-          <Button asChild className="w-full" variant="default">
-            <Link href={`/auctions/${product.id}`}>
-              Place Bid
-            </Link>
-          </Button>
+
+      <CardFooter className="pt-0 pb-4">
+        <div className="w-full">
+          <Link href={`/products/${product.id}`} className="block w-full">
+            <Badge variant="outline" className="w-full justify-center hover:bg-secondary">
+              View Auction
+            </Badge>
+          </Link>
         </div>
       </CardFooter>
     </Card>
