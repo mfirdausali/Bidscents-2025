@@ -659,9 +659,15 @@ export default function SellerProfilePage() {
                       {productsData?.products
                         .filter(product => product.status === 'featured')
                         .map((product) => (
-                          <ProductCard 
-                            key={product.id} product={product}
-                          />
+                          product.listingType === "auction" ? (
+                            <AuctionCard 
+                              key={product.id} product={product}
+                            />
+                          ) : (
+                            <ProductCard 
+                              key={product.id} product={product}
+                            />
+                          )
                         ))}
                     </div>
                   )}
@@ -705,9 +711,15 @@ export default function SellerProfilePage() {
                       {productsData?.products
                         .filter(product => product.status === 'sold')
                         .map((product) => (
-                          <ProductCard 
-                            key={product.id} product={product}
-                          />
+                          product.listingType === "auction" ? (
+                            <AuctionCard 
+                              key={product.id} product={product}
+                            />
+                          ) : (
+                            <ProductCard 
+                              key={product.id} product={product}
+                            />
+                          )
                         ))}
                     </div>
                   )}
