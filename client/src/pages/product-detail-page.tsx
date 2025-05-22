@@ -1,42 +1,23 @@
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { ProductWithDetails, Review, InsertReview } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
+import { ProductWithDetails } from "@shared/schema";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ContactSellerButton } from "@/components/ui/contact-seller-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
-import { Star, StarHalf, Heart, Minus, Plus, MessageSquare, Info, Check } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Info } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-
-// Define review form schema
-const reviewSchema = z.object({
-  rating: z.number().min(1).max(5),
-  comment: z.string().min(10, { message: "Comment must be at least 10 characters" }),
-});
-
-type ReviewFormValues = z.infer<typeof reviewSchema>;
 
 export default function ProductDetailPage() {
   const [, params] = useRoute("/products/:id");
   const productId = params?.id ? parseInt(params.id) : 0;
   const { user } = useAuth();
-  const { toast } = useToast();
   
-  const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState("50ml");
   const [activeTab, setActiveTab] = useState("description");
-  const [selectedRating, setSelectedRating] = useState(0);
 
   // State for current displayed image
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -46,98 +27,6 @@ export default function ProductDetailPage() {
     queryKey: [`/api/products/${productId}`],
     enabled: !!productId,
   });
-
-  // Fetch product reviews
-  const { data: reviews, refetch: refetchReviews } = useQuery<Review[]>({
-    queryKey: [`/api/products/${productId}/reviews`],
-    enabled: !!productId,
-  });
-
-  // Review form
-  const form = useForm<ReviewFormValues>({
-    resolver: zodResolver(reviewSchema),
-    defaultValues: {
-      rating: 5,
-      comment: "",
-    },
-  });
-
-  // Add review mutation
-  const addReviewMutation = useMutation({
-    mutationFn: async (review: InsertReview) => {
-      const res = await apiRequest("POST", "/api/reviews", review);
-      return await res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Review submitted",
-        description: "Thank you for your feedback!",
-      });
-      refetchReviews();
-      form.reset();
-      queryClient.invalidateQueries({ queryKey: [`/api/products/${productId}`] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error submitting review",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Handle quantity change
-  const handleQuantityChange = (change: number) => {
-    const newQuantity = quantity + change;
-    if (newQuantity >= 1) {
-      setQuantity(newQuantity);
-    }
-  };
-
-  // Function to render star ratings
-  const renderStars = (rating: number | undefined) => {
-    if (!rating) rating = 0;
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-
-    // Add full stars
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={`star-${i}`} className="fill-gold text-gold" />);
-    }
-
-    // Add half star if needed
-    if (hasHalfStar) {
-      stars.push(<StarHalf key="half-star" className="fill-gold text-gold" />);
-    }
-
-    // Add empty stars to make total of 5
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(<Star key={`empty-${i}`} className="text-gold" />);
-    }
-
-    return stars;
-  };
-
-
-
-  // Handle review submission
-  const onSubmitReview = (data: ReviewFormValues) => {
-    if (!user || !product) return;
-    
-    const reviewData: InsertReview = {
-      userId: user.id,
-      productId: product.id,
-      rating: data.rating,
-      comment: data.comment,
-    };
-    
-    addReviewMutation.mutate(reviewData);
-  };
-  
-  // Check if user already reviewed this product
-  const hasUserReviewed = user && reviews?.some(review => review.userId === user.id);
 
   if (isLoading) {
     return (
@@ -247,8 +136,6 @@ export default function ProductDetailPage() {
                   )}
                 </div>
                 <h1 className="font-playfair text-2xl md:text-3xl font-bold mb-3">{product.name}</h1>
-                
-                {/* Removed stars and review count */}
                 
                 {/* Seller information */}
                 <div className="flex items-center mb-4 text-sm bg-gray-50 p-3 rounded-md">
@@ -390,154 +277,35 @@ export default function ProductDetailPage() {
                     <h4 className="font-medium mb-1">Authenticity:</h4>
                     <p className="text-gray-600">
                       {product.batchCode ? (
-                        <span className="flex items-center text-green-600">
-                          <Check className="h-4 w-4 mr-1" /> Verified (Batch Code: {product.batchCode})
+                        <span className="flex items-center">
+                          <span className="mr-1">Batch Code:</span> 
+                          <span className="font-medium">{product.batchCode}</span>
                         </span>
                       ) : (
                         "No batch code provided"
                       )}
                     </p>
                   </div>
-                  <div>
-                    <h4 className="font-medium mb-1">Listing Type:</h4>
-                    <p className="text-gray-600">
-                      {product.listingType === "auction" ? "Auction" : 
-                       product.listingType === "negotiable" ? "Negotiable Price" : "Fixed Price"}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-1">Volume:</h4>
-                    <p className="text-gray-600">{product.volume || "Not specified"}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-1">Concentration:</h4>
-                    <p className="text-gray-600">Eau de Parfum</p>
-                  </div>
                 </div>
               </TabsContent>
-              
-              <TabsContent value="reviews" className="p-6 bg-white rounded-lg shadow mt-6">
-                <h3 className="font-playfair text-xl font-semibold mb-4">Customer Reviews</h3>
-                
-                {/* Reviews list */}
-                {reviews && reviews.length > 0 ? (
-                  <div className="space-y-6 mb-8">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="border-b pb-6">
-                        <div className="flex justify-between mb-2">
-                          <div className="flex">
-                            {renderStars(review.rating)}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {new Date(review.createdAt || "").toLocaleDateString()}
-                          </div>
-                        </div>
-                        <p className="text-gray-600 mb-2">{review.comment}</p>
-                        <div className="text-sm text-gray-500">
-                          By: {review.userId === user?.id ? "You" : "Verified Buyer"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 mb-8">
-                    <p className="text-gray-600">No reviews yet. Be the first to leave a review!</p>
-                  </div>
-                )}
-                
-                <Separator className="my-8" />
-                
-                {/* Review form */}
-                {user ? (
-                  hasUserReviewed ? (
-                    <div className="bg-gray-50 p-6 rounded-lg">
-                      <div className="flex items-center text-green-600 mb-2">
-                        <Check className="h-5 w-5 mr-2" />
-                        <span className="font-medium">You've already reviewed this product</span>
-                      </div>
-                      <p className="text-gray-600">Thank you for your feedback!</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <h4 className="font-playfair text-lg font-semibold mb-4">Write a Review</h4>
-                      <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmitReview)} className="space-y-6">
-                          <FormField
-                            control={form.control}
-                            name="rating"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Your Rating</FormLabel>
-                                <FormControl>
-                                  <div className="flex">
-                                    {[1, 2, 3, 4, 5].map((rating) => (
-                                      <button
-                                        key={rating}
-                                        type="button"
-                                        onClick={() => {
-                                          field.onChange(rating);
-                                          setSelectedRating(rating);
-                                        }}
-                                        className="p-1"
-                                      >
-                                        <Star 
-                                          className={`h-6 w-6 ${selectedRating >= rating ? 'fill-purple-600 text-purple-600' : 'text-gray-300'}`} 
-                                        />
-                                      </button>
-                                    ))}
-                                  </div>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={form.control}
-                            name="comment"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Your Review</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    placeholder="Share your experience with this product..."
-                                    className="resize-none h-32"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <Button 
-                            type="submit" 
-                            className="bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
-                            disabled={addReviewMutation.isPending}
-                          >
-                            {addReviewMutation.isPending ? (
-                              <span className="flex items-center">
-                                <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full"></span>
-                                Submitting...
-                              </span>
-                            ) : (
-                              "Submit Review"
-                            )}
-                          </Button>
-                        </form>
-                      </Form>
-                    </div>
-                  )
-                ) : (
-                  <div className="bg-gray-50 p-6 rounded-lg text-center">
-                    <p className="text-gray-600 mb-4">Please sign in to leave a review</p>
-                    <Button asChild className="bg-purple-600 text-white hover:bg-purple-700 shadow-sm">
-                      <a href="/auth">Sign In</a>
-                    </Button>
-                  </div>
-                )}
-              </TabsContent>
             </Tabs>
+          </div>
+          
+          {/* Related products section */}
+          <div className="mt-20">
+            <h2 className="text-2xl font-playfair text-center mb-8">You May Also Like</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="rounded-lg overflow-hidden bg-white shadow-sm transition-transform hover:shadow-md hover:-translate-y-1">
+                  <div className="h-40 bg-gray-200"></div>
+                  <div className="p-4">
+                    <h3 className="font-medium mb-1 truncate">Similar Product {i+1}</h3>
+                    <p className="text-sm text-gray-500 mb-2">Brand Name</p>
+                    <p className="font-semibold">RM 199.00</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </main>
