@@ -101,7 +101,7 @@ const productSchema = z.object({
     .string()
     .min(10, { message: "Description must be at least 10 characters" }),
   price: z.number().min(0.01, { message: "Price must be greater than 0" }),
-  imageUrl: z.string().url({ message: "Please enter a valid image URL" }), // Keep for compatibility, will be updated in backend
+  imageUrl: z.string().url({ message: "Please enter a valid image URL" }).optional(), // Optional to allow empty when deleting all images
   imageFiles: z.any().optional(), // Will hold the actual file objects for upload
   stockQuantity: z
     .number()
