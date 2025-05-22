@@ -239,6 +239,7 @@ export const insertProductSchema = createInsertSchema(products).pick({
   listingType: true,
   status: true,
   volume: true,
+  votes: true,
 });
 
 export const insertCategorySchema = createInsertSchema(categories).pick({
