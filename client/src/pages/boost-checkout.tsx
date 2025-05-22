@@ -108,9 +108,9 @@ export default function BoostCheckoutPage() {
   };
   
   return (
-    <div className="container max-w-5xl py-8">
-      <h1 className="text-3xl font-bold mb-4">Boost Your Products</h1>
-      <p className="text-muted-foreground mb-8">
+    <div className="container max-w-5xl py-8 mx-auto">
+      <h1 className="text-3xl font-bold mb-4 text-center">Boost Your Products</h1>
+      <p className="text-muted-foreground mb-8 text-center">
         Increase visibility and sales by featuring your products on the homepage and in search results.
       </p>
       
