@@ -451,21 +451,25 @@ export class SupabaseStorage implements IStorage {
       purchaseYear: product.purchase_year,
       boxCondition: product.box_condition,
       listingType: product.listing_type,
-      volume: product.volume
+      volume: product.volume,
+      status: product.status // Add the status field
     };
   }
 
   async getSellerProducts(sellerId: number): Promise<ProductWithDetails[]> {
+    console.log(`Fetching products for seller ID: ${sellerId}`);
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('seller_id', sellerId)
-      .or('status.eq.active,status.eq.featured');
+      .eq('seller_id', sellerId);
     
     if (error) {
       console.error('Error getting seller products:', error);
       return [];
     }
+    
+    console.log(`Fetched ${data?.length || 0} products for seller, with statuses:`, 
+      data?.map(p => p.status).filter((v, i, a) => a.indexOf(v) === i));
     
     // Convert snake_case to camelCase
     const mappedProducts = (data || []).map(product => this.mapSnakeToCamelCase(product));
