@@ -613,7 +613,11 @@ export default function SellerProfilePage() {
                               product={{
                                 ...product,
                                 imageUrl: product.imageUrl || '',
-                                auction: product.auction
+                                auction: {
+                                  ...product.auction,
+                                  endsAt: product.auction.endsAt instanceof Date ? product.auction.endsAt.toISOString() : String(product.auction.endsAt),
+                                  startsAt: product.auction.startsAt instanceof Date ? product.auction.startsAt.toISOString() : String(product.auction.startsAt)
+                                }
                               }}
                               images={product.images}
                             />
@@ -671,7 +675,11 @@ export default function SellerProfilePage() {
                               product={{
                                 ...product,
                                 imageUrl: product.imageUrl || '',
-                                auction: product.auction
+                                auction: {
+                                  ...product.auction,
+                                  endsAt: product.auction.endsAt instanceof Date ? product.auction.endsAt.toISOString() : String(product.auction.endsAt),
+                                  startsAt: product.auction.startsAt instanceof Date ? product.auction.startsAt.toISOString() : String(product.auction.startsAt)
+                                }
                               }}
                               images={product.images}
                             />
@@ -729,7 +737,11 @@ export default function SellerProfilePage() {
                               product={{
                                 ...product,
                                 imageUrl: product.imageUrl || '',
-                                auction: product.auction
+                                auction: {
+                                  ...product.auction,
+                                  endsAt: product.auction.endsAt instanceof Date ? product.auction.endsAt.toISOString() : String(product.auction.endsAt),
+                                  startsAt: product.auction.startsAt instanceof Date ? product.auction.startsAt.toISOString() : String(product.auction.startsAt)
+                                }
                               }}
                               images={product.images}
                             />
