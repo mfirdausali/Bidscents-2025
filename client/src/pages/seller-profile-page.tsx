@@ -104,6 +104,7 @@ export default function SellerProfilePage() {
         }
       };
       console.log("Fetched products data:", data);
+      console.log("Products fetched with statuses:", data.products.map(p => p.status));
       return data;
     },
     enabled: !!sellerId
