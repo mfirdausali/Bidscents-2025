@@ -21,6 +21,7 @@ import { AuthProvider } from "./hooks/use-auth";
 import TermsOfServicePage from "./pages/terms-of-service";
 import PrivacyPolicyPage from "./pages/privacy-policy";
 import BuyingGuidePage from "@/pages/buying-guide"; // Import the new component
+import BoostCheckoutPage from "@/pages/boost-checkout"; // Import boost checkout page
 
 function Router() {
   return (
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/terms-of-service" component={TermsOfServicePage} />
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/buying-guide" component={BuyingGuidePage} /> {/* Added Buying Guide route */}
+      <ProtectedRoute path="/boost-checkout" component={BoostCheckoutPage} /> {/* Added Boost Checkout route */}
       <Route component={NotFound} />
     </Switch>
   );
