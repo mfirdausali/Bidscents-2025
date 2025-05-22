@@ -50,6 +50,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   const [isActive, setIsActive] = useState<boolean>(true);
   const [localBids, setLocalBids] = useState<Bid[]>([]);
   const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const socket = useRef<WebSocket | null>(null);
   
   // Calculate the next minimum bid amount (memoized to avoid unnecessary rerenders)
@@ -540,16 +541,39 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           {/* Product Image */}
-          <div className="aspect-square rounded-lg overflow-hidden bg-gray-50">
-            <img 
-              src={product.images && product.images.length > 0 
-                ? `/api/images/${product.images[0]?.imageUrl}` 
-                : product.imageUrl 
-                  ? `/api/images/${product.imageUrl}` 
-                  : '/placeholder.jpg'} 
-              alt={product.name}
-              className="w-full h-full object-cover max-h-[500px]"
-            />
+          <div>
+            <div className="aspect-square rounded-lg overflow-hidden bg-gray-50 mb-4">
+              <img 
+                src={product.images && product.images.length > 0 
+                  ? `/api/images/${product.images[currentImageIndex]?.imageUrl}` 
+                  : product.imageUrl 
+                    ? `/api/images/${product.imageUrl}` 
+                    : '/placeholder.jpg'} 
+                alt={product.name}
+                className="w-full h-full object-cover max-h-[500px]"
+              />
+            </div>
+            
+            {/* Image thumbnails */}
+            {product.images && product.images.length > 0 && (
+              <div className="flex space-x-2 mt-2 overflow-x-auto">
+                {product.images.map((image, index) => (
+                  <div 
+                    key={image.id} 
+                    className={`w-16 h-16 rounded-md overflow-hidden cursor-pointer border-2 ${
+                      currentImageIndex === index ? 'border-amber-500' : 'border-transparent'
+                    }`}
+                    onClick={() => setCurrentImageIndex(index)}
+                  >
+                    <img 
+                      src={`/api/images/${image.imageUrl}`} 
+                      alt={`${product.name} - Image ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           
           {/* Auction Details */}
