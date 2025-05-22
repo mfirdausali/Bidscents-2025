@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ProductWithDetails } from "@shared/schema";
+import { ProductWithDetails, Review, InsertReview } from "@shared/schema";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,23 @@ import { Badge } from "@/components/ui/badge";
 import { ContactSellerButton } from "@/components/ui/contact-seller-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Star, StarHalf, Heart, Minus, Plus, MessageSquare, Info, Check, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Star, StarHalf, Heart, Minus, Plus, MessageSquare, Info, Check } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { Card } from "@/components/ui/card";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+// Define review form schema
+const reviewSchema = z.object({
+  rating: z.number().min(1).max(5),
+  comment: z.string().min(10, { message: "Comment must be at least 10 characters" }),
+});
+
+type ReviewFormValues = z.infer<typeof reviewSchema>;
 
 export default function ProductDetailPage() {
   const [, params] = useRoute("/products/:id");
@@ -24,104 +36,51 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState("50ml");
   const [activeTab, setActiveTab] = useState("description");
+  const [selectedRating, setSelectedRating] = useState(0);
 
   // State for current displayed image
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  // Local vote state with buffer for optimistic UI updates
-  const [localVotes, setLocalVotes] = useState<number | null>(null);
-  const [votesChanged, setVotesChanged] = useState(false);
 
   // Fetch product details
   const { data: product, isLoading } = useQuery<ProductWithDetails>({
     queryKey: [`/api/products/${productId}`],
     enabled: !!productId,
-    onSuccess: (data) => {
-      // Initialize local votes from product data
-      if (localVotes === null) {
-        setLocalVotes(data.votes || 0);
-      }
-    }
   });
-  
-  // No longer need to fetch reviews since we're using votes instead
-  
-  // Use effect to send buffered votes to server when user leaves page
-  useEffect(() => {
-    return () => {
-      // This runs when component unmounts
-      if (votesChanged && product) {
-        console.log("Sending buffered votes to server on page exit");
-        
-        // Send the final vote count to the server
-        if (localVotes !== null) {
-          const finalVoteCount = localVotes;
-          const originalVotes = product.votes || 0;
-          
-          if (finalVoteCount > originalVotes) {
-            // If the final vote count is higher, send upvotes for the difference
-            for (let i = 0; i < finalVoteCount - originalVotes; i++) {
-              fetch(`/api/products/${productId}/upvote`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" }
-              }).catch(err => console.error("Error sending buffered upvote:", err));
-            }
-          } else if (finalVoteCount < originalVotes) {
-            // If the final vote count is lower, send downvotes for the difference
-            for (let i = 0; i < originalVotes - finalVoteCount; i++) {
-              fetch(`/api/products/${productId}/downvote`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" }
-              }).catch(err => console.error("Error sending buffered downvote:", err));
-            }
-          }
-        }
-      }
-    };
-  }, [votesChanged, productId, localVotes, product]);
 
-  // Upvote mutation
-  const upvoteMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/products/${productId}/upvote`);
-      return await res.json();
-    },
-    onSuccess: () => {
-      // Update local vote count for instant feedback
-      setLocalVotes((current) => (current !== null ? current + 1 : 1));
-      setVotesChanged(true);
-      toast({
-        title: "Vote recorded",
-        description: "Thank you for your feedback!",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error recording vote",
-        description: "Failed to upvote. Please try again.",
-        variant: "destructive",
-      });
+  // Fetch product reviews
+  const { data: reviews, refetch: refetchReviews } = useQuery<Review[]>({
+    queryKey: [`/api/products/${productId}/reviews`],
+    enabled: !!productId,
+  });
+
+  // Review form
+  const form = useForm<ReviewFormValues>({
+    resolver: zodResolver(reviewSchema),
+    defaultValues: {
+      rating: 5,
+      comment: "",
     },
   });
-  
-  // Downvote mutation
-  const downvoteMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/products/${productId}/downvote`);
+
+  // Add review mutation
+  const addReviewMutation = useMutation({
+    mutationFn: async (review: InsertReview) => {
+      const res = await apiRequest("POST", "/api/reviews", review);
       return await res.json();
     },
     onSuccess: () => {
-      // Update local vote count for instant feedback
-      setLocalVotes((current) => (current !== null ? Math.max(0, current - 1) : 0));
-      setVotesChanged(true);
       toast({
-        title: "Vote recorded",
+        title: "Review submitted",
         description: "Thank you for your feedback!",
       });
+      refetchReviews();
+      form.reset();
+      queryClient.invalidateQueries({ queryKey: [`/api/products/${productId}`] });
     },
     onError: (error) => {
       toast({
-        title: "Error recording vote",
-        description: "Failed to downvote. Please try again.",
+        title: "Error submitting review",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -135,11 +94,50 @@ export default function ProductDetailPage() {
     }
   };
 
-  // No longer needed since we're now using votes instead of star ratings
+  // Function to render star ratings
+  const renderStars = (rating: number | undefined) => {
+    if (!rating) rating = 0;
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+
+    // Add full stars
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(<Star key={`star-${i}`} className="fill-gold text-gold" />);
+    }
+
+    // Add half star if needed
+    if (hasHalfStar) {
+      stars.push(<StarHalf key="half-star" className="fill-gold text-gold" />);
+    }
+
+    // Add empty stars to make total of 5
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(<Star key={`empty-${i}`} className="text-gold" />);
+    }
+
+    return stars;
+  };
 
 
 
-  // No longer needed - replaced by voting system
+  // Handle review submission
+  const onSubmitReview = (data: ReviewFormValues) => {
+    if (!user || !product) return;
+    
+    const reviewData: InsertReview = {
+      userId: user.id,
+      productId: product.id,
+      rating: data.rating,
+      comment: data.comment,
+    };
+    
+    addReviewMutation.mutate(reviewData);
+  };
+  
+  // Check if user already reviewed this product
+  const hasUserReviewed = user && reviews?.some(review => review.userId === user.id);
 
   if (isLoading) {
     return (
@@ -251,12 +249,12 @@ export default function ProductDetailPage() {
                 <h1 className="font-playfair text-2xl md:text-3xl font-bold mb-3">{product.name}</h1>
                 
                 <div className="flex items-center mb-3">
-                  <div className="flex items-center">
-                    <ThumbsUp className="h-4 w-4 text-purple-600 mr-1" />
-                    <span className="text-sm text-gray-500">
-                      {product?.votes || 0} votes
-                    </span>
+                  <div className="flex">
+                    {renderStars(product.averageRating)}
                   </div>
+                  <span className="text-sm text-gray-500 ml-2">
+                    ({product.reviews?.length || 0} reviews)
+                  </span>
                 </div>
                 
                 {/* Seller information */}
@@ -316,40 +314,30 @@ export default function ProductDetailPage() {
                 </p>
               </div>
               
-              {/* Voting controls */}
+              {/* Quantity and add to cart */}
               <div className="flex flex-col sm:flex-row items-stretch gap-4 mb-8">
-                <div className="flex items-center border rounded h-12 px-3 gap-3">
-                  <div className="font-medium">{localVotes !== null ? localVotes : (product?.votes || 0)} votes</div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      onClick={() => upvoteMutation.mutate()}
-                      disabled={upvoteMutation.isPending || !user}
-                      variant="ghost" 
-                      size="sm"
-                      className="h-8 px-2 hover:bg-green-50 hover:text-green-600"
-                    >
-                      <ThumbsUp className="h-4 w-4 mr-1" />
-                      <span className="text-xs">Upvote</span>
-                    </Button>
-                    
-                    <Button 
-                      onClick={() => downvoteMutation.mutate()}
-                      disabled={downvoteMutation.isPending || !user || (localVotes !== null && localVotes <= 0)}
-                      variant="ghost" 
-                      size="sm"
-                      className="h-8 px-2 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <ThumbsDown className="h-4 w-4 mr-1" />
-                      <span className="text-xs">Downvote</span>
-                    </Button>
-                  </div>
-                  
-                  {votesChanged && (
-                    <div className="text-green-600 text-xs flex items-center ml-1">
-                      <Check className="h-3 w-3 mr-1" />
-                      <span>Saved</span>
-                    </div>
-                  )}
+                <div className="flex border rounded h-12">
+                  <Button 
+                    variant="ghost" 
+                    className="px-3" 
+                    onClick={() => handleQuantityChange(-1)}
+                    disabled={quantity <= 1}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <input 
+                    type="text" 
+                    value={quantity} 
+                    readOnly 
+                    className="w-12 text-center flex-1"
+                  />
+                  <Button 
+                    variant="ghost" 
+                    className="px-3" 
+                    onClick={() => handleQuantityChange(1)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
                 
                 <ContactSellerButton 
@@ -401,9 +389,12 @@ export default function ProductDetailPage() {
           {/* Product details tabs */}
           <div className="mt-16">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="description">Description</TabsTrigger>
                 <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="reviews">
+                  Reviews ({product.reviews?.length || 0})
+                </TabsTrigger>
               </TabsList>
               
               <TabsContent value="description" className="p-6 bg-white rounded-lg shadow mt-6">
@@ -466,53 +457,34 @@ export default function ProductDetailPage() {
                 </div>
               </TabsContent>
               
-              {/* Reviews tab removed */}
-                <h3 className="font-playfair text-xl font-semibold mb-4">Product Rating</h3>
+              <TabsContent value="reviews" className="p-6 bg-white rounded-lg shadow mt-6">
+                <h3 className="font-playfair text-xl font-semibold mb-4">Customer Reviews</h3>
                 
-                <Card className="p-6 bg-gray-50 shadow-sm">
-                  <div className="flex flex-col items-center">
-                    <div className="text-3xl font-bold mb-2">{localVotes !== null ? localVotes : (product?.votes || 0)}</div>
-                    <div className="text-gray-500 mb-6">Total votes</div>
-                    
-                    <div className="flex gap-4">
-                      <Button 
-                        onClick={() => upvoteMutation.mutate()}
-                        disabled={upvoteMutation.isPending || !user}
-                        variant="outline" 
-                        className="flex items-center gap-2 hover:bg-green-50 hover:text-green-600 hover:border-green-200"
-                      >
-                        <ThumbsUp className="h-5 w-5" />
-                        <span>Upvote</span>
-                      </Button>
-                      
-                      <Button 
-                        onClick={() => downvoteMutation.mutate()}
-                        disabled={downvoteMutation.isPending || !user || (localVotes !== null && localVotes <= 0)}
-                        variant="outline" 
-                        className="flex items-center gap-2 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
-                      >
-                        <ThumbsDown className="h-5 w-5" />
-                        <span>Downvote</span>
-                      </Button>
-                    </div>
-                    
-                    {!user && (
-                      <div className="mt-6 text-center text-gray-600">
-                        <p className="mb-2">Please log in to vote on this product</p>
-                        <Button className="bg-purple-600 hover:bg-purple-700 text-white" asChild>
-                          <Link href="/login">Login</Link>
-                        </Button>
+                {/* Reviews list */}
+                {reviews && reviews.length > 0 ? (
+                  <div className="space-y-6 mb-8">
+                    {reviews.map((review) => (
+                      <div key={review.id} className="border-b pb-6">
+                        <div className="flex justify-between mb-2">
+                          <div className="flex">
+                            {renderStars(review.rating)}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {new Date(review.createdAt || "").toLocaleDateString()}
+                          </div>
+                        </div>
+                        <p className="text-gray-600 mb-2">{review.comment}</p>
+                        <div className="text-sm text-gray-500">
+                          By: {review.userId === user?.id ? "You" : "Verified Buyer"}
+                        </div>
                       </div>
-                    )}
-                    
-                    {votesChanged && (
-                      <div className="mt-4 text-green-600 text-sm flex items-center">
-                        <Check className="h-4 w-4 mr-1" />
-                        <span>Your vote has been recorded</span>
-                      </div>
-                    )}
+                    ))}
                   </div>
-                </Card>
+                ) : (
+                  <div className="text-center py-6 mb-8">
+                    <p className="text-gray-600">No reviews yet. Be the first to leave a review!</p>
+                  </div>
+                )}
                 
                 <Separator className="my-8" />
                 
