@@ -908,6 +908,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get auction by product ID
+  app.get("/api/auctions/product/:productId", async (req, res, next) => {
+    try {
+      const productId = parseInt(req.params.productId);
+      console.log(`Getting auction for product ID: ${productId}`);
+      
+      // Find the auction by product ID
+      const { data, error } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('product_id', productId)
+        .single();
+      
+      if (error) {
+        console.error(`Error getting auction for product ${productId}:`, error);
+        return res.status(404).json({ message: "Auction not found" });
+      }
+      
+      // Map snake_case to camelCase
+      const auction = {
+        id: data.id,
+        productId: data.product_id,
+        startingPrice: data.starting_price,
+        reservePrice: data.reserve_price,
+        buyNowPrice: data.buy_now_price,
+        currentBid: data.current_bid,
+        currentBidderId: data.current_bidder_id,
+        bidIncrement: data.bid_increment,
+        startsAt: data.starts_at,
+        endsAt: data.ends_at,
+        status: data.status,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+      
+      console.log(`Found auction ${auction.id} for product ${productId}`);
+      res.json(auction);
+    } catch (error) {
+      console.error("Error fetching auction by product ID:", error);
+      next(error);
+    }
+  });
+  
   // Basic auction details (deprecated, use the complete route below instead)
   // This route is kept for backward compatibility
   app.get("/api/auctions/:id/basic", async (req, res, next) => {
