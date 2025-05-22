@@ -77,8 +77,6 @@ export const products = pgTable("products", {
   listingType: text("listing_type").default("fixed"), // fixed, negotiable, auction
   status: text("status").default("active"), // active, featured, sold, archived
   volume: integer("volume"), // Bottle size (e.g., "50ml", "100ml", "3.4oz")
-  // User voting system
-  votes: integer("votes").default(0).notNull(),
   // New fields for boost packages
   boostPackageId: integer("boost_package_id").references(() => boostPackages.id),
   boostGroupId: text("boost_group_id")
@@ -239,7 +237,6 @@ export const insertProductSchema = createInsertSchema(products).pick({
   listingType: true,
   status: true,
   volume: true,
-  votes: true,
 });
 
 export const insertCategorySchema = createInsertSchema(categories).pick({
