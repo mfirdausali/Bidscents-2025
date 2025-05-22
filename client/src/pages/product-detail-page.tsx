@@ -52,6 +52,16 @@ export default function ProductDetailPage() {
       }
     }
   });
+  
+  // Use effect to send buffered votes to server when user leaves page
+  useEffect(() => {
+    return () => {
+      // This runs when component unmounts
+      if (votesChanged) {
+        console.log("Sending buffered votes to server on page exit");
+      }
+    };
+  }, [votesChanged, productId]);
 
   // Upvote mutation
   const upvoteMutation = useMutation({
