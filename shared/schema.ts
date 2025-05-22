@@ -1,5 +1,5 @@
 import { float } from "drizzle-orm/mysql-core";
-import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, jsonb, pgEnum, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -39,6 +39,19 @@ export const categories = pgTable("categories", {
   description: text("description"),
 });
 
+// Boost Packages table
+export const boostPackages = pgTable("boost_packages", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  packageType: text("package_type").notNull(), // "standard" or "premium"
+  itemCount: integer("item_count").notNull(), // 1, 3, 5, or 10
+  price: integer("price").notNull(), // Price in sen (e.g., RM 5 = 500 sen)
+  durationHours: integer("duration_hours").notNull(), // 15 or 36 hours
+  effectivePrice: decimal("effective_price", { precision: 10, scale: 2 }), // Price per item
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
 // Products table
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
@@ -54,6 +67,7 @@ export const products = pgTable("products", {
   isFeatured: boolean("is_featured").default(false),
   featuredAt: timestamp("featured_at"), // When the product was featured
   featuredUntil: timestamp("featured_until"), // When the featured status expires
+  featuredDurationHours: integer("featured_duration_hours"), // Duration in hours
   createdAt: timestamp("created_at").defaultNow(),
   // Secondhand perfume specific fields
   remainingPercentage: integer("remaining_percentage").default(100), // How full is the bottle (1-100%)
@@ -62,7 +76,10 @@ export const products = pgTable("products", {
   boxCondition: text("box_condition"), // Condition of the box/packaging
   listingType: text("listing_type").default("fixed"), // fixed, negotiable, auction
   status: text("status").default("active"), // active, featured, sold, archived
-  volume: integer("volume") // Bottle size (e.g., "50ml", "100ml", "3.4oz")
+  volume: integer("volume"), // Bottle size (e.g., "50ml", "100ml", "3.4oz")
+  // New fields for boost packages
+  boostPackageId: integer("boost_package_id").references(() => boostPackages.id),
+  boostGroupId: text("boost_group_id")
 });
 
 // Product Images table
@@ -291,6 +308,16 @@ export const insertBidSchema = createInsertSchema(bids).pick({
   isWinning: true,
 });
 
+export const insertBoostPackageSchema = createInsertSchema(boostPackages).pick({
+  name: true,
+  packageType: true,
+  itemCount: true,
+  price: true,
+  durationHours: true,
+  effectivePrice: true,
+  isActive: true,
+});
+
 export const insertPaymentSchema = createInsertSchema(payments).pick({
   userId: true,
   orderId: true,
@@ -323,6 +350,9 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 
 export type Category = typeof categories.$inferSelect;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
+
+export type BoostPackage = typeof boostPackages.$inferSelect;
+export type InsertBoostPackage = z.infer<typeof insertBoostPackageSchema>;
 
 export type Review = typeof reviews.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
@@ -370,6 +400,9 @@ export type ProductWithDetails = Product & {
   featured_until?: Date | string | null;  // Database field name
   featured_duration_hours?: number | null;  // Database field name
   boost_option_id?: number | null;  // Database field name
+  boost_package_id?: number | null;  // Database field name
+  boost_group_id?: string | null;  // Database field name
+  boostPackage?: BoostPackage;  // Related boost package
 };
 
 export type OrderWithItems = Order & {
