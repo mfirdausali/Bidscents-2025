@@ -46,7 +46,7 @@ export default function SellerProfilePage() {
   const [match, params] = useRoute("/sellers/:id");
   const sellerId = params?.id ? parseInt(params.id) : 0;
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("active");
   const [sortOption, setSortOption] = useState("popular");
   const { toast } = useToast();
   const { user } = useAuth();
@@ -106,7 +106,7 @@ export default function SellerProfilePage() {
     enabled: !!sellerId
   });
 
-  // Handle category tab change
+  // Handle tab change
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     setCurrentPage(1);
@@ -555,10 +555,10 @@ export default function SellerProfilePage() {
               >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                   <TabsList>
-                    <TabsTrigger value="all">All Perfumes</TabsTrigger>
-                    <TabsTrigger value="Niche">Niche</TabsTrigger>
-                    <TabsTrigger value="Men's Fragrances">Men's</TabsTrigger>
-                    <TabsTrigger value="Unisex">Unisex</TabsTrigger>
+                    <TabsTrigger value="featured">Featured</TabsTrigger>
+                    <TabsTrigger value="active">Active</TabsTrigger>
+                    <TabsTrigger value="sold">Sold</TabsTrigger>
+                    <TabsTrigger value="reviews">Reviews</TabsTrigger>
                   </TabsList>
 
                   <ProductFilters 
@@ -567,7 +567,7 @@ export default function SellerProfilePage() {
                   />
                 </div>
 
-                <TabsContent value="all" className="mt-0">
+                <TabsContent value="active" className="mt-0">
                   {isProductsLoading ? (
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                       {Array(6).fill(0).map((_, index) => (
@@ -610,20 +610,105 @@ export default function SellerProfilePage() {
                   )}
                 </TabsContent>
 
-                {/* Other tab content will be identical to the "all" tab */}
-                <TabsContent value="Niche" className="mt-0">
-                  {/* Same content as "all" tab but filtered */}
-                  {/* This is handled by the backend query parameters */}
+                {/* Featured tab */}
+                <TabsContent value="featured" className="mt-0">
+                  {isProductsLoading ? (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                      {Array(6).fill(0).map((_, index) => (
+                        <Card key={index} className="overflow-hidden">
+                          <Skeleton className="h-48 w-full" />
+                          <CardContent className="p-4">
+                            <Skeleton className="h-5 w-2/3 mb-2" />
+                            <Skeleton className="h-5 w-1/3 mb-2" />
+                            <Skeleton className="h-4 w-1/4" />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : productsError ? (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground mb-4">
+                        Failed to load products. Please try again later.
+                      </p>
+                      <Button 
+                        onClick={() => window.location.reload()}
+                        variant="outline"
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  ) : productsData?.products.filter(p => p.status === 'featured').length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">
+                        No featured products found.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                      {productsData?.products
+                        .filter(product => product.status === 'featured')
+                        .map((product) => (
+                          <ProductCard 
+                            key={product.id} product={product}
+                          />
+                        ))}
+                    </div>
+                  )}
                 </TabsContent>
 
-                <TabsContent value="Men's Fragrances" className="mt-0">
-                  {/* Same content as "all" tab but filtered */}
-                  {/* This is handled by the backend query parameters */}
+                {/* Sold tab */}
+                <TabsContent value="sold" className="mt-0">
+                  {isProductsLoading ? (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                      {Array(6).fill(0).map((_, index) => (
+                        <Card key={index} className="overflow-hidden">
+                          <Skeleton className="h-48 w-full" />
+                          <CardContent className="p-4">
+                            <Skeleton className="h-5 w-2/3 mb-2" />
+                            <Skeleton className="h-5 w-1/3 mb-2" />
+                            <Skeleton className="h-4 w-1/4" />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : productsError ? (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground mb-4">
+                        Failed to load products. Please try again later.
+                      </p>
+                      <Button 
+                        onClick={() => window.location.reload()}
+                        variant="outline"
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  ) : productsData?.products.filter(p => p.status === 'sold').length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">
+                        No sold products found.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                      {productsData?.products
+                        .filter(product => product.status === 'sold')
+                        .map((product) => (
+                          <ProductCard 
+                            key={product.id} product={product}
+                          />
+                        ))}
+                    </div>
+                  )}
                 </TabsContent>
 
-                <TabsContent value="Unisex" className="mt-0">
-                  {/* Same content as "all" tab but filtered */}
-                  {/* This is handled by the backend query parameters */}
+                {/* Reviews tab */}
+                <TabsContent value="reviews" className="mt-0">
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">
+                      Seller reviews coming soon.
+                    </p>
+                  </div>
                 </TabsContent>
               </Tabs>
 
