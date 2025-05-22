@@ -595,13 +595,29 @@ export default function SellerDashboard() {
     setIsEditMode(true);
     setCurrentProductId(product.id);
 
-    // Clear existing image previews
+    // Clear existing image preview states
     setUploadedImages([]);
-    imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    imagePreviewUrls.forEach((url) => {
+      if (url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
     setImagePreviewUrls([]);
+    setExistingImages([]);
+    setImagesToDelete([]);
 
-    // If the product has images in the product.images array, show them in the preview
+    // If the product has images in the product.images array, set them up for preview
     if (product.images && product.images.length > 0) {
+      console.log("Found existing product images:", product.images);
+      
+      // Store the existing images for tracking
+      const existingImagesData = product.images.map(img => ({
+        id: img.id,
+        url: img.imageUrl
+      }));
+      setExistingImages(existingImagesData);
+      
+      // Set up preview URLs for display
       const existingImageUrls = product.images.map(
         (img) => `/api/images/${img.imageUrl}`,
       );
