@@ -24,7 +24,7 @@ export default function BoostCheckoutPage() {
   const [step, setStep] = useState<'select-package' | 'select-products' | 'checkout'>('select-package');
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   
   // Get selected package details
@@ -69,7 +69,7 @@ export default function BoostCheckoutPage() {
       if (data.paymentUrl) {
         window.location.href = data.paymentUrl;
       } else {
-        navigate('/seller/dashboard?tab=boosted');
+        setLocation('/seller/dashboard?tab=boosted');
       }
     },
     onError: (error: Error) => {
@@ -103,7 +103,7 @@ export default function BoostCheckoutPage() {
     } else if (step === 'checkout') {
       setStep('select-products');
     } else {
-      navigate('/seller/dashboard');
+      setLocation('/seller/dashboard');
     }
   };
   
