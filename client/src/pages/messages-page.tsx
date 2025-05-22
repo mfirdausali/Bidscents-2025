@@ -1056,7 +1056,7 @@ export default function MessagesPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{product.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        ${typeof product.price === 'number' ? product.price.toFixed(2) : 'Price unavailable'}
+                        RM{typeof product.price === 'number' ? product.price.toFixed(2) : 'Price unavailable'}
                       </p>
                       {product.remainingPercentage && (
                         <p className="text-xs">{product.remainingPercentage}% remaining</p>
@@ -1544,7 +1544,7 @@ export default function MessagesPage() {
                                             <div className="font-medium text-base">{msg.product.name}</div>
                                             {msg.product.price && (
                                               <div className="text-sm font-medium text-green-700">
-                                                ${Number(msg.product.price).toFixed(2)}
+                                                RM{Number(msg.product.price).toFixed(2)}
                                               </div>
                                             )}
                                           </div>
