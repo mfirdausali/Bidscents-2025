@@ -79,6 +79,40 @@ export default function SellerProfilePage() {
     },
     enabled: !!sellerId
   });
+  
+  // Fetch seller reviews
+  const {
+    data: reviews,
+    isLoading: isReviewsLoading,
+    error: reviewsError
+  } = useQuery({
+    queryKey: ["/api/sellers", sellerId, "reviews"],
+    queryFn: async () => {
+      const response = await fetch(`/api/sellers/${sellerId}/reviews`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch seller reviews");
+      }
+      return response.json() as Promise<{
+        reviews: {
+          id: number;
+          userId: number;
+          productId: number;
+          rating: number;
+          comment: string | null;
+          createdAt: string;
+          user?: {
+            username: string;
+            profileImage?: string;
+          };
+          product?: {
+            name: string;
+          };
+        }[];
+        averageRating: number;
+      }>;
+    },
+    enabled: !!sellerId
+  });
 
   // Fetch seller products with filtering and pagination
   const { 
@@ -406,15 +440,21 @@ export default function SellerProfilePage() {
                 </div>
 
                 <div className="flex items-center gap-2 mt-1">
-                  {isSellerLoading ? (
+                  {isSellerLoading || isReviewsLoading ? (
                     <Skeleton className="h-5 w-32" />
                   ) : (
                     <>
                       <div className="flex items-center">
                         <Star className="h-4 w-4 fill-primary text-primary" />
-                        <span className="ml-1 font-medium">4.8</span>
+                        <span className="ml-1 font-medium">
+                          {reviews?.averageRating 
+                            ? reviews.averageRating.toFixed(1) 
+                            : "No ratings"}
+                        </span>
                       </div>
-                      <span className="text-muted-foreground">(Reviews coming soon)</span>
+                      <span className="text-muted-foreground">
+                        ({reviews?.reviews.length || 0} {reviews?.reviews.length === 1 ? "review" : "reviews"})
+                      </span>
                     </>
                   )}
                 </div>
@@ -757,11 +797,74 @@ export default function SellerProfilePage() {
 
                 {/* Reviews tab */}
                 <TabsContent value="reviews" className="mt-0">
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground">
-                      Seller reviews coming soon.
-                    </p>
-                  </div>
+                  {isReviewsLoading ? (
+                    <div className="space-y-4 py-4">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="flex gap-4 items-start">
+                          <Skeleton className="h-10 w-10 rounded-full" />
+                          <div className="space-y-2 flex-1">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-1/2" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : reviewsError ? (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">
+                        Failed to load reviews. Please try again later.
+                      </p>
+                    </div>
+                  ) : reviews?.reviews.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">
+                        This seller has no reviews yet.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6 py-4 max-h-[600px] overflow-y-auto pr-2">
+                      {reviews?.reviews.map((review) => (
+                        <div key={review.id} className="border rounded-lg p-4 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2">
+                              <Avatar>
+                                {review.user?.profileImage ? (
+                                  <AvatarImage src={`/api/images/${review.user.profileImage}`} alt={review.user?.username || "User"} />
+                                ) : (
+                                  <AvatarImage src={`https://ui-avatars.com/api/?name=${review.user?.username || "User"}&background=random`} alt={review.user?.username || "User"} />
+                                )}
+                                <AvatarFallback>{(review.user?.username || "U").charAt(0).toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{review.user?.username || "Anonymous"}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(review.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star key={i} 
+                                  className={`h-4 w-4 ${i < review.rating ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} 
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {review.product && (
+                            <div className="text-sm bg-muted/50 px-3 py-1 rounded">
+                              <span className="text-muted-foreground">Product:</span> {review.product.name}
+                            </div>
+                          )}
+                          
+                          {review.comment && (
+                            <p className="text-sm">{review.comment}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
 

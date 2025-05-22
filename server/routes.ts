@@ -1298,6 +1298,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get seller reviews
+  app.get("/api/sellers/:id/reviews", async (req, res, next) => {
+    try {
+      const sellerId = parseInt(req.params.id);
+      
+      console.log(`Fetching reviews for seller ID: ${sellerId}`);
+      
+      // Get reviews where seller_id matches
+      const { data: reviewsData, error: reviewsError } = await supabase
+        .from('reviews')
+        .select(`
+          id, 
+          user_id, 
+          product_id, 
+          seller_id,
+          rating, 
+          comment, 
+          created_at,
+          users:user_id (username, profile_image),
+          products:product_id (name)
+        `)
+        .eq('seller_id', sellerId)
+        .order('created_at', { ascending: false });
+        
+      if (reviewsError) {
+        console.error('Error fetching seller reviews:', reviewsError);
+        return res.status(500).json({ error: 'Failed to fetch seller reviews' });
+      }
+      
+      // Map the reviews to the expected format
+      const reviews = reviewsData.map(review => ({
+        id: review.id,
+        userId: review.user_id,
+        productId: review.product_id,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.created_at,
+        user: review.users ? {
+          username: review.users.username,
+          profileImage: review.users.profile_image
+        } : undefined,
+        product: review.products ? {
+          name: review.products.name
+        } : undefined
+      }));
+      
+      // Calculate average rating
+      let averageRating = 0;
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+        averageRating = totalRating / reviews.length;
+      }
+      
+      return res.json({
+        reviews,
+        averageRating
+      });
+    } catch (error) {
+      console.error('Error fetching seller reviews:', error);
+      return res.status(500).json({ error: 'Failed to fetch seller reviews' });
+    }
+  });
+
   app.get("/api/sellers/:id/products", async (req, res, next) => {
     try {
       const sellerId = parseInt(req.params.id);
