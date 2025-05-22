@@ -68,6 +68,7 @@ import {
   X,
   Timer,
   Tag,
+  Clock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -2422,22 +2423,156 @@ export default function SellerDashboard() {
                   name="auctionEndDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Auction End Date</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="datetime-local"
-                          {...field}
-                          value={
-                            field.value instanceof Date
-                              ? field.value.toISOString().slice(0, 16)
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const date = new Date(e.target.value);
-                            field.onChange(date);
-                          }}
-                        />
-                      </FormControl>
+                      <FormLabel className="text-base">Auction End Date (Your Local Time)</FormLabel>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-3 gap-2">
+                          {/* Date selectors */}
+                          <div>
+                            <FormLabel className="text-xs">Day</FormLabel>
+                            <Select 
+                              value={field.value instanceof Date ? String(field.value.getDate()) : "1"}
+                              onValueChange={(value) => {
+                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                newDate.setDate(parseInt(value));
+                                field.onChange(newDate);
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Day" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                  <SelectItem key={day} value={String(day)}>
+                                    {String(day).padStart(2, '0')}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <FormLabel className="text-xs">Month</FormLabel>
+                            <Select 
+                              value={field.value instanceof Date ? String(field.value.getMonth()) : "0"}
+                              onValueChange={(value) => {
+                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                newDate.setMonth(parseInt(value));
+                                field.onChange(newDate);
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Month" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, index) => (
+                                  <SelectItem key={index} value={String(index)}>
+                                    {month}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <FormLabel className="text-xs">Year</FormLabel>
+                            <Select 
+                              value={field.value instanceof Date ? String(field.value.getFullYear()) : String(new Date().getFullYear())}
+                              onValueChange={(value) => {
+                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                newDate.setFullYear(parseInt(value));
+                                field.onChange(newDate);
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Year" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                                  <SelectItem key={year} value={String(year)}>
+                                    {year}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        {/* Time selectors */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <FormLabel className="text-xs">Hour (24h)</FormLabel>
+                            <Select 
+                              value={field.value instanceof Date ? String(field.value.getHours()) : "12"}
+                              onValueChange={(value) => {
+                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                newDate.setHours(parseInt(value));
+                                field.onChange(newDate);
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Hour" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 24 }, (_, i) => i).map(hour => (
+                                  <SelectItem key={hour} value={String(hour)}>
+                                    {String(hour).padStart(2, '0')}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <FormLabel className="text-xs">Minute</FormLabel>
+                            <Select 
+                              value={field.value instanceof Date ? String(field.value.getMinutes()) : "0"}
+                              onValueChange={(value) => {
+                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                newDate.setMinutes(parseInt(value));
+                                field.onChange(newDate);
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Min" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 60 }, (_, i) => i).map(min => (
+                                  <SelectItem key={min} value={String(min)}>
+                                    {String(min).padStart(2, '0')}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <FormLabel className="text-xs">Second</FormLabel>
+                            <Select 
+                              value={field.value instanceof Date ? String(field.value.getSeconds()) : "0"}
+                              onValueChange={(value) => {
+                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                newDate.setSeconds(parseInt(value));
+                                field.onChange(newDate);
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sec" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 60 }, (_, i) => i).map(sec => (
+                                  <SelectItem key={sec} value={String(sec)}>
+                                    {String(sec).padStart(2, '0')}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div className="text-sm text-muted-foreground">
+                          <Clock className="inline-block mr-1 h-4 w-4" /> Current timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                        </div>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
