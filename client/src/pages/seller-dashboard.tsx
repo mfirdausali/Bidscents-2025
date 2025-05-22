@@ -186,7 +186,7 @@ type AuctionFormValues = z.infer<typeof auctionSchema>;
 export default function SellerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   const [activeTab, setActiveTab] = useState("products");
   const [isEditMode, setIsEditMode] = useState(false);
@@ -1068,13 +1068,22 @@ export default function SellerDashboard() {
                 Manage your perfume products and view insights
               </p>
             </div>
-            <Button
-              onClick={handleAddNewProduct}
-              className="mt-4 md:mt-0 bg-gold text-rich-black hover:bg-metallic-gold flex items-center"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Product
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                onClick={() => setLocation('/boost-checkout')}
+                className="mt-4 md:mt-0 bg-purple-600 hover:bg-purple-700 text-white flex items-center"
+              >
+                <Star className="mr-2 h-4 w-4" />
+                Boost Products
+              </Button>
+              <Button
+                onClick={handleAddNewProduct}
+                className="mt-4 md:mt-0 bg-gold text-rich-black hover:bg-metallic-gold flex items-center"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add New Product
+              </Button>
+            </div>
           </div>
 
           {/* Dashboard summary */}
@@ -1127,6 +1136,12 @@ export default function SellerDashboard() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-6">
               <TabsTrigger value="products">Products</TabsTrigger>
+              <TabsTrigger value="boosted" className="relative">
+                Boosted Products
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-purple-600 text-[10px] text-white">
+                  {boostedProductIds.length}
+                </span>
+              </TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
