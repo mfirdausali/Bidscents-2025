@@ -3515,6 +3515,226 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return `${days} day${days !== 1 ? 's' : ''} and ${remainingHours} hour${remainingHours !== 1 ? 's' : ''}`;
     }
   }
+  
+  // GET /api/boost/packages - Get all boost packages
+  app.get('/api/boost/packages', async (req, res) => {
+    try {
+      console.log("Fetching boost packages");
+      
+      // Check for specific package ID request
+      const packageId = req.query.id;
+      
+      let query = supabase
+        .from('boost_packages')
+        .select('*')
+        .eq('is_active', true);
+        
+      // If ID provided, filter to that specific package
+      if (packageId) {
+        query = query.eq('id', packageId);
+      } else {
+        // Otherwise sort by type and item count
+        query = query
+          .order('package_type', { ascending: true })
+          .order('item_count', { ascending: true });
+      }
+      
+      const { data, error } = await query;
+        
+      if (error) {
+        console.error('Error fetching boost packages:', error);
+        return res.status(500).json({ message: 'Error fetching boost packages', error });
+      }
+      
+      // Format duration for display
+      const formattedPackages = data.map(pkg => ({
+        ...pkg,
+        duration_formatted: formatDuration(pkg.duration_hours)
+      }));
+      
+      return res.json(formattedPackages);
+    } catch (err) {
+      console.error('Error fetching boost packages:', err);
+      return res.status(500).json({ message: 'Server error fetching boost packages' });
+    }
+  });
+  
+  // POST /api/boost/create-order - Create a boost order for multiple products
+  app.post('/api/boost/create-order', async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'Unauthorized: Must be logged in to create boost orders' });
+      }
+      
+      const { boostPackageId, productIds } = req.body;
+      
+      // Validate input
+      if (!boostPackageId || !productIds || !Array.isArray(productIds) || productIds.length === 0) {
+        return res.status(400).json({ message: 'Invalid request: Missing package ID or product IDs' });
+      }
+      
+      // Get boost package details
+      const { data: boostPackage, error: packageError } = await supabase
+        .from('boost_packages')
+        .select('*')
+        .eq('id', boostPackageId)
+        .eq('is_active', true)
+        .single();
+        
+      if (packageError || !boostPackage) {
+        return res.status(404).json({ message: 'Boost package not found or inactive' });
+      }
+      
+      // Validate product count matches package
+      if (productIds.length !== boostPackage.item_count) {
+        return res.status(400).json({ 
+          message: `Invalid number of products. This package requires exactly ${boostPackage.item_count} products.` 
+        });
+      }
+      
+      // Verify products belong to the seller
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, status')
+        .in('id', productIds)
+        .eq('seller_id', req.user.id);
+        
+      if (productsError) {
+        return res.status(500).json({ message: 'Error verifying product ownership' });
+      }
+      
+      if (!products || products.length !== productIds.length) {
+        return res.status(403).json({ message: 'You can only boost products you own' });
+      }
+      
+      // Verify products are active
+      const inactiveProducts = products.filter(p => p.status !== 'active');
+      if (inactiveProducts.length > 0) {
+        return res.status(400).json({ 
+          message: 'Only active products can be boosted', 
+          inactiveProducts: inactiveProducts.map(p => p.name)
+        });
+      }
+      
+      // Create unique boost group ID
+      const boostGroupId = crypto.randomUUID();
+      
+      // Create payment record (unique order ID for this transaction)
+      const orderId = crypto.randomUUID();
+      
+      // Generate description 
+      const packageName = boostPackage.name;
+      const productNames = products.map(p => p.name).join(', ');
+      const truncatedProductNames = productNames.length > 100 
+        ? productNames.substring(0, 97) + '...'
+        : productNames;
+      const description = `${packageName} for: ${truncatedProductNames}`;
+      
+      // Prepare metadata with product IDs in multiple formats for redundancy
+      const paymentMetadata = {
+        paymentType: 'boost',
+        boostPackageId: boostPackage.id,
+        boostPackageType: boostPackage.package_type,
+        boostPackageName: boostPackage.name,
+        durationHours: boostPackage.duration_hours,
+        boostGroupId: boostGroupId,
+        productCount: productIds.length,
+        productIds: productIds, // Array of product IDs
+        product_ids: productIds.join(','), // As CSV string for compatibility
+        productId: productIds.length === 1 ? productIds[0] : null, // Single ID if only one product
+        productDetails: products.map(p => ({ id: p.id, name: p.name }))
+      };
+      
+      console.log('Creating boost package payment:', {
+        packageId: boostPackage.id,
+        packageName: boostPackage.name,
+        productCount: productIds.length,
+        orderId: orderId
+      });
+      
+      // Create a new payment record
+      const payment = await storage.createPayment({
+        userId: req.user.id,
+        orderId,
+        amount: boostPackage.price / 100, // Convert sen to RM for storage
+        status: 'due',
+        billId: null,
+        paymentType: 'boost',
+        productIds: productIds,
+        metadata: paymentMetadata
+      });
+      
+      // Create Billplz bill
+      const bill = await billplz.createBill({
+        collection_id: process.env.BILLPLZ_COLLECTION_ID,
+        email: req.user.email,
+        name: req.user.username || req.user.email,
+        amount: boostPackage.price,
+        callback_url: `${process.env.APP_URL}/api/payments/webhook`,
+        redirect_url: `${process.env.APP_URL}/api/payments/process-redirect`,
+        description: description,
+        reference_1: orderId,
+        reference_2: productIds[0].toString() // Use first product ID as reference
+      });
+      
+      if (!bill || !bill.id) {
+        return res.status(500).json({ message: 'Error creating payment bill' });
+      }
+      
+      // Update payment with bill ID
+      await storage.updatePaymentStatus(
+        payment.id, 
+        'due',      // Keep status as 'due' until paid
+        bill.id,    // Set the bill ID
+        undefined,  // No payment channel yet
+        undefined   // No paid date yet
+      );
+      
+      // Return payment details and payment URL
+      return res.json({
+        success: true,
+        message: 'Boost order created',
+        orderId,
+        billId: bill.id,
+        paymentUrl: billplz.getBillURL(bill.id),
+        boostPackage,
+        products: products
+      });
+    } catch (err) {
+      console.error('Error creating boost order:', err);
+      return res.status(500).json({ message: 'Server error creating boost order' });
+    }
+  });
+  
+  // GET /api/boost/seller-boosted - Get seller's currently boosted products
+  app.get('/api/boost/seller-boosted', async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'Unauthorized: Must be logged in to view boosted products' });
+      }
+      
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          id, name, image_url, price, status, 
+          is_featured, featured_until, featured_at, featured_duration_hours,
+          boost_package_id, boost_group_id,
+          boost_packages(id, name, package_type, duration_hours, item_count)
+        `)
+        .eq('seller_id', req.user.id)
+        .eq('is_featured', true)
+        .gte('featured_until', new Date().toISOString());
+        
+      if (error) {
+        return res.status(500).json({ message: 'Error fetching boosted products', error });
+      }
+      
+      return res.json(data);
+    } catch (err) {
+      console.error('Error fetching boosted products:', err);
+      return res.status(500).json({ message: 'Server error fetching boosted products' });
+    }
+  });
 
   // POST /api/payments/create-boost - Create a boost payment for one or more products
   app.post('/api/payments/create-boost', async (req, res) => {
@@ -3974,6 +4194,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           let durationHours = 168; // Default 7 days (in hours)
           let boostOptionId = null;
+          let boostPackageId = null;
+          let boostGroupId = null;
           
           console.log(`🧪 SUPER DIAGNOSTIC - Product Boost Flow START 🧪`);
           console.log(`🧪 Function input parameters:`);
@@ -3986,16 +4208,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`- payment.metadata exists: ${!!payment.metadata}`);
             console.log(`- payment.webhook_payload exists: ${!!payment.webhook_payload}`);
             
-            // Try to extract boost info directly from webhook_payload as a fix
-            if (payment.webhook_payload && typeof payment.webhook_payload === 'string') {
+            // NEW: Check for boost package in payment metadata (new system)
+            if (payment?.metadata?.boostPackageId) {
+              boostPackageId = payment.metadata.boostPackageId;
+              boostGroupId = payment.metadata.boostGroupId;
+              console.log(`Found boost package ID in payment metadata: ${boostPackageId}`);
+              console.log(`Found boost group ID in payment metadata: ${boostGroupId}`);
+              
+              // Get boost package details to determine duration
+              try {
+                const { data: boostPackage, error: packageError } = await supabase
+                  .from('boost_packages')
+                  .select('*')
+                  .eq('id', boostPackageId)
+                  .single();
+                  
+                if (!packageError && boostPackage) {
+                  console.log(`Found boost package "${boostPackage.name}", duration: ${boostPackage.duration_hours} hours`);
+                  durationHours = Number(boostPackage.duration_hours);
+                } else {
+                  console.warn(`Could not find boost package with ID ${boostPackageId}, using default duration`);
+                  console.error('Boost package lookup error:', packageError);
+                }
+              } catch (err) {
+                console.error('Error fetching boost package:', err);
+              }
+            }
+            // Extract boost info from webhook_payload (legacy system fallback)
+            else if (payment.webhook_payload && typeof payment.webhook_payload === 'string') {
               try {
                 const payloadData = JSON.parse(payment.webhook_payload);
                 console.log(`🧪 Extracted data from webhook_payload:`, {
                   keys: Object.keys(payloadData),
-                  hasBoostOption: !!payloadData.boostOption
+                  hasBoostOption: !!payloadData.boostOption,
+                  hasBoostPackage: !!payloadData.boostPackageId
                 });
                 
-                if (payloadData.boostOption && payloadData.boostOption.duration_hours) {
+                // First check for boost package in webhook payload
+                if (payloadData.boostPackageId) {
+                  boostPackageId = payloadData.boostPackageId;
+                  boostGroupId = payloadData.boostGroupId;
+                  
+                  // Try to get boost package details
+                  try {
+                    const { data: boostPackage, error: packageError } = await supabase
+                      .from('boost_packages')
+                      .select('*')
+                      .eq('id', boostPackageId)
+                      .single();
+                      
+                    if (!packageError && boostPackage) {
+                      console.log(`Found boost package "${boostPackage.name}" from webhook, duration: ${boostPackage.duration_hours} hours`);
+                      durationHours = Number(boostPackage.duration_hours);
+                    }
+                  } catch (err) {
+                    console.error('Error fetching boost package from webhook data:', err);
+                  }
+                }
+                // Legacy boost option extraction as fallback
+                else if (payloadData.boostOption && payloadData.boostOption.duration_hours) {
                   console.log(`🧪 Found boost option in webhook_payload:`, payloadData.boostOption);
                   console.log(`🧪 Setting duration from webhook_payload: ${payloadData.boostOption.duration_hours} hours`);
                   
@@ -4036,40 +4307,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Continue with update to extend feature duration
           }
           
-          // First try to get duration from boost option in payment metadata
-          if (payment?.metadata?.boostOption?.duration_hours) {
-            console.log(`Found duration_hours in payment metadata: ${payment.metadata.boostOption.duration_hours}`);
-            durationHours = Number(payment.metadata.boostOption.duration_hours);
-            
-            if (payment.metadata.boostOption.id) {
-              boostOptionId = payment.metadata.boostOption.id;
-            }
-          } 
-          // Then try to get from boost_option_id if available
-          else if (payment?.boost_option_id) {
-            try {
-              boostOptionId = payment.boost_option_id;
-              console.log(`Looking up boost option with ID: ${payment.boost_option_id}`);
-              const { data: boostOption, error: boostOptionError } = await supabase
-                .from('boost_options')
-                .select('*')
-                .eq('id', payment.boost_option_id)
-                .single();
-                
-              if (!boostOptionError && boostOption) {
-                console.log(`Found boost option "${boostOption.name}", duration: ${boostOption.duration_hours} hours`);
-                durationHours = Number(boostOption.duration_hours);
-              } else {
-                console.warn(`Could not find boost option with ID ${payment.boost_option_id}, using default duration`);
+          // If no boost package found yet, try legacy methods
+          if (!boostPackageId) {
+            // First try to get duration from boost option in payment metadata
+            if (payment?.metadata?.boostOption?.duration_hours) {
+              console.log(`Found duration_hours in payment metadata: ${payment.metadata.boostOption.duration_hours}`);
+              durationHours = Number(payment.metadata.boostOption.duration_hours);
+              
+              if (payment.metadata.boostOption.id) {
+                boostOptionId = payment.metadata.boostOption.id;
               }
-            } catch (err) {
-              console.error('Error fetching boost option:', err);
+            } 
+            // Then try to get from boost_option_id if available
+            else if (payment?.boost_option_id) {
+              try {
+                boostOptionId = payment.boost_option_id;
+                console.log(`Looking up boost option with ID: ${payment.boost_option_id}`);
+                const { data: boostOption, error: boostOptionError } = await supabase
+                  .from('boost_options')
+                  .select('*')
+                  .eq('id', payment.boost_option_id)
+                  .single();
+                  
+                if (!boostOptionError && boostOption) {
+                  console.log(`Found boost option "${boostOption.name}", duration: ${boostOption.duration_hours} hours`);
+                  durationHours = Number(boostOption.duration_hours);
+                } else {
+                  console.warn(`Could not find boost option with ID ${payment.boost_option_id}, using default duration`);
+                }
+              } catch (err) {
+                console.error('Error fetching boost option:', err);
+              }
             }
-          }
-          // Fallback to featureDuration in days for backward compatibility
-          else if (payment?.metadata?.featureDuration) {
-            console.log(`Using legacy featureDuration: ${payment.metadata.featureDuration} days`);
-            durationHours = Number(payment.metadata.featureDuration) * 24;
+            // Fallback to featureDuration in days for backward compatibility
+            else if (payment?.metadata?.featureDuration) {
+              console.log(`Using legacy featureDuration: ${payment.metadata.featureDuration} days`);
+              durationHours = Number(payment.metadata.featureDuration) * 24;
+            }
           }
           
           console.log(`Setting feature duration to ${durationHours} hours for product ${productId}`);
@@ -4084,6 +4358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // DIAGNOSTIC LOGS - Product field values and types
           console.log("SCHEMA DEBUG - Product boost update details:");
           console.log("- Product ID:", productId, "(JS type:", typeof productId, ")");
+          console.log("- Using boost system:", boostPackageId ? "New package-based" : "Legacy option-based");
           console.log("- Field values and types being sent:");
           console.log("  • featured_at:", featuredAt, "(JS type:", typeof featuredAt, ")");
           console.log("  • featured_until:", featuredUntil, "(JS type:", typeof featuredUntil, ")");
@@ -4092,7 +4367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Update the product status in the database
           // Based on database schema: featured_at is numeric, featured_until is timestamp
-          const updateData = {
+          const updateData: any = {
             // Boolean fields
             is_featured: true,
             
@@ -4103,33 +4378,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             featured_until: featuredUntil,
             
             // Duration and reference fields
-            featured_duration_hours: durationHours,
-            boost_option_id: boostOptionId
+            featured_duration_hours: durationHours
           };
           
-          console.log("🧪 CRITICAL - Final update data being sent to database:", updateData);
-          
-          // SUPER DIAGNOSTIC - Check exact column names in the products table
-          try {
-            const { data: columnInfo, error: columnError } = await supabase
-              .rpc('get_column_names', { table_name: 'products' });
-              
-            if (columnError) {
-              console.error("🧪 Error fetching column names:", columnError);
-            } else if (columnInfo) {
-              console.log("🧪 Actual columns in products table:", columnInfo);
-              
-              // Adjust update data to match exact column names if needed
-              const updateKeys = Object.keys(updateData);
-              for (const key of updateKeys) {
-                if (!columnInfo.includes(key)) {
-                  console.log(`🧪 WARNING: Column '${key}' might not exist in products table`);
-                }
-              }
-            }
-          } catch (e) {
-            console.error("🧪 Error in column check:", e);
+          // Add boost option ID if using legacy system
+          if (boostOptionId) {
+            updateData.boost_option_id = boostOptionId;
           }
+          
+          // Add boost package details if using new system
+          if (boostPackageId) {
+            updateData.boost_package_id = boostPackageId;
+          }
+          
+          if (boostGroupId) {
+            updateData.boost_group_id = boostGroupId;
+          }
+          
+          console.log("🧪 CRITICAL - Final update data being sent to database:", updateData);
           
           const { data: updatedProduct, error: productError } = await supabase
             .from('products')
@@ -4158,6 +4424,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 featured_until: featuredUntil.toISOString(),
                 featured_duration_hours: Math.floor(durationHours)
               };
+              
+              // Add boost package info if available
+              if (boostPackageId) {
+                fallbackData.boost_package_id = boostPackageId;
+              }
+              
+              if (boostGroupId) {
+                fallbackData.boost_group_id = boostGroupId;
+              }
               
               console.log("🧪 Fallback update data:", fallbackData);
               
