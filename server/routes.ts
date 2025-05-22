@@ -724,6 +724,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint to update an auction
+  app.put("/api/auctions/:id", async (req, res, next) => {
+    try {
+      // Check authentication
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.body.sellerId) {
+        // If not via session, check if sellerId was provided in the body
+        sellerId = parseInt(req.body.sellerId.toString());
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
+      }
+
+      const auctionId = parseInt(req.params.id);
+      
+      // Get the auction to verify ownership
+      const auction = await storage.getAuctionById(auctionId);
+      if (!auction) {
+        return res.status(404).json({ message: "Auction not found" });
+      }
+      
+      // Get the associated product
+      const product = await storage.getProductById(auction.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      // Verify the product belongs to this seller
+      if (product.sellerId !== sellerId) {
+        return res.status(403).json({ message: "Unauthorized: You can only edit your own auctions" });
+      }
+      
+      // Update both the product and auction data
+      // First, update the product information
+      if (req.body.product) {
+        const productData = {
+          ...req.body.product,
+          sellerId: sellerId // Ensure the seller ID is set correctly
+        };
+        
+        const validatedProductData = insertProductSchema.parse(productData);
+        await storage.updateProduct(product.id, validatedProductData);
+      }
+      
+      // Then update the auction information
+      if (req.body.auction) {
+        const auctionData = req.body.auction;
+        
+        // Only update certain fields if there are no bids yet
+        if (auction.currentBid) {
+          // If there are bids, only allow updating certain fields
+          const safeAuctionData = {
+            buyNowPrice: auctionData.buyNowPrice,
+            // Add other safe-to-update fields here
+          };
+          await storage.updateAuction(auctionId, safeAuctionData);
+        } else {
+          // If no bids yet, can update all fields
+          await storage.updateAuction(auctionId, auctionData);
+        }
+      }
+      
+      // Return the updated auction with product details
+      const updatedAuction = await storage.getAuctionById(auctionId);
+      const updatedProduct = await storage.getProductById(auction.productId);
+      
+      res.json({
+        auction: updatedAuction,
+        product: updatedProduct
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
   // Auction endpoints
   app.post("/api/auctions", async (req, res, next) => {
     try {
@@ -2445,8 +2534,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  
   // Function to check for expired auctions and handle them
   async function checkAndProcessExpiredAuctions() {
     const timestamp = new Date().toISOString();
@@ -2629,8 +2716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // This ensures the next check runs even if there was an error in this execution
   }
   
-  // Create WebSocket server for real-time messaging and auction updates
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  // WebSocket server already initialized earlier
   
   // Map of connected users: userId -> WebSocket connection
   const connectedUsers = new Map<number, WebSocket>();
