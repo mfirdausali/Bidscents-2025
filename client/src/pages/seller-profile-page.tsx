@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { ProductCard } from "../components/ui/product-card";
+import { AuctionCard } from "../components/ui/auction-card";
 import { ProductFilters } from "../components/product-filters";
 import { ProfileEditModal } from "../components/ui/profile-edit-modal";
 import { ImageUploadModal } from "../components/ui/image-upload-modal";
@@ -606,9 +607,21 @@ export default function SellerProfilePage() {
                       {productsData?.products
                         .filter(product => product.status === 'active')
                         .map((product) => (
-                          <ProductCard 
-                            key={product.id} product={product}
-                          />
+                          product.listingType === 'auction' && product.auction ? (
+                            <AuctionCard 
+                              key={product.id} 
+                              product={{
+                                ...product,
+                                imageUrl: product.imageUrl || '',
+                                auction: product.auction
+                              }}
+                              images={product.images}
+                            />
+                          ) : (
+                            <ProductCard 
+                              key={product.id} product={product}
+                            />
+                          )
                         ))}
                     </div>
                   )}
@@ -652,9 +665,21 @@ export default function SellerProfilePage() {
                       {productsData?.products
                         .filter(product => product.status === 'featured')
                         .map((product) => (
-                          <ProductCard 
-                            key={product.id} product={product}
-                          />
+                          product.listingType === 'auction' && product.auction ? (
+                            <AuctionCard 
+                              key={product.id} 
+                              product={{
+                                ...product,
+                                imageUrl: product.imageUrl || '',
+                                auction: product.auction
+                              }}
+                              images={product.images}
+                            />
+                          ) : (
+                            <ProductCard 
+                              key={product.id} product={product}
+                            />
+                          )
                         ))}
                     </div>
                   )}
@@ -698,9 +723,21 @@ export default function SellerProfilePage() {
                       {productsData?.products
                         .filter(product => product.status === 'sold')
                         .map((product) => (
-                          <ProductCard 
-                            key={product.id} product={product}
-                          />
+                          product.listingType === 'auction' && product.auction ? (
+                            <AuctionCard 
+                              key={product.id} 
+                              product={{
+                                ...product,
+                                imageUrl: product.imageUrl || '',
+                                auction: product.auction
+                              }}
+                              images={product.images}
+                            />
+                          ) : (
+                            <ProductCard 
+                              key={product.id} product={product}
+                            />
+                          )
                         ))}
                     </div>
                   )}
