@@ -174,7 +174,8 @@ export default function MessagesPage() {
   const [activeChat, setActiveChat] = useState<Message[]>([]);
   const [loadingChat, setLoadingChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Default to showing conversations list on mobile
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(window.innerWidth < 768);
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
   const [sellerProducts, setSellerProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
