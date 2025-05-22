@@ -6,7 +6,7 @@ import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
 import ProductsPage from "@/pages/products-page";
-import ProductDetailPage from "@/pages/product-detail-page";
+import ProductDetailPage from "@/pages/product-detail-page-new";
 import AuctionDetailPage from "@/pages/auction-detail-page";
 import SellerDashboard from "@/pages/seller-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
