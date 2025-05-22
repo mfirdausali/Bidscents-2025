@@ -156,24 +156,16 @@ export function ProductCard({ product }: ProductCardProps) {
         
         {/* Action buttons based on listing type */}
         {product.listingType === 'negotiable' ? (
-          <div className="grid grid-cols-2 gap-2">
-            <ContactSellerButton 
-              sellerId={product.sellerId}
-              sellerName={product.seller?.username || 'Seller'}
-              sellerImage={product.seller?.profileImage || null}
-              productId={product.id}
-              productName={product.name}
-              variant="secondary"
-              size="sm"
-              className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-1.5 md:py-2 rounded-md"
-            />
-            <Button
-              variant="outline"
-              className="border-purple-600 text-purple-600 hover:bg-purple-50 text-xs py-1.5 md:py-2 rounded-md"
-            >
-              Make Offer
-            </Button>
-          </div>
+          <ContactSellerButton 
+            sellerId={product.sellerId}
+            sellerName={product.seller?.username || 'Seller'}
+            sellerImage={product.seller?.profileImage || null}
+            productId={product.id}
+            productName={product.name}
+            variant="secondary"
+            size="default"
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 w-full rounded-md"
+          />
         ) : product.listingType === 'auction' ? (
           <div>
             <div className="text-xs text-gray-600 mb-1">

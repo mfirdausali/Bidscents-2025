@@ -3061,7 +3061,6 @@ export default function SellerDashboard() {
                             <SelectItem value="negotiable">
                               Negotiable
                             </SelectItem>
-                            <SelectItem value="auction">Auction</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
