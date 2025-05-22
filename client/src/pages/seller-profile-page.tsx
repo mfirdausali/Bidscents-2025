@@ -46,7 +46,7 @@ export default function SellerProfilePage() {
   const [match, params] = useRoute("/sellers/:id");
   const sellerId = params?.id ? parseInt(params.id) : 0;
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState("active");
+  const [activeTab, setActiveTab] = useState("featured");
   const [sortOption, setSortOption] = useState("popular");
   const { toast } = useToast();
   const { user } = useAuth();
@@ -85,15 +85,16 @@ export default function SellerProfilePage() {
     isLoading: isProductsLoading, 
     error: productsError 
   } = useQuery({
-    queryKey: ["/api/sellers", sellerId, "products", { category: activeTab, sort: sortOption, page: currentPage, limit: productsPerPage }],
+    queryKey: ["/api/sellers", sellerId, "products", { sort: sortOption, page: currentPage, limit: productsPerPage }],
     queryFn: async () => {
+      console.log("Fetching seller products", { sellerId, sort: sortOption, page: currentPage, limit: productsPerPage });
       const response = await fetch(
-        `/api/sellers/${sellerId}/products?category=${activeTab}&sort=${sortOption}&page=${currentPage}&limit=${productsPerPage}`
+        `/api/sellers/${sellerId}/products?sort=${sortOption}&page=${currentPage}&limit=${productsPerPage}`
       );
       if (!response.ok) {
         throw new Error("Failed to fetch seller products");
       }
-      return response.json() as Promise<{
+      const data = await response.json() as {
         products: ProductWithDetails[];
         pagination: {
           page: number;
@@ -101,7 +102,9 @@ export default function SellerProfilePage() {
           totalProducts: number;
           totalPages: number;
         }
-      }>;
+      };
+      console.log("Fetched products data:", data);
+      return data;
     },
     enabled: !!sellerId
   });
@@ -421,7 +424,7 @@ export default function SellerProfilePage() {
                 <MessageSquare className="mr-2 h-4 w-4" />
                 Contact Seller
               </Button>
-              <Button variant="outline">Follow Store</Button>
+
             </div>
           </div>
 
@@ -547,7 +550,8 @@ export default function SellerProfilePage() {
             {/* Products Section */}
             <div className="lg:col-span-3" id="products-section">
               <Tabs
-                defaultValue="all"
+                defaultValue="featured"
+                value={activeTab}
                 onValueChange={handleTabChange}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

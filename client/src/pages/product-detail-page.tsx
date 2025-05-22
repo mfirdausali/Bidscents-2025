@@ -248,14 +248,6 @@ export default function ProductDetailPage() {
                 <p className="text-gray-600 mb-6">
                   {product.description || "No description available for this product."}
                 </p>
-                <div className="mb-6">
-                  <h4 className="font-medium mb-2">Key Notes:</h4>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="bg-gray-100 px-3 py-1 rounded-full text-sm">Bergamot</span>
-                    <span className="bg-gray-100 px-3 py-1 rounded-full text-sm">Jasmine</span>
-                    <span className="bg-gray-100 px-3 py-1 rounded-full text-sm">Amber</span>
-                  </div>
-                </div>
               </TabsContent>
               
               <TabsContent value="details" className="p-6 bg-white rounded-lg shadow mt-6">
@@ -289,23 +281,6 @@ export default function ProductDetailPage() {
                 </div>
               </TabsContent>
             </Tabs>
-          </div>
-          
-          {/* Related products section */}
-          <div className="mt-20">
-            <h2 className="text-2xl font-playfair text-center mb-8">You May Also Like</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="rounded-lg overflow-hidden bg-white shadow-sm transition-transform hover:shadow-md hover:-translate-y-1">
-                  <div className="h-40 bg-gray-200"></div>
-                  <div className="p-4">
-                    <h3 className="font-medium mb-1 truncate">Similar Product {i+1}</h3>
-                    <p className="text-sm text-gray-500 mb-2">Brand Name</p>
-                    <p className="font-semibold">RM 199.00</p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </main>

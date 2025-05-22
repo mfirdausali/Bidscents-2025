@@ -11,7 +11,7 @@ import {
   MapPin,
   MessageSquare,
   Star,
-  Store,
+  Store,f
   ThumbsUp,
   Truck,
   Users,
