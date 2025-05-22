@@ -1,6 +1,7 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { CheckCircle2, Sparkles } from 'lucide-react';
 
 interface BoostPackageProps {
   id: number;
@@ -15,46 +16,88 @@ interface BoostPackageProps {
 }
 
 export function BoostPackageCard({ 
-  id, name, packageType, itemCount, price, durationHours, effectivePrice, duration_formatted, onSelect 
+  id,
+  name,
+  packageType,
+  itemCount,
+  price,
+  durationHours,
+  effectivePrice,
+  duration_formatted,
+  onSelect
 }: BoostPackageProps) {
-  const formattedPrice = (price / 100).toFixed(2);
-  const formattedEffectivePrice = typeof effectivePrice === 'number' 
-    ? effectivePrice.toFixed(2) 
-    : (price / 100 / itemCount).toFixed(2);
-  
   const isPremium = packageType === 'premium';
   
   return (
-    <Card className={`w-full ${isPremium ? 'border-purple-400 bg-purple-50' : ''}`}>
-      <CardHeader>
-        <CardTitle className={isPremium ? 'text-purple-700' : ''}>
-          {name}
-        </CardTitle>
-        <CardDescription>
-          Boost {itemCount} {itemCount === 1 ? 'product' : 'products'} for {duration_formatted}
-        </CardDescription>
+    <Card className={`overflow-hidden ${isPremium ? 'border-purple-300' : ''}`}>
+      <div className={`p-2 text-center text-white font-medium ${isPremium ? 'bg-purple-600' : 'bg-primary'}`}>
+        {isPremium ? (
+          <div className="flex items-center justify-center">
+            <Sparkles className="h-4 w-4 mr-1" />
+            <span>Premium Boost</span>
+          </div>
+        ) : (
+          <span>Standard Boost</span>
+        )}
+      </div>
+      
+      <CardHeader className="pb-2 pt-4">
+        <h3 className="text-lg font-bold text-center">{name}</h3>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold mb-2">RM {formattedPrice}</div>
-        <p className="text-sm text-muted-foreground">
-          Effective price: RM {formattedEffectivePrice} per item
-        </p>
-        <div className="mt-4 text-sm">
-          <ul className="list-disc pl-5 space-y-1">
-            <li>Featured on homepage</li>
-            <li>Priority in search results</li>
-            <li>
-              {isPremium 
-                ? 'Extended visibility (36 hours)' 
-                : 'Standard visibility (15 hours)'}
-            </li>
-          </ul>
+      
+      <CardContent className="space-y-4">
+        <div className="text-center">
+          <p className="text-3xl font-bold">
+            RM {(price / 100).toFixed(2)}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {itemCount > 1 ? `${itemCount} Products` : '1 Product'}
+          </p>
         </div>
+        
+        <div className="space-y-2 text-sm">
+          <div className="flex items-start">
+            <CheckCircle2 className="h-4 w-4 mr-2 text-green-500 mt-0.5" />
+            <span>Duration: {duration_formatted}</span>
+          </div>
+          
+          <div className="flex items-start">
+            <CheckCircle2 className="h-4 w-4 mr-2 text-green-500 mt-0.5" />
+            <span>Homepage feature</span>
+          </div>
+          
+          <div className="flex items-start">
+            <CheckCircle2 className="h-4 w-4 mr-2 text-green-500 mt-0.5" />
+            <span>Priority in search results</span>
+          </div>
+          
+          {isPremium && (
+            <>
+              <div className="flex items-start">
+                <CheckCircle2 className="h-4 w-4 mr-2 text-green-500 mt-0.5" />
+                <span>Extended visibility</span>
+              </div>
+              <div className="flex items-start">
+                <CheckCircle2 className="h-4 w-4 mr-2 text-green-500 mt-0.5" />
+                <span>Enhanced product badge</span>
+              </div>
+            </>
+          )}
+        </div>
+        
+        {itemCount > 1 && (
+          <div className="pt-2 border-t">
+            <p className="text-xs text-center text-muted-foreground">
+              Effective price: RM {(effectivePrice / 100).toFixed(2)} per product
+            </p>
+          </div>
+        )}
       </CardContent>
+      
       <CardFooter>
         <Button 
-          onClick={() => onSelect(id)} 
           className={`w-full ${isPremium ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
+          onClick={() => onSelect(id)}
         >
           Select Package
         </Button>
