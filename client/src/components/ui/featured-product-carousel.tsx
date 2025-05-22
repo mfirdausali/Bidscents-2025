@@ -118,10 +118,15 @@ export function FeaturedProductCarousel() {
                 {/* First Product */}
                 <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                   <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
-                    <div className="absolute top-0 left-0 z-10 m-2">
+                    <div className="absolute top-0 left-0 z-10 m-2 flex gap-2">
                       <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
                         Featured
                       </div>
+                      {firstProduct.listingType === "auction" && (
+                        <div className="text-xs bg-amber-500 text-white px-2 py-1 rounded-full uppercase tracking-wider">
+                          Auction
+                        </div>
+                      )}
                     </div>
                     <img 
                       src={getProductImageUrl(firstProduct)} 
@@ -136,13 +141,23 @@ export function FeaturedProductCarousel() {
                       {firstProduct.description || "No description available."}
                     </div>
                     <div className="mt-auto">
-                      <Link href={`/products/${firstProduct.id}`} className="w-full">
-                        <Button 
-                          className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
-                        >
-                          View Details
-                        </Button>
-                      </Link>
+                      {firstProduct.listingType === "auction" && firstProduct.auction ? (
+                        <Link href={`/auctions/${firstProduct.auction.id}`} className="w-full">
+                          <Button 
+                            className="w-full bg-amber-500 text-white hover:bg-amber-600 rounded-full text-sm"
+                          >
+                            Bid Now
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Link href={`/products/${firstProduct.id}`} className="w-full">
+                          <Button 
+                            className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
+                          >
+                            View Details
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -150,10 +165,15 @@ export function FeaturedProductCarousel() {
                 {/* Second Product */}
                 <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                   <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
-                    <div className="absolute top-0 left-0 z-10 m-2">
+                    <div className="absolute top-0 left-0 z-10 m-2 flex gap-2">
                       <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
                         Featured
                       </div>
+                      {secondProduct.listingType === "auction" && (
+                        <div className="text-xs bg-amber-500 text-white px-2 py-1 rounded-full uppercase tracking-wider">
+                          Auction
+                        </div>
+                      )}
                     </div>
                     <img 
                       src={getProductImageUrl(secondProduct)} 
@@ -168,13 +188,23 @@ export function FeaturedProductCarousel() {
                       {secondProduct.description || "No description available."}
                     </div>
                     <div className="mt-auto">
-                      <Link href={`/products/${secondProduct.id}`} className="w-full">
-                        <Button 
-                          className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
-                        >
-                          View Details
-                        </Button>
-                      </Link>
+                      {secondProduct.listingType === "auction" && secondProduct.auction ? (
+                        <Link href={`/auctions/${secondProduct.auction.id}`} className="w-full">
+                          <Button 
+                            className="w-full bg-amber-500 text-white hover:bg-amber-600 rounded-full text-sm"
+                          >
+                            Bid Now
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Link href={`/products/${secondProduct.id}`} className="w-full">
+                          <Button 
+                            className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
+                          >
+                            View Details
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
