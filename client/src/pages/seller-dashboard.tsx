@@ -902,16 +902,33 @@ export default function SellerDashboard() {
       
       const allBoostedIds = featuredProducts.map(p => p.id);
       
-      console.log("Found featured products: ", 
-        featuredProducts.map(p => ({
+      // Log information about boost packages and groups for debugging
+      const packageInfo = featuredProducts.map(p => {
+        let boostType = "Standard";
+        
+        // Determine boost type based on package ID
+        if (p.boost_package_id || p.boostPackageId) {
+          const packageId = p.boost_package_id || p.boostPackageId;
+          // Package IDs 5-8 are Premium packages based on our package structure
+          boostType = packageId >= 5 ? "Premium" : "Standard";
+        }
+        
+        return {
           id: p.id, 
           name: p.name, 
           is_featured: p.is_featured, 
           isFeatured: p.isFeatured, 
           featured_until: p.featured_until, 
-          featuredUntil: p.featuredUntil
-        }))
-      );
+          featuredUntil: p.featuredUntil,
+          boost_package_id: p.boost_package_id,
+          boostPackageId: p.boostPackageId,
+          boost_group_id: p.boost_group_id,
+          boostGroupId: p.boostGroupId,
+          boostType: boostType
+        };
+      });
+      
+      console.log("Found featured products with package info:", packageInfo);
       
       console.log("Final list of featured product IDs:", allBoostedIds);
       setBoostedProductIds(allBoostedIds);
@@ -1528,6 +1545,145 @@ export default function SellerDashboard() {
                       )}
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="boosted">
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col md:flex-row justify-between md:items-center">
+                    <div>
+                      <CardTitle className="flex items-center">
+                        <Star className="h-5 w-5 text-purple-600 mr-2" />
+                        Boosted Products
+                      </CardTitle>
+                      <CardDescription>
+                        Manage your featured product campaigns
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={() => setLocation('/boost-checkout')}
+                      className="mt-4 md:mt-0 bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      Boost More Products
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingProducts ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                    </div>
+                  ) : boostedProductIds.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-purple-50">
+                            <TableHead>Image</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Price</TableHead>
+                            <TableHead>Boost Type</TableHead>
+                            <TableHead>Boosted Until</TableHead>
+                            <TableHead>Time Remaining</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredProducts
+                            ?.filter(p => boostedProductIds.includes(p.id))
+                            .map((product) => {
+                              const featuredUntil = product.featured_until || product.featuredUntil;
+                              const featuredUntilDate = featuredUntil ? new Date(featuredUntil) : null;
+                              const now = new Date();
+                              const timeRemaining = featuredUntilDate ? Math.max(0, Math.floor((featuredUntilDate.getTime() - now.getTime()) / (1000 * 60 * 60))) : 0;
+                              
+                              // Determine boost type based on duration or other properties
+                              const boostType = product.boost_package_id ? 
+                                  (product.boost_package_id >= 5 ? "Premium" : "Standard") : 
+                                  "Standard";
+                              
+                              return (
+                                <TableRow key={product.id} className="bg-purple-50/30">
+                                  <TableCell>
+                                    {product.images && product.images[0]?.imageUrl ? (
+                                      <img
+                                        src={`/api/images/${product.images[0].imageUrl}`}
+                                        alt={product.name}
+                                        className="h-12 w-12 object-cover rounded-md"
+                                      />
+                                    ) : product.imageUrl ? (
+                                      <img
+                                        src={`/api/images/${product.imageUrl}`}
+                                        alt={product.name}
+                                        className="h-12 w-12 object-cover rounded-md"
+                                      />
+                                    ) : (
+                                      <div className="h-12 w-12 bg-gray-200 rounded-md flex items-center justify-center">
+                                        <Package className="h-6 w-6 text-gray-400" />
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="font-medium">
+                                    {product.name}
+                                  </TableCell>
+                                  <TableCell>
+                                    RM{(product.price / 100).toFixed(2)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`${boostType === 'Premium' ? 'border-purple-500 text-purple-700 bg-purple-50' : 'border-amber-500 text-amber-700 bg-amber-50'}`}
+                                    >
+                                      {boostType} Boost
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {featuredUntilDate ? featuredUntilDate.toLocaleDateString() + ' ' + featuredUntilDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
+                                  </TableCell>
+                                  <TableCell>
+                                    {timeRemaining > 0 ? (
+                                      <div className="flex items-center">
+                                        <Timer className="h-4 w-4 mr-1 text-green-600" />
+                                        <span>{timeRemaining} hours left</span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-red-500">Expired</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setLocation('/boost-checkout')}
+                                      className="h-8"
+                                    >
+                                      Renew Boost
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-100">
+                        <Star className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <h3 className="text-lg font-medium mb-2">No Boosted Products</h3>
+                      <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                        Boost your products to increase visibility and sales. Featured products appear at the top of search results and on the homepage.
+                      </p>
+                      <Button
+                        onClick={() => setLocation('/boost-checkout')}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        Get Started with Boost
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
