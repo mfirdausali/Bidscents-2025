@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ProductWithDetails, Review, InsertReview } from "@shared/schema";
+import { ProductWithDetails } from "@shared/schema";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,7 @@ import { Star, StarHalf, Heart, Minus, Plus, MessageSquare, Info, Check, ThumbsU
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
 import { Card } from "@/components/ui/card";
-
-// Define review form schema
-const reviewSchema = z.object({
-  rating: z.number().min(1).max(5),
-  comment: z.string().min(10, { message: "Comment must be at least 10 characters" }),
-});
-
-type ReviewFormValues = z.infer<typeof reviewSchema>;
 
 export default function ProductDetailPage() {
   const [, params] = useRoute("/products/:id");
@@ -33,7 +24,6 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState("50ml");
   const [activeTab, setActiveTab] = useState("description");
-  const [selectedRating, setSelectedRating] = useState(0);
 
   // State for current displayed image
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -52,6 +42,8 @@ export default function ProductDetailPage() {
       }
     }
   });
+  
+  // No longer need to fetch reviews since we're using votes instead
   
   // Use effect to send buffered votes to server when user leaves page
   useEffect(() => {
@@ -418,7 +410,7 @@ export default function ProductDetailPage() {
                 <TabsTrigger value="description">Description</TabsTrigger>
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="reviews">
-                  Reviews ({product.reviews?.length || 0})
+                  Votes ({product?.votes || 0})
                 </TabsTrigger>
               </TabsList>
               
@@ -483,33 +475,52 @@ export default function ProductDetailPage() {
               </TabsContent>
               
               <TabsContent value="reviews" className="p-6 bg-white rounded-lg shadow mt-6">
-                <h3 className="font-playfair text-xl font-semibold mb-4">Customer Reviews</h3>
+                <h3 className="font-playfair text-xl font-semibold mb-4">Product Rating</h3>
                 
-                {/* Reviews list */}
-                {reviews && reviews.length > 0 ? (
-                  <div className="space-y-6 mb-8">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="border-b pb-6">
-                        <div className="flex justify-between mb-2">
-                          <div className="flex">
-                            {renderStars(review.rating)}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {new Date(review.createdAt || "").toLocaleDateString()}
-                          </div>
-                        </div>
-                        <p className="text-gray-600 mb-2">{review.comment}</p>
-                        <div className="text-sm text-gray-500">
-                          By: {review.userId === user?.id ? "You" : "Verified Buyer"}
-                        </div>
+                <Card className="p-6 bg-gray-50 shadow-sm">
+                  <div className="flex flex-col items-center">
+                    <div className="text-3xl font-bold mb-2">{localVotes !== null ? localVotes : (product?.votes || 0)}</div>
+                    <div className="text-gray-500 mb-6">Total votes</div>
+                    
+                    <div className="flex gap-4">
+                      <Button 
+                        onClick={() => upvoteMutation.mutate()}
+                        disabled={upvoteMutation.isPending || !user}
+                        variant="outline" 
+                        className="flex items-center gap-2 hover:bg-green-50 hover:text-green-600 hover:border-green-200"
+                      >
+                        <ThumbsUp className="h-5 w-5" />
+                        <span>Upvote</span>
+                      </Button>
+                      
+                      <Button 
+                        onClick={() => downvoteMutation.mutate()}
+                        disabled={downvoteMutation.isPending || !user || (localVotes !== null && localVotes <= 0)}
+                        variant="outline" 
+                        className="flex items-center gap-2 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                      >
+                        <ThumbsDown className="h-5 w-5" />
+                        <span>Downvote</span>
+                      </Button>
+                    </div>
+                    
+                    {!user && (
+                      <div className="mt-6 text-center text-gray-600">
+                        <p className="mb-2">Please log in to vote on this product</p>
+                        <Button className="bg-purple-600 hover:bg-purple-700 text-white" asChild>
+                          <Link href="/login">Login</Link>
+                        </Button>
                       </div>
-                    ))}
+                    )}
+                    
+                    {votesChanged && (
+                      <div className="mt-4 text-green-600 text-sm flex items-center">
+                        <Check className="h-4 w-4 mr-1" />
+                        <span>Your vote has been recorded</span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="text-center py-6 mb-8">
-                    <p className="text-gray-600">No reviews yet. Be the first to leave a review!</p>
-                  </div>
-                )}
+                </Card>
                 
                 <Separator className="my-8" />
                 
