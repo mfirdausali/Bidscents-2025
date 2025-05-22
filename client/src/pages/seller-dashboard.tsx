@@ -575,7 +575,112 @@ export default function SellerDashboard() {
     // Check if this is an auction listing
     if (product.listingType === "auction") {
       setIsAuctionForm(true);
-      // Would need to load auction data here if editing an auction
+      
+      // If the product has auction data, fetch it or use existing data
+      if (product.auction) {
+        console.log("Loading auction data for edit:", product.auction);
+        
+        // Convert the date string to a Date object for the form
+        const endsAtDate = product.auction.endsAt ? new Date(product.auction.endsAt) : new Date();
+        // Add a day to ensure the date is in the future when editing
+        if (endsAtDate < new Date()) {
+          endsAtDate.setDate(endsAtDate.getDate() + 1);
+        }
+        
+        // Reset the auction form with the auction data
+        auctionForm.reset({
+          name: product.name,
+          brand: product.brand,
+          description: product.description || "",
+          startingPrice: product.auction.startingPrice || product.price,
+          reservePrice: product.auction.reservePrice || 0,
+          buyNowPrice: product.auction.buyNowPrice || 0,
+          bidIncrement: product.auction.bidIncrement || 5,
+          auctionEndDate: endsAtDate,
+          imageUrl: product.imageUrl || "",
+          stockQuantity: product.stockQuantity,
+          categoryId: product.categoryId || 1,
+          isNew: product.isNew === null ? false : product.isNew,
+          isFeatured: product.isFeatured === null ? false : product.isFeatured,
+          // Secondhand perfume specific fields
+          remainingPercentage: product.remainingPercentage || 100,
+          batchCode: product.batchCode || "",
+          purchaseYear: product.purchaseYear || new Date().getFullYear(),
+          boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
+          volume: product.volume || 100,
+        });
+      } else {
+        // If no auction data is found, we need to fetch it
+        const fetchAuctionData = async () => {
+          try {
+            const response = await fetch(`/api/auctions/product/${product.id}`);
+            if (response.ok) {
+              const auctionData = await response.json();
+              console.log("Fetched auction data:", auctionData);
+              
+              if (auctionData) {
+                // Convert the date string to a Date object
+                const endsAtDate = auctionData.endsAt ? new Date(auctionData.endsAt) : new Date();
+                // Add a day to ensure the date is in the future when editing
+                if (endsAtDate < new Date()) {
+                  endsAtDate.setDate(endsAtDate.getDate() + 1);
+                }
+                
+                // Reset form with fetched auction data
+                auctionForm.reset({
+                  name: product.name,
+                  brand: product.brand,
+                  description: product.description || "",
+                  startingPrice: auctionData.startingPrice || product.price,
+                  reservePrice: auctionData.reservePrice || 0,
+                  buyNowPrice: auctionData.buyNowPrice || 0,
+                  bidIncrement: auctionData.bidIncrement || 5,
+                  auctionEndDate: endsAtDate,
+                  imageUrl: product.imageUrl || "",
+                  stockQuantity: product.stockQuantity,
+                  categoryId: product.categoryId || 1,
+                  isNew: product.isNew === null ? false : product.isNew,
+                  isFeatured: product.isFeatured === null ? false : product.isFeatured,
+                  // Secondhand perfume specific fields
+                  remainingPercentage: product.remainingPercentage || 100,
+                  batchCode: product.batchCode || "",
+                  purchaseYear: product.purchaseYear || new Date().getFullYear(),
+                  boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
+                  volume: product.volume || 100,
+                });
+              }
+            } else {
+              console.error("Failed to fetch auction data");
+              // Fallback to product data without auction specifics
+              auctionForm.reset({
+                name: product.name,
+                brand: product.brand,
+                description: product.description || "",
+                startingPrice: product.price,
+                reservePrice: 0,
+                buyNowPrice: 0,
+                bidIncrement: 5,
+                auctionEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+                imageUrl: product.imageUrl || "",
+                stockQuantity: product.stockQuantity,
+                categoryId: product.categoryId || 1,
+                isNew: product.isNew === null ? false : product.isNew,
+                isFeatured: product.isFeatured === null ? false : product.isFeatured,
+                remainingPercentage: product.remainingPercentage || 100,
+                batchCode: product.batchCode || "",
+                purchaseYear: product.purchaseYear || new Date().getFullYear(),
+                boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
+                volume: product.volume || 100,
+              });
+            }
+          } catch (error) {
+            console.error("Error fetching auction data:", error);
+          }
+        };
+        
+        // Call the async function to fetch auction data
+        fetchAuctionData();
+      }
     } else {
       setIsAuctionForm(false);
       form.reset({
@@ -736,6 +841,45 @@ export default function SellerDashboard() {
     onError: (error) => {
       toast({
         title: "Error creating auction",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update Auction mutation
+  const updateAuctionMutation = useMutation({
+    mutationFn: async (data: {
+      auctionId: number;
+      product: any;
+      auction: any;
+    }) => {
+      console.log("Updating auction:", data);
+      const res = await apiRequest(
+        "PUT",
+        `/api/auctions/${data.auctionId}`,
+        {
+          product: data.product,
+          auction: data.auction,
+          sellerId: user?.id
+        }
+      );
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Auction updated",
+        description: "Your auction has been updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/seller/products"] });
+      setIsDialogOpen(false);
+      setIsEditMode(false);
+      setCurrentProductId(null);
+      auctionForm.reset();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error updating auction",
         description: error.message,
         variant: "destructive",
       });
