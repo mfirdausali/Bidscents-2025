@@ -49,11 +49,35 @@ export default function ProductDetailPage() {
   useEffect(() => {
     return () => {
       // This runs when component unmounts
-      if (votesChanged) {
+      if (votesChanged && product) {
         console.log("Sending buffered votes to server on page exit");
+        
+        // Send the final vote count to the server
+        if (localVotes !== null) {
+          const finalVoteCount = localVotes;
+          const originalVotes = product.votes || 0;
+          
+          if (finalVoteCount > originalVotes) {
+            // If the final vote count is higher, send upvotes for the difference
+            for (let i = 0; i < finalVoteCount - originalVotes; i++) {
+              fetch(`/api/products/${productId}/upvote`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+              }).catch(err => console.error("Error sending buffered upvote:", err));
+            }
+          } else if (finalVoteCount < originalVotes) {
+            // If the final vote count is lower, send downvotes for the difference
+            for (let i = 0; i < originalVotes - finalVoteCount; i++) {
+              fetch(`/api/products/${productId}/downvote`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+              }).catch(err => console.error("Error sending buffered downvote:", err));
+            }
+          }
+        }
       }
     };
-  }, [votesChanged, productId]);
+  }, [votesChanged, productId, localVotes, product]);
 
   // Upvote mutation
   const upvoteMutation = useMutation({
