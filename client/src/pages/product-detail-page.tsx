@@ -135,50 +135,11 @@ export default function ProductDetailPage() {
     }
   };
 
-  // Function to render star ratings
-  const renderStars = (rating: number | undefined) => {
-    if (!rating) rating = 0;
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-
-    // Add full stars
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<Star key={`star-${i}`} className="fill-gold text-gold" />);
-    }
-
-    // Add half star if needed
-    if (hasHalfStar) {
-      stars.push(<StarHalf key="half-star" className="fill-gold text-gold" />);
-    }
-
-    // Add empty stars to make total of 5
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(<Star key={`empty-${i}`} className="text-gold" />);
-    }
-
-    return stars;
-  };
+  // No longer needed since we're now using votes instead of star ratings
 
 
 
-  // Handle review submission
-  const onSubmitReview = (data: ReviewFormValues) => {
-    if (!user || !product) return;
-    
-    const reviewData: InsertReview = {
-      userId: user.id,
-      productId: product.id,
-      rating: data.rating,
-      comment: data.comment,
-    };
-    
-    addReviewMutation.mutate(reviewData);
-  };
-  
-  // Check if user already reviewed this product
-  const hasUserReviewed = user && reviews?.some(review => review.userId === user.id);
+  // No longer needed - replaced by voting system
 
   if (isLoading) {
     return (
@@ -290,12 +251,12 @@ export default function ProductDetailPage() {
                 <h1 className="font-playfair text-2xl md:text-3xl font-bold mb-3">{product.name}</h1>
                 
                 <div className="flex items-center mb-3">
-                  <div className="flex">
-                    {renderStars(product.averageRating)}
+                  <div className="flex items-center">
+                    <ThumbsUp className="h-4 w-4 text-purple-600 mr-1" />
+                    <span className="text-sm text-gray-500">
+                      {product?.votes || 0} votes
+                    </span>
                   </div>
-                  <span className="text-sm text-gray-500 ml-2">
-                    ({product.reviews?.length || 0} reviews)
-                  </span>
                 </div>
                 
                 {/* Seller information */}
