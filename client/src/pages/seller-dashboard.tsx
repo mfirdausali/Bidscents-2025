@@ -202,6 +202,8 @@ export default function SellerDashboard() {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<any[]>([]);
+  const [imagesToDelete, setImagesToDelete] = useState<number[]>([]);
   const [boostedProducts, setBoostedProducts] = useState<number[]>([]);
   const [boostedProductIds, setBoostedProductIds] = useState<number[]>([]);
   const [selectedBoostOption, setSelectedBoostOption] = useState<string | null>(null);
@@ -545,7 +547,18 @@ export default function SellerDashboard() {
       if (!response.ok) {
         throw new Error("Failed to fetch product images");
       }
-      return response.json();
+      const images = await response.json();
+      
+      // Update the existingImages state when productImages are fetched
+      setExistingImages(images);
+      
+      // Create preview URLs for existing images
+      const previewUrls = images.map((image: any) => 
+        `/api/images/${image.imageUrl}`
+      );
+      setImagePreviewUrls(previewUrls);
+      
+      return images;
     },
     enabled: !!currentProductId && isEditMode,
   });
