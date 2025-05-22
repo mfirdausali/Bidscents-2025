@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ProductWithDetails, Review, InsertReview } from "@shared/schema";
@@ -9,15 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { ContactSellerButton } from "@/components/ui/contact-seller-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
-import { Star, StarHalf, Heart, Minus, Plus, MessageSquare, Info, Check } from "lucide-react";
+import { Star, StarHalf, Heart, Minus, Plus, MessageSquare, Info, Check, ThumbsUp, ThumbsDown } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Card } from "@/components/ui/card";
 
 // Define review form schema
 const reviewSchema = z.object({
@@ -40,47 +37,65 @@ export default function ProductDetailPage() {
 
   // State for current displayed image
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // Local vote state with buffer for optimistic UI updates
+  const [localVotes, setLocalVotes] = useState<number | null>(null);
+  const [votesChanged, setVotesChanged] = useState(false);
 
   // Fetch product details
   const { data: product, isLoading } = useQuery<ProductWithDetails>({
     queryKey: [`/api/products/${productId}`],
     enabled: !!productId,
+    onSuccess: (data) => {
+      // Initialize local votes from product data
+      if (localVotes === null) {
+        setLocalVotes(data.votes || 0);
+      }
+    }
   });
 
-  // Fetch product reviews
-  const { data: reviews, refetch: refetchReviews } = useQuery<Review[]>({
-    queryKey: [`/api/products/${productId}/reviews`],
-    enabled: !!productId,
-  });
-
-  // Review form
-  const form = useForm<ReviewFormValues>({
-    resolver: zodResolver(reviewSchema),
-    defaultValues: {
-      rating: 5,
-      comment: "",
-    },
-  });
-
-  // Add review mutation
-  const addReviewMutation = useMutation({
-    mutationFn: async (review: InsertReview) => {
-      const res = await apiRequest("POST", "/api/reviews", review);
+  // Upvote mutation
+  const upvoteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/products/${productId}/upvote`);
       return await res.json();
     },
     onSuccess: () => {
+      // Update local vote count for instant feedback
+      setLocalVotes((current) => (current !== null ? current + 1 : 1));
+      setVotesChanged(true);
       toast({
-        title: "Review submitted",
+        title: "Vote recorded",
         description: "Thank you for your feedback!",
       });
-      refetchReviews();
-      form.reset();
-      queryClient.invalidateQueries({ queryKey: [`/api/products/${productId}`] });
     },
     onError: (error) => {
       toast({
-        title: "Error submitting review",
-        description: error.message,
+        title: "Error recording vote",
+        description: "Failed to upvote. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Downvote mutation
+  const downvoteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/products/${productId}/downvote`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      // Update local vote count for instant feedback
+      setLocalVotes((current) => (current !== null ? Math.max(0, current - 1) : 0));
+      setVotesChanged(true);
+      toast({
+        title: "Vote recorded",
+        description: "Thank you for your feedback!",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error recording vote",
+        description: "Failed to downvote. Please try again.",
         variant: "destructive",
       });
     },
