@@ -2411,7 +2411,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const schema = z.object({
         rating: z.number().min(0).max(5),
         comment: z.string().optional(),
-        productId: z.number()
+        productId: z.number(),
+        sellerId: z.number().optional()
       });
       
       const validationResult = schema.safeParse(req.body);
