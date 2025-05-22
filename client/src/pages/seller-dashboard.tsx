@@ -1008,23 +1008,16 @@ export default function SellerDashboard() {
     };
 
     // Create auction data with proper type handling
-    // Format the date as 'YYYY-MM-DD HH:MM:SS'
-    const date =
-      data.auctionEndDate instanceof Date
-        ? data.auctionEndDate
-        : new Date(data.auctionEndDate);
-    const formattedDate =
-      date.getFullYear() +
-      "-" +
-      String(date.getMonth() + 1).padStart(2, "0") +
-      "-" +
-      String(date.getDate()).padStart(2, "0") +
-      " " +
-      String(date.getHours()).padStart(2, "0") +
-      ":" +
-      String(date.getMinutes()).padStart(2, "0") +
-      ":" +
-      String(date.getSeconds()).padStart(2, "0");
+    // Format dates with timezone information for timestamptz
+    const endDate = data.auctionEndDate instanceof Date
+      ? data.auctionEndDate
+      : new Date(data.auctionEndDate);
+      
+    // Generate ISO string with timezone information
+    const endsAtWithTz = endDate.toISOString();
+    
+    // Create a start date (now) with timezone information
+    const startsAtWithTz = new Date().toISOString();
 
     const auctionData = {
       productId: 0, // Will be replaced with actual product ID after product creation
@@ -1032,7 +1025,8 @@ export default function SellerDashboard() {
       reservePrice: data.reservePrice,
       buyNowPrice: data.buyNowPrice,
       bidIncrement: data.bidIncrement,
-      endsAt: formattedDate,
+      startsAt: startsAtWithTz, // Add explicit start time with timezone
+      endsAt: endsAtWithTz, // Use ISO format with timezone information
       status: "active",
     } as InsertAuction;
 
