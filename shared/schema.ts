@@ -97,6 +97,7 @@ export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
   productId: integer("product_id").references(() => products.id).notNull(),
+  sellerId: integer("seller_id").references(() => users.id),
   rating: doublePrecision("rating").notNull(),
   comment: text("comment"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -247,6 +248,7 @@ export const insertCategorySchema = createInsertSchema(categories).pick({
 export const insertReviewSchema = createInsertSchema(reviews).pick({
   userId: true,
   productId: true,
+  sellerId: true,
   rating: true,
   comment: true,
 });
