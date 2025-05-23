@@ -3978,6 +3978,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productDetails: products.map(p => ({ id: p.id, name: p.name }))
       };
       
+      console.log(`📦 BOOST PACKAGE METADATA CREATION:`);
+      console.log(`📦 - Package ID: ${boostPackage.id}`);
+      console.log(`📦 - Package Name: ${boostPackage.name}`);
+      console.log(`📦 - Package Duration: ${boostPackage.duration_hours} hours`);
+      console.log(`📦 - Metadata boostPackageId: ${paymentMetadata.boostPackageId}`);
+      console.log(`📦 - Metadata durationHours: ${paymentMetadata.durationHours}`);
+      console.log(`📦 - Full metadata object:`, JSON.stringify(paymentMetadata, null, 2));
+      
       console.log('Creating boost package payment:', {
         packageId: boostPackage.id,
         packageName: boostPackage.name,
@@ -4349,6 +4357,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Payment status updated to ${status}`);
       
+      console.log(`💳 PAYMENT PROCESSING TRIGGER CHECK:`);
+      console.log(`💳 - Payment ID: ${payment.id}`);
+      console.log(`💳 - Payment Status: ${status}`);
+      console.log(`💳 - Payment Type: ${payment.paymentType}`);
+      console.log(`💳 - Is Paid: ${isPaid}`);
+      console.log(`💳 - Processing timestamp: ${new Date().toISOString()}`);
+      
       // Helper function to update product feature status
       async function updateProductFeatureStatus(productId: number | string, payment: any) {
         try {
@@ -4359,6 +4374,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log(`🔍 DURATION DEBUGGING - Product Boost Flow START 🔍`);
           console.log(`🔍 Input: productId=${productId}, payment exists=${!!payment}`);
+          console.log(`🔍 ==========================================`);
+          console.log(`🔍 CURRENT TIME: ${new Date().toISOString()}`);
+          
+          if (payment) {
+            console.log(`🔍 PAYMENT METADATA ANALYSIS:`);
+            console.log(`- payment.id: ${payment.id}`);
+            console.log(`- payment.status: ${payment.status}`);
+            console.log(`- payment.paymentType: ${payment.paymentType}`);
+            console.log(`- payment.metadata exists: ${!!payment.metadata}`);
+            console.log(`- payment.metadata type: ${typeof payment.metadata}`);
+            
+            if (payment.metadata) {
+              console.log(`🔍 ✅ METADATA FOUND - Checking for boost package data:`);
+              console.log(`- metadata.boostPackageId: ${payment.metadata.boostPackageId} (type: ${typeof payment.metadata.boostPackageId})`);
+              console.log(`- metadata.durationHours: ${payment.metadata.durationHours} (type: ${typeof payment.metadata.durationHours})`);
+              console.log(`- metadata.boostPackageName: ${payment.metadata.boostPackageName}`);
+              console.log(`- metadata keys: ${Object.keys(payment.metadata).join(', ')}`);
+              console.log(`- metadata full:`, JSON.stringify(payment.metadata, null, 2));
+            } else {
+              console.log(`🔍 ❌ NO METADATA - This explains why duration defaults to fallback!`);
+            }
+          } else {
+            console.log(`🔍 ❌ NO PAYMENT OBJECT - Duration will use fallback value!`);
+          }
           
           if (payment) {
             console.log(`🔍 PAYMENT OBJECT ANALYSIS:`);
