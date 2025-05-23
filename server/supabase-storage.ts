@@ -196,6 +196,12 @@ export class SupabaseStorage implements IStorage {
     if (userData.location !== undefined) dbUserData.location = userData.location;
     if (userData.bio !== undefined) dbUserData.bio = userData.bio;
     
+    // Add missing fields that auth.ts is trying to update
+    if (userData.providerId !== undefined) dbUserData.provider_id = userData.providerId;
+    if (userData.provider !== undefined) dbUserData.provider = userData.provider;
+    
+    console.log(`🔧 Updating user ${id} with fields:`, Object.keys(dbUserData));
+    
     const { data, error } = await supabase
       .from('users')
       .update(dbUserData)
@@ -204,9 +210,12 @@ export class SupabaseStorage implements IStorage {
       .single();
     
     if (error || !data) {
-      console.error('Error updating user:', error);
+      console.error('❌ Error updating user:', error);
+      console.error(`❌ Attempted to update user ID ${id} with:`, dbUserData);
       throw new Error(`Failed to update user: ${error?.message}`);
     }
+    
+    console.log(`✅ Successfully updated user ${id}`);
     
     // Use helper method to map user without password
     return this.mapUserFromDb(data);
