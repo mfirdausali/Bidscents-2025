@@ -4,7 +4,7 @@
  * Premium Boost: 36 hours
  */
 
-import { supabase } from '../server/supabase.js';
+import { supabase } from '../server/supabase.ts';
 
 async function createBoostPackagesTable() {
   console.log('🚀 Creating boost_packages table in Supabase...');
