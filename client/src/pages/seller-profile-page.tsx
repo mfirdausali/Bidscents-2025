@@ -788,7 +788,9 @@ export default function SellerProfilePage() {
                             />
                           ) : (
                             <ProductCard 
-                              key={product.id} product={product}
+                              key={product.id} 
+                              product={product}
+                              sold={true}
                             />
                           )
                         ))}
