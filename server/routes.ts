@@ -4044,43 +4044,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/payments/create-boost - Create a boost payment for one or more products
+  // Legacy endpoint - redirect to modern boost system
   app.post('/api/payments/create-boost', async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: 'Unauthorized: Please log in to make payments' });
-      }
-      
-      // Validate request body - now supporting multiple product IDs and boost options
-      const paymentSchema = z.object({
-        productIds: z.array(z.string()).min(1),
-        boostOptionId: z.number().optional(), // Add boost option ID support
-        returnUrl: z.string().url()
-      });
-      
-      const { productIds, boostOptionId, returnUrl } = paymentSchema.parse(req.body);
-      
-      // Check if all products exist and belong to the user
-      const productValidations = await Promise.all(
-        productIds.map(async (pid) => {
-          const productId = parseInt(pid);
-          const product = await storage.getProductById(productId);
-          return { 
-            productId,
-            product,
-            valid: product && product.sellerId === req.user.id 
-          };
-        })
-      );
-      
-      // Filter out invalid products
-      const invalidProducts = productValidations.filter(p => !p.valid);
-      if (invalidProducts.length > 0) {
-        return res.status(403).json({ 
-          message: 'Some products are invalid or do not belong to you',
-          invalidProductIds: invalidProducts.map(p => p.productId)
-        });
-      }
+    return res.status(410).json({ 
+      message: 'This endpoint is deprecated. Please use /api/boost/create-order instead.' 
+    });
+  });
       
       // Get valid products
       const validProducts = productValidations

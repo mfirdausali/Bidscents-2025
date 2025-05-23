@@ -7,7 +7,7 @@ import {
   Category,
   InsertAuction,
 } from "@shared/schema";
-import BoostOptionSelector from "@/components/boost-option-selector";
+// Removed legacy boost option selector import
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
@@ -207,7 +207,7 @@ export default function SellerDashboard() {
   const [imagesToDelete, setImagesToDelete] = useState<string[]>([]);
   const [boostedProducts, setBoostedProducts] = useState<number[]>([]);
   const [boostedProductIds, setBoostedProductIds] = useState<number[]>([]);
-  const [selectedBoostOption, setSelectedBoostOption] = useState<string | null>(null);
+  // Removed selectedBoostOption state - now using package selection directly
   const [isBoostDialogOpen, setIsBoostDialogOpen] = useState(false);
 
   // Check for payment redirect parameters
@@ -1256,7 +1256,17 @@ export default function SellerDashboard() {
     });
   };
 
-  // Open boost dialog to select boost options
+  // Query to fetch boost packages
+  const { data: boostPackages } = useQuery({
+    queryKey: ['/api/boost/packages'],
+    queryFn: async () => {
+      const response = await fetch('/api/boost/packages');
+      if (!response.ok) throw new Error('Failed to fetch boost packages');
+      return response.json();
+    }
+  });
+
+  // Open boost dialog to select boost packages
   const openBoostDialog = () => {
     if (boostedProducts.length === 0) {
       toast({
@@ -1270,8 +1280,8 @@ export default function SellerDashboard() {
     setIsBoostDialogOpen(true);
   };
 
-  // Handle boost checkout - now supporting multiple products and configurable boost options
-  const handleBoostCheckout = async () => {
+  // Handle boost checkout with package selection
+  const handleBoostCheckout = async (selectedPackageId: number) => {
     if (boostedProducts.length === 0) {
       toast({
         title: "No products selected",
@@ -1281,10 +1291,22 @@ export default function SellerDashboard() {
       return;
     }
 
-    if (!selectedBoostOption) {
+    // Find the selected package
+    const selectedPackage = boostPackages?.find((pkg: any) => pkg.id === selectedPackageId);
+    if (!selectedPackage) {
       toast({
-        title: "No boost option selected",
-        description: "Please select a boost duration",
+        title: "Invalid package",
+        description: "Please select a valid boost package",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate product count matches package
+    if (boostedProducts.length !== selectedPackage.item_count) {
+      toast({
+        title: "Product count mismatch",
+        description: `This package requires exactly ${selectedPackage.item_count} products. You have selected ${boostedProducts.length}.`,
         variant: "destructive"
       });
       return;
@@ -1296,74 +1318,48 @@ export default function SellerDashboard() {
     });
 
     try {
-      // Convert product IDs to strings for the API
-      const productIds = boostedProducts.map(id => id.toString());
-      
-      // Create payment request for multiple product boost
-      const response = await fetch('/api/payments/create-boost', {
+      // Create boost order using the modern package system
+      const response = await fetch('/api/boost/create-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          productIds, // Send all selected product IDs
-          boostOptionId: selectedBoostOption ? parseInt(selectedBoostOption) : undefined, // Add selected boost option
-          returnUrl: window.location.href, // Return to the seller dashboard after payment
+          boostPackageId: selectedPackageId,
+          productIds: boostedProducts
         }),
         credentials: 'include',
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create payment');
+        throw new Error(errorData.message || 'Failed to create boost order');
       }
 
-      const paymentData = await response.json();
+      const orderData = await response.json();
       
-      // Calculate total cost
-      const totalCost = paymentData.totalAmount || 10 * boostedProducts.length;
-      const productText = boostedProducts.length === 1 ? 'product' : 'products';
+      // Close the dialog
+      setIsBoostDialogOpen(false);
       
-      // Show popup with countdown before redirecting
-      const countdownSeconds = 5; // 5 second countdown
-      let remainingSeconds = countdownSeconds;
+      // Clear selected products
+      setBoostedProducts([]);
       
-      // Create toast with initial countdown
-      const { dismiss } = toast({
-        title: `Boosting ${boostedProducts.length} ${productText} (RM${totalCost})`,
-        description: `You will be redirected to Billplz in ${remainingSeconds} seconds...`,
-        duration: (countdownSeconds + 1) * 1000, // Add 1 second buffer
-      });
-      
-      // Set up countdown interval
-      const countdownInterval = setInterval(() => {
-        remainingSeconds -= 1;
-        
-        // Update toast message with new countdown
-        if (remainingSeconds > 0) {
-          toast({
-            title: `Boosting ${boostedProducts.length} ${productText} (RM${totalCost})`,
-            description: `You will be redirected to Billplz in ${remainingSeconds} seconds...`,
-            duration: remainingSeconds * 1000 + 500, // Add buffer
-          });
-        } else {
-          // Clear interval when countdown reaches 0
-          clearInterval(countdownInterval);
-          dismiss();
-          
-          // Redirect to the Billplz payment page
-          window.location.href = paymentData.billUrl;
-        }
-      }, 1000);
-
-      // Cleanup interval if user navigates away
-      return () => clearInterval(countdownInterval);
+      // Redirect to payment page
+      if (orderData.paymentUrl) {
+        window.location.href = orderData.paymentUrl;
+      } else {
+        toast({
+          title: "Error",
+          description: "Payment URL not received",
+          variant: "destructive"
+        });
+      }
       
     } catch (error) {
-      console.error('Payment error:', error);
+      console.error('Boost order error:', error);
       toast({
-        title: "Payment Error",
-        description: error instanceof Error ? error.message : "Failed to process payment request",
+        title: "Boost Order Error",
+        description: error instanceof Error ? error.message : "Failed to create boost order",
         variant: "destructive",
       });
     }
@@ -3251,51 +3247,94 @@ export default function SellerDashboard() {
         </div>
       )}
       
-      {/* Boost Options Dialog */}
+      {/* Boost Packages Dialog */}
       <Dialog open={isBoostDialogOpen} onOpenChange={setIsBoostDialogOpen}>
-        <DialogContent className="sm:max-w-md md:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Boost Your Products</DialogTitle>
             <DialogDescription>
-              Selected products will appear at the top of search results and be highlighted in product listings.
+              Select a boost package that matches your selected product count. Boosted products appear at the top of search results.
             </DialogDescription>
           </DialogHeader>
           
           <div className="py-4">
             {/* Product count summary */}
-            <div className="flex items-center mb-4 p-3 bg-slate-50 rounded-md border">
+            <div className="flex items-center mb-6 p-3 bg-slate-50 rounded-md border">
               <Package className="h-5 w-5 text-slate-600 mr-3" />
               <div>
                 <span className="font-medium">
                   {boostedProducts.length} {boostedProducts.length === 1 ? 'product' : 'products'} selected
                 </span>
                 <p className="text-sm text-muted-foreground">
-                  Boost all selected products with the same duration
+                  Choose a package that matches your product count
                 </p>
               </div>
             </div>
             
-            {/* Boost Option Selector */}
-            <BoostOptionSelector 
-              value={selectedBoostOption} 
-              onChange={setSelectedBoostOption}
-              className="mt-4"
-            />
+            {/* Package Selection Grid */}
+            {boostPackages && boostPackages.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {boostPackages
+                  .filter((pkg: any) => pkg.item_count === boostedProducts.length)
+                  .map((pkg: any) => (
+                    <Card 
+                      key={pkg.id} 
+                      className="cursor-pointer hover:border-[#F5A623] transition-colors"
+                      onClick={() => handleBoostCheckout(pkg.id)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg">{pkg.name}</CardTitle>
+                          <Badge variant={pkg.package_type === 'premium' ? 'default' : 'secondary'}>
+                            {pkg.package_type}
+                          </Badge>
+                        </div>
+                        <CardDescription>
+                          {pkg.item_count} {pkg.item_count === 1 ? 'product' : 'products'} • {pkg.duration_formatted}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl font-bold text-[#F5A623]">
+                            RM{(pkg.price / 100).toFixed(2)}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            RM{(pkg.effective_price).toFixed(2)} per item
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F5A623] mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading boost packages...</p>
+              </div>
+            )}
+            
+            {/* No matching packages message */}
+            {boostPackages && boostPackages.length > 0 && 
+             !boostPackages.some((pkg: any) => pkg.item_count === boostedProducts.length) && (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium mb-2">No matching packages</h3>
+                <p className="text-muted-foreground mb-4">
+                  No boost packages are available for {boostedProducts.length} {boostedProducts.length === 1 ? 'product' : 'products'}.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Available package sizes: {boostPackages.map((pkg: any) => pkg.item_count).join(', ')} products
+                </p>
+              </div>
+            )}
           </div>
           
-          <DialogFooter className="flex-col sm:flex-row sm:justify-between sm:space-x-2">
+          <DialogFooter>
             <Button 
               variant="outline" 
               onClick={() => setIsBoostDialogOpen(false)}
             >
               Cancel
-            </Button>
-            <Button 
-              onClick={handleBoostCheckout}
-              className="bg-[#F5A623] hover:bg-[#E59400] text-white"
-              disabled={!selectedBoostOption}
-            >
-              Proceed to Payment
             </Button>
           </DialogFooter>
         </DialogContent>
