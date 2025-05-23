@@ -4327,7 +4327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Helper function to update product feature status
       async function updateProductFeatureStatus(productId: number | string, payment: any) {
         try {
-          let durationHours = 168; // Default 7 days (in hours)
+          let durationHours = 24; // Default 1 day (in hours) - will be overridden by actual package duration
           let boostOptionId = null;
           let boostPackageId = null;
           let boostGroupId = null;

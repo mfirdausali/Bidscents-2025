@@ -203,7 +203,9 @@ export default function SellerDashboard() {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
-  const [existingImages, setExistingImages] = useState<{id: string, url: string}[]>([]);
+  const [existingImages, setExistingImages] = useState<
+    { id: string; url: string }[]
+  >([]);
   const [imagesToDelete, setImagesToDelete] = useState<string[]>([]);
   const [boostedProducts, setBoostedProducts] = useState<number[]>([]);
   const [boostedProductIds, setBoostedProductIds] = useState<number[]>([]);
@@ -213,35 +215,37 @@ export default function SellerDashboard() {
   // Check for payment redirect parameters
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const paymentStatus = searchParams.get('payment');
-    const paymentMessage = searchParams.get('message');
-    
+    const paymentStatus = searchParams.get("payment");
+    const paymentMessage = searchParams.get("message");
+
     if (paymentStatus && paymentMessage) {
       // Handle payment status
-      if (paymentStatus === 'success') {
+      if (paymentStatus === "success") {
         toast({
           title: "Payment Successful",
           description: decodeURIComponent(paymentMessage),
           variant: "default",
-          className: "bg-green-100 border-green-400 text-green-800"
+          className: "bg-green-100 border-green-400 text-green-800",
         });
-        
+
         // Force a refresh of the products data
-        queryClient.invalidateQueries({ queryKey: ["/api/seller/products", user?.id] });
-      } else if (paymentStatus === 'failed') {
+        queryClient.invalidateQueries({
+          queryKey: ["/api/seller/products", user?.id],
+        });
+      } else if (paymentStatus === "failed") {
         toast({
           title: "Payment Failed",
           description: decodeURIComponent(paymentMessage),
-          variant: "destructive"
+          variant: "destructive",
         });
-      } else if (paymentStatus === 'error') {
+      } else if (paymentStatus === "error") {
         toast({
           title: "Payment Error",
           description: decodeURIComponent(paymentMessage),
-          variant: "destructive"
+          variant: "destructive",
         });
       }
-      
+
       // Clean up the URL to prevent duplicate notifications on refresh
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -517,25 +521,25 @@ export default function SellerDashboard() {
           product: productWithSellerId,
         });
         productId = updatedProduct.id;
-        
+
         // Process any images marked for deletion
         if (imagesToDelete.length > 0) {
           console.log("Deleting images:", imagesToDelete);
-          
+
           // Delete each image one by one
           for (const imageId of imagesToDelete) {
             try {
               await apiRequest(
                 "DELETE",
                 `/api/products/${currentProductId}/images/${imageId}?sellerId=${user?.id || 0}`,
-                null
+                null,
               );
               console.log(`Successfully deleted image ${imageId}`);
             } catch (error) {
               console.error(`Failed to delete image ${imageId}:`, error);
             }
           }
-          
+
           // Clear the deletion list after processing
           setImagesToDelete([]);
         }
@@ -576,16 +580,16 @@ export default function SellerDashboard() {
         throw new Error("Failed to fetch product images");
       }
       const images = await response.json();
-      
+
       // Update the existingImages state when productImages are fetched
       setExistingImages(images);
-      
+
       // Create preview URLs for existing images
-      const previewUrls = images.map((image: any) => 
-        `/api/images/${image.imageUrl}`
+      const previewUrls = images.map(
+        (image: any) => `/api/images/${image.imageUrl}`,
       );
       setImagePreviewUrls(previewUrls);
-      
+
       return images;
     },
     enabled: !!currentProductId && isEditMode,
@@ -599,7 +603,7 @@ export default function SellerDashboard() {
     // Clear existing image preview states
     setUploadedImages([]);
     imagePreviewUrls.forEach((url) => {
-      if (url.startsWith('blob:')) {
+      if (url.startsWith("blob:")) {
         URL.revokeObjectURL(url);
       }
     });
@@ -610,14 +614,14 @@ export default function SellerDashboard() {
     // If the product has images in the product.images array, set them up for preview
     if (product.images && product.images.length > 0) {
       console.log("Found existing product images:", product.images);
-      
+
       // Store the existing images for tracking
-      const existingImagesData = product.images.map(img => ({
+      const existingImagesData = product.images.map((img) => ({
         id: img.id,
-        url: img.imageUrl
+        url: img.imageUrl,
       }));
       setExistingImages(existingImagesData);
-      
+
       // Set up preview URLs for display
       const existingImageUrls = product.images.map(
         (img) => `/api/images/${img.imageUrl}`,
@@ -632,18 +636,20 @@ export default function SellerDashboard() {
     // Check if this is an auction listing
     if (product.listingType === "auction") {
       setIsAuctionForm(true);
-      
+
       // If the product has auction data, fetch it or use existing data
       if (product.auction) {
         console.log("Loading auction data for edit:", product.auction);
-        
+
         // Convert the date string to a Date object for the form
-        const endsAtDate = product.auction.endsAt ? new Date(product.auction.endsAt) : new Date();
+        const endsAtDate = product.auction.endsAt
+          ? new Date(product.auction.endsAt)
+          : new Date();
         // Add a day to ensure the date is in the future when editing
         if (endsAtDate < new Date()) {
           endsAtDate.setDate(endsAtDate.getDate() + 1);
         }
-        
+
         // Reset the auction form with the auction data
         auctionForm.reset({
           name: product.name,
@@ -663,7 +669,8 @@ export default function SellerDashboard() {
           remainingPercentage: product.remainingPercentage || 100,
           batchCode: product.batchCode || "",
           purchaseYear: product.purchaseYear || new Date().getFullYear(),
-          boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
+          boxCondition:
+            (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
           volume: product.volume || 100,
         });
       } else {
@@ -674,15 +681,17 @@ export default function SellerDashboard() {
             if (response.ok) {
               const auctionData = await response.json();
               console.log("Fetched auction data:", auctionData);
-              
+
               if (auctionData) {
                 // Convert the date string to a Date object
-                const endsAtDate = auctionData.endsAt ? new Date(auctionData.endsAt) : new Date();
+                const endsAtDate = auctionData.endsAt
+                  ? new Date(auctionData.endsAt)
+                  : new Date();
                 // Add a day to ensure the date is in the future when editing
                 if (endsAtDate < new Date()) {
                   endsAtDate.setDate(endsAtDate.getDate() + 1);
                 }
-                
+
                 // Reset form with fetched auction data
                 auctionForm.reset({
                   name: product.name,
@@ -697,12 +706,16 @@ export default function SellerDashboard() {
                   stockQuantity: product.stockQuantity,
                   categoryId: product.categoryId || 1,
                   isNew: product.isNew === null ? false : product.isNew,
-                  isFeatured: product.isFeatured === null ? false : product.isFeatured,
+                  isFeatured:
+                    product.isFeatured === null ? false : product.isFeatured,
                   // Secondhand perfume specific fields
                   remainingPercentage: product.remainingPercentage || 100,
                   batchCode: product.batchCode || "",
-                  purchaseYear: product.purchaseYear || new Date().getFullYear(),
-                  boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
+                  purchaseYear:
+                    product.purchaseYear || new Date().getFullYear(),
+                  boxCondition:
+                    (product.boxCondition as "Good" | "Damaged" | "No Box") ||
+                    "Good",
                   volume: product.volume || 100,
                 });
               }
@@ -722,11 +735,14 @@ export default function SellerDashboard() {
                 stockQuantity: product.stockQuantity,
                 categoryId: product.categoryId || 1,
                 isNew: product.isNew === null ? false : product.isNew,
-                isFeatured: product.isFeatured === null ? false : product.isFeatured,
+                isFeatured:
+                  product.isFeatured === null ? false : product.isFeatured,
                 remainingPercentage: product.remainingPercentage || 100,
                 batchCode: product.batchCode || "",
                 purchaseYear: product.purchaseYear || new Date().getFullYear(),
-                boxCondition: (product.boxCondition as "Good" | "Damaged" | "No Box") || "Good",
+                boxCondition:
+                  (product.boxCondition as "Good" | "Damaged" | "No Box") ||
+                  "Good",
                 volume: product.volume || 100,
               });
             }
@@ -734,7 +750,7 @@ export default function SellerDashboard() {
             console.error("Error fetching auction data:", error);
           }
         };
-        
+
         // Call the async function to fetch auction data
         fetchAuctionData();
       }
@@ -783,13 +799,15 @@ export default function SellerDashboard() {
     const newFiles: File[] = Array.from(files).slice(0, maxNewImages);
 
     // Create preview URLs for new files
-    const newFilePreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
+    const newFilePreviewUrls = newFiles.map((file) =>
+      URL.createObjectURL(file),
+    );
 
     // If in edit mode, keep existing images and add new ones
     if (isEditMode) {
       // Append new files to existing uploaded files list
       setUploadedImages([...uploadedImages, ...newFiles]);
-      
+
       // Keep existing image previews and add new ones
       // (Existing image previews should already be in imagePreviewUrls from the product images query)
       setImagePreviewUrls([...imagePreviewUrls, ...newFilePreviewUrls]);
@@ -810,8 +828,8 @@ export default function SellerDashboard() {
     if (isEditMode && index < existingImages.length) {
       // Add the image ID to imagesToDelete for server-side deletion on save
       const imageToDelete = existingImages[index];
-      setImagesToDelete(prev => [...prev, imageToDelete.id]);
-      
+      setImagesToDelete((prev) => [...prev, imageToDelete.id]);
+
       // Remove from existing images
       const newExistingImages = [...existingImages];
       newExistingImages.splice(index, 1);
@@ -823,15 +841,15 @@ export default function SellerDashboard() {
       newImages.splice(adjustedIndex, 1);
       setUploadedImages(newImages);
     }
-    
+
     // Update preview URLs in both cases
     const newPreviewUrls = [...imagePreviewUrls];
-    
+
     // Revoke object URL to prevent memory leaks
-    if (newPreviewUrls[index] && newPreviewUrls[index].startsWith('blob:')) {
+    if (newPreviewUrls[index] && newPreviewUrls[index].startsWith("blob:")) {
       URL.revokeObjectURL(newPreviewUrls[index]);
     }
-    
+
     newPreviewUrls.splice(index, 1);
     setImagePreviewUrls(newPreviewUrls);
 
@@ -854,13 +872,15 @@ export default function SellerDashboard() {
     const newFiles: File[] = Array.from(files).slice(0, maxNewImages);
 
     // Create preview URLs for new files
-    const newFilePreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
+    const newFilePreviewUrls = newFiles.map((file) =>
+      URL.createObjectURL(file),
+    );
 
     // If in edit mode, keep existing images and add new ones
     if (isEditMode) {
       // Append new files to existing uploaded files list
       setUploadedImages([...uploadedImages, ...newFiles]);
-      
+
       // Keep existing image previews and add new ones
       // (Existing image previews should already be in imagePreviewUrls from the product images query)
       setImagePreviewUrls([...imagePreviewUrls, ...newFilePreviewUrls]);
@@ -955,15 +975,11 @@ export default function SellerDashboard() {
       auction: any;
     }) => {
       console.log("Updating auction:", data);
-      const res = await apiRequest(
-        "PUT",
-        `/api/auctions/${data.auctionId}`,
-        {
-          product: data.product,
-          auction: data.auction,
-          sellerId: user?.id
-        }
-      );
+      const res = await apiRequest("PUT", `/api/auctions/${data.auctionId}`, {
+        product: data.product,
+        auction: data.auction,
+        sellerId: user?.id,
+      });
       return await res.json();
     },
     onSuccess: () => {
@@ -1010,13 +1026,14 @@ export default function SellerDashboard() {
 
     // Create auction data with proper type handling
     // Format dates with timezone information for timestamptz
-    const endDate = data.auctionEndDate instanceof Date
-      ? data.auctionEndDate
-      : new Date(data.auctionEndDate);
-      
+    const endDate =
+      data.auctionEndDate instanceof Date
+        ? data.auctionEndDate
+        : new Date(data.auctionEndDate);
+
     // Generate ISO string with timezone information
     const endsAtWithTz = endDate.toISOString();
-    
+
     // Create a start date (now) with timezone information
     const startsAtWithTz = new Date().toISOString();
 
@@ -1033,54 +1050,56 @@ export default function SellerDashboard() {
 
     try {
       console.log(auctionData);
-      
+
       // Check if we're editing an existing auction or creating a new one
       if (isEditMode && currentProductId) {
         console.log("Editing existing auction for product:", currentProductId);
-        
+
         // First fetch the auction data to get the auction ID
-        const response = await fetch(`/api/auctions/product/${currentProductId}`);
-        
+        const response = await fetch(
+          `/api/auctions/product/${currentProductId}`,
+        );
+
         if (response.ok) {
           const existingAuction = await response.json();
           console.log("Found existing auction:", existingAuction);
-          
+
           if (existingAuction && existingAuction.id) {
             // Update both the product and auction
             const result = await updateAuctionMutation.mutateAsync({
               auctionId: existingAuction.id,
               product: {
                 ...productData,
-                id: currentProductId
+                id: currentProductId,
               },
               auction: {
                 ...auctionData,
-                productId: currentProductId
-              }
+                productId: currentProductId,
+              },
             });
-            
+
             // Process any images marked for deletion
             if (imagesToDelete.length > 0) {
               console.log("Deleting images:", imagesToDelete);
-              
+
               // Delete each image one by one
               for (const imageId of imagesToDelete) {
                 try {
                   await apiRequest(
                     "DELETE",
                     `/api/products/${currentProductId}/images/${imageId}?sellerId=${user?.id || 0}`,
-                    null
+                    null,
                   );
                   console.log(`Successfully deleted image ${imageId}`);
                 } catch (error) {
                   console.error(`Failed to delete image ${imageId}:`, error);
                 }
               }
-              
+
               // Clear the deletion list after processing
               setImagesToDelete([]);
             }
-            
+
             // Upload any new images
             if (uploadedImages.length > 0) {
               await registerImagesMutation.mutateAsync({
@@ -1115,7 +1134,7 @@ export default function SellerDashboard() {
       setImagePreviewUrls([]);
       setExistingImages([]);
       setImagesToDelete([]);
-      
+
       // Close dialog after successful submission
       setIsDialogOpen(false);
     } catch (error) {
@@ -1184,60 +1203,63 @@ export default function SellerDashboard() {
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.brand.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-  
+
   // Track boosted products based on database featured status fields
   useEffect(() => {
     if (products) {
       const nowDate = new Date();
-      console.log("Checking featured products status. Total products:", products.length);
-      
+      console.log(
+        "Checking featured products status. Total products:",
+        products.length,
+      );
+
       // Comprehensive check for all possible featured flags and dates
       // This ensures compatibility with both database field names and code field names
-      const featuredProducts = products.filter(p => {
+      const featuredProducts = products.filter((p) => {
         // Check all possible "featured" flags
-        const isFeaturedByFlag = (p.is_featured === true) || (p.isFeatured === true);
-        
+        const isFeaturedByFlag =
+          p.is_featured === true || p.isFeatured === true;
+
         // Check all possible "featured until" dates
         const now = new Date();
-        const hasFutureDate = (
+        const hasFutureDate =
           (p.featured_until && new Date(p.featured_until) > now) ||
-          (p.featuredUntil && new Date(p.featuredUntil) > now)
-        );
-        
+          (p.featuredUntil && new Date(p.featuredUntil) > now);
+
         // Product is featured if either the flag is true or the date is valid
         return isFeaturedByFlag || hasFutureDate;
       });
-      
-      const allBoostedIds = featuredProducts.map(p => p.id);
-      
+
+      const allBoostedIds = featuredProducts.map((p) => p.id);
+
       // Log information about boost packages and groups for debugging
-      const packageInfo = featuredProducts.map(p => {
+      const packageInfo = featuredProducts.map((p) => {
         let boostType = "Standard";
-        
+
         // Determine boost type based on package ID
         if (p.boost_package_id || p.boostPackageId) {
           const packageId = p.boost_package_id || p.boostPackageId || 0;
           // Package IDs 5-8 are Premium packages based on our package structure
           boostType = packageId >= 5 ? "Premium" : "Standard";
         }
-        
+
         return {
-          id: p.id, 
-          name: p.name, 
-          is_featured: p.is_featured, 
-          isFeatured: p.isFeatured, 
-          featured_until: p.featured_until, 
+          id: p.id,
+          name: p.name,
+          is_featured: p.is_featured,
+          isFeatured: p.isFeatured,
+          featured_until: p.featured_until,
           featuredUntil: p.featuredUntil,
           boost_package_id: p.boost_package_id,
           boostPackageId: p.boostPackageId,
           boost_group_id: p.boost_group_id,
           boostGroupId: p.boostGroupId,
-          boostType: boostType
+          boostType: boostType,
         };
       });
-      
+
       console.log("Found featured products with package info:", packageInfo);
-      
+
       console.log("Final list of featured product IDs:", allBoostedIds);
       setBoostedProductIds(allBoostedIds);
     }
@@ -1258,12 +1280,12 @@ export default function SellerDashboard() {
 
   // Query to fetch boost packages
   const { data: boostPackages } = useQuery({
-    queryKey: ['/api/boost/packages'],
+    queryKey: ["/api/boost/packages"],
     queryFn: async () => {
-      const response = await fetch('/api/boost/packages');
-      if (!response.ok) throw new Error('Failed to fetch boost packages');
+      const response = await fetch("/api/boost/packages");
+      if (!response.ok) throw new Error("Failed to fetch boost packages");
       return response.json();
-    }
+    },
   });
 
   // Open boost dialog to select boost packages
@@ -1272,11 +1294,11 @@ export default function SellerDashboard() {
       toast({
         title: "No products selected",
         description: "Please select at least one product to boost",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
-    
+
     setIsBoostDialogOpen(true);
   };
 
@@ -1286,18 +1308,20 @@ export default function SellerDashboard() {
       toast({
         title: "No products selected",
         description: "Please select at least one product to boost",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     // Find the selected package
-    const selectedPackage = boostPackages?.find((pkg: any) => pkg.id === selectedPackageId);
+    const selectedPackage = boostPackages?.find(
+      (pkg: any) => pkg.id === selectedPackageId,
+    );
     if (!selectedPackage) {
       toast({
         title: "Invalid package",
         description: "Please select a valid boost package",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -1307,7 +1331,7 @@ export default function SellerDashboard() {
       toast({
         title: "Product count mismatch",
         description: `This package requires exactly ${selectedPackage.item_count} products. You have selected ${boostedProducts.length}.`,
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -1319,31 +1343,31 @@ export default function SellerDashboard() {
 
     try {
       // Create boost order using the modern package system
-      const response = await fetch('/api/boost/create-order', {
-        method: 'POST',
+      const response = await fetch("/api/boost/create-order", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           boostPackageId: selectedPackageId,
-          productIds: boostedProducts
+          productIds: boostedProducts,
         }),
-        credentials: 'include',
+        credentials: "include",
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create boost order');
+        throw new Error(errorData.message || "Failed to create boost order");
       }
 
       const orderData = await response.json();
-      
+
       // Close the dialog
       setIsBoostDialogOpen(false);
-      
+
       // Clear selected products
       setBoostedProducts([]);
-      
+
       // Redirect to payment page
       if (orderData.paymentUrl) {
         window.location.href = orderData.paymentUrl;
@@ -1351,15 +1375,17 @@ export default function SellerDashboard() {
         toast({
           title: "Error",
           description: "Payment URL not received",
-          variant: "destructive"
+          variant: "destructive",
         });
       }
-      
     } catch (error) {
-      console.error('Boost order error:', error);
+      console.error("Boost order error:", error);
       toast({
         title: "Boost Order Error",
-        description: error instanceof Error ? error.message : "Failed to create boost order",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to create boost order",
         variant: "destructive",
       });
     }
@@ -1391,7 +1417,7 @@ export default function SellerDashboard() {
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
-                onClick={() => setLocation('/boost-checkout')}
+                onClick={() => setLocation("/boost-checkout")}
                 className="mt-4 md:mt-0 bg-purple-600 hover:bg-purple-700 text-white flex items-center"
               >
                 <Star className="mr-2 h-4 w-4" />
@@ -1520,9 +1546,13 @@ export default function SellerDashboard() {
                         </TableHeader>
                         <TableBody>
                           {filteredProducts.map((product) => (
-                            <TableRow 
+                            <TableRow
                               key={product.id}
-                              className={boostedProductIds.includes(product.id) ? "bg-[#FFF9E6]" : ""}
+                              className={
+                                boostedProductIds.includes(product.id)
+                                  ? "bg-[#FFF9E6]"
+                                  : ""
+                              }
                             >
                               <TableCell className="bg-[#FFF9E6]">
                                 {boostedProductIds.includes(product.id) ? (
@@ -1534,8 +1564,12 @@ export default function SellerDashboard() {
                                 ) : (
                                   <Checkbox
                                     id={`boost-${product.id}`}
-                                    checked={boostedProducts.includes(product.id)}
-                                    onCheckedChange={() => toggleBoostProduct(product.id)}
+                                    checked={boostedProducts.includes(
+                                      product.id,
+                                    )}
+                                    onCheckedChange={() =>
+                                      toggleBoostProduct(product.id)
+                                    }
                                     className="h-5 w-5 border-2 border-[#F5A623] data-[state=checked]:bg-[#F5A623] data-[state=checked]:text-white rounded-sm focus:ring-0 animate-pulse transition-all duration-300 ease-in-out"
                                   />
                                 )}
@@ -1584,11 +1618,6 @@ export default function SellerDashboard() {
                                     New
                                   </span>
                                 )}
-                                {product.isFeatured && (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-metallic-gold text-white">
-                                    Featured
-                                  </span>
-                                )}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end space-x-2">
@@ -1620,17 +1649,23 @@ export default function SellerDashboard() {
                           ))}
                         </TableBody>
                       </Table>
-                      
+
                       {/* Total Price Summary for Boosted Products */}
                       {boostedProducts.length > 0 && (
                         <div className="mt-4 p-4 bg-[#FFF9E6] border border-[#F5A623] rounded-md">
                           <div className="flex justify-between items-center">
                             <div>
-                              <span className="font-medium text-gray-700">Total Boost Cost:</span>
-                              <span className="ml-2 font-bold text-lg">RM{(boostedProducts.length * 10).toFixed(2)}</span>
-                              <span className="ml-2 text-sm text-gray-500">({boostedProducts.length} products × RM10.00)</span>
+                              <span className="font-medium text-gray-700">
+                                Total Boost Cost:
+                              </span>
+                              <span className="ml-2 font-bold text-lg">
+                                RM{(boostedProducts.length * 10).toFixed(2)}
+                              </span>
+                              <span className="ml-2 text-sm text-gray-500">
+                                ({boostedProducts.length} products × RM10.00)
+                              </span>
                             </div>
-                            <Button 
+                            <Button
                               onClick={handleBoostCheckout}
                               className="bg-[#F5A623] hover:bg-[#E59400] text-white"
                             >
@@ -1867,7 +1902,7 @@ export default function SellerDashboard() {
                       </CardDescription>
                     </div>
                     <Button
-                      onClick={() => setLocation('/boost-checkout')}
+                      onClick={() => setLocation("/boost-checkout")}
                       className="mt-4 md:mt-0 bg-purple-600 hover:bg-purple-700 text-white"
                     >
                       Boost More Products
@@ -1890,26 +1925,48 @@ export default function SellerDashboard() {
                             <TableHead>Boost Type</TableHead>
                             <TableHead>Boosted Until</TableHead>
                             <TableHead>Time Remaining</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="text-right">
+                              Actions
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredProducts
-                            ?.filter(p => boostedProductIds.includes(p.id))
+                            ?.filter((p) => boostedProductIds.includes(p.id))
                             .map((product) => {
-                              const featuredUntil = product.featured_until || product.featuredUntil;
-                              const featuredUntilDate = featuredUntil ? new Date(featuredUntil) : null;
+                              const featuredUntil =
+                                product.featured_until || product.featuredUntil;
+                              const featuredUntilDate = featuredUntil
+                                ? new Date(featuredUntil)
+                                : null;
                               const now = new Date();
-                              const timeRemaining = featuredUntilDate ? Math.max(0, Math.floor((featuredUntilDate.getTime() - now.getTime()) / (1000 * 60 * 60))) : 0;
-                              
+                              const timeRemaining = featuredUntilDate
+                                ? Math.max(
+                                    0,
+                                    Math.floor(
+                                      (featuredUntilDate.getTime() -
+                                        now.getTime()) /
+                                        (1000 * 60 * 60),
+                                    ),
+                                  )
+                                : 0;
+
                               // Determine boost type based on package ID - Premium packages have IDs 5-8
-                              const packageId = product.boost_package_id || product.boostPackageId || 0;
-                              const boostType = packageId >= 5 ? "Premium" : "Standard";
-                              
+                              const packageId =
+                                product.boost_package_id ||
+                                product.boostPackageId ||
+                                0;
+                              const boostType =
+                                packageId >= 5 ? "Premium" : "Standard";
+
                               return (
-                                <TableRow key={product.id} className="bg-purple-50/30">
+                                <TableRow
+                                  key={product.id}
+                                  className="bg-purple-50/30"
+                                >
                                   <TableCell>
-                                    {product.images && product.images[0]?.imageUrl ? (
+                                    {product.images &&
+                                    product.images[0]?.imageUrl ? (
                                       <img
                                         src={`/api/images/${product.images[0].imageUrl}`}
                                         alt={product.name}
@@ -1934,15 +1991,25 @@ export default function SellerDashboard() {
                                     RM{(product.price / 100).toFixed(2)}
                                   </TableCell>
                                   <TableCell>
-                                    <Badge 
-                                      variant="outline" 
-                                      className={`${boostType === 'Premium' ? 'border-purple-500 text-purple-700 bg-purple-50' : 'border-amber-500 text-amber-700 bg-amber-50'}`}
+                                    <Badge
+                                      variant="outline"
+                                      className={`${boostType === "Premium" ? "border-purple-500 text-purple-700 bg-purple-50" : "border-amber-500 text-amber-700 bg-amber-50"}`}
                                     >
                                       {boostType} Boost
                                     </Badge>
                                   </TableCell>
                                   <TableCell>
-                                    {featuredUntilDate ? featuredUntilDate.toLocaleDateString() + ' ' + featuredUntilDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
+                                    {featuredUntilDate
+                                      ? featuredUntilDate.toLocaleDateString() +
+                                        " " +
+                                        featuredUntilDate.toLocaleTimeString(
+                                          [],
+                                          {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          },
+                                        )
+                                      : "N/A"}
                                   </TableCell>
                                   <TableCell>
                                     {timeRemaining > 0 ? (
@@ -1951,14 +2018,18 @@ export default function SellerDashboard() {
                                         <span>{timeRemaining} hours left</span>
                                       </div>
                                     ) : (
-                                      <span className="text-red-500">Expired</span>
+                                      <span className="text-red-500">
+                                        Expired
+                                      </span>
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right">
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => setLocation('/boost-checkout')}
+                                      onClick={() =>
+                                        setLocation("/boost-checkout")
+                                      }
                                       className="h-8"
                                     >
                                       Renew Boost
@@ -1975,12 +2046,16 @@ export default function SellerDashboard() {
                       <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-100">
                         <Star className="h-6 w-6 text-purple-600" />
                       </div>
-                      <h3 className="text-lg font-medium mb-2">No Boosted Products</h3>
+                      <h3 className="text-lg font-medium mb-2">
+                        No Boosted Products
+                      </h3>
                       <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                        Boost your products to increase visibility and sales. Featured products appear at the top of search results and on the homepage.
+                        Boost your products to increase visibility and sales.
+                        Featured products appear at the top of search results
+                        and on the homepage.
                       </p>
                       <Button
-                        onClick={() => setLocation('/boost-checkout')}
+                        onClick={() => setLocation("/boost-checkout")}
                         className="bg-purple-600 hover:bg-purple-700 text-white"
                       >
                         Get Started with Boost
@@ -2419,16 +2494,25 @@ export default function SellerDashboard() {
                   name="auctionEndDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base">Auction End Date (Your Local Time)</FormLabel>
+                      <FormLabel className="text-base">
+                        Auction End Date (Your Local Time)
+                      </FormLabel>
                       <div className="space-y-4">
                         <div className="grid grid-cols-3 gap-2">
                           {/* Date selectors */}
                           <div>
                             <FormLabel className="text-xs">Day</FormLabel>
-                            <Select 
-                              value={field.value instanceof Date ? String(field.value.getDate()) : "1"}
+                            <Select
+                              value={
+                                field.value instanceof Date
+                                  ? String(field.value.getDate())
+                                  : "1"
+                              }
                               onValueChange={(value) => {
-                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                const newDate =
+                                  field.value instanceof Date
+                                    ? new Date(field.value)
+                                    : new Date();
                                 newDate.setDate(parseInt(value));
                                 field.onChange(newDate);
                               }}
@@ -2437,21 +2521,31 @@ export default function SellerDashboard() {
                                 <SelectValue placeholder="Day" />
                               </SelectTrigger>
                               <SelectContent>
-                                {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                {Array.from(
+                                  { length: 31 },
+                                  (_, i) => i + 1,
+                                ).map((day) => (
                                   <SelectItem key={day} value={String(day)}>
-                                    {String(day).padStart(2, '0')}
+                                    {String(day).padStart(2, "0")}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div>
                             <FormLabel className="text-xs">Month</FormLabel>
-                            <Select 
-                              value={field.value instanceof Date ? String(field.value.getMonth()) : "0"}
+                            <Select
+                              value={
+                                field.value instanceof Date
+                                  ? String(field.value.getMonth())
+                                  : "0"
+                              }
                               onValueChange={(value) => {
-                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                const newDate =
+                                  field.value instanceof Date
+                                    ? new Date(field.value)
+                                    : new Date();
                                 newDate.setMonth(parseInt(value));
                                 field.onChange(newDate);
                               }}
@@ -2460,7 +2554,20 @@ export default function SellerDashboard() {
                                 <SelectValue placeholder="Month" />
                               </SelectTrigger>
                               <SelectContent>
-                                {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, index) => (
+                                {[
+                                  "Jan",
+                                  "Feb",
+                                  "Mar",
+                                  "Apr",
+                                  "May",
+                                  "Jun",
+                                  "Jul",
+                                  "Aug",
+                                  "Sep",
+                                  "Oct",
+                                  "Nov",
+                                  "Dec",
+                                ].map((month, index) => (
                                   <SelectItem key={index} value={String(index)}>
                                     {month}
                                   </SelectItem>
@@ -2468,13 +2575,20 @@ export default function SellerDashboard() {
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div>
                             <FormLabel className="text-xs">Year</FormLabel>
-                            <Select 
-                              value={field.value instanceof Date ? String(field.value.getFullYear()) : String(new Date().getFullYear())}
+                            <Select
+                              value={
+                                field.value instanceof Date
+                                  ? String(field.value.getFullYear())
+                                  : String(new Date().getFullYear())
+                              }
                               onValueChange={(value) => {
-                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                const newDate =
+                                  field.value instanceof Date
+                                    ? new Date(field.value)
+                                    : new Date();
                                 newDate.setFullYear(parseInt(value));
                                 field.onChange(newDate);
                               }}
@@ -2483,7 +2597,10 @@ export default function SellerDashboard() {
                                 <SelectValue placeholder="Year" />
                               </SelectTrigger>
                               <SelectContent>
-                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                                {Array.from(
+                                  { length: 5 },
+                                  (_, i) => new Date().getFullYear() + i,
+                                ).map((year) => (
                                   <SelectItem key={year} value={String(year)}>
                                     {year}
                                   </SelectItem>
@@ -2492,15 +2609,24 @@ export default function SellerDashboard() {
                             </Select>
                           </div>
                         </div>
-                        
+
                         {/* Time selectors */}
                         <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <FormLabel className="text-xs">Hour (24h)</FormLabel>
-                            <Select 
-                              value={field.value instanceof Date ? String(field.value.getHours()) : "12"}
+                            <FormLabel className="text-xs">
+                              Hour (24h)
+                            </FormLabel>
+                            <Select
+                              value={
+                                field.value instanceof Date
+                                  ? String(field.value.getHours())
+                                  : "12"
+                              }
                               onValueChange={(value) => {
-                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                const newDate =
+                                  field.value instanceof Date
+                                    ? new Date(field.value)
+                                    : new Date();
                                 newDate.setHours(parseInt(value));
                                 field.onChange(newDate);
                               }}
@@ -2509,21 +2635,30 @@ export default function SellerDashboard() {
                                 <SelectValue placeholder="Hour" />
                               </SelectTrigger>
                               <SelectContent>
-                                {Array.from({ length: 24 }, (_, i) => i).map(hour => (
-                                  <SelectItem key={hour} value={String(hour)}>
-                                    {String(hour).padStart(2, '0')}
-                                  </SelectItem>
-                                ))}
+                                {Array.from({ length: 24 }, (_, i) => i).map(
+                                  (hour) => (
+                                    <SelectItem key={hour} value={String(hour)}>
+                                      {String(hour).padStart(2, "0")}
+                                    </SelectItem>
+                                  ),
+                                )}
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div>
                             <FormLabel className="text-xs">Minute</FormLabel>
-                            <Select 
-                              value={field.value instanceof Date ? String(field.value.getMinutes()) : "0"}
+                            <Select
+                              value={
+                                field.value instanceof Date
+                                  ? String(field.value.getMinutes())
+                                  : "0"
+                              }
                               onValueChange={(value) => {
-                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                const newDate =
+                                  field.value instanceof Date
+                                    ? new Date(field.value)
+                                    : new Date();
                                 newDate.setMinutes(parseInt(value));
                                 field.onChange(newDate);
                               }}
@@ -2532,21 +2667,30 @@ export default function SellerDashboard() {
                                 <SelectValue placeholder="Min" />
                               </SelectTrigger>
                               <SelectContent>
-                                {Array.from({ length: 60 }, (_, i) => i).map(min => (
-                                  <SelectItem key={min} value={String(min)}>
-                                    {String(min).padStart(2, '0')}
-                                  </SelectItem>
-                                ))}
+                                {Array.from({ length: 60 }, (_, i) => i).map(
+                                  (min) => (
+                                    <SelectItem key={min} value={String(min)}>
+                                      {String(min).padStart(2, "0")}
+                                    </SelectItem>
+                                  ),
+                                )}
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div>
                             <FormLabel className="text-xs">Second</FormLabel>
-                            <Select 
-                              value={field.value instanceof Date ? String(field.value.getSeconds()) : "0"}
+                            <Select
+                              value={
+                                field.value instanceof Date
+                                  ? String(field.value.getSeconds())
+                                  : "0"
+                              }
                               onValueChange={(value) => {
-                                const newDate = field.value instanceof Date ? new Date(field.value) : new Date();
+                                const newDate =
+                                  field.value instanceof Date
+                                    ? new Date(field.value)
+                                    : new Date();
                                 newDate.setSeconds(parseInt(value));
                                 field.onChange(newDate);
                               }}
@@ -2555,18 +2699,22 @@ export default function SellerDashboard() {
                                 <SelectValue placeholder="Sec" />
                               </SelectTrigger>
                               <SelectContent>
-                                {Array.from({ length: 60 }, (_, i) => i).map(sec => (
-                                  <SelectItem key={sec} value={String(sec)}>
-                                    {String(sec).padStart(2, '0')}
-                                  </SelectItem>
-                                ))}
+                                {Array.from({ length: 60 }, (_, i) => i).map(
+                                  (sec) => (
+                                    <SelectItem key={sec} value={String(sec)}>
+                                      {String(sec).padStart(2, "0")}
+                                    </SelectItem>
+                                  ),
+                                )}
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
-                        
+
                         <div className="text-sm text-muted-foreground">
-                          <Clock className="inline-block mr-1 h-4 w-4" /> Current timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                          <Clock className="inline-block mr-1 h-4 w-4" />{" "}
+                          Current timezone:{" "}
+                          {Intl.DateTimeFormat().resolvedOptions().timeZone}
                         </div>
                       </div>
                       <FormMessage />
@@ -2818,15 +2966,21 @@ export default function SellerDashboard() {
                   <Button
                     type="submit"
                     className="bg-gold text-rich-black hover:bg-metallic-gold"
-                    disabled={createAuctionMutation.isPending || updateAuctionMutation.isPending}
+                    disabled={
+                      createAuctionMutation.isPending ||
+                      updateAuctionMutation.isPending
+                    }
                   >
-                    {createAuctionMutation.isPending || updateAuctionMutation.isPending ? (
+                    {createAuctionMutation.isPending ||
+                    updateAuctionMutation.isPending ? (
                       <span className="flex items-center">
                         <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
                         {isEditMode ? "Updating..." : "Creating..."}
                       </span>
+                    ) : isEditMode ? (
+                      "Update Auction"
                     ) : (
-                      isEditMode ? "Update Auction" : "Create Auction"
+                      "Create Auction"
                     )}
                   </Button>
                 </DialogFooter>
@@ -3232,65 +3386,78 @@ export default function SellerDashboard() {
       {/* Floating action button for boosting products */}
       {boostedProducts.length > 0 && (
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-fadeIn">
-          <Button 
+          <Button
             onClick={openBoostDialog}
             className="bg-gradient-to-r from-gold to-metallic-gold text-rich-black hover:from-metallic-gold hover:to-gold shadow-lg px-6 py-6 rounded-full flex items-center space-x-2 transition-all duration-300 ease-in-out"
           >
-            <span className="font-semibold">Boost Selected ({boostedProducts.length})</span>
+            <span className="font-semibold">
+              Boost Selected ({boostedProducts.length})
+            </span>
             <span className="mx-2 text-xs bg-white/20 px-2 py-1 rounded">
               Select boost options
             </span>
-            <span className="flex items-center">
-              Continue →
-            </span>
+            <span className="flex items-center">Continue →</span>
           </Button>
         </div>
       )}
-      
+
       {/* Boost Packages Dialog */}
       <Dialog open={isBoostDialogOpen} onOpenChange={setIsBoostDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Boost Your Products</DialogTitle>
             <DialogDescription>
-              Select a boost package that matches your selected product count. Boosted products appear at the top of search results.
+              Select a boost package that matches your selected product count.
+              Boosted products appear at the top of search results.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4">
             {/* Product count summary */}
             <div className="flex items-center mb-6 p-3 bg-slate-50 rounded-md border">
               <Package className="h-5 w-5 text-slate-600 mr-3" />
               <div>
                 <span className="font-medium">
-                  {boostedProducts.length} {boostedProducts.length === 1 ? 'product' : 'products'} selected
+                  {boostedProducts.length}{" "}
+                  {boostedProducts.length === 1 ? "product" : "products"}{" "}
+                  selected
                 </span>
                 <p className="text-sm text-muted-foreground">
                   Choose a package that matches your product count
                 </p>
               </div>
             </div>
-            
+
             {/* Package Selection Grid */}
             {boostPackages && boostPackages.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {boostPackages
-                  .filter((pkg: any) => pkg.item_count === boostedProducts.length)
+                  .filter(
+                    (pkg: any) => pkg.item_count === boostedProducts.length,
+                  )
                   .map((pkg: any) => (
-                    <Card 
-                      key={pkg.id} 
+                    <Card
+                      key={pkg.id}
                       className="cursor-pointer hover:border-[#F5A623] transition-colors"
                       onClick={() => handleBoostCheckout(pkg.id)}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-lg">{pkg.name}</CardTitle>
-                          <Badge variant={pkg.package_type === 'premium' ? 'default' : 'secondary'}>
+                          <Badge
+                            variant={
+                              pkg.package_type === "premium"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
                             {pkg.package_type}
                           </Badge>
                         </div>
                         <CardDescription>
-                          {pkg.item_count} {pkg.item_count === 1 ? 'product' : 'products'} • {pkg.duration_formatted}
+                          {pkg.item_count}{" "}
+                          {pkg.item_count === 1 ? "product" : "products"} •{" "}
+                          {pkg.duration_formatted}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -3299,7 +3466,7 @@ export default function SellerDashboard() {
                             RM{(pkg.price / 100).toFixed(2)}
                           </span>
                           <span className="text-sm text-muted-foreground">
-                            RM{(pkg.effective_price).toFixed(2)} per item
+                            RM{pkg.effective_price.toFixed(2)} per item
                           </span>
                         </div>
                       </CardContent>
@@ -3309,29 +3476,39 @@ export default function SellerDashboard() {
             ) : (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F5A623] mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading boost packages...</p>
+                <p className="text-muted-foreground">
+                  Loading boost packages...
+                </p>
               </div>
             )}
-            
+
             {/* No matching packages message */}
-            {boostPackages && boostPackages.length > 0 && 
-             !boostPackages.some((pkg: any) => pkg.item_count === boostedProducts.length) && (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No matching packages</h3>
-                <p className="text-muted-foreground mb-4">
-                  No boost packages are available for {boostedProducts.length} {boostedProducts.length === 1 ? 'product' : 'products'}.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Available package sizes: {boostPackages.map((pkg: any) => pkg.item_count).join(', ')} products
-                </p>
-              </div>
-            )}
+            {boostPackages &&
+              boostPackages.length > 0 &&
+              !boostPackages.some(
+                (pkg: any) => pkg.item_count === boostedProducts.length,
+              ) && (
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">
+                    No matching packages
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    No boost packages are available for {boostedProducts.length}{" "}
+                    {boostedProducts.length === 1 ? "product" : "products"}.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Available package sizes:{" "}
+                    {boostPackages.map((pkg: any) => pkg.item_count).join(", ")}{" "}
+                    products
+                  </p>
+                </div>
+              )}
           </div>
-          
+
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsBoostDialogOpen(false)}
             >
               Cancel
