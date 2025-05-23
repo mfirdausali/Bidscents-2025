@@ -350,39 +350,15 @@ export function setupAuth(app: Express) {
           
           // Create the session directly since user is verified via Supabase
           req.login(user, (err) => {
-                if (err) {
-                  return res.status(500).json({ message: "Session creation failed" });
-                }
-                return res.json({
-                  ...user,
-                  providerId: supabaseUser.id,
-                  provider: 'supabase'
-                });
-              });
-            } catch (updateError) {
-              console.error("Failed to update user with Supabase providerId:", updateError);
-              // Continue with the validation check even if update fails
+            if (err) {
+              return res.status(500).json({ message: "Session creation failed" });
             }
-          } 
-          // If providerId already exists, validate it matches Supabase ID
-          else if (user.providerId === supabaseUser.id) {
-            // IDs match - create session
-            req.login(user, (err) => {
-              if (err) {
-                return res.status(500).json({ message: "Session creation failed" });
-              }
-              return res.json(user);
+            return res.json({
+              ...user,
+              providerId: supabaseUser.id,
+              provider: 'supabase'
             });
-          } else {
-            // User has a providerId but it doesn't match Supabase ID
-            // This is a security concern - don't create a session
-            console.log("User found by email but Supabase ID doesn't match providerId - not creating session");
-            return res.status(200).json({ 
-              user: user,
-              authenticated: false,
-              message: "Additional authentication required"
-            });
-          }
+          });
         } else {
           return res.status(404).json({ message: "User not found" });
         }
