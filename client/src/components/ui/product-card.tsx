@@ -11,9 +11,10 @@ import { ContactSellerButton } from "./contact-seller-button";
 
 interface ProductCardProps {
   product: ProductWithDetails;
+  sold?: boolean;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, sold = false }: ProductCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLiked, setIsLiked] = useState(false);
@@ -48,28 +49,56 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 border flex flex-col h-full">
       <div className="relative">
-        <Link href={`/products/${product.id}`}>
-          <img
-            src={
-              // First, try to find an image with imageOrder=0
-              product.images?.find(img => img.imageOrder === 0)?.imageUrl 
-                ? `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`
-                // Then try any available image
-                : product.images?.[0]?.imageUrl
-                  ? `/api/images/${product.images[0].imageUrl}`
-                  // Fallback to the old imageUrl field if no images in the table
-                  : product.imageUrl
-                    ? `/api/images/${product.imageUrl}`
-                    : '/placeholder.jpg' // Default placeholder
-            }
-            alt={product.name}
-            className="w-full h-36 md:h-48 object-cover"
-            onError={(e) => {
-              e.currentTarget.src = '/placeholder.jpg';
-              e.currentTarget.onerror = null; // Prevent infinite loop
-            }}
-          />
-        </Link>
+        {sold ? (
+          <div className="relative">
+            <img
+              src={
+                // First, try to find an image with imageOrder=0
+                product.images?.find(img => img.imageOrder === 0)?.imageUrl 
+                  ? `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`
+                  // Then try any available image
+                  : product.images?.[0]?.imageUrl
+                    ? `/api/images/${product.images[0].imageUrl}`
+                    // Fallback to the old imageUrl field if no images in the table
+                    : product.imageUrl
+                      ? `/api/images/${product.imageUrl}`
+                      : '/placeholder.jpg' // Default placeholder
+              }
+              alt={product.name}
+              className="w-full h-36 md:h-48 object-cover opacity-70"
+              onError={(e) => {
+                e.currentTarget.src = '/placeholder.jpg';
+                e.currentTarget.onerror = null; // Prevent infinite loop
+              }}
+            />
+            <Badge className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-sm font-bold py-1 px-3 bg-gray-800/80 text-white">
+              SOLD
+            </Badge>
+          </div>
+        ) : (
+          <Link href={`/products/${product.id}`}>
+            <img
+              src={
+                // First, try to find an image with imageOrder=0
+                product.images?.find(img => img.imageOrder === 0)?.imageUrl 
+                  ? `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`
+                  // Then try any available image
+                  : product.images?.[0]?.imageUrl
+                    ? `/api/images/${product.images[0].imageUrl}`
+                    // Fallback to the old imageUrl field if no images in the table
+                    : product.imageUrl
+                      ? `/api/images/${product.imageUrl}`
+                      : '/placeholder.jpg' // Default placeholder
+              }
+              alt={product.name}
+              className="w-full h-36 md:h-48 object-cover"
+              onError={(e) => {
+                e.currentTarget.src = '/placeholder.jpg';
+                e.currentTarget.onerror = null; // Prevent infinite loop
+              }}
+            />
+          </Link>
+        )}
         
         {/* Heart button */}
         <button 
@@ -107,11 +136,17 @@ export function ProductCard({ product }: ProductCardProps) {
       
       <div className="p-3 md:p-4 flex flex-col flex-grow">
         {/* Product name */}
-        <Link href={`/products/${product.id}`}>
-          <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-1 mb-0.5 md:mb-1">
+        {sold ? (
+          <h3 className="font-semibold text-gray-700 line-clamp-1 mb-0.5 md:mb-1">
             {product.name}
           </h3>
-        </Link>
+        ) : (
+          <Link href={`/products/${product.id}`}>
+            <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-1 mb-0.5 md:mb-1">
+              {product.name}
+            </h3>
+          </Link>
+        )}
         
         {/* Product subtitle */}
         <div className="text-sm font-medium text-gray-600 mb-0.5 md:mb-1 line-clamp-1">
@@ -155,7 +190,11 @@ export function ProductCard({ product }: ProductCardProps) {
         <div className="flex-grow"></div>
         
         {/* Action buttons based on listing type */}
-        {product.listingType === 'negotiable' ? (
+        {sold ? (
+          <div className="w-full text-center py-2 bg-gray-200 text-gray-600 rounded-md text-xs">
+            Item Sold
+          </div>
+        ) : product.listingType === 'negotiable' ? (
           <ContactSellerButton 
             sellerId={product.sellerId}
             sellerName={product.seller?.username || 'Seller'}
