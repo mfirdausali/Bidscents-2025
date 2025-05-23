@@ -448,7 +448,7 @@ export default function HomePage() {
           </p>
           <Button
             className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full shadow-sm"
-            onClick={() => window.open("https://www.facebook.com/groups/malaysianfragrancecommunity", "_blank")}
+            onClick={() => window.open("https://www.facebook.com/groups/malaysiafragcomm/", "_blank")}
           >
             Join Our Facebook Group
           </Button>
