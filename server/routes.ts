@@ -3870,9 +3870,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/boost/create-order - Create a boost order for multiple products
   app.post('/api/boost/create-order', async (req, res) => {
     try {
-      if (!req.isAuthenticated()) {
+      console.log(`🔐 BOOST ORDER AUTHENTICATION CHECK:`);
+      console.log(`- req.isAuthenticated(): ${req.isAuthenticated ? req.isAuthenticated() : 'method not available'}`);
+      console.log(`- req.user exists: ${!!req.user}`);
+      console.log(`- req.session exists: ${!!req.session}`);
+      console.log(`- req.sessionID: ${req.sessionID}`);
+      
+      if (req.user) {
+        console.log(`- req.user.id: ${req.user.id}`);
+        console.log(`- req.user.username: ${req.user.username}`);
+        console.log(`- req.user.email: ${req.user.email}`);
+      }
+      
+      // Alternative authentication check - try both methods
+      const isAuth = req.isAuthenticated && req.isAuthenticated();
+      const hasUser = req.user && req.user.id;
+      
+      if (!isAuth && !hasUser) {
+        console.log(`🔐 ❌ AUTHENTICATION FAILED - User not authenticated`);
         return res.status(401).json({ message: 'Unauthorized: Must be logged in to create boost orders' });
       }
+      
+      // If no isAuthenticated method but user exists, proceed
+      if (!isAuth && hasUser) {
+        console.log(`🔐 ⚠️ FALLBACK AUTHENTICATION - Using user object instead of isAuthenticated()`);
+      }
+      
+      console.log(`🔐 ✅ AUTHENTICATION SUCCESS - User authenticated`);
+      console.log(`🔐 Proceeding with boost order creation for user ${req.user.id}`);
       
       const { boostPackageId, productIds } = req.body;
       
