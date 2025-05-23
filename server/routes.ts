@@ -4332,10 +4332,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let boostPackageId = null;
           let boostGroupId = null;
           
-          console.log(`🧪 SUPER DIAGNOSTIC - Product Boost Flow START 🧪`);
-          console.log(`🧪 Function input parameters:`);
-          console.log(`- productId: ${productId} (type: ${typeof productId})`);
-          console.log(`- payment object available: ${!!payment}`);
+          console.log(`🔍 DURATION DEBUGGING - Product Boost Flow START 🔍`);
+          console.log(`🔍 Input: productId=${productId}, payment exists=${!!payment}`);
+          
+          if (payment) {
+            console.log(`🔍 PAYMENT OBJECT ANALYSIS:`);
+            console.log(`- payment.id: ${payment.id}`);
+            console.log(`- payment.boost_option_id: ${payment.boost_option_id}`);
+            console.log(`- payment.metadata exists: ${!!payment.metadata}`);
+            
+            if (payment.metadata) {
+              console.log(`🔍 PAYMENT METADATA CONTENT:`);
+              console.log(`- metadata.boostPackageId: ${payment.metadata.boostPackageId}`);
+              console.log(`- metadata.boostGroupId: ${payment.metadata.boostGroupId}`);
+              console.log(`- metadata.boostOption: ${JSON.stringify(payment.metadata.boostOption)}`);
+              console.log(`- metadata.featureDuration: ${payment.metadata.featureDuration}`);
+              console.log(`- metadata keys: ${Object.keys(payment.metadata).join(', ')}`);
+            }
+            
+            console.log(`- payment.webhook_payload exists: ${!!payment.webhook_payload}`);
+            if (payment.webhook_payload) {
+              console.log(`- webhook_payload type: ${typeof payment.webhook_payload}`);
+              console.log(`- webhook_payload length: ${payment.webhook_payload?.length || 'N/A'}`);
+            }
+          }
           
           if (payment) {
             console.log(`- payment.id: ${payment.id}`);
@@ -4347,26 +4367,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (payment?.metadata?.boostPackageId) {
               boostPackageId = payment.metadata.boostPackageId;
               boostGroupId = payment.metadata.boostGroupId;
-              console.log(`Found boost package ID in payment metadata: ${boostPackageId}`);
-              console.log(`Found boost group ID in payment metadata: ${boostGroupId}`);
+              console.log(`🔍 FOUND BOOST PACKAGE ID in payment metadata: ${boostPackageId}`);
+              console.log(`🔍 FOUND BOOST GROUP ID in payment metadata: ${boostGroupId}`);
               
               // Get boost package details to determine duration
               try {
+                console.log(`🔍 QUERYING boost_packages table for ID: ${boostPackageId}`);
                 const { data: boostPackage, error: packageError } = await supabase
                   .from('boost_packages')
                   .select('*')
                   .eq('id', boostPackageId)
                   .single();
                   
+                console.log(`🔍 BOOST PACKAGE QUERY RESULT:`);
+                console.log(`- packageError: ${!!packageError} ${packageError ? JSON.stringify(packageError) : ''}`);
+                console.log(`- boostPackage found: ${!!boostPackage}`);
+                
                 if (!packageError && boostPackage) {
-                  console.log(`Found boost package "${boostPackage.name}", duration: ${boostPackage.duration_hours} hours`);
+                  console.log(`🔍 ✅ BOOST PACKAGE FOUND: "${boostPackage.name}"`);
+                  console.log(`🔍 ✅ DURATION FROM PACKAGE: ${boostPackage.duration_hours} hours`);
+                  console.log(`🔍 ✅ SETTING durationHours = ${boostPackage.duration_hours}`);
                   durationHours = Number(boostPackage.duration_hours);
+                  console.log(`🔍 ✅ CONFIRMED durationHours = ${durationHours}`);
                 } else {
-                  console.warn(`Could not find boost package with ID ${boostPackageId}, using default duration`);
-                  console.error('Boost package lookup error:', packageError);
+                  console.error(`🔍 ❌ BOOST PACKAGE LOOKUP FAILED for ID ${boostPackageId}`);
+                  console.error(`🔍 ❌ Error details:`, packageError);
+                  console.log(`🔍 ❌ FALLING BACK TO DEFAULT DURATION: ${durationHours} hours`);
                 }
               } catch (err) {
-                console.error('Error fetching boost package:', err);
+                console.error(`🔍 ❌ EXCEPTION during boost package lookup:`, err);
+                console.log(`🔍 ❌ FALLING BACK TO DEFAULT DURATION: ${durationHours} hours`);
               }
             }
             // Extract boost info from webhook_payload (legacy system fallback)
@@ -4481,19 +4511,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          console.log(`Setting feature duration to ${durationHours} hours for product ${productId}`);
+          console.log(`🔍 FINAL DURATION CALCULATION:`);
+          console.log(`🔍 - Final durationHours value: ${durationHours} hours`);
+          console.log(`🔍 - Duration source: ${boostPackageId ? `Boost Package #${boostPackageId}` : boostOptionId ? `Boost Option #${boostOptionId}` : 'Default fallback'}`);
           
           // Create feature expiry date - add hours instead of days
           const featuredAt = new Date();
           const featuredUntil = new Date(featuredAt);
           featuredUntil.setHours(featuredUntil.getHours() + durationHours);
           
-          console.log(`Feature timeframe: ${featuredAt.toISOString()} to ${featuredUntil.toISOString()}`);
+          console.log(`🔍 CALCULATED TIMESTAMPS:`);
+          console.log(`🔍 - featuredAt: ${featuredAt.toISOString()}`);
+          console.log(`🔍 - featuredUntil: ${featuredUntil.toISOString()}`);
+          console.log(`🔍 - Hours added: ${durationHours}`);
+          console.log(`🔍 - Expected expiry: ${Math.round((featuredUntil.getTime() - featuredAt.getTime()) / (1000 * 60 * 60))} hours from now`);
           
           // DIAGNOSTIC LOGS - Product field values and types
-          console.log("SCHEMA DEBUG - Product boost update details:");
+          console.log("🔍 DATABASE UPDATE PREPARATION:");
           console.log("- Product ID:", productId, "(JS type:", typeof productId, ")");
-          console.log("- Using boost system:", boostPackageId ? "New package-based" : "Legacy option-based");
+          console.log("- Using boost system:", boostPackageId ? `New package-based (Package #${boostPackageId})` : boostOptionId ? `Legacy option-based (Option #${boostOptionId})` : "Unknown/Default");
           console.log("- Field values and types being sent:");
           console.log("  • featured_at:", featuredAt, "(JS type:", typeof featuredAt, ")");
           console.log("  • featured_until:", featuredUntil, "(JS type:", typeof featuredUntil, ")");
