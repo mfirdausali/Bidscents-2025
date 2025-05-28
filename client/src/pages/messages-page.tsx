@@ -554,12 +554,12 @@ export default function MessagesPage() {
       const hasStatusField = data.some((product: any) => product.status !== undefined);
       console.log("Has status field:", hasStatusField);
       const filteredProducts = hasStatusField 
-        ? data.filter((product: any) => product.status === 'active')
+        ? data.filter((product: any) => product.status === 'active' || product.status === 'featured')
         : data;
       
       console.log("Filtered products:", filteredProducts);
       console.log("Products with active status:", 
-        hasStatusField ? data.filter((product: any) => product.status === 'active').length : 'N/A');
+        hasStatusField ? data.filter((product: any) => product.status === 'active' || product.status == 'featured').length : 'N/A');
       console.log("Total products:", data.length);
       
       setSellerProducts(filteredProducts);
