@@ -75,33 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   
-  // Updated to handle the security-enhanced API response
+  // Query for current user with JWT authentication
   const {
-    data: authResponse,
+    data: user,
     error,
     isLoading,
-  } = useQuery<{ user: SelectUser, authenticated: boolean } | SelectUser | undefined, Error>({
+  } = useQuery<SelectUser | null, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
-
-  // Extract user data from the response, handling both formats
-  const user = authResponse && 'user' in authResponse ? authResponse.user : authResponse;
-  
-  // If we got the enhanced security response and authentication is required
-  useEffect(() => {
-    if (authResponse && 'authenticated' in authResponse && authResponse.authenticated === false) {
-      // Authenticated with Supabase but not fully verified
-      console.log("User found but additional authentication required");
-      toast({
-        title: "Authentication needed",
-        description: "Please log in to continue.",
-        variant: "default",
-      });
-      // Navigate to auth page to complete authentication
-      setLocation("/auth");
-    }
-  }, [authResponse, toast, setLocation]);
 
   // Original login with username
   const loginMutation = useMutation({
