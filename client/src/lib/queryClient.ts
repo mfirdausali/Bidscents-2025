@@ -1,5 +1,30 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// JWT token management
+let jwtToken: string | null = null;
+
+export function setJwtToken(token: string | null) {
+  jwtToken = token;
+  if (token) {
+    localStorage.setItem('jwt_token', token);
+  } else {
+    localStorage.removeItem('jwt_token');
+  }
+}
+
+export function getJwtToken(): string | null {
+  if (jwtToken) return jwtToken;
+  
+  // Try to get from localStorage
+  const storedToken = localStorage.getItem('jwt_token');
+  if (storedToken) {
+    jwtToken = storedToken;
+    return storedToken;
+  }
+  
+  return null;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,11 +37,22 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers: Record<string, string> = {};
+  
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  
+  // Add JWT token if available
+  const token = getJwtToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -29,8 +65,16 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const headers: Record<string, string> = {};
+    
+    // Add JWT token if available
+    const token = getJwtToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
+      headers,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

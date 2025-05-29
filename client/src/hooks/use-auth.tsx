@@ -5,7 +5,7 @@ import {
   UseMutationResult,
 } from "@tanstack/react-query";
 import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
-import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
+import { getQueryFn, apiRequest, queryClient, setJwtToken, getJwtToken } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { signInWithFacebook } from "@/lib/supabase";
@@ -50,6 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const [isEmailVerified, setIsEmailVerified] = useState(false);
+  
+  // Initialize JWT token from localStorage on app start
+  useEffect(() => {
+    const storedToken = getJwtToken();
+    if (storedToken) {
+      console.log('JWT token found in localStorage, initializing authentication');
+    }
+  }, []);
   
   // Check for verification success in URL
   useEffect(() => {
@@ -128,6 +136,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (data) => {
+      // Store JWT token for future requests
+      if (data.session?.access_token) {
+        setJwtToken(data.session.access_token);
+        console.log('JWT token stored successfully');
+      }
+      
       queryClient.setQueryData(["/api/user"], data.user);
       toast({
         title: "Login successful",
@@ -224,6 +238,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
+      // Clear JWT token from storage
+      setJwtToken(null);
+      console.log('JWT token cleared successfully');
+      
       queryClient.setQueryData(["/api/user"], null);
       toast({
         title: "Logged out",
@@ -231,10 +249,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      // Clear JWT token even on logout error
+      setJwtToken(null);
+      queryClient.setQueryData(["/api/user"], null);
+      
       toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
+        title: "Logged out",
+        description: "You have been logged out.",
       });
     },
   });
