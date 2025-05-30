@@ -2082,15 +2082,28 @@ export class SupabaseStorage implements IStorage {
       
       console.log(`Updating featured status for ${productIds.length} products from payment ${paymentId}`);
       
-      // Feature duration in days (default to 7 if not specified)
-      const featureDuration = payment.metadata && payment.metadata.featureDuration
-        ? Number(payment.metadata.featureDuration)
-        : 7;
+      // Get duration from boost package metadata (in hours)
+      let durationHours = 24; // Default fallback in hours
       
-      // Calculate the featured until date
+      if (payment.metadata) {
+        // Check for boost package duration first (preferred)
+        if (payment.metadata.durationHours) {
+          durationHours = Number(payment.metadata.durationHours);
+          console.log(`Using boost package duration: ${durationHours} hours`);
+        }
+        // Legacy fallback for old featureDuration in days
+        else if (payment.metadata.featureDuration) {
+          durationHours = Number(payment.metadata.featureDuration) * 24;
+          console.log(`Using legacy featureDuration: ${payment.metadata.featureDuration} days = ${durationHours} hours`);
+        }
+      }
+      
+      // Calculate the featured until date using hours instead of days
       const now = new Date();
       const featuredUntil = new Date(now);
-      featuredUntil.setDate(now.getDate() + featureDuration);
+      featuredUntil.setHours(featuredUntil.getHours() + durationHours);
+      
+      console.log(`Setting featured duration: ${durationHours} hours, until ${featuredUntil.toISOString()}`);
       
       // Update each product
       for (const productId of productIds) {
@@ -2431,8 +2444,12 @@ export class SupabaseStorage implements IStorage {
       
       // Now update the existing product record to mark it as featured
       try {
+        // Use hours instead of days for more precise control
+        const durationHours = params.featureDuration ? params.featureDuration * 24 : 24; // Convert days to hours, default 24 hours
         const featureUntil = new Date();
-        featureUntil.setDate(featureUntil.getDate() + (params.featureDuration || 7));
+        featureUntil.setHours(featureUntil.getHours() + durationHours);
+        
+        console.log(`Setting product featured for ${durationHours} hours until ${featureUntil.toISOString()}`);
         
         const { error: updateError } = await supabase
           .from('products')
