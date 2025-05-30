@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { setupSimpleAuth, authenticateSupabaseUser, optionalAuthenticateSupabaseUser } from "./auth-simple";
+import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { 
   insertProductSchema, 
@@ -143,8 +143,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
-  // Set up simplified Supabase-only authentication
-  setupSimpleAuth(app);
+  // Set up authentication routes
+  setupAuth(app);
   
   // Raw query middleware specifically for Billplz redirect
   // This captures the original query string before Express parses it
