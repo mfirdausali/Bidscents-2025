@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js';
 
 // Initialize the Supabase client with environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseKey = process.env.SUPABASE_KEY;
 
 // Log environment variables for debugging (excluding sensitive values)
 console.log('Environment check:');

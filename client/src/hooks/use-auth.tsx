@@ -5,7 +5,7 @@ import {
   UseMutationResult,
 } from "@tanstack/react-query";
 import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
-import { getQueryFn, apiRequest, queryClient, setJwtToken, getJwtToken } from "../lib/queryClient";
+import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { signInWithFacebook } from "@/lib/supabase";
@@ -51,14 +51,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   
-  // Initialize JWT token from localStorage on app start
-  useEffect(() => {
-    const storedToken = getJwtToken();
-    if (storedToken) {
-      console.log('JWT token found in localStorage, initializing authentication');
-    }
-  }, []);
-  
   // Check for verification success in URL
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -75,15 +67,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   
-  // Query for current user with JWT authentication
+  // Updated to handle the security-enhanced API response
   const {
-    data: user,
+    data: authResponse,
     error,
     isLoading,
-  } = useQuery<SelectUser | null, Error>({
+  } = useQuery<{ user: SelectUser, authenticated: boolean } | SelectUser | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
+
+  // Extract user data from the response, handling both formats
+  const user = authResponse && 'user' in authResponse ? authResponse.user : authResponse;
+  
+  // If we got the enhanced security response and authentication is required
+  useEffect(() => {
+    if (authResponse && 'authenticated' in authResponse && authResponse.authenticated === false) {
+      // Authenticated with Supabase but not fully verified
+      console.log("User found but additional authentication required");
+      toast({
+        title: "Authentication needed",
+        description: "Please log in to continue.",
+        variant: "default",
+      });
+      // Navigate to auth page to complete authentication
+      setLocation("/auth");
+    }
+  }, [authResponse, toast, setLocation]);
 
   // Original login with username
   const loginMutation = useMutation({
@@ -118,12 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (data) => {
-      // Store JWT token for future requests
-      if (data.session?.access_token) {
-        setJwtToken(data.session.access_token);
-        console.log('JWT token stored successfully');
-      }
-      
       queryClient.setQueryData(["/api/user"], data.user);
       toast({
         title: "Login successful",
@@ -220,10 +224,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
-      // Clear JWT token from storage
-      setJwtToken(null);
-      console.log('JWT token cleared successfully');
-      
       queryClient.setQueryData(["/api/user"], null);
       toast({
         title: "Logged out",
@@ -231,13 +231,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
-      // Clear JWT token even on logout error
-      setJwtToken(null);
-      queryClient.setQueryData(["/api/user"], null);
-      
       toast({
-        title: "Logged out",
-        description: "You have been logged out.",
+        title: "Logout failed",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
