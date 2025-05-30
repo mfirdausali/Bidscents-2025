@@ -5395,9 +5395,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 createdPayments.push(newPayment);
                 
                 // Now update the product to mark it as featured directly in database
-                const featureDuration = 7; // Default to 7 days
+                // Get duration from boost package metadata
+                let durationHours = 24; // Default fallback
+                
+                try {
+                  // Try to get duration from webhook_payload
+                  if (payment.webhook_payload) {
+                    const webhookData = typeof payment.webhook_payload === 'string' 
+                      ? JSON.parse(payment.webhook_payload) 
+                      : payment.webhook_payload;
+                    
+                    if (webhookData.durationHours) {
+                      durationHours = Number(webhookData.durationHours);
+                      console.log(`Using duration from webhook payload: ${durationHours} hours`);
+                    }
+                  }
+                } catch (err) {
+                  console.error('Error parsing webhook payload for duration:', err);
+                }
+                
                 const featureUntil = new Date();
-                featureUntil.setDate(featureUntil.getDate() + featureDuration);
+                featureUntil.setHours(featureUntil.getHours() + durationHours);
+                
+                console.log(`Setting product #${productId} featured until: ${featureUntil.toISOString()} (${durationHours} hours from now)`);
                 
                 // Update product status using exact column names from database
                 const { error: productUpdateError } = await supabase
