@@ -5710,16 +5710,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Make signature optional in sandbox environment
-      if (!directSignature && !isBillplzSandbox()) {
-        console.error('❌ ERROR: Missing signature in production environment');
-        return res.status(400).json({
-          message: 'Invalid payment redirect: missing signature',
-          details: 'Required parameter billplz[x_signature] not found.'
-        });
-      } else if (!directSignature) {
-        console.warn('⚠️ SANDBOX MODE: Missing signature but continuing for testing purposes');
-      }
+      // SKIP SIGNATURE VERIFICATION - Using direct Billplz API verification instead
+      console.log('🔧 SKIPPING X-SIGNATURE VERIFICATION - Using direct API validation');
       
       // Build the paymentData object 
       const paymentData = {
@@ -5767,28 +5759,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('❌ No bill ID provided, cannot verify with API');
       }
       
-      // Process the payment - this updates the database
-      console.log('⚙️ Processing payment from redirect...');
-      const result = await processPaymentUpdate(paymentData, false);
-      console.log('⚙️ Payment processing result:', result);
+      // Determine UI state based on authentic Billplz API verification
+      let uiState, message;
       
-      // Determine UI state based on the payment status
-      const isPaid = directPaid === 'true';
-      const uiState = result.success && isPaid ? 'success' : 
-                      isPaid === false ? 'failed' : 'pending';
+      if (apiVerificationSuccess && billDetails) {
+        const isActuallyPaid = billDetails.paid === true;
+        
+        if (isActuallyPaid) {
+          uiState = 'success';
+          message = 'Payment completed successfully! Your products will be boosted now.';
+          console.log('✅ PAYMENT VERIFIED AS SUCCESSFUL via Billplz API');
+          
+          // Process payment in database with verified successful payment
+          console.log('⚙️ Processing verified successful payment...');
+          const result = await processPaymentUpdate(paymentData, false);
+          console.log('⚙️ Payment processing result:', result);
+          
+        } else {
+          uiState = 'failed';
+          message = 'Payment was not successful. Please try again.';
+          console.log('❌ PAYMENT VERIFIED AS FAILED via Billplz API');
+          // Don't process failed payments to avoid incorrect database updates
+        }
+      } else {
+        uiState = 'error';
+        message = 'Unable to verify payment status. Please contact support if payment was deducted.';
+        console.log('⚠️ PAYMENT VERIFICATION FAILED - Cannot determine authentic status');
+        // Don't process unverified payments
+      }
       
-      // Build a redirect URL with appropriate status
-      const message = encodeURIComponent(
-        uiState === 'success' ? 'Payment completed successfully! Your products will be boosted now.' :
-        uiState === 'failed' ? 'Payment was not successful. Please try again.' : 
-        'Payment is being processed. Please wait a moment.'
-      );
-      
-      const redirectUrl = `/seller/dashboard?payment=${uiState}&message=${message}&id=${encodeURIComponent(directBillId || '')}`;
+      // Build redirect URL with verification status
+      const encodedMessage = encodeURIComponent(message);
+      const redirectUrl = `/seller/dashboard?payment=${uiState}&message=${encodedMessage}&id=${encodeURIComponent(directBillId || '')}&verified=${apiVerificationSuccess}`;
       
       console.log(`🔄 Redirecting user to: ${redirectUrl}`);
+      console.log(`📊 Final Status: ${uiState} (API Verified: ${apiVerificationSuccess})`);
       
-      // Use 303 status code (See Other) to follow the spec for redirects after actions
       return res.redirect(303, redirectUrl);
       
     } catch (error) {
