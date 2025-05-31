@@ -3,6 +3,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { storage } from "./storage";
+import crypto from "crypto";
 import { User as SelectUser } from "@shared/schema";
 import {
   registerUserWithEmailVerification, 
@@ -25,8 +26,8 @@ declare global {
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "luxury-perfume-marketplace-secret",
-    resave: true,
-    saveUninitialized: true,
+    resave: false, // SECURITY: Don't save unmodified sessions
+    saveUninitialized: false, // SECURITY: Don't create sessions for unauthenticated users
     cookie: {
       secure: false, // Set to true in production with HTTPS
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
@@ -35,6 +36,10 @@ export function setupAuth(app: Express) {
     },
     store: storage.sessionStore,
     name: 'luxperfume.sid', // Custom session name to avoid conflicts
+    genid: () => {
+      // Generate cryptographically secure session IDs
+      return crypto.randomBytes(32).toString('hex');
+    }
   };
   
   console.log('🔧 Session configuration:');
