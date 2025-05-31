@@ -1521,7 +1521,7 @@ export default function SellerDashboard() {
                   {boostedProductIds.length}
                 </span>
               </TabsTrigger>
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              {/* <TabsTrigger value="analytics">Analytics</TabsTrigger> */}
               <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
 
