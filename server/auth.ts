@@ -68,18 +68,22 @@ export function setupAuth(app: Express) {
   );
 
   passport.serializeUser((user, done) => {
-    console.log('🔐 SERIALIZE USER:', user.id);
+    console.log('🔐 SERIALIZE USER - ID:', user.id, 'Username:', user.username, 'Email:', user.email, 'ProviderId:', user.providerId);
     done(null, user.id);
   });
   
   passport.deserializeUser(async (id: number, done) => {
-    console.log('🔐 DESERIALIZE USER START - ID:', id);
+    console.log('🔐 DESERIALIZE USER START - Session ID:', id);
     try {
       const user = await storage.getUser(id);
-      console.log('🔐 DESERIALIZE USER SUCCESS:', !!user, user ? user.username : 'no user');
+      if (user) {
+        console.log('🔐 DESERIALIZE SUCCESS - ID:', user.id, 'Username:', user.username, 'Email:', user.email, 'ProviderId:', user.providerId);
+      } else {
+        console.log('🔐 DESERIALIZE FAILED - No user found for ID:', id);
+      }
       done(null, user);
     } catch (error) {
-      console.log('🔐 DESERIALIZE USER ERROR:', error);
+      console.log('🔐 DESERIALIZE ERROR - ID:', id, 'Error:', error);
       done(error, null);
     }
   });
@@ -339,21 +343,42 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", async (req, res) => {
+    const sessionId = req.sessionID;
+    const timestamp = new Date().toISOString();
+    
+    console.log(`\n🔍 [${timestamp}] /api/user REQUEST START`);
+    console.log(`🔍 Session ID: ${sessionId}`);
+    const sessionUser = req.session && (req.session as any).passport ? (req.session as any).passport.user : 'none';
+    console.log(`🔍 Express Session User ID: ${sessionUser}`);
+    console.log(`🔍 req.isAuthenticated(): ${req.isAuthenticated()}`);
+    console.log(`🔍 req.user exists: ${!!req.user}`);
+    if (req.user) {
+      console.log(`🔍 req.user details: ID=${req.user.id}, Username=${req.user.username}, Email=${req.user.email}, ProviderId=${req.user.providerId}`);
+    }
+
     try {
       // First check if user is authenticated with Passport
       if (req.isAuthenticated() && req.user) {
+        console.log(`✅ [${sessionId}] PASSPORT AUTH SUCCESS - returning user ${req.user.username} (ID: ${req.user.id})`);
         return res.json(req.user);
       }
 
       // If not, check if authenticated with Supabase
+      console.log(`🔍 [${sessionId}] Checking Supabase authentication...`);
       const supabaseUser = await getCurrentUser();
+      
       if (supabaseUser) {
+        console.log(`🔍 [${sessionId}] Supabase user found - ID: ${supabaseUser.id}, Email: ${supabaseUser.email}`);
+        
         // SECURITY FIX: Find user by provider ID first for secure authentication
         let user = await storage.getUserByProviderId(supabaseUser.id);
+        console.log(`🔍 [${sessionId}] getUserByProviderId(${supabaseUser.id}) result: ${user ? `Found user ${user.username} (ID: ${user.id})` : 'No user found'}`);
         
         if (!user) {
           // If no user found by provider ID, try to find by email for account linking
+          console.log(`🔍 [${sessionId}] Trying to find user by email: ${supabaseUser.email}`);
           const userByEmail = await storage.getUserByEmail(supabaseUser.email || '');
+          console.log(`🔍 [${sessionId}] getUserByEmail(${supabaseUser.email}) result: ${userByEmail ? `Found user ${userByEmail.username} (ID: ${userByEmail.id}, ProviderId: ${userByEmail.providerId})` : 'No user found'}`);
           
           if (userByEmail) {
             // SECURITY: Only link accounts if the user doesn't already have a provider ID
@@ -361,14 +386,16 @@ export function setupAuth(app: Express) {
               // TEMPORARILY DISABLED: Link the Supabase account to existing user
               // await storage.updateUserProviderId(userByEmail.id, supabaseUser.id, 'supabase');
               user = { ...userByEmail, providerId: supabaseUser.id, provider: 'supabase' };
-              console.log(`🔗 Using existing user ${userByEmail.username} (provider linking disabled)`);
+              console.log(`🔗 [${sessionId}] Using existing user ${userByEmail.username} (provider linking disabled)`);
             } else {
               // User already has a different provider ID - this is a security violation
-              console.warn(`🚨 SECURITY: User ${userByEmail.username} already has provider ID ${userByEmail.providerId}, but Supabase user ${supabaseUser.id} tried to access it`);
+              console.warn(`🚨 [${sessionId}] SECURITY VIOLATION: User ${userByEmail.username} (ID: ${userByEmail.id}) already has provider ID ${userByEmail.providerId}, but Supabase user ${supabaseUser.id} tried to access it`);
+              console.warn(`🚨 [${sessionId}] This suggests a potential account hijacking attempt!`);
               return res.status(401).json({ message: "Account authentication mismatch" });
             }
           } else {
             // No user found at all
+            console.log(`❌ [${sessionId}] No user found for Supabase ID ${supabaseUser.id} or email ${supabaseUser.email}`);
             return res.status(404).json({ message: "User not found" });
           }
         }
@@ -376,26 +403,35 @@ export function setupAuth(app: Express) {
         if (user) {
           // Final security check: Ensure provider IDs match
           if (user.providerId !== supabaseUser.id) {
-            console.warn(`🚨 SECURITY: Provider ID mismatch for user ${user.username}. Expected: ${user.providerId}, Got: ${supabaseUser.id}`);
+            console.warn(`🚨 [${sessionId}] CRITICAL SECURITY VIOLATION: Provider ID mismatch!`);
+            console.warn(`🚨 [${sessionId}] Local user: ${user.username} (ID: ${user.id}, ProviderId: ${user.providerId})`);
+            console.warn(`🚨 [${sessionId}] Supabase user: ID ${supabaseUser.id}, Email: ${supabaseUser.email}`);
+            console.warn(`🚨 [${sessionId}] This indicates a serious authentication bug!`);
             return res.status(401).json({ message: "Authentication provider mismatch" });
           }
 
           // Create the session with verified user
+          console.log(`🔐 [${sessionId}] Creating session for user ${user.username} (ID: ${user.id})`);
           req.login(user, (err) => {
             if (err) {
+              console.error(`❌ [${sessionId}] Session creation failed:`, err);
               return res.status(500).json({ message: "Session creation failed" });
             }
-            console.log(`✅ Authenticated user ${user.username} via Supabase (ID: ${supabaseUser.id})`);
+            console.log(`✅ [${sessionId}] SESSION CREATED - Authenticated user ${user.username} (ID: ${user.id}) via Supabase (ProviderId: ${supabaseUser.id})`);
+            const newSessionUser = req.session && (req.session as any).passport ? (req.session as any).passport.user : 'none';
+            console.log(`✅ [${sessionId}] New session user: ${newSessionUser}`);
             return res.json(user);
           });
         } else {
+          console.log(`❌ [${sessionId}] No user object available after processing`);
           return res.status(404).json({ message: "User not found" });
         }
       } else {
+        console.log(`❌ [${sessionId}] No Supabase user found`);
         return res.sendStatus(401);
       }
     } catch (error) {
-      console.error("Error in /api/user:", error);
+      console.error(`❌ [${sessionId}] Error in /api/user:`, error);
       return res.status(500).json({ message: "Server error" });
     }
   });
