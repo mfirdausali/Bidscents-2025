@@ -358,10 +358,10 @@ export function setupAuth(app: Express) {
           if (userByEmail) {
             // SECURITY: Only link accounts if the user doesn't already have a provider ID
             if (!userByEmail.providerId) {
-              // Link the Supabase account to existing user
-              await storage.updateUserProviderId(userByEmail.id, supabaseUser.id, 'supabase');
+              // TEMPORARILY DISABLED: Link the Supabase account to existing user
+              // await storage.updateUserProviderId(userByEmail.id, supabaseUser.id, 'supabase');
               user = { ...userByEmail, providerId: supabaseUser.id, provider: 'supabase' };
-              console.log(`🔗 Linked Supabase account ${supabaseUser.id} to existing user ${userByEmail.username}`);
+              console.log(`🔗 Using existing user ${userByEmail.username} (provider linking disabled)`);
             } else {
               // User already has a different provider ID - this is a security violation
               console.warn(`🚨 SECURITY: User ${userByEmail.username} already has provider ID ${userByEmail.providerId}, but Supabase user ${supabaseUser.id} tried to access it`);
