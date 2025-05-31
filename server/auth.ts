@@ -29,10 +29,18 @@ export function setupAuth(app: Express) {
     saveUninitialized: true,
     cookie: {
       secure: false, // Set to true in production with HTTPS
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      httpOnly: true, // Prevent XSS attacks
+      sameSite: 'strict' // CSRF protection
     },
     store: storage.sessionStore,
+    name: 'luxperfume.sid', // Custom session name to avoid conflicts
   };
+  
+  console.log('🔧 Session configuration:');
+  console.log('🔧   - Secret length:', sessionSettings.secret?.length);
+  console.log('🔧   - Store type:', storage.sessionStore.constructor.name);
+  console.log('🔧   - Cookie settings:', sessionSettings.cookie);
 
   app.set("trust proxy", 1);
   app.use(session(sessionSettings));
