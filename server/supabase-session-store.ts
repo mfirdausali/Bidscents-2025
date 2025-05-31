@@ -59,25 +59,34 @@ export class SupabaseSessionStore extends Store {
       .eq('sid', sid)
       .single()
       .then(({ data, error }) => {
-        if (error) {
-          if (error.code === 'PGRST116') {
-            // No session found
-            console.log(`🔐 [${sessionId}] SESSION NOT FOUND - SID: ${sid}`);
+        try {
+          if (error) {
+            if (error.code === 'PGRST116') {
+              // No session found
+              console.log(`🔐 [${sessionId}] SESSION NOT FOUND - SID: ${sid}`);
+              return callback(null, null);
+            }
+            console.error(`🔐 [${sessionId}] SESSION GET ERROR:`, error);
+            return callback(error);
+          }
+
+          // Check if session has expired
+          if (data.expire && new Date(data.expire) <= new Date()) {
+            console.log(`🔐 [${sessionId}] SESSION EXPIRED - SID: ${sid}`);
+            this.destroy(sid, () => {});
             return callback(null, null);
           }
-          console.error(`🔐 [${sessionId}] SESSION GET ERROR:`, error);
-          return callback(error);
-        }
 
-        // Check if session has expired
-        if (data.expire && new Date(data.expire) <= new Date()) {
-          console.log(`🔐 [${sessionId}] SESSION EXPIRED - SID: ${sid}`);
-          this.destroy(sid, () => {});
-          return callback(null, null);
+          console.log(`🔐 [${sessionId}] SESSION FOUND - SID: ${sid}, User: ${data.sess?.passport?.user || 'none'}`);
+          callback(null, data.sess);
+        } catch (innerError) {
+          console.error(`🔐 [${sessionId}] SESSION GET INNER ERROR:`, innerError);
+          callback(innerError);
         }
-
-        console.log(`🔐 [${sessionId}] SESSION FOUND - SID: ${sid}, User: ${data.sess?.passport?.user || 'none'}`);
-        callback(null, data.sess);
+      })
+      .catch((promiseError) => {
+        console.error(`🔐 [${sessionId}] SESSION GET PROMISE ERROR:`, promiseError);
+        callback(promiseError);
       });
   }
 
