@@ -582,7 +582,11 @@ export default function SellerDashboard() {
       const images = await response.json();
 
       // Update the existingImages state when productImages are fetched
-      setExistingImages(images);
+      const formattedImages = images.map((img: any) => ({
+        id: String(img.id),
+        url: img.imageUrl
+      }));
+      setExistingImages(formattedImages);
 
       // Create preview URLs for existing images
       const previewUrls = images.map(
@@ -1204,6 +1208,38 @@ export default function SellerDashboard() {
       product.brand.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
+  // Sort products by status priority: featured -> active -> pending -> sold
+  const sortedProducts = filteredProducts?.sort((a, b) => {
+    const getStatusPriority = (product: ProductWithDetails) => {
+      // Check if product is featured (boosted)
+      const isFeatured = boostedProductIds.includes(product.id);
+      if (isFeatured) return 4; // Highest priority
+      
+      // Use the status field from the database
+      const status = product.status?.toLowerCase() || 'active';
+      switch (status) {
+        case 'active': return 3;
+        case 'pending': return 2; 
+        case 'sold': return 1;
+        case 'archived': return 0;
+        default: return 3; // Default to active priority
+      }
+    };
+
+    const priorityA = getStatusPriority(a);
+    const priorityB = getStatusPriority(b);
+    
+    // Sort by priority descending, then by creation date descending
+    if (priorityA !== priorityB) {
+      return priorityB - priorityA;
+    }
+    
+    // If same priority, sort by creation date (newest first)
+    const dateA = new Date(a.createdAt || 0).getTime();
+    const dateB = new Date(b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
+
   // Track boosted products based on database featured status fields
   useEffect(() => {
     if (products) {
@@ -1519,7 +1555,7 @@ export default function SellerDashboard() {
                     <div className="flex justify-center py-12">
                       <Loader2 className="h-8 w-8 animate-spin text-gold" />
                     </div>
-                  ) : filteredProducts && filteredProducts.length > 0 ? (
+                  ) : sortedProducts && sortedProducts.length > 0 ? (
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -1545,7 +1581,7 @@ export default function SellerDashboard() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredProducts.map((product) => (
+                          {sortedProducts.map((product) => (
                             <TableRow
                               key={product.id}
                               className={
@@ -1613,11 +1649,34 @@ export default function SellerDashboard() {
                               </TableCell>
                               <TableCell>{product.stockQuantity}</TableCell>
                               <TableCell>
-                                {product.isNew && (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gold text-rich-black mr-1">
-                                    New
-                                  </span>
-                                )}
+                                <div className="flex flex-wrap gap-1">
+                                  {boostedProductIds.includes(product.id) && (
+                                    <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                                      Featured
+                                    </Badge>
+                                  )}
+                                  <Badge 
+                                    variant={
+                                      product.status === 'active' ? 'default' :
+                                      product.status === 'pending' ? 'secondary' :
+                                      product.status === 'sold' ? 'destructive' :
+                                      'outline'
+                                    }
+                                    className={
+                                      product.status === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
+                                      product.status === 'pending' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100' :
+                                      product.status === 'sold' ? 'bg-red-100 text-red-800 hover:bg-red-100' :
+                                      'bg-gray-100 text-gray-800 hover:bg-gray-100'
+                                    }
+                                  >
+                                    {product.status ? product.status.charAt(0).toUpperCase() + product.status.slice(1) : 'Active'}
+                                  </Badge>
+                                  {product.isNew && (
+                                    <Badge className="bg-gold text-rich-black hover:bg-gold">
+                                      New
+                                    </Badge>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end space-x-2">
