@@ -43,7 +43,50 @@ export function setupAuth(app: Express) {
   console.log('🔧   - Cookie settings:', sessionSettings.cookie);
 
   app.set("trust proxy", 1);
+  
+  // Add session debugging middleware
+  app.use((req, res, next) => {
+    const originalSessionId = req.sessionID;
+    req.on('close', () => {
+      if (req.sessionID !== originalSessionId) {
+        console.warn(`🚨 SESSION ID CHANGED during request: ${originalSessionId} -> ${req.sessionID}`);
+      }
+    });
+    next();
+  });
+  
   app.use(session(sessionSettings));
+  
+  // Log session creation/access
+  app.use((req, res, next) => {
+    const sessionId = req.sessionID;
+    if (req.session && (req.session as any).isNew) {
+      console.log(`🆕 NEW SESSION CREATED: ${sessionId}`);
+    }
+    
+    // Track session to user mapping
+    const sessionUser = req.session && (req.session as any).passport ? (req.session as any).passport.user : null;
+    if (sessionUser) {
+      const trackingKey = `session_${sessionId}`;
+      const lastMapping = (global as any)[trackingKey];
+      
+      if (lastMapping && lastMapping.userId !== sessionUser) {
+        console.error(`🚨 SESSION HIJACK DETECTED: Session ${sessionId} was mapped to user ${lastMapping.userId}, now mapped to user ${sessionUser}`);
+        console.error(`🚨 Previous mapping: ${JSON.stringify(lastMapping)}`);
+        console.error(`🚨 Current mapping: User ID ${sessionUser} at ${new Date().toISOString()}`);
+      }
+      
+      (global as any)[trackingKey] = {
+        userId: sessionUser,
+        timestamp: new Date().toISOString(),
+        userAgent: req.get('User-Agent'),
+        ip: req.ip
+      };
+    }
+    
+    next();
+  });
+  
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -81,17 +124,45 @@ export function setupAuth(app: Express) {
   });
   
   passport.deserializeUser(async (id: number, done) => {
-    console.log('🔐 DESERIALIZE USER START - Session ID:', id);
+    const deserializeId = Math.random().toString(36).substr(2, 9);
+    console.log(`🔐 [${deserializeId}] DESERIALIZE START - Requested User ID: ${id}`);
+    
     try {
+      // CRITICAL: Check if we've seen this ID request before and what user we returned
+      const sessionKey = `deserialize_${id}`;
+      const lastResult = (global as any)[sessionKey];
+      
       const user = await storage.getUser(id);
       if (user) {
-        console.log('🔐 DESERIALIZE SUCCESS - ID:', user.id, 'Username:', user.username, 'Email:', user.email, 'ProviderId:', user.providerId);
+        console.log(`🔐 [${deserializeId}] DESERIALIZE SUCCESS:`);
+        console.log(`🔐 [${deserializeId}]   - Requested ID: ${id}`);
+        console.log(`🔐 [${deserializeId}]   - Returned User: ${user.id} (${user.username})`);
+        console.log(`🔐 [${deserializeId}]   - User Email: ${user.email}`);
+        console.log(`🔐 [${deserializeId}]   - Provider ID: ${user.providerId}`);
+        
+        // SECURITY CHECK: Verify the ID we're returning matches what was requested
+        if (user.id !== id) {
+          console.error(`🚨 [${deserializeId}] CRITICAL SESSION BUG: Requested ID ${id} but returning user ID ${user.id}!`);
+          console.error(`🚨 [${deserializeId}] This indicates a serious session mapping error!`);
+        }
+        
+        // Track what we returned for this session ID
+        if (lastResult && lastResult.userId !== user.id) {
+          console.warn(`🚨 [${deserializeId}] SESSION ID COLLISION: Session ID ${id} previously returned user ${lastResult.userId} (${lastResult.username}), now returning ${user.id} (${user.username})`);
+        }
+        
+        (global as any)[sessionKey] = {
+          userId: user.id,
+          username: user.username,
+          timestamp: new Date().toISOString()
+        };
+        
       } else {
-        console.log('🔐 DESERIALIZE FAILED - No user found for ID:', id);
+        console.log(`🔐 [${deserializeId}] DESERIALIZE FAILED - No user found for ID: ${id}`);
       }
       done(null, user);
     } catch (error) {
-      console.log('🔐 DESERIALIZE ERROR - ID:', id, 'Error:', error);
+      console.log(`🔐 [${deserializeId}] DESERIALIZE ERROR - ID: ${id}, Error:`, error);
       done(error, null);
     }
   });
@@ -224,10 +295,13 @@ export function setupAuth(app: Express) {
           const updatedUser = await storage.getUserByEmail(email);
           if (updatedUser) {
             // Log in with the updated user info
+            console.log(`🔐 CREATING SESSION for user ${updatedUser.username} (ID: ${updatedUser.id}) - Account linking`);
             req.login(updatedUser, (err) => {
               if (err) {
+                console.error(`❌ SESSION CREATION FAILED for user ${updatedUser.username}:`, err);
                 return res.status(500).json({ message: "Session creation failed" });
               }
+              console.log(`✅ SESSION CREATED for user ${updatedUser.username} (ID: ${updatedUser.id}) - Session ID: ${req.sessionID}`);
               return res.status(200).json({ user: updatedUser });
             });
             return;
@@ -240,10 +314,13 @@ export function setupAuth(app: Express) {
       else if (user.providerId === authData.user.id) {
         // Case 2: Accounts already properly linked
         console.log(`User ${user.username} authenticated with matching Supabase ID`);
+        console.log(`🔐 CREATING SESSION for user ${user.username} (ID: ${user.id}) - Proper auth`);
         req.login(user, (err) => {
           if (err) {
+            console.error(`❌ SESSION CREATION FAILED for user ${user.username}:`, err);
             return res.status(500).json({ message: "Session creation failed" });
           }
+          console.log(`✅ SESSION CREATED for user ${user.username} (ID: ${user.id}) - Session ID: ${req.sessionID}`);
           res.status(200).json({ user });
         });
       }
