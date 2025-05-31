@@ -5760,20 +5760,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('📦 Payment data for processing:', paymentData);
       
+      // ENHANCED DIAGNOSTIC LOGGING FOR SIGNATURE VERIFICATION
+      console.log('🔧 ENVIRONMENT DIAGNOSTIC:');
+      console.log('- BILLPLZ_BASE_URL:', process.env.BILLPLZ_BASE_URL);
+      console.log('- Is Sandbox:', isBillplzSandbox());
+      console.log('- Has XSIGN_KEY:', !!process.env.BILLPLZ_XSIGN_KEY);
+      console.log('- XSIGN_KEY length:', process.env.BILLPLZ_XSIGN_KEY?.length || 0);
+      console.log('- XSIGN_KEY starts with:', process.env.BILLPLZ_XSIGN_KEY?.substring(0, 10) || 'N/A');
+      
       // Attempt to validate the signature
       let signatureValid = false;
       
       // First, try signature verification if we have a raw query string
       if (req.rawQuery) {
+        console.log('🔍 SIGNATURE VERIFICATION INPUTS:');
+        console.log('- Raw Query String:', req.rawQuery);
+        console.log('- Expected Signature:', directSignature);
+        console.log('- Signature Length:', directSignature?.length || 0);
+        
         try {
           signatureValid = billplz.verifyRedirectSignature(req.rawQuery, directSignature);
           console.log('🔐 Signature verification result:', signatureValid ? 'VALID ✅' : 'INVALID ❌');
+          
+          if (!signatureValid) {
+            console.log('❌ SIGNATURE MISMATCH DETECTED - Possible causes:');
+            console.log('1. Wrong BILLPLZ_XSIGN_KEY (using sandbox key with production?)');
+            console.log('2. URL encoding issues with query parameters');
+            console.log('3. Missing or malformed billplz[x_signature] parameter');
+            console.log('4. Parameter order or format differences');
+          }
         } catch (sigError) {
           console.error('⚠️ Error during signature verification:', sigError);
+          console.error('Error details:', sigError instanceof Error ? sigError.message : sigError);
           // Continue processing even if signature verification fails temporarily
         }
       } else {
         console.warn('⚠️ No raw query string available for signature verification');
+        console.log('This usually indicates middleware issues or URL parsing problems');
       }
       
       // For PRODUCTION environment, strictly enforce signature verification

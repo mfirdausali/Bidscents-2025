@@ -328,6 +328,9 @@ export function verifyRedirectSignature(rawQueryString: string, expectedXSignatu
   console.log('🔐 REDIRECT SIGNATURE VERIFICATION START (billplz.ts) 🔐');
   console.log('Raw Query String:', rawQueryString);
   console.log('Expected X-Signature:', expectedXSignature);
+  console.log('BILLPLZ_XSIGN_KEY length:', BILLPLZ_XSIGN_KEY?.length);
+  console.log('BILLPLZ_XSIGN_KEY starts with:', BILLPLZ_XSIGN_KEY?.substring(0, 10));
+  console.log('BILLPLZ_BASE_URL:', BILLPLZ_BASE_URL);
 
   // Determine if we're in sandbox mode (more permissive)
   const isSandbox = BILLPLZ_BASE_URL?.includes('sandbox') ?? true;
