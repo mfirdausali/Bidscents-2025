@@ -426,7 +426,8 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('status', 'featured');
+      .eq('status', 'featured')
+      .order('featured_at', { ascending: false });
     
     if (error) {
       console.error('Error getting featured products:', error);
