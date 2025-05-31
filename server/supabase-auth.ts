@@ -72,7 +72,10 @@ export function setupSupabaseAuth(app: Express) {
           
           // Update user with Supabase provider ID if not set
           if (!user.providerId) {
-            await storage.updateUser(user.id, { providerId: result.user.id });
+            await storage.updateUser(user.id, { 
+              providerId: result.user.id,
+              provider: 'supabase'
+            });
             console.log(`[${authId}] Updated user ${user.id} with provider ID: ${result.user.id}`);
           }
           
