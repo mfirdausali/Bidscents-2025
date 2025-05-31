@@ -108,8 +108,7 @@ export class SupabaseSessionStore extends Store {
         
         console.log(`🔐 [${sessionId}] SESSION SAVED - SID: ${sid}, User: ${userId}, Expires: ${expire.toISOString()}`);
         callback?.();
-      })
-      .catch(callback);
+      });
   }
 
   /**
@@ -131,8 +130,7 @@ export class SupabaseSessionStore extends Store {
         
         console.log(`🔐 [${sessionId}] SESSION DESTROYED - SID: ${sid}`);
         callback?.();
-      })
-      .catch(callback);
+      });
   }
 
   /**
@@ -153,8 +151,7 @@ export class SupabaseSessionStore extends Store {
           return callback?.(error);
         }
         callback?.();
-      })
-      .catch(callback);
+      });
   }
 
   /**
