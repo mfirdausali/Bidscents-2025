@@ -2810,6 +2810,13 @@ export default function SellerDashboard() {
                             ))}
                           </div>
                         )}
+                        
+                        {/* Note about editing and reuploading images */}
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
+                          <p className="text-xs text-blue-700">
+                            📝 <strong>Note:</strong> If your images don't show up properly on the homepage, please edit and reupload your pictures for the listings.
+                          </p>
+                        </div>
                       </div>
                       <FormMessage />
                     </FormItem>
@@ -3179,6 +3186,13 @@ export default function SellerDashboard() {
                             ))}
                           </div>
                         )}
+                        
+                        {/* Note about editing and reuploading images */}
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
+                          <p className="text-xs text-blue-700">
+                            📝 <strong>Note:</strong> If your images don't show up properly on the homepage, please edit and reupload your pictures for the listings.
+                          </p>
+                        </div>
                       </div>
                       <FormMessage />
                     </FormItem>
