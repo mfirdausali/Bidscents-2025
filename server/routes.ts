@@ -3870,11 +3870,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/boost/create-order - Create a boost order for multiple products
   app.post('/api/boost/create-order', async (req, res) => {
     try {
-      console.log(`🔐 BOOST ORDER AUTHENTICATION CHECK:`);
+      console.log(`🔐 BOOST ORDER DETAILED SESSION ANALYSIS:`);
+      console.log(`- Timestamp: ${new Date().toISOString()}`);
       console.log(`- req.isAuthenticated(): ${req.isAuthenticated ? req.isAuthenticated() : 'method not available'}`);
       console.log(`- req.user exists: ${!!req.user}`);
       console.log(`- req.session exists: ${!!req.session}`);
       console.log(`- req.sessionID: ${req.sessionID}`);
+      console.log(`- Session data:`, req.session);
+      console.log(`- Session passport:`, req.session?.passport);
+      console.log(`- Headers cookie:`, req.headers.cookie);
       
       if (req.user) {
         console.log(`- req.user.id: ${req.user.id}`);
