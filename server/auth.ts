@@ -95,29 +95,34 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Update local strategy to verify with Supabase auth
+  // Simplified local strategy - direct database authentication
   passport.use(
     new LocalStrategy(async (username, password, done) => {
+      console.log(`🔐 AUTH ATTEMPT - Username: ${username}`);
       try {
-        // Get user from database first to check if username exists
+        // Get user from database
         const user = await storage.getUserByUsername(username);
         if (!user) {
+          console.log(`🔐 AUTH FAILED - User not found: ${username}`);
           return done(null, false);
         }
         
-        // Then verify credentials with Supabase
+        // For now, authenticate with Supabase but with proper error handling
         try {
           const result = await signInWithEmail(user.email, password);
           if (result?.user) {
+            console.log(`🔐 AUTH SUCCESS - User: ${user.id} (${user.username})`);
             return done(null, user);
           } else {
+            console.log(`🔐 AUTH FAILED - Invalid credentials for: ${username}`);
             return done(null, false);
           }
         } catch (authError) {
-          console.error("Authentication error:", authError);
+          console.error(`🔐 AUTH ERROR - Supabase error for ${username}:`, authError);
           return done(null, false);
         }
       } catch (error) {
+        console.error(`🔐 AUTH SYSTEM ERROR:`, error);
         return done(error);
       }
     }),
