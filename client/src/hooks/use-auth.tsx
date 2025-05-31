@@ -172,15 +172,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       const res = await apiRequest("POST", "/api/register-with-verification", data);
       console.log("📨 Registration response status:", res.status);
+      console.log("📨 Registration response headers:", Object.fromEntries(res.headers.entries()));
+      
+      // Get response text first to debug what's being returned
+      const responseText = await res.text();
+      console.log("📨 Raw response text:", responseText);
       
       if (!res.ok) {
-        const errorData = await res.json();
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error("❌ Failed to parse error response as JSON:", parseError);
+          throw new Error("Registration failed with invalid response");
+        }
         console.error("❌ Registration failed with error:", errorData);
         throw new Error(errorData.message || "Registration failed");
       }
       
-      const responseData = await res.json();
-      console.log("✅ Registration successful with response:", responseData);
+      // Try to parse the successful response
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        console.log("✅ Registration successful with response:", responseData);
+      } catch (parseError) {
+        console.error("❌ Failed to parse success response as JSON:", parseError);
+        throw new Error("Registration succeeded but response was invalid");
+      }
+      
       return responseData;
     },
     onSuccess: (data: RegisterWithVerificationResponse) => {
