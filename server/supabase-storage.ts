@@ -34,6 +34,7 @@ import { IStorage } from "./storage";
 import { supabase } from "./supabase";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
 
 type ProductFilter = {
   categoryId?: number;
@@ -51,13 +52,16 @@ export class SupabaseStorage implements IStorage {
   sessionStore: any;
 
   constructor() {
-    // Initialize in-memory session store instead of PostgreSQL
-    const MemoryStore = createMemoryStore(session);
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
+    // SECURITY FIX: Use PostgreSQL session store to prevent session sharing
+    const PgSession = connectPg(session);
+    
+    this.sessionStore = new PgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: 'session',
+      createTableIfMissing: true
     });
     
-    console.log('SupabaseStorage initialized with in-memory session store');
+    console.log('SupabaseStorage initialized with PostgreSQL session store for security');
   }
   
   // Helper method to map DB user to our User type without password
