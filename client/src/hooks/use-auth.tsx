@@ -168,39 +168,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // New register with email verification
   const registerWithVerificationMutation = useMutation({
     mutationFn: async (data: RegisterWithVerificationData) => {
-      console.log("📤 Starting registration request with data:", { ...data, password: "[REDACTED]" });
-      
       const res = await apiRequest("POST", "/api/register-with-verification", data);
-      console.log("📨 Registration response status:", res.status);
-      console.log("📨 Registration response headers:", Object.fromEntries(res.headers.entries()));
-      
-      // Get response text first to debug what's being returned
-      const responseText = await res.text();
-      console.log("📨 Raw response text:", responseText);
-      
       if (!res.ok) {
-        let errorData;
-        try {
-          errorData = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error("❌ Failed to parse error response as JSON:", parseError);
-          throw new Error("Registration failed with invalid response");
-        }
-        console.error("❌ Registration failed with error:", errorData);
+        const errorData = await res.json();
         throw new Error(errorData.message || "Registration failed");
       }
-      
-      // Try to parse the successful response
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-        console.log("✅ Registration successful with response:", responseData);
-      } catch (parseError) {
-        console.error("❌ Failed to parse success response as JSON:", parseError);
-        throw new Error("Registration succeeded but response was invalid");
-      }
-      
-      return responseData;
+      return await res.json();
     },
     onSuccess: (data: RegisterWithVerificationResponse) => {
       toast({
@@ -211,12 +184,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLocation("/login?registration=success");
     },
     onError: (error: Error) => {
-      console.error("❌ Registration mutation error:", error);
-      console.error("❌ Error details:", {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      });
       toast({
         title: "Registration failed",
         description: error.message,
