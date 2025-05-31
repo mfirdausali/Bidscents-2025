@@ -1211,13 +1211,9 @@ export default function SellerDashboard() {
   // Sort products by status priority: featured -> active -> pending -> sold
   const sortedProducts = filteredProducts?.sort((a, b) => {
     const getStatusPriority = (product: ProductWithDetails) => {
-      // Check if product is featured (boosted)
-      const isFeatured = boostedProductIds.includes(product.id);
-      if (isFeatured) return 4; // Highest priority
-      
-      // Use the status field from the database
       const status = product.status?.toLowerCase() || 'active';
       switch (status) {
+        case 'featured': return 4; // Highest priority
         case 'active': return 3;
         case 'pending': return 2; 
         case 'sold': return 1;
@@ -1649,34 +1645,7 @@ export default function SellerDashboard() {
                               </TableCell>
                               <TableCell>{product.stockQuantity}</TableCell>
                               <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {boostedProductIds.includes(product.id) && (
-                                    <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
-                                      Featured
-                                    </Badge>
-                                  )}
-                                  <Badge 
-                                    variant={
-                                      product.status === 'active' ? 'default' :
-                                      product.status === 'pending' ? 'secondary' :
-                                      product.status === 'sold' ? 'destructive' :
-                                      'outline'
-                                    }
-                                    className={
-                                      product.status === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
-                                      product.status === 'pending' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100' :
-                                      product.status === 'sold' ? 'bg-red-100 text-red-800 hover:bg-red-100' :
-                                      'bg-gray-100 text-gray-800 hover:bg-gray-100'
-                                    }
-                                  >
-                                    {product.status ? product.status.charAt(0).toUpperCase() + product.status.slice(1) : 'Active'}
-                                  </Badge>
-                                  {product.isNew && (
-                                    <Badge className="bg-gold text-rich-black hover:bg-gold">
-                                      New
-                                    </Badge>
-                                  )}
-                                </div>
+                                {product.status ? product.status.charAt(0).toUpperCase() + product.status.slice(1) : 'Active'}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end space-x-2">
