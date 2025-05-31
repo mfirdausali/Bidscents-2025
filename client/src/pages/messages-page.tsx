@@ -1299,6 +1299,10 @@ export default function MessagesPage() {
                               <span role="img" aria-label="prohibited" className="mr-1 flex-shrink-0">🚫</span>
                               <span>Never share personal or banking information outside of our secure platform.</span>
                             </li>
+                            <li className="flex items-start">
+                              <span role="img" aria-label="plus" className="mr-1 flex-shrink-0">➕</span>
+                              <span>Sellers are mandatory to press the + button and create a new transaction and choose which perfume buyer wants to buy.</span>
+                            </li>
                           </ul>
                           <p className="text-blue-700 text-xs mt-2 italic">
                             If something feels off, report the user immediately or contact us at admin@bidscents.com.
