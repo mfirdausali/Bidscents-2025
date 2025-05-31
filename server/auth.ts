@@ -67,12 +67,19 @@ export function setupAuth(app: Express) {
     }),
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
+  passport.serializeUser((user, done) => {
+    console.log('🔐 SERIALIZE USER:', user.id);
+    done(null, user.id);
+  });
+  
   passport.deserializeUser(async (id: number, done) => {
+    console.log('🔐 DESERIALIZE USER START - ID:', id);
     try {
       const user = await storage.getUser(id);
+      console.log('🔐 DESERIALIZE USER SUCCESS:', !!user, user ? user.username : 'no user');
       done(null, user);
     } catch (error) {
+      console.log('🔐 DESERIALIZE USER ERROR:', error);
       done(error, null);
     }
   });
