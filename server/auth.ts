@@ -341,23 +341,45 @@ export function setupAuth(app: Express) {
       // If not, check if authenticated with Supabase
       const supabaseUser = await getCurrentUser();
       if (supabaseUser) {
-        // Get user from our database by email
-        const user = await storage.getUserByEmail(supabaseUser.email || '');
-        if (user) {
-          // SECURITY FIX: Additional validation for Supabase authentication
-          // Skip provider ID update for now to prevent authentication blocking
-          console.log(`✅ Authenticating user ${user.username} via Supabase (ID: ${supabaseUser.id})`);
+        // SECURITY FIX: Find user by provider ID first for secure authentication
+        let user = await storage.getUserByProviderId(supabaseUser.id);
+        
+        if (!user) {
+          // If no user found by provider ID, try to find by email for account linking
+          const userByEmail = await storage.getUserByEmail(supabaseUser.email || '');
           
-          // Create the session directly since user is verified via Supabase
+          if (userByEmail) {
+            // SECURITY: Only link accounts if the user doesn't already have a provider ID
+            if (!userByEmail.providerId) {
+              // Link the Supabase account to existing user
+              await storage.updateUserProviderId(userByEmail.id, supabaseUser.id, 'supabase');
+              user = { ...userByEmail, providerId: supabaseUser.id, provider: 'supabase' };
+              console.log(`🔗 Linked Supabase account ${supabaseUser.id} to existing user ${userByEmail.username}`);
+            } else {
+              // User already has a different provider ID - this is a security violation
+              console.warn(`🚨 SECURITY: User ${userByEmail.username} already has provider ID ${userByEmail.providerId}, but Supabase user ${supabaseUser.id} tried to access it`);
+              return res.status(401).json({ message: "Account authentication mismatch" });
+            }
+          } else {
+            // No user found at all
+            return res.status(404).json({ message: "User not found" });
+          }
+        }
+
+        if (user) {
+          // Final security check: Ensure provider IDs match
+          if (user.providerId !== supabaseUser.id) {
+            console.warn(`🚨 SECURITY: Provider ID mismatch for user ${user.username}. Expected: ${user.providerId}, Got: ${supabaseUser.id}`);
+            return res.status(401).json({ message: "Authentication provider mismatch" });
+          }
+
+          // Create the session with verified user
           req.login(user, (err) => {
             if (err) {
               return res.status(500).json({ message: "Session creation failed" });
             }
-            return res.json({
-              ...user,
-              providerId: supabaseUser.id,
-              provider: 'supabase'
-            });
+            console.log(`✅ Authenticated user ${user.username} via Supabase (ID: ${supabaseUser.id})`);
+            return res.json(user);
           });
         } else {
           return res.status(404).json({ message: "User not found" });
