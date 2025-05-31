@@ -79,7 +79,9 @@ export class SupabaseStorage implements IStorage {
       isVerified: data.is_verified,
       shopName: data.shop_name,
       location: data.location,
-      bio: data.bio
+      bio: data.bio,
+      providerId: data.provider_id,
+      provider: data.provider
     } as User;
   }
 
@@ -133,6 +135,42 @@ export class SupabaseStorage implements IStorage {
     }
     
     // Use helper method to map user without password
+    return this.mapUserFromDb(data);
+  }
+
+  async getUserByProviderId(providerId: string): Promise<User | undefined> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('provider_id', providerId)
+      .single();
+    
+    if (error || !data) {
+      if (!error?.message.includes('No rows found')) {
+        console.error('Error getting user by provider ID:', error);
+      }
+      return undefined;
+    }
+    
+    return this.mapUserFromDb(data);
+  }
+
+  async updateUserProviderId(userId: number, providerId: string, provider: string): Promise<User> {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ 
+        provider_id: providerId,
+        provider: provider
+      })
+      .eq('id', userId)
+      .select('*')
+      .single();
+    
+    if (error || !data) {
+      console.error('Error updating user provider ID:', error);
+      throw new Error('Failed to update user provider ID');
+    }
+    
     return this.mapUserFromDb(data);
   }
 
