@@ -29,7 +29,7 @@ export default function ProductsPage() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
   const [brands, setBrands] = useState<string[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
-  const [sortOption, setSortOption] = useState("featured");
+  const [sortOption, setSortOption] = useState("newest");
 
   // Fetch categories
   const { data: categories, isLoading: isLoadingCategories } = useQuery<Category[]>({
@@ -117,16 +117,47 @@ export default function ProductsPage() {
         sorted.sort((a, b) => b.price - a.price);
         break;
       case "newest":
-        sorted.sort((a, b) => 
-          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-        );
+        sorted.sort((a, b) => {
+          // Always prioritize featured products first
+          if (a.isFeatured && !b.isFeatured) return -1;
+          if (!a.isFeatured && b.isFeatured) return 1;
+          // Within same featured status, sort by created_at (newest first)
+          const aTime = new Date(a.createdAt || 0).getTime();
+          const bTime = new Date(b.createdAt || 0).getTime();
+          return bTime - aTime;
+        });
         break;
       case "bestselling":
-        // This would require a sales count field, so we'll default to featured
+        sorted.sort((a, b) => {
+          // Always prioritize featured products first
+          if (a.isFeatured && !b.isFeatured) return -1;
+          if (!a.isFeatured && b.isFeatured) return 1;
+          // Within same featured status, sort by review count
+          const aReviews = a.reviews?.length || 0;
+          const bReviews = b.reviews?.length || 0;
+          return bReviews - aReviews;
+        });
         break;
       case "featured":
+        // Show featured products first, then others, all sorted by recency
+        sorted.sort((a, b) => {
+          if (a.isFeatured && !b.isFeatured) return -1;
+          if (!a.isFeatured && b.isFeatured) return 1;
+          // Both featured or both not featured, sort by newest using created_at
+          const aTime = new Date(a.createdAt || 0).getTime();
+          const bTime = new Date(b.createdAt || 0).getTime();
+          return bTime - aTime;
+        });
+        break;
       default:
-        sorted = sorted.filter(p => p.isFeatured).concat(sorted.filter(p => !p.isFeatured));
+        // Default to newest first with featured priority
+        sorted.sort((a, b) => {
+          if (a.isFeatured && !b.isFeatured) return -1;
+          if (!a.isFeatured && b.isFeatured) return 1;
+          const aTime = new Date(a.createdAt || 0).getTime();
+          const bTime = new Date(b.createdAt || 0).getTime();
+          return bTime - aTime;
+        });
         break;
     }
     
