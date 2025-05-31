@@ -118,10 +118,6 @@ export default function ProductsPage() {
         break;
       case "newest":
         sorted.sort((a, b) => {
-          // Always prioritize featured products first
-          if (a.isFeatured && !b.isFeatured) return -1;
-          if (!a.isFeatured && b.isFeatured) return 1;
-          // Within same featured status, sort by created_at (newest first)
           const aTime = new Date(a.createdAt || 0).getTime();
           const bTime = new Date(b.createdAt || 0).getTime();
           return bTime - aTime;
@@ -129,31 +125,23 @@ export default function ProductsPage() {
         break;
       case "bestselling":
         sorted.sort((a, b) => {
-          // Always prioritize featured products first
-          if (a.isFeatured && !b.isFeatured) return -1;
-          if (!a.isFeatured && b.isFeatured) return 1;
-          // Within same featured status, sort by review count
           const aReviews = a.reviews?.length || 0;
           const bReviews = b.reviews?.length || 0;
           return bReviews - aReviews;
         });
         break;
       case "featured":
-        // Show featured products first, then others, all sorted by recency
         sorted.sort((a, b) => {
           if (a.isFeatured && !b.isFeatured) return -1;
           if (!a.isFeatured && b.isFeatured) return 1;
-          // Both featured or both not featured, sort by newest using created_at
           const aTime = new Date(a.createdAt || 0).getTime();
           const bTime = new Date(b.createdAt || 0).getTime();
           return bTime - aTime;
         });
         break;
       default:
-        // Default to newest first with featured priority
+        // Default to newest first using created_at
         sorted.sort((a, b) => {
-          if (a.isFeatured && !b.isFeatured) return -1;
-          if (!a.isFeatured && b.isFeatured) return 1;
           const aTime = new Date(a.createdAt || 0).getTime();
           const bTime = new Date(b.createdAt || 0).getTime();
           return bTime - aTime;
