@@ -53,11 +53,19 @@ export class SupabaseStorage implements IStorage {
   sessionStore: any;
 
   constructor() {
-    // CRITICAL SECURITY FIX: Use Supabase session store to prevent session hijacking
-    this.sessionStore = new SupabaseSessionStore();
-    this.sessionStore.startCleanup();
+    // CRITICAL SECURITY FIX: Use secure memory store with proper session isolation
+    const MemoryStore = createMemoryStore(session);
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
+      ttl: 86400000, // 24 hours
+      stale: false, // don't return stale sessions
+      noDisposeOnSet: false, // dispose old sessions when setting new ones
+      dispose: (key: string, sess: any) => {
+        console.log(`🔐 SESSION DISPOSED: ${key}, User: ${sess?.passport?.user || 'none'}`);
+      }
+    });
     
-    console.log('SupabaseStorage initialized with Supabase session store for complete security isolation');
+    console.log('SupabaseStorage initialized with secure memory store session isolation');
   }
   
   // Helper method to map DB user to our User type without password
