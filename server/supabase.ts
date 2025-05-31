@@ -29,12 +29,17 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 // Create a Supabase client with auth configuration
+console.log('🔧 Creating Supabase client instance...');
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
   }
 });
+
+// Log client creation for debugging multiple instance issue
+console.log('✅ Supabase client created successfully');
+console.log('🔍 Client instance ID:', Math.random().toString(36).substr(2, 9));
 
 // Test the connection
 export async function testSupabaseConnection() {
