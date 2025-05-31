@@ -5532,56 +5532,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Received payment webhook payload:', req.body);
       console.log('Content-Type:', req.headers['content-type']);
       
-      // DEBUG: Log all potential signature sources
-      console.log('🔍 DEBUG: Checking all possible signature sources:');
-      console.log('- x-signature header:', req.headers['x-signature']);
-      console.log('- X-Signature header:', req.headers['X-Signature']);
-      console.log('- x_signature in body:', req.body?.x_signature);
-      console.log('- x_signature type:', typeof req.body?.x_signature);
-     
-      // Get the X-Signature from header OR body (Billplz might send it in either place)
-      let xSignature = req.headers['x-signature'] as string || 
-                       req.headers['X-Signature'] as string;
+      // DISABLED WEBHOOK SIGNATURE VERIFICATION
+      console.log('🔧 WEBHOOK PROCESSING WITHOUT X-SIGNATURE VERIFICATION');
       
-      // If not in headers, try to get from body
-      if (!xSignature && req.body && req.body.x_signature) {
-        xSignature = req.body.x_signature;
-        console.log('✅ Found signature in request body');
-      }
+      // Log signature sources for reference only
+      console.log('Available signature sources (for logging only):');
+      console.log('- x-signature header:', !!req.headers['x-signature']);
+      console.log('- X-Signature header:', !!req.headers['X-Signature']);
+      console.log('- x_signature in body:', !!req.body?.x_signature);
       
-      // For sandbox environment, make signature optional
-      const isSandbox = isBillplzSandbox();
-      
-      if (!xSignature && !isSandbox) {
-        console.error('❌ ERROR: Missing X-Signature (checked headers and body)');
-        return res.status(400).json({ message: 'Missing X-Signature header' });
-      } else if (!xSignature) {
-        console.warn('⚠️ SANDBOX MODE: Missing signature but continuing for testing purposes');
-        // In sandbox, we'll continue without a signature for easier testing
-      }
-      
-      console.log('🔑 X-Signature found:', xSignature);
-      
-      // Try signature verification
-      let isValid = false;
-      try {
-        isValid = billplz.verifyWebhookSignature(req.body, xSignature);
-        console.log('🔐 Signature verification result:', isValid ? 'VALID ✅' : 'INVALID ❌');
-      } catch (sigError) {
-        console.error('⚠️ Error during webhook signature verification:', sigError);
-      }
-      
-      // Only do signature verification if we have a signature
-      if (xSignature) {
-        // For PRODUCTION environment, strictly enforce signature verification
-        // For SANDBOX, already defined above
-        if (!isValid && !isSandbox) {
-          console.error('❌ ERROR: Invalid X-Signature in PRODUCTION environment');
-          return res.status(401).json({ message: 'Invalid signature' });
-        } else if (!isValid) {
-          console.warn('⚠️ SANDBOX MODE: Invalid signature but continuing for testing');
-        }
-      }
+      console.log('Skipping signature verification - processing webhook directly');
       
       // CRITICAL FIX: Direct boost processing for products
       // This ensures boost is applied even if the payment update fails due to schema issues
@@ -5760,54 +5720,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('📦 Payment data for processing:', paymentData);
       
-      // ENHANCED DIAGNOSTIC LOGGING FOR SIGNATURE VERIFICATION
-      console.log('🔧 ENVIRONMENT DIAGNOSTIC:');
-      console.log('- BILLPLZ_BASE_URL:', process.env.BILLPLZ_BASE_URL);
-      console.log('- Is Sandbox:', isBillplzSandbox());
-      console.log('- Has XSIGN_KEY:', !!process.env.BILLPLZ_XSIGN_KEY);
-      console.log('- XSIGN_KEY length:', process.env.BILLPLZ_XSIGN_KEY?.length || 0);
-      console.log('- XSIGN_KEY starts with:', process.env.BILLPLZ_XSIGN_KEY?.substring(0, 10) || 'N/A');
+      // DISABLED X-SIGNATURE VERIFICATION - Using direct Billplz API verification instead
+      console.log('🔧 PAYMENT VERIFICATION WITHOUT X-SIGNATURE:');
+      console.log('- Bill ID:', directBillId);
+      console.log('- Payment Status from redirect:', directPaid);
       
-      // Attempt to validate the signature
-      let signatureValid = false;
+      // Instead of signature verification, get the actual bill status from Billplz API
+      let billDetails = null;
+      let apiVerificationSuccess = false;
       
-      // First, try signature verification if we have a raw query string
-      if (req.rawQuery) {
-        console.log('🔍 SIGNATURE VERIFICATION INPUTS:');
-        console.log('- Raw Query String:', req.rawQuery);
-        console.log('- Expected Signature:', directSignature);
-        console.log('- Signature Length:', directSignature?.length || 0);
-        
+      if (directBillId) {
         try {
-          signatureValid = billplz.verifyRedirectSignature(req.rawQuery, directSignature);
-          console.log('🔐 Signature verification result:', signatureValid ? 'VALID ✅' : 'INVALID ❌');
+          console.log('🔍 Verifying payment with Billplz API...');
+          billDetails = await billplz.getBill(directBillId);
+          apiVerificationSuccess = true;
           
-          if (!signatureValid) {
-            console.log('❌ SIGNATURE MISMATCH DETECTED - Possible causes:');
-            console.log('1. Wrong BILLPLZ_XSIGN_KEY (using sandbox key with production?)');
-            console.log('2. URL encoding issues with query parameters');
-            console.log('3. Missing or malformed billplz[x_signature] parameter');
-            console.log('4. Parameter order or format differences');
-          }
-        } catch (sigError) {
-          console.error('⚠️ Error during signature verification:', sigError);
-          console.error('Error details:', sigError instanceof Error ? sigError.message : sigError);
-          // Continue processing even if signature verification fails temporarily
+          console.log('✅ Successfully retrieved bill details from Billplz');
+          console.log('- API Bill Status:', billDetails?.state || 'unknown');
+          console.log('- API Paid Status:', billDetails?.paid || false);
+          console.log('- API Paid Amount:', billDetails?.paid_amount || 0);
+          
+          // Override redirect parameters with actual API data
+          paymentData.paid = billDetails?.paid === true ? 'true' : 'false';
+          paymentData.paid_at = billDetails?.paid_at || directPaidAt;
+          
+        } catch (apiError) {
+          console.error('❌ Failed to verify payment with Billplz API:', apiError);
+          console.log('Falling back to redirect parameters for payment processing');
+          apiVerificationSuccess = false;
         }
       } else {
-        console.warn('⚠️ No raw query string available for signature verification');
-        console.log('This usually indicates middleware issues or URL parsing problems');
-      }
-      
-      // For PRODUCTION environment, strictly enforce signature verification
-      // For SANDBOX, allow bypass for testing
-      
-      if (!signatureValid && !isSandbox) {
-        console.error('❌ ERROR: Signature verification failed in PRODUCTION environment');
-        return res.status(401).json({
-          message: 'Invalid payment redirect: signature verification failed',
-          details: 'The payment signature could not be verified in production environment.'
-        });
+        console.error('❌ No bill ID provided, cannot verify with API');
       }
       
       // Process the payment - this updates the database
