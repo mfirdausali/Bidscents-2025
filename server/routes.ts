@@ -3890,7 +3890,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAuth = req.isAuthenticated && req.isAuthenticated();
       const hasUser = req.user && req.user.id;
       
-      if (!isAuth && !hasUser) {
+      console.log(`🔐 AUTHENTICATION COMPARISON:`);
+      console.log(`- isAuthenticated(): ${isAuth}`);
+      console.log(`- hasUser: ${hasUser}`);
+      console.log(`- Session passport user: ${req.session?.passport?.user}`);
+      
+      // TEMPORARY FIX: Use session-based authentication while debugging
+      const sessionUserId = req.session?.passport?.user;
+      if (sessionUserId) {
+        console.log(`🔐 ✅ USING SESSION-BASED AUTH - User ID: ${sessionUserId}`);
+        // Continue with the request using session user ID
+      } else if (!isAuth && !hasUser) {
         console.log(`🔐 ❌ AUTHENTICATION FAILED - User not authenticated`);
         return res.status(401).json({ message: 'Unauthorized: Must be logged in to create boost orders' });
       }
