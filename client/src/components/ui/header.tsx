@@ -79,9 +79,6 @@ export function Header() {
             <Link href="/seller/dashboard" className="hidden md:block font-medium hover:text-purple-700 transition">
               Sell
             </Link>
-            <Link href="/community" className="hidden md:block font-medium hover:text-purple-700 transition">
-              Community
-            </Link>
             
             {/* Mobile search icon */}
             <button className="md:hidden text-gray-700">
