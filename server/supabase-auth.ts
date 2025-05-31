@@ -145,5 +145,98 @@ export function setupSupabaseAuth(app: Express) {
     next();
   });
 
+  // Login endpoint using Passport LocalStrategy
+  app.post("/api/login", (req, res, next) => {
+    const loginId = Math.random().toString(36).substr(2, 9);
+    console.log(`[${loginId}] Login attempt for: ${req.body.username}`);
+    
+    passport.authenticate('local', (err: any, user: any, info: any) => {
+      if (err) {
+        console.error(`[${loginId}] Authentication error:`, err);
+        return res.status(500).json({ message: "Authentication system error" });
+      }
+      
+      if (!user) {
+        console.log(`[${loginId}] Authentication failed for: ${req.body.username}`);
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      req.logIn(user, (err: any) => {
+        if (err) {
+          console.error(`[${loginId}] Session creation failed:`, err);
+          return res.status(500).json({ message: "Session creation failed" });
+        }
+        
+        console.log(`[${loginId}] Login successful for: ${user.username} (ID: ${user.id})`);
+        res.json(user);
+      });
+    })(req, res, next);
+  });
+
+  // Login with email endpoint
+  app.post("/api/login-with-email", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const loginId = Math.random().toString(36).substr(2, 9);
+      console.log(`[${loginId}] Email login attempt for: ${email}`);
+
+      // Authenticate with Supabase
+      const authData = await signInWithEmail(email, password);
+      
+      if (!authData.user) {
+        console.log(`[${loginId}] Supabase authentication failed for: ${email}`);
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Find the corresponding user in our database
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        console.log(`[${loginId}] User not found in database: ${email}`);
+        return res.status(404).json({ message: "User account not found" });
+      }
+
+      // Update provider ID if needed
+      if (!user.providerId && authData.user.id) {
+        console.log(`[${loginId}] Linking Supabase user ${authData.user.id} to local user ${user.id}`);
+        await storage.updateUser(user.id, {
+          providerId: authData.user.id,
+          provider: 'supabase'
+        });
+      }
+
+      // Create session
+      req.login(user, (err) => {
+        if (err) {
+          console.error(`[${loginId}] Session creation failed:`, err);
+          return res.status(500).json({ message: "Session creation failed" });
+        }
+        
+        console.log(`[${loginId}] Email login successful for: ${user.username} (ID: ${user.id})`);
+        res.json({ user });
+      });
+    } catch (error: any) {
+      console.error("Email login error:", error);
+      res.status(401).json({ message: error.message || "Authentication failed" });
+    }
+  });
+
+  // Logout endpoint
+  app.post("/api/logout", (req, res) => {
+    const logoutId = Math.random().toString(36).substr(2, 9);
+    const userId = req.user?.id;
+    console.log(`[${logoutId}] Logout request for user: ${userId}`);
+    
+    req.logout((err) => {
+      if (err) {
+        console.error(`[${logoutId}] Logout error:`, err);
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      
+      console.log(`[${logoutId}] Logout successful for user: ${userId}`);
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
   console.log('Supabase-integrated authentication system initialized');
 }
