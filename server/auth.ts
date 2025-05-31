@@ -182,31 +182,59 @@ export function setupAuth(app: Express) {
   // Register with email verification
   app.post("/api/register-with-verification", async (req, res, next) => {
     try {
+      console.log("🔐 REGISTRATION REQUEST:", {
+        body: { ...req.body, password: "[REDACTED]" },
+        timestamp: new Date().toISOString()
+      });
+
       const { email, password, username, firstName, lastName } = req.body;
 
+      // Validate input fields
+      if (!email || !password || !username) {
+        console.log("🚨 REGISTRATION FAILED: Missing required fields");
+        return res.status(400).json({ message: "Email, password, and username are required" });
+      }
+
+      console.log("🔍 Checking for existing username:", username);
       // Check if username is already taken
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
+        console.log("🚨 REGISTRATION FAILED: Username already exists:", username);
         return res.status(400).json({ message: "Username already exists" });
       }
 
+      console.log("🔍 Checking for existing email:", email);
       // Check if email is already registered
       const existingEmail = await storage.getUserByEmail(email);
       if (existingEmail) {
+        console.log("🚨 REGISTRATION FAILED: Email already exists:", email);
         return res.status(400).json({ message: "Email already exists" });
       }
 
+      console.log("🔐 Attempting Supabase registration for email:", email);
       // Register the user with Supabase Auth (sends verification email)
       const authData = await registerUserWithEmailVerification(
         email,
         password,
         { username, firstName, lastName }
       );
+      console.log("✅ Supabase registration successful:", { 
+        userId: authData?.user?.id, 
+        email: authData?.user?.email 
+      });
 
       let providerId = null;
       if (authData?.user?.id) {
         providerId = authData.user.id;
       }
+
+      console.log("🔐 Creating user in database with data:", {
+        username,
+        email,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        providerId
+      });
 
       // Create user in our database too (for backward compatibility)
       // Only creating basic info, the rest will be completed after email verification
@@ -226,6 +254,13 @@ export function setupAuth(app: Express) {
         provider: 'supabase'
       });
 
+      console.log("✅ User created successfully in database:", {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      });
+
+      console.log("📤 Sending success response to client");
       res.status(201).json({ 
         message: "Registration successful! Please check your email to verify your account.",
         user: {
@@ -235,8 +270,21 @@ export function setupAuth(app: Express) {
         }
       });
     } catch (error: any) {
-      console.error("Registration error:", error);
-      res.status(500).json({ message: error.message || "Registration failed" });
+      console.error("🚨 REGISTRATION ERROR:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Send more specific error messages based on error type
+      if (error.message && error.message.includes('duplicate key')) {
+        res.status(400).json({ message: "User already exists" });
+      } else if (error.message && error.message.includes('pattern')) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: error.message || "Registration failed" });
+      }
     }
   });
 
