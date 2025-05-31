@@ -72,11 +72,24 @@ export function setupSupabaseAuth(app: Express) {
           
           // Update user with Supabase provider ID if not set
           if (!user.providerId) {
-            await storage.updateUser(user.id, { 
-              providerId: result.user.id,
-              provider: 'supabase'
-            });
-            console.log(`[${authId}] Updated user ${user.id} with provider ID: ${result.user.id}`);
+            try {
+              // Use direct SQL update to bypass cache issues
+              const { error } = await supabase
+                .from('users')
+                .update({ 
+                  provider_id: result.user.id,
+                  provider: 'supabase'
+                })
+                .eq('id', user.id);
+              
+              if (error) {
+                console.error(`[${authId}] Failed to update provider info:`, error);
+              } else {
+                console.log(`[${authId}] Updated user ${user.id} with provider ID: ${result.user.id}`);
+              }
+            } catch (updateError) {
+              console.error(`[${authId}] Error updating provider info:`, updateError);
+            }
           }
           
           return done(null, user);
@@ -202,10 +215,24 @@ export function setupSupabaseAuth(app: Express) {
       // Update provider ID if needed
       if (!user.providerId && authData.user.id) {
         console.log(`[${loginId}] Linking Supabase user ${authData.user.id} to local user ${user.id}`);
-        await storage.updateUser(user.id, {
-          providerId: authData.user.id,
-          provider: 'supabase'
-        });
+        try {
+          // Use direct SQL update to bypass cache issues
+          const { error } = await supabase
+            .from('users')
+            .update({ 
+              provider_id: authData.user.id,
+              provider: 'supabase'
+            })
+            .eq('id', user.id);
+          
+          if (error) {
+            console.error(`[${loginId}] Failed to update provider info:`, error);
+          } else {
+            console.log(`[${loginId}] Successfully linked accounts`);
+          }
+        } catch (updateError) {
+          console.error(`[${loginId}] Error updating provider info:`, updateError);
+        }
       }
 
       // Create session
