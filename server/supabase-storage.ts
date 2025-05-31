@@ -35,6 +35,7 @@ import { supabase } from "./supabase";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import connectPg from "connect-pg-simple";
+import { SupabaseSessionStore } from "./supabase-session-store";
 
 type ProductFilter = {
   categoryId?: number;
@@ -52,16 +53,11 @@ export class SupabaseStorage implements IStorage {
   sessionStore: any;
 
   constructor() {
-    // SECURITY FIX: Use PostgreSQL session store to prevent session sharing
-    const PgSession = connectPg(session);
+    // CRITICAL SECURITY FIX: Use Supabase session store to prevent session hijacking
+    this.sessionStore = new SupabaseSessionStore();
+    this.sessionStore.startCleanup();
     
-    this.sessionStore = new PgSession({
-      conString: process.env.DATABASE_URL,
-      tableName: 'session',
-      createTableIfMissing: true
-    });
-    
-    console.log('SupabaseStorage initialized with PostgreSQL session store for security');
+    console.log('SupabaseStorage initialized with Supabase session store for complete security isolation');
   }
   
   // Helper method to map DB user to our User type without password
