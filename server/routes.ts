@@ -2057,6 +2057,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // Optimized conversations summary endpoint
+  app.get("/api/conversations", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(403).json({ message: "Unauthorized: Must be logged in to access conversations" });
+      }
+
+      const userId = req.user.id;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      const messages = await storage.getUserMessages(userId);
+      
+      // Group messages by conversation and get summary
+      const conversationMap = new Map();
+      
+      messages.forEach(msg => {
+        const otherUserId = msg.senderId === userId ? msg.receiverId : msg.senderId;
+        const key = `${Math.min(userId, otherUserId)}-${Math.max(userId, otherUserId)}`;
+        
+        if (!conversationMap.has(key)) {
+          conversationMap.set(key, {
+            otherUserId,
+            messages: [],
+            unreadCount: 0,
+            lastMessage: null
+          });
+        }
+        
+        const conversation = conversationMap.get(key);
+        conversation.messages.push(msg);
+        
+        // Count unread messages
+        if (!msg.isRead && msg.receiverId === userId) {
+          conversation.unreadCount++;
+        }
+        
+        // Track latest message
+        if (!conversation.lastMessage || new Date(msg.createdAt) > new Date(conversation.lastMessage.createdAt)) {
+          conversation.lastMessage = {
+            ...msg,
+            content: msg.content ? decryptMessage(msg.content) : msg.content
+          };
+        }
+      });
+
+      // Convert to array and sort by last message time
+      const conversations = Array.from(conversationMap.values())
+        .sort((a, b) => new Date(b.lastMessage?.createdAt || 0).getTime() - new Date(a.lastMessage?.createdAt || 0).getTime())
+        .slice((page - 1) * limit, page * limit);
+
+      res.json({
+        conversations,
+        totalCount: conversationMap.size,
+        page,
+        limit
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
   
   // Get conversation between two users
   app.get("/api/messages/conversation/:userId", async (req, res, next) => {
