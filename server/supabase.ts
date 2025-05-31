@@ -1,6 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
 
+// Track authentication state for debugging
+interface AuthTracker {
+  lastSupabaseUserId?: string | null;
+  lastSupabaseUserEmail?: string | null;
+}
+
+declare global {
+  var authTracker: AuthTracker;
+}
+
+global.authTracker = global.authTracker || {};
+
 // Initialize the Supabase client with environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -210,17 +222,57 @@ export async function signOut() {
  * Get the current authenticated user
  */
 export async function getCurrentUser(): Promise<User | null> {
+  const callId = Math.random().toString(36).substr(2, 9);
+  const timestamp = new Date().toISOString();
+  
+  console.log(`\n🔒 [${timestamp}] getCurrentUser() CALLED - Call ID: ${callId}`);
+  
   try {
+    // Check the current session state before making the call
+    const sessionResult = await supabase.auth.getSession();
+    console.log(`🔒 [${callId}] Current session exists: ${!!sessionResult.data.session}`);
+    if (sessionResult.data.session) {
+      console.log(`🔒 [${callId}] Session user ID: ${sessionResult.data.session.user.id}`);
+    }
+    
     const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error) {
-      console.error('Error getting current user:', error);
+      console.error(`🔒 [${callId}] Error getting current user:`, error);
       return null;
+    }
+
+    if (user) {
+      console.log(`🔒 [${callId}] Supabase user found:`);
+      console.log(`🔒 [${callId}]   - ID: ${user.id}`);
+      console.log(`🔒 [${callId}]   - Email: ${user.email}`);
+      console.log(`🔒 [${callId}]   - Email verified: ${user.email_confirmed_at ? 'yes' : 'no'}`);
+      console.log(`🔒 [${callId}]   - Last sign in: ${user.last_sign_in_at}`);
+      console.log(`🔒 [${callId}]   - Created at: ${user.created_at}`);
+      console.log(`🔒 [${callId}]   - User metadata: ${JSON.stringify(user.user_metadata)}`);
+      
+      // CRITICAL: Log if this same user ID has been returned recently for different calls
+      // This would indicate authentication state pollution
+      const lastUserId = global.authTracker.lastSupabaseUserId;
+      if (lastUserId && lastUserId !== user.id) {
+        console.warn(`🚨 [${callId}] CRITICAL: Different user ID returned!`);
+        console.warn(`🚨 [${callId}] Previous user ID: ${lastUserId}`);
+        console.warn(`🚨 [${callId}] Current user ID: ${user.id}`);
+        console.warn(`🚨 [${callId}] This indicates authentication state contamination!`);
+      }
+      
+      global.authTracker.lastSupabaseUserId = user.id;
+      global.authTracker.lastSupabaseUserEmail = user.email;
+      
+    } else {
+      console.log(`🔒 [${callId}] No Supabase user found (null)`);
+      global.authTracker.lastSupabaseUserId = null;
+      global.authTracker.lastSupabaseUserEmail = null;
     }
 
     return user;
   } catch (error) {
-    console.error('Exception in getCurrentUser:', error);
+    console.error(`🔒 [${callId}] Exception in getCurrentUser:`, error);
     return null;
   }
 }
