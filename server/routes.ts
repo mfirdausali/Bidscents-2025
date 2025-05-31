@@ -2080,7 +2080,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!conversationMap.has(key)) {
           conversationMap.set(key, {
-            otherUserId,
+            userId: otherUserId,
+            username: '',
+            profileImage: null,
             messages: [],
             unreadCount: 0,
             lastMessage: null
@@ -2089,6 +2091,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const conversation = conversationMap.get(key);
         conversation.messages.push(msg);
+        
+        // Update user info from message data
+        if (msg.senderId === otherUserId) {
+          conversation.username = msg.sender?.username || 'Unknown User';
+          conversation.profileImage = msg.sender?.profileImage;
+        } else if (msg.receiverId === otherUserId) {
+          conversation.username = msg.receiver?.username || 'Unknown User';
+          conversation.profileImage = msg.receiver?.profileImage;
+        }
         
         // Count unread messages
         if (!msg.isRead && msg.receiverId === userId) {

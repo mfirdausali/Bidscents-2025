@@ -181,73 +181,15 @@ export default function MessagesPage() {
   const [sellerProducts, setSellerProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   
-  // Group messages by conversation (unique user pairs)
-  const conversations = React.useMemo(() => {
-    if (!user || !messages.length) return [];
-    
-    const conversationMap = new Map<number, {
-      userId: number;
-      username: string;
-      profileImage?: string | null;
-      lastMessage: Message;
-      unreadCount: number;
-      productInfo?: {
-        id: number;
-        name: string;
-      };
-    }>();
-    
-    // Group messages by the other user in the conversation
-    messages.forEach(message => {
-      let otherUserId: number;
-      let otherUsername: string;
-      let otherUserImage: string | null | undefined;
-      
-      if (message.senderId === user.id) {
-        // Message sent by current user
-        otherUserId = message.receiverId;
-        otherUsername = message.receiver?.username || 'Unknown User';
-        otherUserImage = message.receiver?.profileImage;
-      } else {
-        // Message received by current user
-        otherUserId = message.senderId;
-        otherUsername = message.sender?.username || 'Unknown User';
-        otherUserImage = message.sender?.profileImage;
-      }
-      
-      const existingConversation = conversationMap.get(otherUserId);
-      
-      // Check if message is unread and not sent by current user
-      const isUnread = !message.isRead && message.receiverId === user.id;
-      
-      // Get product info if available
-      const productInfo = message.product ? {
-        id: message.product.id,
-        name: message.product.name
-      } : undefined;
-      
-      if (!existingConversation || 
-          new Date(message.createdAt) > new Date(existingConversation.lastMessage.createdAt)) {
-        conversationMap.set(otherUserId, {
-          userId: otherUserId,
-          username: otherUsername,
-          profileImage: otherUserImage,
-          lastMessage: message,
-          unreadCount: isUnread ? 1 : (existingConversation?.unreadCount || 0),
-          productInfo: productInfo || existingConversation?.productInfo
-        });
-      } else if (isUnread) {
-        // Update unread count for existing conversation
-        existingConversation.unreadCount += 1;
-        conversationMap.set(otherUserId, existingConversation);
-      }
-    });
-    
-    // Convert map to array and sort by most recent message
-    return Array.from(conversationMap.values()).sort((a, b) => 
-      new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
-    );
-  }, [messages, user]);
+  // Use optimized conversations endpoint with React Query caching
+  const { data: conversationsData, isLoading: loadingConversations } = useQuery({
+    queryKey: ['/api/conversations', user?.id],
+    enabled: !!user?.id,
+    staleTime: 30000, // Cache for 30 seconds
+    gcTime: 300000, // Keep in cache for 5 minutes
+  });
+
+  const conversations = conversationsData?.conversations || [];
   
   // Fetch conversation messages when a user is selected
   const loadConversation = useCallback(async (userId: number, productId?: number) => {
