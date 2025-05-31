@@ -741,6 +741,25 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByProviderId(providerId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.providerId, providerId));
+    return user;
+  }
+
+  async updateUserProviderId(userId: number, providerId: string, provider: string): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({ providerId, provider })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    if (!updatedUser) {
+      throw new Error("User not found");
+    }
+    
+    return updatedUser;
+  }
+
   async createUser(user: InsertUser): Promise<User> {
     // Ensure boolean values are correctly set
     const userData = {
