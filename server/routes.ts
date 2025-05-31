@@ -25,6 +25,7 @@ import { encryptMessage, decryptMessage, isEncrypted } from './encryption';
 import { generateSellerPreview } from './social-preview';
 import * as billplz from './billplz';
 import crypto from 'crypto';
+import { setupAuth } from './auth';
 
 /**
  * Helper function to determine if we're in a sandbox environment
@@ -143,9 +144,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
-  // Set up authentication routes
-  // Set up Supabase-integrated authentication with session security
-  setupSupabaseAuth(app);
+  // Set up authentication routes (includes registration endpoint)
+  setupAuth(app);
   
   // Raw query middleware specifically for Billplz redirect
   // This captures the original query string before Express parses it
