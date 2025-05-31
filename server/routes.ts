@@ -279,7 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.log('SERVER API: Attempting admin update with extracted user ID');
                 
                 // Create a new admin client with admin key
-                const adminKey = process.env.SUPABASE_KEY;
+                const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
                 if (adminKey && adminKey.startsWith('ey')) {
                   const adminClient = createClient(
                     process.env.SUPABASE_URL || '',
@@ -345,7 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create a separate client for this attempt
         const resetClient = createClient(
           process.env.SUPABASE_URL || '',
-          process.env.SUPABASE_KEY || '',
+          process.env.SUPABASE_SERVICE_ROLE_KEY || '',
           {
             auth: {
               autoRefreshToken: false,
