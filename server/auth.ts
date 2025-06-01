@@ -296,29 +296,29 @@ export function setupAuth(app: Express) {
   // OAuth callback handler
   app.get("/auth/callback", async (req, res) => {
     try {
-      const { code, state } = req.query;
+      const { code } = req.query;
       
       if (!code) {
         return res.redirect('/auth?error=no_code');
       }
 
       // Exchange code for session with Supabase
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code as string);
+      const { data: authData, error: authError } = await supabase.auth.exchangeCodeForSession(code as string);
       
-      if (error || !data?.user) {
-        console.error("OAuth callback error:", error);
+      if (authError || !authData?.user) {
+        console.error("OAuth callback error:", authError);
         return res.redirect('/auth?error=oauth_failed');
       }
 
       // Check if user exists in our database
-      let user = await storage.getUserByEmail(data.user.email!);
+      let user = await storage.getUserByEmail(authData.user.email!);
       
       if (!user) {
         // Create new user from Google OAuth data
-        const userData = data.user.user_metadata;
+        const userData = authData.user.user_metadata;
         user = await storage.createUser({
-          username: userData.email || data.user.email!,
-          email: data.user.email!,
+          username: userData.email || authData.user.email!,
+          email: authData.user.email!,
           firstName: userData.given_name || userData.name?.split(' ')[0] || null,
           lastName: userData.family_name || userData.name?.split(' ').slice(1).join(' ') || null,
           address: null,
@@ -327,16 +327,16 @@ export function setupAuth(app: Express) {
           isSeller: true,
           isAdmin: false,
           isBanned: false,
-          providerId: data.user.id,
+          providerId: authData.user.id,
           provider: 'google'
         });
       } else if (!user.providerId) {
         // Link existing account with Google
         await storage.updateUser(user.id, {
-          providerId: data.user.id,
+          providerId: authData.user.id,
           provider: 'google'
         });
-        user = await storage.getUserByEmail(data.user.email!);
+        user = await storage.getUserByEmail(authData.user.email!);
       }
 
       // Create session
