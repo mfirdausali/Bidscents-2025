@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowRight, Mail, Lock, User, AlertCircle } from "lucide-react";
+import { FaGoogle } from "react-icons/fa";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Extended schemas with validation
@@ -167,6 +168,36 @@ export default function AuthPage() {
       firstName: registerData.firstName,
       lastName: registerData.lastName
     });
+  };
+
+  const handleGoogleAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Google authentication failed');
+      }
+
+      const data = await response.json();
+      
+      if (data.url) {
+        // Redirect to Google OAuth
+        window.location.href = data.url;
+      } else {
+        throw new Error('No OAuth URL received');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Authentication Error",
+        description: error.message || "Failed to authenticate with Google",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -328,6 +359,26 @@ export default function AuthPage() {
                             "Sign In with Email"
                           )}
                         </Button>
+                        
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">Or</span>
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          className="w-full"
+                          onClick={handleGoogleAuth}
+                        >
+                          <FaGoogle className="mr-2 h-4 w-4" />
+                          Continue with Google
+                        </Button>
+                        
                         <Button 
                           type="button" 
                           variant="ghost"
@@ -395,6 +446,26 @@ export default function AuthPage() {
                             "Sign In"
                           )}
                         </Button>
+                        
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">Or</span>
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          className="w-full"
+                          onClick={handleGoogleAuth}
+                        >
+                          <FaGoogle className="mr-2 h-4 w-4" />
+                          Continue with Google
+                        </Button>
+                        
                         <Button 
                           type="button" 
                           variant="ghost"
@@ -554,6 +625,24 @@ export default function AuthPage() {
                       )}
                     </Button>
                     
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">Or</span>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleGoogleAuth}
+                    >
+                      <FaGoogle className="mr-2 h-4 w-4" />
+                      Continue with Google
+                    </Button>
 
                   </CardFooter>
                 </form>
