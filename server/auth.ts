@@ -346,8 +346,8 @@ export function setupAuth(app: Express) {
           return res.redirect('/auth?error=session_failed');
         }
         
-        // Redirect to dashboard on successful login
-        res.redirect('/dashboard');
+        // Redirect to homepage on successful login
+        res.redirect('/');
       });
       
     } catch (error: any) {
