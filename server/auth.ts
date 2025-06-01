@@ -316,6 +316,14 @@ export function setupAuth(app: Express) {
       if (!user) {
         // Create new user from Google OAuth data
         const userData = authData.user.user_metadata;
+        console.log('Creating new Google OAuth user:', {
+          email: authData.user.email,
+          name: userData.name,
+          given_name: userData.given_name,
+          family_name: userData.family_name,
+          avatar_url: userData.avatar_url
+        });
+        
         user = await storage.createUser({
           username: userData.email || authData.user.email!,
           email: authData.user.email!,
@@ -330,13 +338,22 @@ export function setupAuth(app: Express) {
           providerId: authData.user.id,
           provider: 'google'
         });
+        
+        console.log('Successfully created Google OAuth user in database:', {
+          id: user.id,
+          username: user.username,
+          email: user.email
+        });
       } else if (!user.providerId) {
         // Link existing account with Google
+        console.log('Linking existing user with Google OAuth:', user.email);
         await storage.updateUser(user.id, {
           providerId: authData.user.id,
           provider: 'google'
         });
         user = await storage.getUserByEmail(authData.user.email!);
+      } else {
+        console.log('Existing Google OAuth user found:', user.email);
       }
 
       // Create session
