@@ -8,13 +8,11 @@ import { User as SelectUser } from "@shared/schema";
 import {
   registerUserWithEmailVerification, 
   signInWithEmail, 
-  signInWithGoogle,
   signOut as supabaseSignOut,
   getCurrentUser,
   verifyEmail,
   resetPassword,
-  updatePassword,
-  supabase
+  updatePassword
 } from './supabase';
 
 declare global {
@@ -274,102 +272,6 @@ export function setupAuth(app: Express) {
     } catch (error: any) {
       console.error("Email verification error:", error);
       res.status(500).json({ message: error.message || "Email verification failed" });
-    }
-  });
-
-  // Google OAuth sign-in
-  app.post("/api/auth/google", async (req, res) => {
-    try {
-      const data = await signInWithGoogle();
-      
-      if (!data.url) {
-        return res.status(500).json({ message: "Google authentication failed" });
-      }
-      
-      res.json({ url: data.url });
-    } catch (error: any) {
-      console.error("Google OAuth error:", error.message);
-      res.status(500).json({ message: error.message || "Google authentication failed" });
-    }
-  });
-
-  // OAuth callback handler
-  app.get("/auth/callback", async (req, res) => {
-    try {
-      const { code } = req.query;
-      
-      if (!code) {
-        return res.redirect('/auth?error=no_code');
-      }
-
-      // Exchange code for session with Supabase
-      const { data: authData, error: authError } = await supabase.auth.exchangeCodeForSession(code as string);
-      
-      if (authError || !authData?.user) {
-        console.error("OAuth callback error:", authError);
-        return res.redirect('/auth?error=oauth_failed');
-      }
-
-      // Check if user exists in our database
-      let user = await storage.getUserByEmail(authData.user.email!);
-      
-      if (!user) {
-        // Create new user from Google OAuth data
-        const userData = authData.user.user_metadata;
-        console.log('Creating new Google OAuth user:', {
-          email: authData.user.email,
-          name: userData.name,
-          given_name: userData.given_name,
-          family_name: userData.family_name,
-          avatar_url: userData.avatar_url
-        });
-        
-        user = await storage.createUser({
-          username: userData.email || authData.user.email!,
-          email: authData.user.email!,
-          firstName: userData.given_name || userData.name?.split(' ')[0] || null,
-          lastName: userData.family_name || userData.name?.split(' ').slice(1).join(' ') || null,
-          address: null,
-          profileImage: userData.avatar_url || null,
-          walletBalance: 0,
-          isSeller: true,
-          isAdmin: false,
-          isBanned: false,
-          providerId: authData.user.id,
-          provider: 'google'
-        });
-        
-        console.log('Successfully created Google OAuth user in database:', {
-          id: user.id,
-          username: user.username,
-          email: user.email
-        });
-      } else if (!user.providerId) {
-        // Link existing account with Google
-        console.log('Linking existing user with Google OAuth:', user.email);
-        await storage.updateUser(user.id, {
-          providerId: authData.user.id,
-          provider: 'google'
-        });
-        user = await storage.getUserByEmail(authData.user.email!);
-      } else {
-        console.log('Existing Google OAuth user found:', user.email);
-      }
-
-      // Create session
-      req.login(user!, (err) => {
-        if (err) {
-          console.error("Session creation failed:", err);
-          return res.redirect('/auth?error=session_failed');
-        }
-        
-        // Redirect to homepage on successful login
-        res.redirect('/');
-      });
-      
-    } catch (error: any) {
-      console.error("OAuth callback error:", error);
-      res.redirect('/auth?error=oauth_failed');
     }
   });
 
