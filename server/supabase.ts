@@ -205,10 +205,15 @@ export async function signInWithEmail(email: string, password: string) {
  */
 export async function signInWithGoogle() {
   try {
+    // Use the current Replit domain for the redirect
+    const currentDomain = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+      : 'http://localhost:5000';
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${process.env.APP_URL || 'http://localhost:5000'}/auth/callback`
+        redirectTo: `${currentDomain}/auth/callback`
       }
     });
 
