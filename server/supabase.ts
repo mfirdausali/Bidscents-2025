@@ -200,6 +200,31 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 /**
+ * Sign in with Google OAuth
+ * Returns the redirect URL for Google OAuth
+ */
+export async function signInWithGoogle() {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${process.env.APP_URL || 'http://localhost:5000'}/auth/callback`
+      }
+    });
+
+    if (error) {
+      console.error('Error signing in with Google:', error);
+      throw new Error(`Google sign in failed: ${error.message}`);
+    }
+
+    return data;
+  } catch (error: any) {
+    console.error('Exception in signInWithGoogle:', error);
+    throw error;
+  }
+}
+
+/**
  * Sign out the current user
  */
 export async function signOut() {

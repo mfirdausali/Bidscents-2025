@@ -8,11 +8,13 @@ import { User as SelectUser } from "@shared/schema";
 import {
   registerUserWithEmailVerification, 
   signInWithEmail, 
+  signInWithGoogle,
   signOut as supabaseSignOut,
   getCurrentUser,
   verifyEmail,
   resetPassword,
-  updatePassword
+  updatePassword,
+  supabase
 } from './supabase';
 
 declare global {
@@ -272,6 +274,85 @@ export function setupAuth(app: Express) {
     } catch (error: any) {
       console.error("Email verification error:", error);
       res.status(500).json({ message: error.message || "Email verification failed" });
+    }
+  });
+
+  // Google OAuth sign-in
+  app.post("/api/auth/google", async (req, res) => {
+    try {
+      const data = await signInWithGoogle();
+      
+      if (!data.url) {
+        return res.status(500).json({ message: "Google authentication failed" });
+      }
+      
+      res.json({ url: data.url });
+    } catch (error: any) {
+      console.error("Google OAuth error:", error.message);
+      res.status(500).json({ message: error.message || "Google authentication failed" });
+    }
+  });
+
+  // OAuth callback handler
+  app.get("/auth/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code) {
+        return res.redirect('/auth?error=no_code');
+      }
+
+      // Exchange code for session with Supabase
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code as string);
+      
+      if (error || !data?.user) {
+        console.error("OAuth callback error:", error);
+        return res.redirect('/auth?error=oauth_failed');
+      }
+
+      // Check if user exists in our database
+      let user = await storage.getUserByEmail(data.user.email!);
+      
+      if (!user) {
+        // Create new user from Google OAuth data
+        const userData = data.user.user_metadata;
+        user = await storage.createUser({
+          username: userData.email || data.user.email!,
+          email: data.user.email!,
+          firstName: userData.given_name || userData.name?.split(' ')[0] || null,
+          lastName: userData.family_name || userData.name?.split(' ').slice(1).join(' ') || null,
+          address: null,
+          profileImage: userData.avatar_url || null,
+          walletBalance: 0,
+          isSeller: true,
+          isAdmin: false,
+          isBanned: false,
+          providerId: data.user.id,
+          provider: 'google'
+        });
+      } else if (!user.providerId) {
+        // Link existing account with Google
+        await storage.updateUser(user.id, {
+          providerId: data.user.id,
+          provider: 'google'
+        });
+        user = await storage.getUserByEmail(data.user.email!);
+      }
+
+      // Create session
+      req.login(user!, (err) => {
+        if (err) {
+          console.error("Session creation failed:", err);
+          return res.redirect('/auth?error=session_failed');
+        }
+        
+        // Redirect to dashboard on successful login
+        res.redirect('/dashboard');
+      });
+      
+    } catch (error: any) {
+      console.error("OAuth callback error:", error);
+      res.redirect('/auth?error=oauth_failed');
     }
   });
 
