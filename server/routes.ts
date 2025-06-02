@@ -2080,12 +2080,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get conversation between two users
   app.get("/api/messages/conversation/:userId", async (req, res, next) => {
     try {
-      // Check authentication
-      if (!req.isAuthenticated()) {
+      // Check JWT authentication
+      const jwtUser = getJWTUser(req);
+      if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to access messages" });
       }
       
-      const currentUserId = req.user.id;
+      const currentUserId = jwtUser.id;
       const otherUserId = parseInt(req.params.userId);
       
       if (isNaN(otherUserId)) {
@@ -2480,8 +2481,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Submit a review for a completed transaction
   app.post("/api/messages/submit-review/:messageId", async (req, res, next) => {
     try {
-      // Check authentication
-      if (!req.isAuthenticated()) {
+      // Check JWT authentication
+      const jwtUser = getJWTUser(req);
+      if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to submit reviews" });
       }
       
@@ -2508,7 +2510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { rating, comment, productId, sellerId } = validationResult.data;
-      const userId = req.user.id;
+      const userId = jwtUser.id;
       
       // Fetch the message to verify it's a review action message for this user
       const message = await storage.getMessageById(messageId);
@@ -2619,8 +2621,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mark messages as read
   app.post("/api/messages/mark-read", async (req, res, next) => {
     try {
-      // Check authentication
-      if (!req.isAuthenticated()) {
+      // Check JWT authentication
+      const jwtUser = getJWTUser(req);
+      if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to update messages" });
       }
       
@@ -2633,7 +2636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const { messageId, senderId } = schema.parse(req.body);
-      const currentUserId = req.user.id;
+      const currentUserId = jwtUser.id;
       
       if (messageId) {
         // Mark a single message as read
@@ -2652,12 +2655,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint to get unread message count
   app.get("/api/messages/unread-count", async (req, res, next) => {
     try {
-      // Check authentication
-      if (!req.isAuthenticated()) {
+      // Check JWT authentication
+      const jwtUser = getJWTUser(req);
+      if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to get unread messages" });
       }
       
-      const currentUserId = req.user.id;
+      const currentUserId = jwtUser.id;
       
       // Get unread message count
       const count = await storage.getUnreadMessageCount(currentUserId);
