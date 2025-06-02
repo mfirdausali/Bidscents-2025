@@ -101,11 +101,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest("POST", "/api/login", credentials);
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (response: { user: SelectUser; token: string }) => {
+      // Store the JWT token
+      setAuthToken(response.token);
+      // Cache the user data
+      queryClient.setQueryData(["/api/user"], response.user);
       toast({
         title: "Login successful",
-        description: `Welcome back, ${user.username}!`,
+        description: `Welcome back, ${response.user.username}!`,
       });
     },
     onError: (error: Error) => {
