@@ -319,14 +319,10 @@ export function useMessaging() {
     const fetchMessages = async () => {
       setLoading(true);
       try {
-        // Get response data from API
-        const res = await fetch('/api/messages');
-        if (res.ok) {
-          const data = await res.json();
-          setMessages(data as Message[]);
-        } else {
-          throw new Error('Failed to fetch messages');
-        }
+        // Use authenticated API request that includes JWT token
+        const res = await apiRequest('GET', '/api/messages');
+        const data = await res.json();
+        setMessages(data as Message[]);
         setError(null);
       } catch (err: any) {
         console.error('Error fetching messages:', err);
@@ -491,8 +487,8 @@ export function useMessaging() {
       
       console.log('Fetching conversation from URL:', url);
       
-      // Fetch conversation data
-      const res = await fetch(url);
+      // Fetch conversation data with authentication
+      const res = await apiRequest('GET', url);
       console.log('Conversation API response status:', res.status);
       
       if (!res.ok) {
