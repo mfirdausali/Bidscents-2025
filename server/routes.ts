@@ -1611,7 +1611,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("File upload request received");
       
-      if (!req.isAuthenticated()) {
+      const jwtUser = getJWTUser(req);
+      if (!jwtUser) {
         console.log("Authentication check failed");
         return res.status(401).json({ message: "Unauthorized: Please log in to upload files" });
       }
@@ -1665,7 +1666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Prepare message data
       const messagePayload = {
-        sender_id: req.user.id,
+        sender_id: jwtUser.id,
         receiver_id: parseInt(req.body.receiverId),
         content: null, // Content is null for FILE type messages
         product_id: req.body.productId ? parseInt(req.body.productId) : null,
@@ -2054,12 +2055,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all messages for authenticated user
   app.get("/api/messages", async (req, res, next) => {
     try {
-      // Check authentication
-      if (!req.isAuthenticated()) {
+      // Check JWT authentication
+      const jwtUser = getJWTUser(req);
+      if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to access messages" });
       }
       
-      const userId = req.user.id;
+      const userId = jwtUser.id;
       const messages = await storage.getUserMessages(userId);
       
       // Decrypt message content and prepare file URLs
@@ -2247,8 +2249,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Confirm transaction action
   app.post("/api/messages/action/confirm", async (req, res, next) => {
     try {
-      // Check authentication
-      if (!req.isAuthenticated()) {
+      // Check JWT authentication
+      const jwtUser = getJWTUser(req);
+      if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to confirm transactions" });
       }
       
@@ -2267,7 +2270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { messageId } = validationResult.data;
-      const userId = req.user.id;
+      const userId = jwtUser.id;
       
       // Fetch the message to verify it's a transaction for this user
       const message = await storage.getMessageById(messageId);
