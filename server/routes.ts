@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { setupSupabaseAuth } from "./supabase-auth";
+// Removed complex Passport.js authentication
 import { storage } from "./storage";
 import { 
   insertProductSchema, 
@@ -25,7 +25,7 @@ import { encryptMessage, decryptMessage, isEncrypted } from './encryption';
 import { generateSellerPreview } from './social-preview';
 import * as billplz from './billplz';
 import crypto from 'crypto';
-import { setupAuth } from './auth';
+import { setupJWTAuth } from './simple-jwt-auth';
 
 /**
  * Helper function to determine if we're in a sandbox environment
@@ -145,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Set up authentication routes (includes registration endpoint)
-  setupAuth(app);
+  setupJWTAuth(app);
   
   // Raw query middleware specifically for Billplz redirect
   // This captures the original query string before Express parses it
