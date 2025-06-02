@@ -5,7 +5,7 @@ import {
   UseMutationResult,
 } from "@tanstack/react-query";
 import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
-import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
+import { getQueryFn, apiRequest, queryClient, setAuthToken, removeAuthToken } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { signInWithFacebook } from "@/lib/supabase";
@@ -117,10 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // New login with email
+  // JWT-based login with email
   const loginWithEmailMutation = useMutation({
     mutationFn: async (credentials: EmailLoginData) => {
-      const res = await apiRequest("POST", "/api/login-with-email", credentials);
+      const res = await apiRequest("POST", "/api/login", credentials);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Login failed");
@@ -128,6 +128,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (data) => {
+      // Store JWT token
+      if (data.token) {
+        setAuthToken(data.token);
+      }
+      // Update user data in cache
       queryClient.setQueryData(["/api/user"], data.user);
       toast({
         title: "Login successful",
@@ -143,17 +148,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Original register
+  // JWT-based register
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
       const res = await apiRequest("POST", "/api/register", credentials);
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (data) => {
+      // Store JWT token
+      if (data.token) {
+        setAuthToken(data.token);
+      }
+      // Update user data in cache
+      queryClient.setQueryData(["/api/user"], data.user);
       toast({
         title: "Registration successful",
-        description: `Welcome, ${user.username}!`,
+        description: `Welcome, ${data.user.username}!`,
       });
     },
     onError: (error: Error) => {
@@ -218,12 +228,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Logout mutation
+  // JWT-based logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
+      // Remove JWT token from storage
+      removeAuthToken();
+      // Clear user data from cache
       queryClient.setQueryData(["/api/user"], null);
       toast({
         title: "Logged out",
@@ -231,10 +244,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      // Even if server logout fails, remove token locally
+      removeAuthToken();
+      queryClient.setQueryData(["/api/user"], null);
       toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
+        title: "Logged out",
+        description: "You have been logged out.",
       });
     },
   });

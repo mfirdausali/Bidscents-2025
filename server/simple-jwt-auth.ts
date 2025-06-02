@@ -1,7 +1,8 @@
 import { Express, Request, Response, NextFunction } from "express";
 import { generateToken, verifyTokenFromRequest } from "./jwt";
 import { storage } from "./storage";
-import { signInWithEmail } from "./supabase";
+import { signInWithEmail, registerUserWithEmailVerification } from "./supabase";
+import { insertUserSchema } from "@shared/schema";
 
 /**
  * Simple JWT-based authentication setup
@@ -123,6 +124,80 @@ export function setupJWTAuth(app: Express) {
 
     } catch (error: any) {
       console.error("Get user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Registration endpoint with JWT token generation
+  app.post("/api/register", async (req: Request, res: Response) => {
+    try {
+      const registrationId = Math.random().toString(36).substr(2, 9);
+      console.log(`[${registrationId}] JWT Registration attempt`);
+
+      // Validate request body
+      const userData = insertUserSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(userData.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      const existingUsername = await storage.getUserByUsername(userData.username);
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Register with Supabase first
+      let authData;
+      try {
+        authData = await registerUserWithEmailVerification(userData.email, userData.password || 'temp', { 
+          username: userData.username 
+        });
+      } catch (authError: any) {
+        console.error(`[${registrationId}] Supabase registration error:`, authError);
+        return res.status(400).json({ message: authError.message || "Registration failed with auth provider" });
+      }
+
+      // Extract provider ID for secure linking
+      let providerId = null;
+      if (authData?.user?.id) {
+        providerId = authData.user.id;
+      }
+
+      // Create user in our database
+      const user = await storage.createUser({
+        ...userData,
+        providerId: providerId,
+        provider: 'supabase',
+      });
+
+      // Generate JWT token
+      const token = generateToken(user);
+
+      console.log(`[${registrationId}] JWT Registration successful for: ${user.username} (ID: ${user.id})`);
+
+      // Return user and token
+      res.status(201).json({
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          avatarUrl: user.avatarUrl,
+          isAdmin: user.isAdmin,
+          isSeller: user.isSeller,
+          isVerified: user.isVerified,
+          shopName: user.shopName,
+          location: user.location,
+          bio: user.bio
+        },
+        token
+      });
+
+    } catch (error: any) {
+      console.error("Registration error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
