@@ -13,19 +13,25 @@ export function setupJWTAuth(app: Express) {
   // Login endpoint with JWT token generation
   app.post("/api/login", async (req: Request, res: Response) => {
     try {
-      const { email, password } = req.body;
+      const { email, username, password } = req.body;
       const loginId = Math.random().toString(36).substr(2, 9);
+      const identifier = email || username;
       
-      console.log(`[${loginId}] JWT Login attempt for: ${email}`);
+      console.log(`[${loginId}] JWT Login attempt for: ${identifier}`);
 
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
+      if (!identifier || !password) {
+        return res.status(400).json({ message: "Email/username and password are required" });
       }
 
-      // Get user from database by email
-      const user = await storage.getUserByEmail(email);
+      // Get user from database by email or username
+      let user;
+      if (email) {
+        user = await storage.getUserByEmail(email);
+      } else if (username) {
+        user = await storage.getUserByUsername(username);
+      }
       if (!user) {
-        console.log(`[${loginId}] User not found: ${email}`);
+        console.log(`[${loginId}] User not found: ${identifier}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
@@ -39,9 +45,9 @@ export function setupJWTAuth(app: Express) {
         hasProviderId: !!user.providerId
       });
 
-      // Verify credentials with Supabase
+      // Verify credentials with Supabase using the user's email
       try {
-        const authResult = await signInWithEmail(email, password);
+        const authResult = await signInWithEmail(user.email, password);
         console.log(`[${loginId}] Supabase auth result:`, {
           hasUser: !!authResult?.user,
           supabaseUserId: authResult?.user?.id,
