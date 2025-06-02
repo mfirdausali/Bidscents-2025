@@ -9,14 +9,18 @@ async function throwIfResNotOk(res: Response) {
 
 // JWT token management
 function getAuthToken(): string | null {
-  return localStorage.getItem('auth_token');
+  const token = localStorage.getItem('auth_token');
+  console.log('[JWT] Getting token from localStorage:', token ? 'token present' : 'no token');
+  return token;
 }
 
 function setAuthToken(token: string): void {
+  console.log('[JWT] Storing token in localStorage');
   localStorage.setItem('auth_token', token);
 }
 
 function removeAuthToken(): void {
+  console.log('[JWT] Removing token from localStorage');
   localStorage.removeItem('auth_token');
 }
 

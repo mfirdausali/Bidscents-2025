@@ -26,6 +26,7 @@ import { generateSellerPreview } from './social-preview';
 import * as billplz from './billplz';
 import crypto from 'crypto';
 import { setupJWTAuth } from './simple-jwt-auth';
+import { verifyTokenFromRequest } from './jwt';
 
 /**
  * Helper function to determine if we're in a sandbox environment
@@ -33,6 +34,20 @@ import { setupJWTAuth } from './simple-jwt-auth';
  */
 function isBillplzSandbox(): boolean {
   return process.env.BILLPLZ_BASE_URL?.includes('sandbox') ?? true;
+}
+
+/**
+ * JWT Authentication helper function
+ * Replaces req.isAuthenticated() checks with JWT token verification
+ */
+function getJWTUser(req: any): any | null {
+  const tokenUser = verifyTokenFromRequest(req);
+  if (tokenUser) {
+    console.log(`JWT auth successful for user ID: ${tokenUser.id}`);
+    return tokenUser;
+  }
+  console.log('JWT auth failed - no valid token');
+  return null;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -171,7 +186,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User profile update endpoint
   app.patch("/api/user/:id", async (req, res, next) => {
     try {
-      if (!req.isAuthenticated()) {
+      const jwtUser = getJWTUser(req);
+      if (!jwtUser) {
         return res.status(401).json({ message: "Unauthorized: Please log in to update your profile" });
       }
 

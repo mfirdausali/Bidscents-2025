@@ -59,17 +59,20 @@ export function setupJWTAuth(app: Express) {
           
           // Update user with Supabase provider ID for future logins
           try {
-            await storage.updateUser(user.id, {
+            console.log(`[${loginId}] Attempting to update user ${user.id} with providerId...`);
+            const updatedUser = await storage.updateUser(user.id, {
               providerId: authResult.user.id,
               provider: 'supabase'
             });
-            console.log(`[${loginId}] Updated user ${user.id} with providerId: ${authResult.user.id}`);
+            console.log(`[${loginId}] Successfully updated user ${user.id} with providerId: ${authResult.user.id}`);
             
             // Update the user object for the rest of this request
             user.providerId = authResult.user.id;
             user.provider = 'supabase';
           } catch (updateError: any) {
             console.error(`[${loginId}] Failed to update user providerId:`, updateError);
+            console.error(`[${loginId}] Update error details:`, updateError.message, updateError.stack);
+            // Continue with login even if update fails
           }
         } else {
           // Verify provider ID matches for security
