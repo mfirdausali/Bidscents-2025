@@ -134,16 +134,21 @@ export function setupJWTAuth(app: Express) {
       const registrationId = Math.random().toString(36).substr(2, 9);
       console.log(`[${registrationId}] JWT Registration attempt`);
 
-      // Validate request body
-      const userData = insertUserSchema.parse(req.body);
+      // Validate request body and get password
+      const { password, ...userData } = req.body;
+      const validatedData = insertUserSchema.parse(userData);
+      
+      if (!password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
       
       // Check if user already exists
-      const existingUser = await storage.getUserByEmail(userData.email);
+      const existingUser = await storage.getUserByEmail(validatedData.email);
       if (existingUser) {
         return res.status(400).json({ message: "Email already exists" });
       }
 
-      const existingUsername = await storage.getUserByUsername(userData.username);
+      const existingUsername = await storage.getUserByUsername(validatedData.username);
       if (existingUsername) {
         return res.status(400).json({ message: "Username already exists" });
       }
@@ -151,8 +156,8 @@ export function setupJWTAuth(app: Express) {
       // Register with Supabase first
       let authData;
       try {
-        authData = await registerUserWithEmailVerification(userData.email, userData.password || 'temp', { 
-          username: userData.username 
+        authData = await registerUserWithEmailVerification(validatedData.email, password, { 
+          username: validatedData.username 
         });
       } catch (authError: any) {
         console.error(`[${registrationId}] Supabase registration error:`, authError);
@@ -167,7 +172,7 @@ export function setupJWTAuth(app: Express) {
 
       // Create user in our database
       const user = await storage.createUser({
-        ...userData,
+        ...validatedData,
         providerId: providerId,
         provider: 'supabase',
       });
