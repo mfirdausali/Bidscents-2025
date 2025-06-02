@@ -29,18 +29,54 @@ export function setupJWTAuth(app: Express) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
+      // DEBUG: Log user details to identify the issue
+      console.log(`[${loginId}] Found user:`, {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        providerId: user.providerId,
+        provider: user.provider,
+        hasProviderId: !!user.providerId
+      });
+
       // Verify credentials with Supabase
       try {
         const authResult = await signInWithEmail(email, password);
+        console.log(`[${loginId}] Supabase auth result:`, {
+          hasUser: !!authResult?.user,
+          supabaseUserId: authResult?.user?.id,
+          supabaseUserEmail: authResult?.user?.email
+        });
+
         if (!authResult?.user) {
           console.log(`[${loginId}] Supabase authentication failed for: ${email}`);
           return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        // Verify provider ID matches for security
-        if (user.providerId !== authResult.user.id) {
-          console.error(`[${loginId}] Provider ID mismatch - User: ${user.providerId}, Supabase: ${authResult.user.id}`);
-          return res.status(401).json({ message: "Authentication provider mismatch" });
+        // Check if user has providerId set
+        if (!user.providerId) {
+          console.log(`[${loginId}] User missing providerId, attempting to update with Supabase ID: ${authResult.user.id}`);
+          
+          // Update user with Supabase provider ID for future logins
+          try {
+            await storage.updateUser(user.id, {
+              providerId: authResult.user.id,
+              provider: 'supabase'
+            });
+            console.log(`[${loginId}] Updated user ${user.id} with providerId: ${authResult.user.id}`);
+            
+            // Update the user object for the rest of this request
+            user.providerId = authResult.user.id;
+            user.provider = 'supabase';
+          } catch (updateError: any) {
+            console.error(`[${loginId}] Failed to update user providerId:`, updateError);
+          }
+        } else {
+          // Verify provider ID matches for security
+          if (user.providerId !== authResult.user.id) {
+            console.error(`[${loginId}] Provider ID mismatch - User: ${user.providerId}, Supabase: ${authResult.user.id}`);
+            return res.status(401).json({ message: "Authentication provider mismatch" });
+          }
         }
 
         // Generate JWT token
