@@ -17,6 +17,7 @@ export function setupJWTAuth(app: Express) {
       const loginId = Math.random().toString(36).substr(2, 9);
       const identifier = email || username;
       
+      console.log(`[${loginId}] Request body:`, { email, username, password: password ? '[REDACTED]' : 'missing' });
       console.log(`[${loginId}] JWT Login attempt for: ${identifier}`);
 
       if (!identifier || !password) {
