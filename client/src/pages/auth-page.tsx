@@ -84,11 +84,7 @@ export default function AuthPage() {
       setResetRequested(true);
     }
     
-    // Check if email is verified
-    if (params.get("verified") === "true") {
-      setIsEmailVerified(true);
-    }
-  }, [location, setIsEmailVerified]);
+  }, [location]);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -192,15 +188,7 @@ export default function AuthPage() {
                   </CardDescription>
                 </CardHeader>
                 
-                {isEmailVerified && (
-                  <Alert className="mx-6 mb-4 bg-green-50 border-green-200">
-                    <AlertCircle className="h-4 w-4 text-green-600" />
-                    <AlertTitle className="text-green-600">Email verified</AlertTitle>
-                    <AlertDescription className="text-green-700">
-                      Your email has been successfully verified. You can now log in.
-                    </AlertDescription>
-                  </Alert>
-                )}
+
                 
                 {registrationSuccess && (
                   <Alert className="mx-6 mb-4 bg-blue-50 border-blue-200">
