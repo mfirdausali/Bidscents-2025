@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from './use-auth';
+import { useAuth } from './use-supabase-auth';
 import { useToast } from './use-toast';
 import { apiRequest } from '@/lib/queryClient';
 

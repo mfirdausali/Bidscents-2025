@@ -32,7 +32,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-supabase-auth";
 import { ProductCard } from "../components/ui/product-card";
 import { AuctionCard } from "../components/ui/auction-card";
 import { ProductFilters } from "../components/product-filters";

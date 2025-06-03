@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ContactSellerButton } from "@/components/ui/contact-seller-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Info } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-supabase-auth";
 
 export default function ProductDetailPage() {
   const [, params] = useRoute("/products/:id");

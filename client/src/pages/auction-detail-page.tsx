@@ -11,7 +11,7 @@ import { Clock, DollarSign, User, Users, CheckCircle, MessageCircle } from "luci
 import { queryClient } from "@/lib/queryClient";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-supabase-auth";
 
 interface Bid {
   id: number;

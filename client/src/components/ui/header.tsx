@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-supabase-auth";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { Input } from "./input";
 import { Button } from "./button";

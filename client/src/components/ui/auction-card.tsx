@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Button } from "./button";
 import { Heart, Star, StarHalf, Clock, Users } from "lucide-react";
 import { Badge } from "./badge";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-supabase-auth";
 import { useToast } from "@/hooks/use-toast";
 import { ContactSellerButton } from "./contact-seller-button";
 
