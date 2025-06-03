@@ -51,14 +51,10 @@ export default function AuthPage() {
   const [location, navigate] = useLocation();
   const { 
     user, 
-    loginMutation, 
-    loginWithEmailMutation,
-    registerMutation, 
-    registerWithVerificationMutation,
+    signInMutation,
+    signUpMutation,
     resetPasswordMutation,
-    loginWithFacebookMutation,
-    isEmailVerified,
-    setIsEmailVerified
+    signInWithFacebookMutation
   } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
@@ -144,11 +140,11 @@ export default function AuthPage() {
   });
 
   const onLoginSubmit = (data: LoginFormValues) => {
-    loginMutation.mutate(data);
+    signInMutation.mutate(data);
   };
   
   const onEmailLoginSubmit = (data: EmailLoginFormValues) => {
-    loginWithEmailMutation.mutate(data);
+    signInMutation.mutate(data);
   };
   
   const onResetPasswordSubmit = (data: ResetPasswordFormValues) => {
@@ -160,7 +156,7 @@ export default function AuthPage() {
     const { confirmPassword, terms, ...registerData } = data;
     
     // Use the new verification-based registration with Supabase Auth
-    registerWithVerificationMutation.mutate({
+    signUpMutation.mutate({
       username: registerData.username,
       email: registerData.email,
       password: registerData.password,
@@ -317,9 +313,9 @@ export default function AuthPage() {
                         <Button 
                           type="submit" 
                           className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
-                          disabled={loginWithEmailMutation.isPending}
+                          disabled={signInMutation.isPending}
                         >
-                          {loginWithEmailMutation.isPending ? (
+                          {signInMutation.isPending ? (
                             <span className="flex items-center">
                               <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
                               Signing in...
@@ -384,9 +380,9 @@ export default function AuthPage() {
                         <Button 
                           type="submit" 
                           className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
-                          disabled={loginMutation.isPending}
+                          disabled={signInMutation.isPending}
                         >
-                          {loginMutation.isPending ? (
+                          {signInMutation.isPending ? (
                             <span className="flex items-center">
                               <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
                               Signing in...
@@ -542,9 +538,9 @@ export default function AuthPage() {
                     <Button 
                       type="submit" 
                       className="w-full bg-amber-500 text-black font-semibold hover:bg-amber-600"
-                      disabled={registerWithVerificationMutation.isPending}
+                      disabled={signUpMutation.isPending}
                     >
-                      {registerWithVerificationMutation.isPending ? (
+                      {signUpMutation.isPending ? (
                         <span className="flex items-center">
                           <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-rich-black rounded-full"></span>
                           Setting up account...
