@@ -25,7 +25,7 @@ import { encryptMessage, decryptMessage, isEncrypted } from './encryption';
 import { generateSellerPreview } from './social-preview';
 import * as billplz from './billplz';
 import crypto from 'crypto';
-import { setupJWTAuth } from './simple-jwt-auth';
+import { setupAppAuth } from './app-auth';
 import { verifyTokenFromRequest } from './jwt';
 
 /**
@@ -159,8 +159,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
-  // Set up authentication routes (includes registration endpoint)
-  setupJWTAuth(app);
+  // Set up streamlined Supabase authentication system
+  const { requireAuth } = setupAppAuth(app);
   
   // Raw query middleware specifically for Billplz redirect
   // This captures the original query string before Express parses it

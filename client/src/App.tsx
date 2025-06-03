@@ -17,7 +17,7 @@ import VerifyEmailPage from "@/pages/verify-email";
 import ResetPasswordPage from "@/pages/reset-password";
 import AuthCallback from "@/pages/auth-callback";
 import { ProtectedRoute } from "./lib/protected-route";
-import { AuthProvider } from "./hooks/use-auth";
+import { AuthProvider } from "./hooks/use-supabase-auth";
 import TermsOfServicePage from "./pages/terms-of-service";
 import PrivacyPolicyPage from "./pages/privacy-policy";
 import BuyingGuidePage from "@/pages/buying-guide"; // Import the new component
