@@ -25,8 +25,7 @@ import { encryptMessage, decryptMessage, isEncrypted } from './encryption';
 import { generateSellerPreview } from './social-preview';
 import * as billplz from './billplz';
 import crypto from 'crypto';
-import { setupAppAuth } from './app-auth';
-import { verifyTokenFromRequest } from './jwt';
+import { requireAuth, getUserFromToken, authRoutes, AuthenticatedRequest } from './app-auth';
 
 /**
  * Helper function to determine if we're in a sandbox environment
@@ -37,17 +36,11 @@ function isBillplzSandbox(): boolean {
 }
 
 /**
- * JWT Authentication helper function
- * Replaces req.isAuthenticated() checks with JWT token verification
+ * Helper function to get authenticated user from request
+ * Uses the new Supabase-only authentication system
  */
-function getJWTUser(req: any): any | null {
-  const tokenUser = verifyTokenFromRequest(req);
-  if (tokenUser) {
-    console.log(`JWT auth successful for user ID: ${tokenUser.id}`);
-    return tokenUser;
-  }
-  console.log('JWT auth failed - no valid token');
-  return null;
+function getAuthenticatedUser(req: Request): { id: number; email: string; supabaseId: string } | null {
+  return getUserFromToken(req);
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {

@@ -162,7 +162,7 @@ export class MemStorage implements IStorage {
   private orderItems: Map<number, OrderItem>;
   private productImages: Map<number, ProductImage>;
   private messages: Map<number, Message>;
-  sessionStore: any;
+  // Removed session store - using Supabase authentication
   currentIds: {
     users: number;
     categories: number;
@@ -690,13 +690,10 @@ export class MemStorage implements IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  sessionStore: any;
+  // Removed session store - using Supabase authentication
 
   constructor() {
-    this.sessionStore = new PgSessionStore({
-      pool,
-      createTableIfMissing: true
-    });
+    // Using Supabase as sole authentication provider
     this.initializeDefaultData();
   }
 
