@@ -612,7 +612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all products (for admin dashboard)
   app.get("/api/products/all", async (req, res, next) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user || !user.isAdmin) {
+      if (!getAuthenticatedUser(req) || !user.isAdmin) {
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
       
@@ -651,7 +651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/products", async (req, res, next) => {
     try {
       // First check if the user is authenticated via session
-      const user = getAuthenticatedUser(req); if (!user) {
+      if (!getAuthenticatedUser(req)) {
         // If not, try to get current user ID from the query parameters
         if (!req.body.sellerId) {
           return res.status(403).json({ message: "Unauthorized: User not authenticated" });
@@ -694,7 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // First check if the user is authenticated via session
       let sellerId = 0;
-      const user = getAuthenticatedUser(req); if (user) {
+      if (getAuthenticatedUser(req) && user) {
         if (!user.isSeller) {
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
         }
@@ -744,7 +744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check authentication
       let sellerId = 0;
-      const user = getAuthenticatedUser(req); if (user) {
+      if (getAuthenticatedUser(req) && user) {
         if (!user.isSeller) {
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
         }
@@ -835,7 +835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check authentication
       let sellerId = 0;
-      const user = getAuthenticatedUser(req); if (user) {
+      if (getAuthenticatedUser(req) && user) {
         if (!user.isSeller) {
           console.log("User is not a seller:", user);
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
@@ -991,7 +991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // First check if the user is authenticated via session
       let sellerId = 0;
-      const user = getAuthenticatedUser(req); if (user) {
+      if (getAuthenticatedUser(req) && user) {
         if (!user.isSeller) {
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
         }
@@ -1066,7 +1066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check authentication
       let sellerId = 0;
-      const user = getAuthenticatedUser(req); if (user) {
+      if (getAuthenticatedUser(req) && user) {
         if (!user.isSeller) {
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
         }
@@ -1145,7 +1145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check authentication
       let sellerId = 0;
-      const user = getAuthenticatedUser(req); if (user) {
+      if (getAuthenticatedUser(req) && user) {
         if (!user.isSeller) {
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
         }
@@ -1206,7 +1206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cart endpoints
   app.get("/api/cart", async (req, res, next) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user) {
+      if (!getAuthenticatedUser(req)) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
@@ -1231,7 +1231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/reviews", async (req, res, next) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user) {
+      if (!getAuthenticatedUser(req)) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
@@ -1263,7 +1263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/seller/products", async (req, res, next) => {
     try {
       // Check if user is authenticated via session
-      const user = getAuthenticatedUser(req); if (user if (getAuthenticatedUser(req) &&if (getAuthenticatedUser(req) && user.isSeller) {
+      if (getAuthenticatedUser(req) && user.isSeller) {
         const products = await storage.getSellerProducts(user.id);
         return res.json(products);
       }
@@ -1449,7 +1449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin-specific endpoints
   app.get("/api/admin/users", async (req, res, next) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user || !user.isAdmin) {
+      if (!getAuthenticatedUser(req) || !user.isAdmin) {
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
 
@@ -1462,7 +1462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/admin/users/:id/ban", async (req, res, next) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user || !user.isAdmin) {
+      if (!getAuthenticatedUser(req) || !user.isAdmin) {
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
 
@@ -1488,7 +1488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/orders", async (req, res, next) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user || !user.isAdmin) {
+      if (!getAuthenticatedUser(req) || !user.isAdmin) {
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
 
@@ -1501,7 +1501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/admin/orders/:id/status", async (req, res, next) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user || !user.isAdmin) {
+      if (!getAuthenticatedUser(req) || !user.isAdmin) {
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
 
@@ -1525,7 +1525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin route to remove a product listing and notify the seller
   app.post("/api/admin/products/:id/remove", async (req, res, next) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user || !user.isAdmin) {
+      if (!getAuthenticatedUser(req) || !user.isAdmin) {
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
       
@@ -1881,7 +1881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check authentication
       let sellerId = 0;
-      const user = getAuthenticatedUser(req); if (user) {
+      if (getAuthenticatedUser(req) && user) {
         if (!user.isSeller) {
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
         }
@@ -1942,7 +1942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check authentication
       let sellerId = 0;
-      const user = getAuthenticatedUser(req); if (user) {
+      if (getAuthenticatedUser(req) && user) {
         if (!user.isSeller) {
           return res.status(403).json({ message: "Unauthorized: Seller account required" });
         }
@@ -4074,7 +4074,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/boost/seller-boosted - Get seller's currently boosted products
   app.get('/api/boost/seller-boosted', async (req, res) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user) {
+      if (!getAuthenticatedUser(req)) {
         return res.status(401).json({ message: 'Unauthorized: Must be logged in to view boosted products' });
       }
       
@@ -5823,7 +5823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/payments/user - Get user's payments
   app.get('/api/payments/user', async (req, res) => {
     try {
-      const user = getAuthenticatedUser(req); if (!user) {
+      if (!getAuthenticatedUser(req)) {
         return res.status(401).json({ message: 'Unauthorized: Please log in to view payments' });
       }
       
