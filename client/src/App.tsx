@@ -16,6 +16,7 @@ import MessagesPage from "@/pages/messages-page";
 import VerifyEmailPage from "@/pages/verify-email";
 import ResetPasswordPage from "@/pages/reset-password";
 import AuthCallback from "@/pages/auth-callback";
+import { AuthVerifyPage } from "@/pages/auth-verify";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-supabase-auth";
 import TermsOfServicePage from "./pages/terms-of-service";
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/login" component={AuthPage} />
       <Route path="/register" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
+      <Route path="/auth/verify" component={AuthVerifyPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/auth-callback" component={AuthCallback} />
       <Route path="/products" component={ProductsPage} />
