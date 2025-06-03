@@ -167,14 +167,24 @@ export const authRoutes = {
       let localUser = await storage.getUserByProviderId(user.id);
       
       if (!localUser) {
-        localUser = await storage.createUser({
-          email: user.email!,
-          username: user.email!.split('@')[0],
-          providerId: user.id,
-          provider: 'supabase',
-          firstName: user.user_metadata?.first_name || null,
-          lastName: user.user_metadata?.last_name || null,
-        });
+        // Try to find existing user by email
+        const existingUser = await storage.getUserByEmail(user.email!);
+        
+        if (existingUser) {
+          // Update existing user with provider information
+          await storage.updateUserProviderId(existingUser.id, user.id);
+          localUser = existingUser;
+        } else {
+          // Create new user
+          localUser = await storage.createUser({
+            email: user.email!,
+            username: user.email!.split('@')[0],
+            providerId: user.id,
+            provider: 'supabase',
+            firstName: user.user_metadata?.first_name || null,
+            lastName: user.user_metadata?.last_name || null,
+          });
+        }
       }
 
       // Generate application JWT
