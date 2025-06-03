@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessagingDialog } from '@/components/ui/messaging-dialog';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-supabase-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { MessageSquare } from 'lucide-react';

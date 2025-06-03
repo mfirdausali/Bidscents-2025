@@ -4,7 +4,7 @@ import { X, Trash2, Plus, Minus } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { CartItemWithProduct } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-supabase-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "./separator";
 import { Badge } from "./badge";

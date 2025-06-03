@@ -4,7 +4,7 @@ import { Button } from "./button";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-supabase-auth";
 import { useToast } from "@/hooks/use-toast";
 
 export function FeaturedProductCarousel() {
