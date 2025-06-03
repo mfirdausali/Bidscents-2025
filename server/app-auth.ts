@@ -196,6 +196,28 @@ export const authRoutes = {
     }
   },
 
+  // Look up email by username for authentication
+  lookupEmail: async (req: Request, res: Response) => {
+    try {
+      const { username } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ error: 'Username required' });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      
+      if (!user) {
+        return res.status(404).json({ error: 'Username not found' });
+      }
+
+      res.json({ email: user.email });
+    } catch (error) {
+      console.error('Email lookup error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+
   // Get current user profile
   me: async (req: Request, res: Response) => {
     try {

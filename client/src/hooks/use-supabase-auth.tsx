@@ -30,7 +30,8 @@ type SignUpData = {
 };
 
 type SignInData = { 
-  email: string; 
+  email?: string;
+  username?: string;
   password: string;
 };
 
@@ -38,7 +39,7 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   
   // Check for authentication state and get user profile
   const {
@@ -149,11 +150,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Sign in with email and password
+  // Sign in with email/username and password
   const signInMutation = useMutation({
     mutationFn: async (credentials: SignInData) => {
+      let email: string | undefined = credentials.email;
+      
+      // If username is provided instead of email, look up the email
+      if (credentials.username && !credentials.email) {
+        const response = await apiRequest("POST", "/api/v1/auth/lookup-email", {
+          username: credentials.username
+        });
+        
+        if (!response.ok) {
+          throw new Error("Username not found");
+        }
+        
+        const data = await response.json();
+        email = data.email;
+      }
+
+      if (!email) {
+        throw new Error("Email or username is required");
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: credentials.email,
+        email: email,
         password: credentials.password,
       });
 
@@ -169,6 +190,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Login successful",
         description: "Welcome back!",
       });
+      
+      // Redirect to homepage after successful login
+      setLocation("/");
     },
     onError: (error: Error) => {
       toast({
