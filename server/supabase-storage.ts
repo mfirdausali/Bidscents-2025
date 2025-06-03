@@ -32,10 +32,8 @@ interface CartItemWithProduct extends CartItem {
 }
 import { IStorage } from "./storage";
 import { supabase } from "./supabase";
-import session from "express-session";
-import createMemoryStore from "memorystore";
-import connectPg from "connect-pg-simple";
-import { SupabaseSessionStore } from "./supabase-session-store";
+// Removed session dependency - using Supabase as sole IdP
+// Removed all session dependencies - using Supabase as sole IdP
 
 type ProductFilter = {
   categoryId?: number;
@@ -50,7 +48,7 @@ type ProductFilter = {
  * while keeping Replit Object Storage for file storage
  */
 export class SupabaseStorage implements IStorage {
-  sessionStore: any;
+  // Removed session store - using Supabase authentication
 
   constructor() {
     // CRITICAL SECURITY FIX: Use secure memory store with proper session isolation

@@ -29,16 +29,12 @@ interface InsertCartItem {
 interface CartItemWithProduct extends CartItem {
   product: Product;
 }
-import session from "express-session";
-import createMemoryStore from "memorystore";
-import connectPg from "connect-pg-simple";
+// Removed session dependencies - using Supabase as sole IdP
 import { db } from "./db";
 import { eq, and, gte, lte, like, ilike, asc, desc, sql, or, isNull } from "drizzle-orm";
 import pkg from "pg";
 const { Pool } = pkg;
 
-const MemoryStore = createMemoryStore(session);
-const PgSessionStore = connectPg(session);
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
@@ -153,8 +149,7 @@ export interface IStorage {
   getProductTransactions(productId: number): Promise<TransactionWithDetails[]>;
   updateTransactionStatus(id: number, status: string): Promise<Transaction>;
   
-  // Session storage
-  sessionStore: any;
+  // Removed session storage - using Supabase as sole IdP
 }
 
 export class MemStorage implements IStorage {
@@ -201,9 +196,7 @@ export class MemStorage implements IStorage {
       productImages: 1,
       messages: 1
     };
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000, // 1 day
-    });
+    // Removed session store initialization - using Supabase authentication
     
     // Initialize with default categories
     this.initializeDefaultData();
