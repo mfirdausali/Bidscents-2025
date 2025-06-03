@@ -17,7 +17,7 @@ import { Search, Heart, MessageCircle, User, LogOut, Package, Shield } from "luc
 
 export function Header() {
   const [location] = useLocation();
-  const { user, logoutMutation } = useAuth();
+  const { user, signOutMutation } = useAuth();
   const { unreadCount } = useUnreadMessages();
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,7 +47,7 @@ export function Header() {
 
   // Handle logout
   const handleLogout = () => {
-    logoutMutation.mutate();
+    signOutMutation.mutate();
     queryClient.invalidateQueries();
   };
 

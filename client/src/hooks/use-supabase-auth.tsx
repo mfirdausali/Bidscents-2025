@@ -15,7 +15,7 @@ type AuthContextType = {
   isLoading: boolean;
   error: Error | null;
   signUpMutation: UseMutationResult<any, Error, SignUpData>;
-  signInMutation: UseMutationResult<SelectUser, Error, SignInData>;
+  signInMutation: UseMutationResult<any, Error, SignInData>;
   signOutMutation: UseMutationResult<void, Error, void>;
   resetPasswordMutation: UseMutationResult<void, Error, { email: string }>;
   signInWithFacebookMutation: UseMutationResult<any, Error, void>;
