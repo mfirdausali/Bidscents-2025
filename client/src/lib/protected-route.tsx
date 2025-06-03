@@ -11,6 +11,8 @@ export function ProtectedRoute({
 }) {
   const { user, isLoading } = useAuth();
 
+  console.log('🛡️ ProtectedRoute:', path, 'User:', user ? `ID ${user.id} isSeller:${user.isSeller}` : 'null', 'Loading:', isLoading);
+
   if (isLoading) {
     return (
       <Route path={path}>
