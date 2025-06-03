@@ -153,7 +153,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Set up streamlined Supabase authentication system
-  const { requireAuth } = setupAppAuth(app);
+  // Setup Supabase authentication endpoints
+  app.post('/api/auth/session', authRoutes.session);
+  app.get('/api/auth/me', requireAuth, authRoutes.me);
+  app.post('/api/auth/logout', authRoutes.logout);
   
   // Raw query middleware specifically for Billplz redirect
   // This captures the original query string before Express parses it
@@ -179,15 +182,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User profile update endpoint
   app.patch("/api/user/:id", async (req, res, next) => {
     try {
-      const jwtUser = getJWTUser(req);
-      if (!jwtUser) {
+      const user = getAuthenticatedUser(req);
+      if (!user) {
         return res.status(401).json({ message: "Unauthorized: Please log in to update your profile" });
       }
 
       const id = parseInt(req.params.id);
       
       // Users can only update their own profiles
-      if (req.user.id !== id && !req.user.isAdmin) {
+      if (user.id !== id) {
         return res.status(403).json({ message: "Forbidden: You can only update your own profile" });
       }
 
@@ -457,7 +460,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Profile image upload endpoint
   app.post("/api/user/avatar", imageUpload.single('image'), async (req, res, next) => {
     try {
-      if (!req.isAuthenticated()) {
+      const user = getAuthenticatedUser(req);
+      if (!user) {
         return res.status(401).json({ message: "Unauthorized: Please log in to upload a profile image" });
       }
 
@@ -480,7 +484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Upload the profile image
       const uploadResult = await objectStorage.uploadProfileImage(
         req.file.buffer,
-        req.user.id,
+        user.id,
         req.file.mimetype
       );
 
@@ -489,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update the user record in the database with the new avatar URL
-      const updatedUser = await storage.updateUser(req.user.id, {
+      const updatedUser = await storage.updateUser(user.id, {
         avatarUrl: uploadResult.url
       });
 
@@ -1604,7 +1608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("File upload request received");
       
-      const jwtUser = getJWTUser(req);
+      const jwtUser = getAuthenticatedUser(req);
       if (!jwtUser) {
         console.log("Authentication check failed");
         return res.status(401).json({ message: "Unauthorized: Please log in to upload files" });
@@ -2049,7 +2053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/messages", async (req, res, next) => {
     try {
       // Check JWT authentication
-      const jwtUser = getJWTUser(req);
+      const jwtUser = getAuthenticatedUser(req);
       if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to access messages" });
       }
@@ -2074,7 +2078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/messages/conversation/:userId", async (req, res, next) => {
     try {
       // Check JWT authentication
-      const jwtUser = getJWTUser(req);
+      const jwtUser = getAuthenticatedUser(req);
       if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to access messages" });
       }
@@ -2244,7 +2248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/messages/action/confirm", async (req, res, next) => {
     try {
       // Check JWT authentication
-      const jwtUser = getJWTUser(req);
+      const jwtUser = getAuthenticatedUser(req);
       if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to confirm transactions" });
       }
@@ -2475,7 +2479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/messages/submit-review/:messageId", async (req, res, next) => {
     try {
       // Check JWT authentication
-      const jwtUser = getJWTUser(req);
+      const jwtUser = getAuthenticatedUser(req);
       if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to submit reviews" });
       }
@@ -2615,7 +2619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/messages/mark-read", async (req, res, next) => {
     try {
       // Check JWT authentication
-      const jwtUser = getJWTUser(req);
+      const jwtUser = getAuthenticatedUser(req);
       if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to update messages" });
       }
@@ -2649,7 +2653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/messages/unread-count", async (req, res, next) => {
     try {
       // Check JWT authentication
-      const jwtUser = getJWTUser(req);
+      const jwtUser = getAuthenticatedUser(req);
       if (!jwtUser) {
         return res.status(403).json({ message: "Unauthorized: Must be logged in to get unread messages" });
       }
