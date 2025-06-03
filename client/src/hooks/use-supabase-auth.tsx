@@ -97,6 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign up with email and password
   const signUpMutation = useMutation({
     mutationFn: async (credentials: SignUpData) => {
+      console.log('🔄 Starting Supabase registration for:', credentials.email);
+      
       const { data, error } = await supabase.auth.signUp({
         email: credentials.email,
         password: credentials.password,
@@ -105,21 +107,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             username: credentials.username,
             first_name: credentials.firstName,
             last_name: credentials.lastName,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/auth/verify`
         }
       });
 
+      console.log('📧 Supabase signup response:', { data, error });
+
       if (error) {
+        console.error('❌ Supabase signup error:', error);
         throw error;
+      }
+
+      // Check if email confirmation is required
+      if (data.user && !data.user.email_confirmed_at) {
+        console.log('📬 Email confirmation required for user:', data.user.email);
+      } else {
+        console.log('✅ User email already confirmed:', data.user?.email);
       }
 
       return data;
     },
     onSuccess: (data) => {
-      toast({
-        title: "Registration successful",
-        description: "Please check your email to verify your account.",
-      });
+      if (data.user && !data.user.email_confirmed_at) {
+        toast({
+          title: "Registration successful",
+          description: "Please check your email to verify your account. If you don't receive an email, check your spam folder or contact support.",
+        });
+      } else {
+        toast({
+          title: "Registration successful",
+          description: "Your account has been created and verified.",
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
