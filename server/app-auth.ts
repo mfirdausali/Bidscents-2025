@@ -163,46 +163,17 @@ export const authRoutes = {
         return res.status(401).json({ error: 'Invalid Supabase token' });
       }
 
-      console.log('🔍 AUTH FLOW: Starting user lookup for Supabase ID:', user.id);
-      console.log('🔍 AUTH FLOW: User email:', user.email);
-      
-      // Find or create local user profile
-      let localUser = await storage.getUserByProviderId(user.id);
-      console.log('🔍 AUTH FLOW: getUserByProviderId result:', localUser ? 'Found user' : 'No user found');
+      // Find or create local user profile - simplified approach
+      let localUser = await storage.getUserByEmail(user.email!);
       
       if (!localUser) {
-        // Try to find existing user by email
-        console.log('🔍 AUTH FLOW: Searching for existing user by email:', user.email);
-        const existingUser = await storage.getUserByEmail(user.email!);
-        console.log('🔍 AUTH FLOW: getUserByEmail result:', existingUser ? `Found user ID ${existingUser.id}` : 'No user found');
-        
-        if (existingUser) {
-          // Update existing user with provider information
-          console.log('🔍 AUTH FLOW: Updating existing user with provider ID');
-          try {
-            await storage.updateUserProviderId(existingUser.id, user.id);
-            console.log('✅ AUTH FLOW: Successfully updated provider ID');
-            localUser = existingUser;
-          } catch (error) {
-            console.error('❌ AUTH FLOW: Failed to update provider ID:', error);
-            // Continue without provider ID for now
-            localUser = existingUser;
-          }
-        } else {
-          // Create new user
-          console.log('🔍 AUTH FLOW: Creating new user');
-          localUser = await storage.createUser({
-            email: user.email!,
-            username: user.email!.split('@')[0],
-            providerId: user.id,
-            provider: 'supabase',
-            firstName: user.user_metadata?.first_name || null,
-            lastName: user.user_metadata?.last_name || null,
-          });
-          console.log('✅ AUTH FLOW: Successfully created new user ID:', localUser.id);
-        }
-      } else {
-        console.log('✅ AUTH FLOW: Found existing user with provider ID:', localUser.id);
+        // Create new user
+        localUser = await storage.createUser({
+          email: user.email!,
+          username: user.email!.split('@')[0],
+          firstName: user.user_metadata?.first_name || null,
+          lastName: user.user_metadata?.last_name || null,
+        });
       }
 
       // Generate application JWT

@@ -46,37 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
+    refetch: refetchUser,
   } = useQuery<SelectUser | null, Error>({
     queryKey: ["/api/v1/auth/me"],
-    queryFn: async () => {
-      try {
-        // First check if we have a Supabase session
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          return null;
-        }
-
-        // Exchange Supabase JWT for application JWT
-        const response = await apiRequest("POST", "/api/v1/auth/session", {
-          supabaseToken: session.access_token
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to authenticate");
-        }
-
-        const data = await response.json();
-        
-        // Store application JWT
-        setAuthToken(data.token);
-        
-        return data.user;
-      } catch (error) {
-        console.error("Authentication error:", error);
-        return null;
-      }
-    },
+    enabled: !!localStorage.getItem('app_token'),
     retry: false,
   });
 
@@ -101,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.log('✅ Frontend: Token exchange successful, setting auth token');
               setAuthToken(data.token);
               queryClient.setQueryData(["/api/v1/auth/me"], data.user);
-              queryClient.invalidateQueries({ queryKey: ["/api/v1/auth/me"] });
+              refetchUser();
             } else {
               const errorData = await response.json();
               console.error('❌ Frontend: Token exchange failed with error:', errorData);
