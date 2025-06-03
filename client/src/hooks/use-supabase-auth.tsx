@@ -88,19 +88,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (event === 'SIGNED_IN' && session) {
           // Exchange Supabase JWT for application JWT
+          console.log('🔄 Frontend: Starting token exchange with Supabase token');
           try {
             const response = await apiRequest("POST", "/api/v1/auth/session", {
               supabaseToken: session.access_token
             });
 
+            console.log('🔄 Frontend: Token exchange response status:', response.status);
+            
             if (response.ok) {
               const data = await response.json();
+              console.log('✅ Frontend: Token exchange successful, setting auth token');
               setAuthToken(data.token);
               queryClient.setQueryData(["/api/v1/auth/me"], data.user);
               queryClient.invalidateQueries({ queryKey: ["/api/v1/auth/me"] });
+            } else {
+              const errorData = await response.json();
+              console.error('❌ Frontend: Token exchange failed with error:', errorData);
             }
           } catch (error) {
-            console.error("Failed to exchange tokens:", error);
+            console.error("❌ Frontend: Token exchange request failed:", error);
           }
         } else if (event === 'SIGNED_OUT') {
           // Clear application JWT and user data
