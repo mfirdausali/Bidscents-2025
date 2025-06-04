@@ -32,6 +32,7 @@ function Router() {
       <Route path="/login" component={AuthPage} />
       <Route path="/register" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
+      <Route path="/auth-verify" component={AuthVerifyPage} />
       <Route path="/auth/verify" component={AuthVerifyPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/auth-callback" component={AuthCallback} />

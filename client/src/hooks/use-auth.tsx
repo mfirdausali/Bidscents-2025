@@ -8,17 +8,17 @@ import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema
 import { getQueryFn, apiRequest, queryClient, setAuthToken, removeAuthToken } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { signInWithFacebook } from "@/lib/supabase";
+import { supabase, signInWithFacebook } from "@/lib/supabase";
 
 type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
-  loginWithEmailMutation: UseMutationResult<SelectUser, Error, EmailLoginData>;
+  loginMutation: UseMutationResult<any, Error, LoginData>;
+  loginWithEmailMutation: UseMutationResult<any, Error, EmailLoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
-  registerWithVerificationMutation: UseMutationResult<RegisterWithVerificationResponse, Error, RegisterWithVerificationData>;
+  registerWithVerificationMutation: UseMutationResult<{ message: string; user: any }, Error, RegisterWithVerificationData>;
   resetPasswordMutation: UseMutationResult<void, Error, { email: string }>;
   loginWithFacebookMutation: UseMutationResult<any, Error, void>;
   isEmailVerified: boolean;
@@ -37,11 +37,7 @@ type RegisterWithVerificationData = {
 };
 type RegisterWithVerificationResponse = { 
   message: string; 
-  user: { 
-    id: number; 
-    username: string; 
-    email: string;
-  } 
+  user: any; // Supabase User type which has different structure
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -178,28 +174,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // New register with email verification
+  // New register with email verification using Supabase
   const registerWithVerificationMutation = useMutation({
-    mutationFn: async (data: RegisterWithVerificationData) => {
-      const res = await apiRequest("POST", "/api/register-with-verification", data);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Registration failed");
-      }
-      return await res.json();
-    },
-    onSuccess: (data: RegisterWithVerificationResponse) => {
-      toast({
-        title: "Registration successful",
-        description: data.message || "Please check your email to verify your account.",
+    mutationFn: async (registrationData: RegisterWithVerificationData) => {
+      const { email, password, username, firstName, lastName } = registrationData;
+
+      // Determine the base URL for email redirection dynamically
+      const siteURL = import.meta.env.VITE_SITE_URL || window.location.origin;
+      const redirectURL = `${siteURL}/auth-verify`;
+
+      console.log(`Attempting Supabase signUp with email: ${email}, redirectURL: ${redirectURL}`);
+
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          emailRedirectTo: redirectURL,
+          data: {
+            username: username,
+            first_name: firstName,
+            last_name: lastName,
+          }
+        }
       });
-      // Redirect to login page after successful registration
-      setLocation("/login?registration=success");
+
+      if (error) {
+        console.error('Supabase signUp error:', error);
+        throw error;
+      }
+
+      console.log('Supabase signUp successful (email verification pending):', data);
+      return { 
+        message: "Registration successful! Please check your email to verify your account.", 
+        user: data.user 
+      };
+    },
+    onSuccess: (response) => {
+      toast({
+        title: "Registration Initiated",
+        description: response.message,
+      });
+      // Navigate to login page with registration success indicator
+      setLocation("/auth?tab=login&registration=success");
     },
     onError: (error: Error) => {
       toast({
-        title: "Registration failed",
-        description: error.message,
+        title: "Registration Failed",
+        description: error.message || "An unknown error occurred.",
         variant: "destructive",
       });
     },
