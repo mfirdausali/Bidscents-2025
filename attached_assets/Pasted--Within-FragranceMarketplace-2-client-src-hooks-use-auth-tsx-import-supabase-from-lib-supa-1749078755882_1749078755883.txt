@@ -1,0 +1,68 @@
+// Within FragranceMarketplace 2/client/src/hooks/use-auth.tsx
+
+import { supabase } from '@/lib/supabase'; // Ensure this import points to your Supabase client instance
+// ... other imports ...
+
+// Update your RegisterWithVerificationData if needed, e.g., to ensure it has all fields for Supabase
+type RegisterWithVerificationData = {
+  username: string; // Consider if you need this directly in Supabase auth or just your public table
+  email: string;
+  password: string;
+  firstName?: string | null;
+  lastName?: string | null;
+};
+
+// Update the mutation
+const registerWithVerificationMutation = useMutation({
+  mutationFn: async (registrationData: RegisterWithVerificationData) => {
+    const { email, password, username, firstName, lastName } = registrationData;
+
+    // Determine the base URL for email redirection dynamically
+    // Ensure VITE_SITE_URL is set in your .env file for client-side use
+    const siteURL = import.meta.env.VITE_SITE_URL || window.location.origin;
+    const redirectURL = `${siteURL}/auth-callback`; // Or your preferred callback page e.g., /verify-email
+
+    console.log(`Attempting Supabase signUp with email: ${email}, redirectURL: ${redirectURL}`);
+
+    const { data, error } = await supabase.auth.signUp({
+      email: email,
+      password: password,
+      options: {
+        emailRedirectTo: redirectURL,
+        data: { // This data is stored in auth.users.raw_user_meta_data
+          username: username,     // Or full_name: `${firstName} ${lastName}`
+          first_name: firstName,
+          last_name: lastName,
+          // You can add other metadata you want to store directly with the Supabase auth user
+        }
+      }
+    });
+
+    if (error) {
+      console.error('Supabase signUp error:', error);
+      throw error; // Let React Query handle the error
+    }
+
+    // data.user will contain the newly created Supabase auth user (but session might be null until verified)
+    // data.session will typically be null here because email confirmation is required.
+    console.log('Supabase signUp successful (email verification pending):', data);
+    return { message: "Registration successful! Please check your email to verify your account.", user: data.user };
+  },
+  onSuccess: (response) => { // data here is { message, user }
+    toast({
+      title: "Registration Initiated",
+      description: response.message,
+    });
+    // Navigate to a page informing the user to check their email,
+    // or the login page with a message.
+    // The auth-page.tsx already has logic for `registration=success`
+    setLocation("/auth?tab=login&registration=success"); 
+  },
+  onError: (error: Error) => {
+    toast({
+      title: "Registration Failed",
+      description: error.message || "An unknown error occurred.",
+      variant: "destructive",
+    });
+  },
+});
