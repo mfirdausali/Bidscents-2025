@@ -153,36 +153,66 @@ export const authRoutes = {
   // Exchange Supabase JWT for application JWT
   session: async (req: Request, res: Response) => {
     try {
+      console.log('🔄 Backend: Starting session creation with request body:', req.body);
       const { supabaseToken } = req.body;
       
       if (!supabaseToken) {
+        console.log('❌ Backend: No Supabase token provided');
         return res.status(400).json({ error: 'Supabase token required' });
       }
 
+      console.log('🔄 Backend: Verifying Supabase JWT...');
       // Verify the Supabase JWT
       const { data: { user }, error } = await supabase.auth.getUser(supabaseToken);
       
-      if (error || !user) {
+      if (error) {
+        console.error('❌ Backend: Supabase auth error:', error);
+        return res.status(401).json({ error: 'Invalid Supabase token' });
+      }
+      
+      if (!user) {
+        console.log('❌ Backend: No user returned from Supabase');
         return res.status(401).json({ error: 'Invalid Supabase token' });
       }
 
-      // Find or create local user profile - simplified approach
-      let localUser = await storage.getUserByEmail(user.email!);
-      
-      if (!localUser) {
-        // Create new user
-        localUser = await storage.createUser({
-          email: user.email!,
-          username: user.email!.split('@')[0],
-          firstName: user.user_metadata?.first_name || null,
-          lastName: user.user_metadata?.last_name || null,
-        });
+      console.log('✅ Backend: Supabase user verified:', {
+        id: user.id,
+        email: user.email,
+        email_confirmed_at: user.email_confirmed_at,
+        user_metadata: user.user_metadata
+      });
+
+      if (!user.email) {
+        console.error('❌ Backend: User email is null/undefined');
+        return res.status(400).json({ error: 'User email is required' });
       }
 
+      console.log('🔄 Backend: Looking up local user by email:', user.email);
+      // Find or create local user profile - simplified approach
+      let localUser = await storage.getUserByEmail(user.email);
+      
+      if (!localUser) {
+        console.log('🔄 Backend: Creating new local user');
+        // Create new user
+        const newUserData = {
+          email: user.email,
+          username: user.email.split('@')[0],
+          firstName: user.user_metadata?.first_name || null,
+          lastName: user.user_metadata?.last_name || null,
+        };
+        console.log('🔄 Backend: New user data:', newUserData);
+        
+        localUser = await storage.createUser(newUserData);
+        console.log('✅ Backend: Created local user:', localUser);
+      } else {
+        console.log('✅ Backend: Found existing local user:', localUser);
+      }
+
+      console.log('🔄 Backend: Generating application JWT...');
       // Generate application JWT with seller status
       const appToken = generateAppJWT(localUser.id, localUser.email, user.id, localUser.isSeller);
 
-      res.json({
+      const response = {
         token: appToken,
         user: {
           id: localUser.id,
@@ -192,9 +222,16 @@ export const authRoutes = {
           lastName: localUser.lastName,
           isSeller: localUser.isSeller,
         }
-      });
+      };
+      
+      console.log('✅ Backend: Session created successfully for user:', localUser.email);
+      res.json(response);
     } catch (error) {
-      console.error('Session creation error:', error);
+      console.error('❌ Backend: Session creation error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       res.status(500).json({ error: 'Internal server error' });
     }
   },
