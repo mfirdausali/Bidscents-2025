@@ -9,15 +9,30 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase credentials');
 }
 
-// Create a Supabase client with auth configuration
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce'
+// Ensure single instance creation to fix "Multiple GoTrueClient instances detected" warning
+let supabaseInstance: ReturnType<typeof createClient> | null = null;
+
+function createSupabaseClient() {
+  if (supabaseInstance) {
+    console.log('🔧 Reusing existing Supabase client instance');
+    return supabaseInstance;
   }
-});
+
+  console.log('🔧 Creating new Supabase client instance');
+  supabaseInstance = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce'
+    }
+  });
+  
+  return supabaseInstance;
+}
+
+// Create a single Supabase client instance
+export const supabase = createSupabaseClient();
 
 /**
  * Sign in with Facebook

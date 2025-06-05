@@ -15,13 +15,25 @@ export function AuthVerifyPage() {
   useEffect(() => {
     const handleEmailVerification = async () => {
       try {
-        // Get the URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const accessToken = urlParams.get('access_token');
-        const refreshToken = urlParams.get('refresh_token');
-        const type = urlParams.get('type');
+        console.log('🔍 Full verification URL:', window.location.href);
+        console.log('🔍 URL hash:', window.location.hash);
+        console.log('🔍 URL search:', window.location.search);
+        
+        // Supabase sends auth tokens in the URL hash/fragment, not search params
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const searchParams = new URLSearchParams(window.location.search);
+        
+        const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+        const type = hashParams.get('type') || searchParams.get('type');
 
-        console.log('🔄 Processing email verification:', { type, hasAccessToken: !!accessToken });
+        console.log('🔄 Processing email verification:', { 
+          type, 
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          hashKeys: Array.from(hashParams.keys()),
+          searchKeys: Array.from(searchParams.keys())
+        });
 
         if (type === 'signup' && accessToken && refreshToken) {
           // Set the session with the tokens from the email link
