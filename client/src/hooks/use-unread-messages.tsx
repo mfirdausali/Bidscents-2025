@@ -26,7 +26,10 @@ export function useUnreadMessages() {
     queryFn: async () => {
       if (!user) return 0;
       
-      const response = await fetch('/api/messages/unread-count');
+      // Import the apiRequest function here to avoid circular dependencies
+      const { apiRequest } = await import('@/lib/queryClient');
+      const response = await apiRequest('GET', '/api/messages/unread-count');
+      
       if (!response.ok) {
         throw new Error('Failed to fetch unread message count');
       }
