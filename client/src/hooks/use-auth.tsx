@@ -1,169 +1,153 @@
+/**
+ * Unified Supabase-Only Authentication Hook
+ * 
+ * This is the consolidated authentication system using Supabase as the sole identity provider.
+ * Replaces the previous dual authentication system for enhanced security.
+ */
+
 import { createContext, ReactNode, useContext, useState, useEffect } from "react";
 import {
   useQuery,
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
-import { getQueryFn, apiRequest, queryClient, setAuthToken, removeAuthToken } from "../lib/queryClient";
+import { User as SelectUser } from "@shared/schema";
+import { apiRequest, queryClient, setAuthToken, removeAuthToken } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { supabase, signInWithFacebook } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: UseMutationResult<any, Error, LoginData>;
-  loginWithEmailMutation: UseMutationResult<any, Error, EmailLoginData>;
-  logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
-  registerWithVerificationMutation: UseMutationResult<{ message: string; user: any }, Error, RegisterWithVerificationData>;
+  signUpMutation: UseMutationResult<any, Error, SignUpData>;
+  signInMutation: UseMutationResult<any, Error, SignInData>;
+  signOutMutation: UseMutationResult<void, Error, void>;
   resetPasswordMutation: UseMutationResult<void, Error, { email: string }>;
-  loginWithFacebookMutation: UseMutationResult<any, Error, void>;
-  isEmailVerified: boolean;
-  setIsEmailVerified: (value: boolean) => void;
+  signInWithFacebookMutation: UseMutationResult<any, Error, void>;
 };
 
-type LoginData = { username: string; password: string };
-type EmailLoginData = { email: string; password: string };
-
-type RegisterWithVerificationData = { 
-  username: string;
+type SignUpData = { 
   email: string;
   password: string;
-  firstName?: string | null;
-  lastName?: string | null;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
 };
-type RegisterWithVerificationResponse = { 
-  message: string; 
-  user: any; // Supabase User type which has different structure
+
+type SignInData = { 
+  email?: string;
+  username?: string;
+  password: string;
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const [location, setLocation] = useLocation();
-  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [, setLocation] = useLocation();
   
-  // Check for verification success in URL
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    if (searchParams.get('verified') === 'true') {
-      toast({
-        title: "Email verified",
-        description: "Your email has been successfully verified. You can now log in.",
-      });
-      setIsEmailVerified(true);
-      
-      // Remove the query parameter
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
-    }
-  }, []);
-  
-  // Updated to handle the security-enhanced API response
+  // Check for authentication state and get user profile using the secure endpoint
   const {
-    data: authResponse,
+    data: user,
     error,
     isLoading,
-  } = useQuery<{ user: SelectUser, authenticated: boolean } | SelectUser | undefined, Error>({
-    queryKey: ["/api/user"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    refetch: refetchUser,
+  } = useQuery<SelectUser | null, Error>({
+    queryKey: ["/api/v1/auth/me"],
+    enabled: !!localStorage.getItem('app_token'),
+    retry: false,
   });
 
-  // Extract user data from the response, handling both formats
-  const user = authResponse && 'user' in authResponse ? authResponse.user : authResponse;
-  
-  // If we got the enhanced security response and authentication is required
+  // Listen for Supabase auth state changes
   useEffect(() => {
-    if (authResponse && 'authenticated' in authResponse && authResponse.authenticated === false) {
-      // Authenticated with Supabase but not fully verified
-      console.log("User found but additional authentication required");
-      toast({
-        title: "Authentication needed",
-        description: "Please log in to continue.",
-        variant: "default",
-      });
-      // Navigate to auth page to complete authentication
-      setLocation("/auth");
-    }
-  }, [authResponse, toast, setLocation]);
+    console.log('🔧 Creating new Supabase client instance');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Supabase auth state changed:', event);
+        
+        if (event === 'SIGNED_IN' && session) {
+          // Exchange Supabase JWT for application JWT
+          console.log('🔄 Frontend: Starting token exchange with Supabase token');
+          try {
+            const response = await apiRequest("POST", "/api/v1/auth/session", {
+              supabaseToken: session.access_token
+            });
 
-  // Original login with username
-  const loginMutation = useMutation({
-    mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
-      return await res.json();
-    },
-    onSuccess: (response: { user: SelectUser; token: string }) => {
-      // Store the JWT token
-      setAuthToken(response.token);
-      // Cache the user data
-      queryClient.setQueryData(["/api/user"], response.user);
-      toast({
-        title: "Login successful",
-        description: `Welcome back, ${response.user.username}!`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Login failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // JWT-based login with email
-  const loginWithEmailMutation = useMutation({
-    mutationFn: async (credentials: EmailLoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Login failed");
+            console.log('🔄 Frontend: Token exchange response status:', response.status);
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log('✅ Frontend: Token exchange successful, setting auth token');
+              setAuthToken(data.token);
+              queryClient.setQueryData(["/api/v1/auth/me"], data.user);
+              refetchUser();
+            } else {
+              const errorData = await response.json();
+              console.error('❌ Frontend: Token exchange failed with error:', errorData);
+            }
+          } catch (error) {
+            console.error("❌ Frontend: Token exchange request failed:", error);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          // Clear application JWT and user data
+          removeAuthToken();
+          queryClient.setQueryData(["/api/v1/auth/me"], null);
+          queryClient.invalidateQueries({ queryKey: ["/api/v1/auth/me"] });
+        }
       }
-      return await res.json();
+    );
+
+    return () => subscription.unsubscribe();
+  }, [refetchUser]);
+
+  // Sign up with email and password
+  const signUpMutation = useMutation({
+    mutationFn: async (credentials: SignUpData) => {
+      console.log('🔄 Starting Supabase registration for:', credentials.email);
+      
+      const { data, error } = await supabase.auth.signUp({
+        email: credentials.email,
+        password: credentials.password,
+        options: {
+          data: {
+            username: credentials.username,
+            first_name: credentials.firstName,
+            last_name: credentials.lastName,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/verify`
+        }
+      });
+
+      console.log('📧 Supabase signup response:', { data, error });
+
+      if (error) {
+        console.error('❌ Supabase signup error:', error);
+        throw error;
+      }
+
+      // Check if email confirmation is required
+      if (data.user && !data.user.email_confirmed_at) {
+        console.log('📬 Email confirmation required for user:', data.user.email);
+      } else {
+        console.log('✅ User email already confirmed:', data.user?.email);
+      }
+
+      return data;
     },
     onSuccess: (data) => {
-      // Store JWT token
-      if (data.token) {
-        setAuthToken(data.token);
+      if (data.user && !data.user.email_confirmed_at) {
+        toast({
+          title: "Registration successful",
+          description: "Please check your email to verify your account. If you don't receive an email, check your spam folder or contact support.",
+        });
+      } else {
+        toast({
+          title: "Registration successful",
+          description: "Your account has been created and verified.",
+        });
       }
-      // Update user data in cache
-      queryClient.setQueryData(["/api/user"], data.user);
-      toast({
-        title: "Login successful",
-        description: `Welcome back, ${data.user.username}!`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Login failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // JWT-based register
-  const registerMutation = useMutation({
-    mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials);
-      return await res.json();
-    },
-    onSuccess: (data) => {
-      // Store JWT token
-      if (data.token) {
-        setAuthToken(data.token);
-      }
-      // Update user data in cache
-      queryClient.setQueryData(["/api/user"], data.user);
-      toast({
-        title: "Registration successful",
-        description: `Welcome, ${data.user.username}!`,
-      });
     },
     onError: (error: Error) => {
       toast({
@@ -174,10 +158,169 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // New register with email verification using Supabase
-  const registerWithVerificationMutation = useMutation({
-    mutationFn: async (registrationData: RegisterWithVerificationData) => {
-      const { email, password, username, firstName, lastName } = registrationData;
+  // Sign in with email/username and password
+  const signInMutation = useMutation({
+    mutationFn: async (credentials: SignInData) => {
+      let email: string | undefined = credentials.email;
+      
+      // If username is provided instead of email, look up the email
+      if (credentials.username && !credentials.email) {
+        const response = await apiRequest("POST", "/api/v1/auth/lookup-email", {
+          username: credentials.username
+        });
+        
+        if (!response.ok) {
+          throw new Error("Username not found");
+        }
+        
+        const data = await response.json();
+        email = data.email;
+      }
+
+      if (!email) {
+        throw new Error("Email or username is required");
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: credentials.password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // The onAuthStateChange listener will handle the token exchange
+      return data.user;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Login successful",
+        description: "Welcome back!",
+      });
+      
+      // Redirect to homepage after successful login
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Sign out
+  const signOutMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+
+      // Also call our application logout endpoint
+      try {
+        await apiRequest("POST", "/api/v1/auth/logout");
+      } catch (error) {
+        // Non-critical if this fails
+        console.warn("Application logout failed:", error);
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      // Even if server logout fails, clear local state
+      removeAuthToken();
+      queryClient.setQueryData(["/api/v1/auth/me"], null);
+      toast({
+        title: "Logged out",
+        description: "You have been logged out.",
+      });
+      setLocation("/");
+    },
+  });
+
+  // Password reset
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ email }: { email: string }) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password reset email sent",
+        description: "Please check your email for password reset instructions.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Password reset failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Facebook login
+  const signInWithFacebookMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo: `${window.location.origin}/auth-callback`,
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Redirecting to Facebook",
+        description: "You'll be redirected to Facebook to complete the login process.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Facebook login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user: user ?? null,
+        isLoading,
+        error,
+        signUpMutation,
+        signInMutation,
+        signOutMutation,
+        resetPasswordMutation,
+        signInWithFacebookMutation,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
 
       // Determine the base URL for email redirection dynamically
       const siteURL = import.meta.env.VITE_SITE_URL || window.location.origin;
