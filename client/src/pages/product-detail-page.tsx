@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ProductWithDetails } from "@shared/schema";
+import { analytics } from "@/hooks/use-analytics";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,19 @@ export default function ProductDetailPage() {
     queryKey: [`/api/products/${productId}`],
     enabled: !!productId,
   });
+
+  // Track product view when product loads
+  useEffect(() => {
+    if (product) {
+      analytics.viewItem({
+        item_id: product.id.toString(),
+        item_name: product.name,
+        item_category: product.category?.name || 'Perfume',
+        price: product.price,
+        item_brand: product.brand
+      });
+    }
+  }, [product]);
 
   if (isLoading) {
     return (
