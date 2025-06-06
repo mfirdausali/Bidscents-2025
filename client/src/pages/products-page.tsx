@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { ProductWithDetails, Category } from "@shared/schema";
+import { analytics } from "@/hooks/use-analytics";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { ProductCard } from "@/components/ui/product-card";
@@ -76,6 +77,16 @@ export default function ProductsPage() {
   const applyFilters = () => {
     setMinPrice(priceRange[0]);
     setMaxPrice(priceRange[1]);
+    
+    // Track filter usage
+    analytics.applyFilter('price_range', `${priceRange[0]}-${priceRange[1]}`);
+    if (selectedBrands.length > 0) {
+      analytics.applyFilter('brands', selectedBrands.join(','));
+    }
+    if (categoryId) {
+      analytics.applyFilter('category', categoryId.toString());
+    }
+    
     refetch();
   };
 
