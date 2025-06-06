@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { secureRoutes } from "./secure-routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { testConnection } from "./db";
 import { testSupabaseConnection } from "./supabase";

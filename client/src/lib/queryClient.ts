@@ -7,21 +7,29 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// JWT token management
+// Unified token management - using consistent key name
+const TOKEN_KEY = 'app_token';
+
 function getAuthToken(): string | null {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem(TOKEN_KEY);
   console.log('[JWT] Getting token from localStorage:', token ? 'token present' : 'no token');
   return token;
 }
 
 function setAuthToken(token: string): void {
   console.log('[JWT] Storing token in localStorage');
-  localStorage.setItem('auth_token', token);
+  localStorage.setItem(TOKEN_KEY, token);
+  // Clean up any legacy token keys for security
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('supabase_token');
 }
 
 function removeAuthToken(): void {
   console.log('[JWT] Removing token from localStorage');
+  localStorage.removeItem(TOKEN_KEY);
+  // Clean up any legacy token keys
   localStorage.removeItem('auth_token');
+  localStorage.removeItem('supabase_token');
 }
 
 export { setAuthToken, removeAuthToken };

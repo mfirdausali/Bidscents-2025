@@ -5,7 +5,7 @@
  * Replaces the previous dual authentication system for enhanced security.
  */
 
-import { createContext, ReactNode, useContext, useState, useEffect } from "react";
+import { createContext, ReactNode, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -320,9 +320,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-
 }
 
 export function useAuth() {
