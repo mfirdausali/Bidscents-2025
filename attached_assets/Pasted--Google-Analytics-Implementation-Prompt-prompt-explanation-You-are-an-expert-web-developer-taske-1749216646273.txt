@@ -1,0 +1,96 @@
+# Google Analytics Implementation Prompt
+
+<prompt_explanation>
+You are an expert web developer tasked with implementing Google Analytics tracking across all pages of a website or web application. Your goal is to ensure comprehensive analytics coverage that captures user interactions, page views, and key metrics across the entire site.
+
+First, carefully analyze the provided website structure, framework, or codebase. Understand the architecture, routing system, page templates, and any existing analytics implementations. Spend significant time considering all the different page types, user flows, and tracking requirements.
+
+Next, develop a comprehensive implementation strategy that ensures Google Analytics is properly loaded and configured on every page. For each implementation approach, specify the following in a table:
+
+- Implementation Method: The specific technique or approach used
+- Target Pages: Which pages or page types this method applies to  
+- Code Location: Where the analytics code should be placed
+- Configuration: Any specific settings or customizations needed
+- Priority: The importance level of this implementation
+
+After defining all implementation methods in tabular format, write out the actual implementation code for each approach. Ensure the implementation follows these principles:
+
+1. **Universal Coverage**: Analytics must load on every page without exception
+2. **Performance Optimization**: Minimize impact on page load times
+3. **Error Handling**: Gracefully handle any loading failures
+4. **Compliance**: Respect user privacy and consent requirements
+
+For each implementation, provide clear comments explaining the purpose and any important considerations.
+
+Once all implementation methods have been documented, review them to ensure complete coverage across all possible page types and user scenarios.
+
+Finally, provide implementation guidelines, testing recommendations, and maintenance considerations.
+</prompt_explanation>
+
+<response_format>
+<architecture_analysis_section>
+<header>Website Architecture Analysis:</header>
+<analysis>$architecture_analysis</analysis>
+</architecture_analysis_section>
+
+<implementation_strategy_section>
+<header>Implementation Strategy:</header>
+<table>
+<header_row>
+<column1>Implementation Method</column1>
+<column2>Target Pages</column2>
+<column3>Code Location</column3>
+<column4>Configuration</column4>
+<column5>Priority</column5>
+</header_row>
+$implementation_table
+</table>
+</implementation_strategy_section>
+
+<implementation_code_section>
+<header>Implementation Code:</header>
+$implementation_code
+</implementation_code_section>
+
+<testing_verification_section>
+<header>Testing & Verification:</header>
+<verification>$testing_methods</verification>
+</testing_verification_section>
+
+<maintenance_guidelines_section>
+<header>Implementation Guidelines:</header>
+<guidelines>$implementation_guidelines</guidelines>
+<maintenance>$maintenance_considerations</maintenance>
+</maintenance_guidelines_section>
+</response_format>
+
+Here is the website/codebase that you must implement Google Analytics tracking for:
+
+<website_details>
+{{PASTE_YOUR_WEBSITE_STRUCTURE_OR_CODEBASE_HERE}}
+</website_details>
+
+<analytics_configuration>
+Google Analytics Tracking ID: G-QTQMZPNL13
+
+Required Analytics Code:
+```html
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-QTQMZPNL13"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-QTQMZPNL13');
+</script>
+```
+</analytics_configuration>
+
+<additional_requirements>
+- Ensure GDPR/privacy compliance where applicable
+- Implement error handling for failed script loads
+- Consider page load performance impact
+- Handle single-page applications (SPA) if relevant
+- Account for server-side rendering (SSR) considerations
+- Include debugging capabilities for development environments
+</additional_requirements>
