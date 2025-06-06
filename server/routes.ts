@@ -76,11 +76,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Handle different message types
         switch (data.type) {
           case 'auth':
-            // Authenticate and store user info with the connection
-            if (data.userId && data.username) {
-              clients.set(ws, { userId: data.userId, username: data.username });
-              console.log(`User authenticated: ${data.username} (ID: ${data.userId})`);
-              ws.send(JSON.stringify({ type: 'auth_success' }));
+            // Secure JWT-based authentication
+            if (data.token) {
+              try {
+                const { verifyWebSocketAuth } = await import('./auth-security');
+                const decoded = verifyWebSocketAuth(data.token);
+                
+                if (decoded) {
+                  clients.set(ws, { 
+                    userId: decoded.userId, 
+                    username: decoded.username,
+                    email: decoded.email,
+                    supabaseId: decoded.supabaseId
+                  });
+                  console.log(`User authenticated via JWT: ${decoded.username} (ID: ${decoded.userId})`);
+                  ws.send(JSON.stringify({ type: 'auth_success' }));
+                } else {
+                  console.log('WebSocket authentication failed: invalid token');
+                  ws.send(JSON.stringify({ type: 'auth_failed', message: 'Invalid authentication token' }));
+                  ws.close();
+                }
+              } catch (error) {
+                console.error('WebSocket authentication error:', error);
+                ws.send(JSON.stringify({ type: 'auth_failed', message: 'Authentication failed' }));
+                ws.close();
+              }
+            } else {
+              console.log('WebSocket authentication failed: no token provided');
+              ws.send(JSON.stringify({ type: 'auth_failed', message: 'Authentication token required' }));
+              ws.close();
             }
             break;
             
