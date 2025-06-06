@@ -54,6 +54,35 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
+    
+    <!-- Google Analytics (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-QTQMZPNL13"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      
+      // Initialize with enhanced e-commerce and privacy settings
+      gtag('config', 'G-QTQMZPNL13', {
+        // Enhanced e-commerce for marketplace tracking
+        enhanced_ecommerce: true,
+        // Privacy settings
+        anonymize_ip: true,
+        respect_dnt: true,
+        // Performance settings
+        transport_type: 'beacon',
+        // Debug mode (remove in production)
+        debug_mode: false
+      });
+      
+      // Error handling for failed Analytics loads
+      window.gtag = window.gtag || function() {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('Google Analytics not loaded');
+        }
+      };
+    </script>
+
     <style>
       body {
         font-family: "Lato", sans-serif;

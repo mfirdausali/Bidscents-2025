@@ -2,6 +2,7 @@ import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { useAnalytics } from "./hooks/use-analytics";
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
@@ -25,6 +26,9 @@ import BuyingGuidePage from "@/pages/buying-guide"; // Import the new component
 import BoostCheckoutPage from "@/pages/boost-checkout"; // Import boost checkout page
 
 function Router() {
+  // Analytics tracking for all route changes
+  useAnalytics();
+  
   return (
     <Switch>
       <Route path="/" component={HomePage} />
