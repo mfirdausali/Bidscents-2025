@@ -136,11 +136,25 @@ export function useMessaging() {
         // Reset reconnect attempts on successful connection
         reconnectAttempts = 0;
         
-        // Authenticate with the server
+        // Authenticate with the server using JWT token
         if (user?.id) {
-          const authMessage = { type: 'auth', userId: user.id };
-          console.log('Sending authentication message to WebSocket server:', authMessage);
-          socket.send(JSON.stringify(authMessage));
+          // Get the JWT token from localStorage or sessionStorage
+          const token = localStorage.getItem('supabase.auth.token') || sessionStorage.getItem('supabase.auth.token');
+          
+          if (token) {
+            const authMessage = { 
+              type: 'auth', 
+              userId: user.id,
+              token: token
+            };
+            console.log('Sending JWT authentication message to WebSocket server');
+            socket.send(JSON.stringify(authMessage));
+          } else {
+            // Fallback to user ID authentication
+            const authMessage = { type: 'auth', userId: user.id };
+            console.log('Sending user ID authentication message to WebSocket server:', authMessage);
+            socket.send(JSON.stringify(authMessage));
+          }
         } else {
           console.error('Cannot authenticate WebSocket - user ID is missing');
         }

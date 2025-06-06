@@ -584,7 +584,7 @@ export default function SellerDashboard() {
       // Update the existingImages state when productImages are fetched
       const formattedImages = images.map((img: any) => ({
         id: String(img.id),
-        url: img.imageUrl
+        url: img.imageUrl,
       }));
       setExistingImages(formattedImages);
 
@@ -1211,25 +1211,31 @@ export default function SellerDashboard() {
   // Sort products by status priority: featured -> active -> pending -> sold
   const sortedProducts = filteredProducts?.sort((a, b) => {
     const getStatusPriority = (product: ProductWithDetails) => {
-      const status = product.status?.toLowerCase() || 'active';
+      const status = product.status?.toLowerCase() || "active";
       switch (status) {
-        case 'featured': return 4; // Highest priority
-        case 'active': return 3;
-        case 'pending': return 2; 
-        case 'sold': return 1;
-        case 'archived': return 0;
-        default: return 3; // Default to active priority
+        case "featured":
+          return 4; // Highest priority
+        case "active":
+          return 3;
+        case "pending":
+          return 2;
+        case "sold":
+          return 1;
+        case "archived":
+          return 0;
+        default:
+          return 3; // Default to active priority
       }
     };
 
     const priorityA = getStatusPriority(a);
     const priorityB = getStatusPriority(b);
-    
+
     // Sort by priority descending, then by creation date descending
     if (priorityA !== priorityB) {
       return priorityB - priorityA;
     }
-    
+
     // If same priority, sort by creation date (newest first)
     const dateA = new Date(a.createdAt || 0).getTime();
     const dateB = new Date(b.createdAt || 0).getTime();
@@ -1645,7 +1651,10 @@ export default function SellerDashboard() {
                               </TableCell>
                               <TableCell>{product.stockQuantity}</TableCell>
                               <TableCell>
-                                {product.status ? product.status.charAt(0).toUpperCase() + product.status.slice(1) : 'Active'}
+                                {product.status
+                                  ? product.status.charAt(0).toUpperCase() +
+                                    product.status.slice(1)
+                                  : "Active"}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end space-x-2">
@@ -1693,12 +1702,12 @@ export default function SellerDashboard() {
                                 ({boostedProducts.length} products × RM10.00)
                               </span>
                             </div>
-                            <Button
+                            {/* <Button
                               onClick={handleBoostCheckout}
                               className="bg-[#F5A623] hover:bg-[#E59400] text-white"
                             >
                               Boost Now
-                            </Button>
+                            </Button> */}
                           </div>
                         </div>
                       )}
@@ -2838,11 +2847,13 @@ export default function SellerDashboard() {
                             ))}
                           </div>
                         )}
-                        
+
                         {/* Note about editing and reuploading images */}
                         <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
                           <p className="text-xs text-blue-700">
-                            📝 <strong>Note:</strong> If your images don't show up properly on the homepage, please edit and reupload your pictures for the listings.
+                            📝 <strong>Note:</strong> If your images don't show
+                            up properly on the homepage, please edit and
+                            reupload your pictures for the listings.
                           </p>
                         </div>
                       </div>
@@ -3214,11 +3225,13 @@ export default function SellerDashboard() {
                             ))}
                           </div>
                         )}
-                        
+
                         {/* Note about editing and reuploading images */}
                         <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
                           <p className="text-xs text-blue-700">
-                            📝 <strong>Note:</strong> If your images don't show up properly on the homepage, please edit and reupload your pictures for the listings.
+                            📝 <strong>Note:</strong> If your images don't show
+                            up properly on the homepage, please edit and
+                            reupload your pictures for the listings.
                           </p>
                         </div>
                       </div>
