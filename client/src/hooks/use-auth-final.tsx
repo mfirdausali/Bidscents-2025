@@ -5,7 +5,7 @@
  * Replaces the previous dual authentication system for enhanced security.
  */
 
-import { createContext, ReactNode, useContext, useState, useEffect } from "react";
+import { createContext, ReactNode, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -62,33 +62,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Listen for Supabase auth state changes
   useEffect(() => {
-    console.log('🔧 Creating new Supabase client instance');
+    console.log('Creating new Supabase client instance');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Supabase auth state changed:', event);
         
         if (event === 'SIGNED_IN' && session) {
           // Exchange Supabase JWT for application JWT
-          console.log('🔄 Frontend: Starting token exchange with Supabase token');
+          console.log('Frontend: Starting token exchange with Supabase token');
           try {
             const response = await apiRequest("POST", "/api/v1/auth/session", {
               supabaseToken: session.access_token
             });
 
-            console.log('🔄 Frontend: Token exchange response status:', response.status);
+            console.log('Frontend: Token exchange response status:', response.status);
             
             if (response.ok) {
               const data = await response.json();
-              console.log('✅ Frontend: Token exchange successful, setting auth token');
+              console.log('Frontend: Token exchange successful, setting auth token');
               setAuthToken(data.token);
               queryClient.setQueryData(["/api/v1/auth/me"], data.user);
               refetchUser();
             } else {
               const errorData = await response.json();
-              console.error('❌ Frontend: Token exchange failed with error:', errorData);
+              console.error('Frontend: Token exchange failed with error:', errorData);
             }
           } catch (error) {
-            console.error("❌ Frontend: Token exchange request failed:", error);
+            console.error("Frontend: Token exchange request failed:", error);
           }
         } else if (event === 'SIGNED_OUT') {
           // Clear application JWT and user data
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign up with email and password
   const signUpMutation = useMutation({
     mutationFn: async (credentials: SignUpData) => {
-      console.log('🔄 Starting Supabase registration for:', credentials.email);
+      console.log('Starting Supabase registration for:', credentials.email);
       
       const { data, error } = await supabase.auth.signUp({
         email: credentials.email,
@@ -120,18 +120,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      console.log('📧 Supabase signup response:', { data, error });
+      console.log('Supabase signup response:', { data, error });
 
       if (error) {
-        console.error('❌ Supabase signup error:', error);
+        console.error('Supabase signup error:', error);
         throw error;
       }
 
       // Check if email confirmation is required
       if (data.user && !data.user.email_confirmed_at) {
-        console.log('📬 Email confirmation required for user:', data.user.email);
+        console.log('Email confirmation required for user:', data.user.email);
       } else {
-        console.log('✅ User email already confirmed:', data.user?.email);
+        console.log('User email already confirmed:', data.user?.email);
       }
 
       return data;
