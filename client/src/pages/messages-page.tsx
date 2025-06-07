@@ -1664,7 +1664,7 @@ export default function MessagesPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-56 p-2" side="top">
                         <div className="space-y-1">
-                          <Button 
+                          {/* <Button 
                             variant="ghost" 
                             className="w-full justify-start"
                             onClick={triggerFileUpload}
@@ -1674,7 +1674,7 @@ export default function MessagesPage() {
                               <Upload className="mr-2 h-4 w-4" />
                               <span>Upload file</span>
                             </div>
-                          </Button>
+                          </Button> */}
                           {user?.isSeller && (
                             <Button 
                               variant="ghost" 
