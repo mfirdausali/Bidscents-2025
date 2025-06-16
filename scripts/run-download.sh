@@ -11,8 +11,8 @@ echo ""
 # Check if Supabase credentials are set
 if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
     echo "❌ Missing Supabase credentials:"
-    echo "   VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:+✅ Set}"
-    echo "   SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:+✅ Set}"
+    [ -n "$VITE_SUPABASE_URL" ] && echo "   VITE_SUPABASE_URL: ✅ Set" || echo "   VITE_SUPABASE_URL: ❌ Missing"
+    [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && echo "   SUPABASE_SERVICE_ROLE_KEY: ✅ Set" || echo "   SUPABASE_SERVICE_ROLE_KEY: ❌ Missing"
     echo ""
     echo "Please set these environment variables:"
     echo "   export VITE_SUPABASE_URL=your_supabase_url"

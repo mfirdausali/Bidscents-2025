@@ -8,29 +8,29 @@
  */
 
 import { Client } from "@replit/object-storage";
+import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import pg from "pg";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Database connection
-const { Pool } = pg;
+// Supabase connection
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!process.env.DATABASE_URL) {
-  console.error("❌ DATABASE_URL environment variable is not set");
-  console.error("Please make sure your database is configured");
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error("❌ Missing Supabase credentials:");
+  console.error("   VITE_SUPABASE_URL:", supabaseUrl ? "✅ Set" : "❌ Missing");
+  console.error("   SUPABASE_SERVICE_ROLE_KEY:", supabaseServiceKey ? "✅ Set" : "❌ Missing");
   process.exit(1);
 }
 
-console.log("🔗 Connecting to database...");
+console.log("🔗 Connecting to Supabase...");
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Object storage clients
 const productBucketId =
@@ -73,18 +73,24 @@ async function getFileIdsFromDatabase() {
 
   try {
     // Get product images with metadata
-    const productImagesQuery = await pool.query(`
-      SELECT pi.image_url, pi.image_name, p.name as product_name, pi.created_at 
-      FROM product_images pi 
-      LEFT JOIN products p ON pi.product_id = p.id 
-      WHERE pi.image_url IS NOT NULL
-    `);
-    productImagesQuery.rows.forEach(row => {
+    const { data: productImagesData, error: productImagesError } = await supabase
+      .from('product_images')
+      .select(`
+        image_url,
+        image_name,
+        created_at,
+        products(name)
+      `)
+      .not('image_url', 'is', null);
+    
+    if (productImagesError) throw productImagesError;
+    
+    productImagesData.forEach(row => {
       if (row.image_url) {
         fileData.productImages.push({
           id: row.image_url,
           name: row.image_name,
-          productName: row.product_name,
+          productName: row.products?.name,
           createdAt: row.created_at
         });
         fileData.allIds.add(row.image_url);
@@ -93,12 +99,14 @@ async function getFileIdsFromDatabase() {
     console.log(`Found ${fileData.productImages.length} product images`);
 
     // Get user profile images
-    const profileImagesQuery = await pool.query(`
-      SELECT avatar_url, username, email 
-      FROM users 
-      WHERE avatar_url IS NOT NULL
-    `);
-    profileImagesQuery.rows.forEach(row => {
+    const { data: profileImagesData, error: profileImagesError } = await supabase
+      .from('users')
+      .select('avatar_url, username, email')
+      .not('avatar_url', 'is', null);
+    
+    if (profileImagesError) throw profileImagesError;
+    
+    profileImagesData.forEach(row => {
       if (row.avatar_url) {
         fileData.profileImages.push({
           id: row.avatar_url,
@@ -111,12 +119,14 @@ async function getFileIdsFromDatabase() {
     console.log(`Found ${fileData.profileImages.length} profile images`);
 
     // Get user cover photos
-    const coverPhotosQuery = await pool.query(`
-      SELECT cover_photo, username, email 
-      FROM users 
-      WHERE cover_photo IS NOT NULL
-    `);
-    coverPhotosQuery.rows.forEach(row => {
+    const { data: coverPhotosData, error: coverPhotosError } = await supabase
+      .from('users')
+      .select('cover_photo, username, email')
+      .not('cover_photo', 'is', null);
+    
+    if (coverPhotosError) throw coverPhotosError;
+    
+    coverPhotosData.forEach(row => {
       if (row.cover_photo) {
         fileData.coverPhotos.push({
           id: row.cover_photo,
@@ -129,19 +139,25 @@ async function getFileIdsFromDatabase() {
     console.log(`Found ${fileData.coverPhotos.length} cover photos`);
 
     // Get message files
-    const messageFilesQuery = await pool.query(`
-      SELECT m.file_url, u1.username as sender, u2.username as receiver, m.created_at
-      FROM messages m
-      LEFT JOIN users u1 ON m.sender_id = u1.id
-      LEFT JOIN users u2 ON m.receiver_id = u2.id
-      WHERE m.file_url IS NOT NULL AND m.file_url != 'NULL'
-    `);
-    messageFilesQuery.rows.forEach(row => {
+    const { data: messageFilesData, error: messageFilesError } = await supabase
+      .from('messages')
+      .select(`
+        file_url,
+        created_at,
+        sender:users!messages_sender_id_fkey(username),
+        receiver:users!messages_receiver_id_fkey(username)
+      `)
+      .not('file_url', 'is', null)
+      .neq('file_url', 'NULL');
+    
+    if (messageFilesError) throw messageFilesError;
+    
+    messageFilesData.forEach(row => {
       if (row.file_url && row.file_url !== 'NULL') {
         fileData.messageFiles.push({
           id: row.file_url,
-          sender: row.sender,
-          receiver: row.receiver,
+          sender: row.sender?.username,
+          receiver: row.receiver?.username,
           createdAt: row.created_at
         });
         fileData.allIds.add(row.file_url);
@@ -348,21 +364,17 @@ async function main() {
   } catch (error) {
     console.error("Script failed:", error);
     process.exit(1);
-  } finally {
-    await pool.end();
   }
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', async () => {
+process.on('SIGINT', () => {
   console.log('Download interrupted by user');
-  await pool.end();
   process.exit(0);
 });
 
 // Run the script
-main().catch(async (error) => {
+main().catch((error) => {
   console.error('Unhandled error:', error);
-  await pool.end();
   process.exit(1);
 });

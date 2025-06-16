@@ -14,29 +14,29 @@
  */
 
 import { Client } from "@replit/object-storage";
+import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import pg from "pg";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Database connection
-const { Pool } = pg;
+// Supabase connection
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!process.env.DATABASE_URL) {
-  console.error("❌ DATABASE_URL environment variable is not set");
-  console.error("Please make sure your database is configured");
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error("❌ Missing Supabase credentials:");
+  console.error("   VITE_SUPABASE_URL:", supabaseUrl ? "✅ Set" : "❌ Missing");
+  console.error("   SUPABASE_SERVICE_ROLE_KEY:", supabaseServiceKey ? "✅ Set" : "❌ Missing");
   process.exit(1);
 }
 
-console.log("🔗 Connecting to database...");
+console.log("🔗 Connecting to Supabase...");
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Object storage clients
 const productBucketId =
@@ -78,29 +78,54 @@ async function getFileIdsFromDatabase() {
 
   try {
     // Get product images
-    const productImagesQuery = await pool.query("SELECT DISTINCT image_url FROM product_images WHERE image_url IS NOT NULL");
-    productImagesQuery.rows.forEach(row => {
+    const { data: productImages, error: productImagesError } = await supabase
+      .from('product_images')
+      .select('image_url')
+      .not('image_url', 'is', null);
+    
+    if (productImagesError) throw productImagesError;
+    
+    productImages.forEach(row => {
       if (row.image_url) fileMap.productImages.add(row.image_url);
     });
     console.log(`  📸 Found ${fileMap.productImages.size} product images in database`);
 
     // Get user profile images
-    const profileImagesQuery = await pool.query("SELECT DISTINCT avatar_url FROM users WHERE avatar_url IS NOT NULL");
-    profileImagesQuery.rows.forEach(row => {
+    const { data: profileImages, error: profileImagesError } = await supabase
+      .from('users')
+      .select('avatar_url')
+      .not('avatar_url', 'is', null);
+    
+    if (profileImagesError) throw profileImagesError;
+    
+    profileImages.forEach(row => {
       if (row.avatar_url) fileMap.profileImages.add(row.avatar_url);
     });
     console.log(`  👤 Found ${fileMap.profileImages.size} profile images in database`);
 
     // Get user cover photos
-    const coverPhotosQuery = await pool.query("SELECT DISTINCT cover_photo FROM users WHERE cover_photo IS NOT NULL");
-    coverPhotosQuery.rows.forEach(row => {
+    const { data: coverPhotos, error: coverPhotosError } = await supabase
+      .from('users')
+      .select('cover_photo')
+      .not('cover_photo', 'is', null);
+    
+    if (coverPhotosError) throw coverPhotosError;
+    
+    coverPhotos.forEach(row => {
       if (row.cover_photo) fileMap.coverPhotos.add(row.cover_photo);
     });
     console.log(`  🖼️ Found ${fileMap.coverPhotos.size} cover photos in database`);
 
     // Get message files
-    const messageFilesQuery = await pool.query("SELECT DISTINCT file_url FROM messages WHERE file_url IS NOT NULL AND file_url != 'NULL'");
-    messageFilesQuery.rows.forEach(row => {
+    const { data: messageFiles, error: messageFilesError } = await supabase
+      .from('messages')
+      .select('file_url')
+      .not('file_url', 'is', null)
+      .neq('file_url', 'NULL');
+    
+    if (messageFilesError) throw messageFilesError;
+    
+    messageFiles.forEach(row => {
       if (row.file_url && row.file_url !== 'NULL') fileMap.messageFiles.add(row.file_url);
     });
     console.log(`  📎 Found ${fileMap.messageFiles.size} message files in database`);
@@ -264,27 +289,22 @@ async function main() {
   } catch (error) {
     console.error("\n❌ Script failed:", error);
     process.exit(1);
-  } finally {
-    await pool.end();
   }
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', async () => {
+process.on('SIGINT', () => {
   console.log('\n🛑 Download interrupted by user');
-  await pool.end();
   process.exit(0);
 });
 
-process.on('SIGTERM', async () => {
+process.on('SIGTERM', () => {
   console.log('\n🛑 Download terminated');
-  await pool.end();
   process.exit(0);
 });
 
 // Run the script
-main().catch(async (error) => {
+main().catch((error) => {
   console.error('❌ Unhandled error:', error);
-  await pool.end();
   process.exit(1);
 });
