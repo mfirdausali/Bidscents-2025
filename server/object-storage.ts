@@ -1,4 +1,4 @@
-import { Client } from "@replit/object-storage/dist/index.js";
+import { Client } from "@replit/object-storage";
 import { randomUUID } from "crypto";
 
 // Define constants for file types

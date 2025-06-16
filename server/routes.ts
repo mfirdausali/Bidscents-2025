@@ -55,6 +55,31 @@ async function getAuthenticatedUser(req: Request): Promise<any | null> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Version endpoint to check deployed commit hash
+  app.get("/api/version", (req, res) => {
+    try {
+      const { execSync } = require('child_process');
+      const commitHash = execSync('git rev-parse HEAD').toString().trim();
+      const shortHash = execSync('git rev-parse --short HEAD').toString().trim();
+      const branch = execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
+      const timestamp = new Date().toISOString();
+      
+      res.json({
+        commitHash,
+        shortHash,
+        branch,
+        timestamp,
+        version: "1.0.0"
+      });
+    } catch (error) {
+      res.json({
+        error: "Could not retrieve version info",
+        timestamp: new Date().toISOString(),
+        version: "1.0.0"
+      });
+    }
+  });
+
   // Create HTTP server for both Express and WebSocket
   const httpServer = createServer(app);
   
