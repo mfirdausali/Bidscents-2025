@@ -78,6 +78,7 @@ The enhanced download script includes:
 - **File Type Detection**: Automatically detects file types from binary signatures
 - **Smart Discovery**: Attempts to find files not tracked in the database
 - **Detailed Reporting**: Comprehensive summary of what was downloaded
+- **Automatic Compression**: Creates zip files for easy transfer and storage
 
 ## File Organization
 
@@ -126,12 +127,29 @@ Each script generates a summary file showing:
 - **Files not found**: Normal if files were deleted from storage but references remain in database
 - **Zero downloads**: Check your database connection and object storage configuration
 
+## Automatic Compression
+
+Both download scripts automatically create compressed backup files:
+
+### Basic Download
+Creates: `object-storage-backup-YYYY-MM-DD.zip`
+
+### Enhanced Download  
+Creates: `object-storage-backup-enhanced-YYYY-MM-DD.zip`
+
+The zip files include:
+- All downloaded files organized by type
+- Summary reports
+- Metadata files (enhanced version only)
+
+If zip creation fails, the scripts will attempt to create a `.tar.gz` file as backup.
+
 ## Moving Files After Download
 
 Once downloaded, you can:
-1. **Copy to external storage**: USB drive, external hard drive
-2. **Upload to cloud storage**: Google Drive, Dropbox, etc.
-3. **Archive**: Create zip files for easier handling
+1. **Use the zip file**: Easy to transfer the single compressed file
+2. **Copy to external storage**: USB drive, external hard drive
+3. **Upload to cloud storage**: Google Drive, Dropbox, etc.
 4. **Backup**: Store in multiple locations for safety
 
 ## Troubleshooting

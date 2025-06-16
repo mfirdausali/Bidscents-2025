@@ -13,9 +13,12 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const execAsync = promisify(exec);
 
 // Supabase connection
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -346,6 +349,62 @@ BUCKET INFORMATION:
   console.log(summary);
 }
 
+// Create zip file of enhanced downloads folder
+async function createEnhancedZipFile() {
+  console.log("Creating enhanced zip file...");
+  
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const zipFileName = `object-storage-backup-enhanced-${timestamp.split('T')[0]}.zip`;
+  const zipPath = path.join(__dirname, "..", zipFileName);
+  
+  try {
+    // Create zip file using system zip command
+    const { stdout, stderr } = await execAsync(`cd "${path.dirname(downloadDir)}" && zip -r "${zipPath}" "${path.basename(downloadDir)}"`);
+    
+    if (stderr && !stderr.includes('zip warning')) {
+      console.log(`Zip warnings: ${stderr}`);
+    }
+    
+    // Check if zip file was created and get its size
+    if (fs.existsSync(zipPath)) {
+      const stats = fs.statSync(zipPath);
+      const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+      
+      console.log(`Enhanced zip file created successfully!`);
+      console.log(`Location: ${zipPath}`);
+      console.log(`Size: ${fileSizeMB} MB`);
+      
+      return zipPath;
+    } else {
+      throw new Error("Zip file was not created");
+    }
+  } catch (error) {
+    console.error("Error creating zip file:", error.message);
+    
+    // Try alternative zip method if system zip fails
+    try {
+      console.log("Trying alternative compression method...");
+      await execAsync(`cd "${path.dirname(downloadDir)}" && tar -czf "${zipPath.replace('.zip', '.tar.gz')}" "${path.basename(downloadDir)}"`);
+      
+      const tarPath = zipPath.replace('.zip', '.tar.gz');
+      if (fs.existsSync(tarPath)) {
+        const stats = fs.statSync(tarPath);
+        const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+        
+        console.log(`Tar.gz file created successfully!`);
+        console.log(`Location: ${tarPath}`);
+        console.log(`Size: ${fileSizeMB} MB`);
+        
+        return tarPath;
+      }
+    } catch (tarError) {
+      console.error("Both zip and tar.gz creation failed");
+      console.log("Files are available in the downloads-enhanced folder without compression");
+      return null;
+    }
+  }
+}
+
 // Main execution function
 async function main() {
   console.log("Starting Enhanced Object Storage Download Script");
@@ -358,8 +417,14 @@ async function main() {
     const discoveredFiles = await discoverAdditionalFiles(fileData.allIds);
     generateEnhancedSummary(stats, fileData, discoveredFiles);
 
+    // Create zip file
+    const zipPath = await createEnhancedZipFile();
+
     console.log("Enhanced download script completed successfully!");
     console.log("Check the 'downloads-enhanced' folder for your files");
+    if (zipPath) {
+      console.log(`Compressed backup available: ${path.basename(zipPath)}`);
+    }
 
   } catch (error) {
     console.error("Script failed:", error);
