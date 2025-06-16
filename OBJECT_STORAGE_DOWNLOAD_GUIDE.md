@@ -39,7 +39,9 @@ Run the interactive script to choose your download method:
 
 ## What You Need
 
-1. **Database Access**: Your `DATABASE_URL` environment variable must be set
+1. **Supabase Access**: These environment variables must be set:
+   - `VITE_SUPABASE_URL` - Your Supabase project URL
+   - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key (with database access)
 2. **Object Storage Access**: The script uses your existing object storage configuration
 3. **Disk Space**: Ensure you have enough space for all files
 
@@ -86,9 +88,10 @@ Files are automatically organized by type and include:
 
 ## Running the Downloads
 
-1. **Make sure your database is accessible**:
+1. **Make sure your Supabase credentials are accessible**:
    ```bash
-   echo $DATABASE_URL
+   echo $VITE_SUPABASE_URL
+   echo $SUPABASE_SERVICE_ROLE_KEY
    ```
 
 2. **Choose your download method**:

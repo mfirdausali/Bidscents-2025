@@ -8,10 +8,15 @@ echo "Object Storage Download Tool"
 echo "==================================="
 echo ""
 
-# Check if DATABASE_URL is set
-if [ -z "$DATABASE_URL" ]; then
-    echo "❌ DATABASE_URL environment variable is not set"
-    echo "Please make sure your database is configured"
+# Check if Supabase credentials are set
+if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+    echo "❌ Missing Supabase credentials:"
+    echo "   VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:+✅ Set}"
+    echo "   SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:+✅ Set}"
+    echo ""
+    echo "Please set these environment variables:"
+    echo "   export VITE_SUPABASE_URL=your_supabase_url"
+    echo "   export SUPABASE_SERVICE_ROLE_KEY=your_service_role_key"
     exit 1
 fi
 
