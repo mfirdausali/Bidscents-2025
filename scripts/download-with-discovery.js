@@ -17,31 +17,19 @@ import pg from "pg";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Database connection using Supabase
+// Database connection
 const { Pool } = pg;
 
-// Construct Supabase connection string with service role
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error("❌ Missing Supabase credentials:");
-  console.error("   VITE_SUPABASE_URL:", supabaseUrl ? "✅ Set" : "❌ Missing");
-  console.error("   SUPABASE_SERVICE_ROLE_KEY:", supabaseServiceKey ? "✅ Set" : "❌ Missing");
+if (!process.env.DATABASE_URL) {
+  console.error("❌ DATABASE_URL environment variable is not set");
+  console.error("Please make sure your database is configured");
   process.exit(1);
 }
 
-// Extract database details from Supabase URL
-const supabaseUrlObj = new URL(supabaseUrl);
-const supabaseHost = supabaseUrlObj.hostname;
-const supabaseProject = supabaseHost.split('.')[0];
-
-const connectionString = `postgresql://postgres:${supabaseServiceKey}@db.${supabaseProject}.supabase.co:5432/postgres`;
-
-console.log(`🔗 Connecting to Supabase database: ${supabaseProject}`);
+console.log("🔗 Connecting to database...");
 
 const pool = new Pool({
-  connectionString: connectionString,
+  connectionString: process.env.DATABASE_URL,
 });
 
 // Object storage clients
