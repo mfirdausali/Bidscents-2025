@@ -26,16 +26,21 @@ export function AuthVerifyPage() {
         const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
         const type = hashParams.get('type') || searchParams.get('type');
+        const token = searchParams.get('token'); // For legacy API endpoint support
 
         console.log('🔄 Processing email verification:', { 
           type, 
           hasAccessToken: !!accessToken,
           hasRefreshToken: !!refreshToken,
+          hasToken: !!token,
           hashKeys: Array.from(hashParams.keys()),
           searchKeys: Array.from(searchParams.keys())
         });
 
+        // Method 1: Modern Supabase token flow (preferred)
         if (type === 'signup' && accessToken && refreshToken) {
+          console.log('🔄 Using Supabase token flow...');
+          
           // Set the session with the tokens from the email link
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -49,20 +54,83 @@ export function AuthVerifyPage() {
             return;
           }
 
-          console.log('✅ Email verification successful:', data);
-          setVerificationStatus('success');
+          console.log('✅ Email verification successful via Supabase:', data);
           
-          toast({
-            title: "Email verified successfully",
-            description: "Your account has been verified. You can now sign in.",
-          });
+          // Now create or update local user profile
+          try {
+            const response = await fetch('/api/v1/auth/session', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                supabaseToken: accessToken
+              })
+            });
 
-          // Redirect to home page after 2 seconds
-          setTimeout(() => {
-            setLocation('/');
-          }, 2000);
+            if (response.ok) {
+              const sessionData = await response.json();
+              console.log('✅ Local user profile created/updated:', sessionData);
+              
+              // Store the application token
+              localStorage.setItem('token', sessionData.token);
+              
+              setVerificationStatus('success');
+              toast({
+                title: "Email verified successfully",
+                description: "Your account has been verified and is ready to use.",
+              });
+
+              // Redirect to home page after 2 seconds
+              setTimeout(() => {
+                setLocation('/');
+              }, 2000);
+            } else {
+              const errorData = await response.json();
+              console.error('❌ Failed to create local user profile:', errorData);
+              setVerificationStatus('error');
+              setErrorMessage('Email verified but failed to complete profile setup');
+            }
+          } catch (profileError) {
+            console.error('❌ Error creating local user profile:', profileError);
+            setVerificationStatus('error');
+            setErrorMessage('Email verified but failed to complete profile setup');
+          }
+        } 
+        // Method 2: Legacy API endpoint flow (fallback)
+        else if (token) {
+          console.log('🔄 Using legacy API endpoint flow...');
+          
+          try {
+            const response = await fetch(`/api/verify-email?token=${token}`);
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log('✅ Email verification successful via API:', data);
+              
+              setVerificationStatus('success');
+              toast({
+                title: "Email verified successfully",
+                description: "Your account has been verified. You can now sign in.",
+              });
+              
+              // Redirect to auth page after 2 seconds
+              setTimeout(() => {
+                setLocation('/auth?verified=true');
+              }, 2000);
+            } else {
+              const errorData = await response.json();
+              console.error('❌ API verification failed:', errorData);
+              setVerificationStatus('error');
+              setErrorMessage(errorData.message || 'Email verification failed');
+            }
+          } catch (apiError) {
+            console.error('❌ API verification error:', apiError);
+            setVerificationStatus('error');
+            setErrorMessage('An unexpected error occurred during verification');
+          }
         } else {
-          console.log('❌ Invalid verification parameters');
+          console.log('❌ No valid verification parameters found');
           setVerificationStatus('error');
           setErrorMessage('Invalid verification link or missing parameters');
         }
