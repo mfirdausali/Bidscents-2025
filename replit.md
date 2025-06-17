@@ -29,10 +29,12 @@ BidScents is a sophisticated secondhand luxury perfume marketplace built as a fu
 ## Key Components
 
 ### Authentication System
-- **Primary Provider**: Supabase Auth with JWT tokens
-- **Security Features**: Provider ID validation, secure session creation, automatic account linking
-- **Session Management**: Express session store with PostgreSQL backend
-- **Authorization**: Role-based access control (Admin, Seller, Regular User)
+- **Hybrid Architecture**: Supabase Auth + Local User Profiles
+- **Primary Provider**: Supabase Auth for identity, local database for business data
+- **Security Features**: Provider ID validation, JWT token exchange, automatic profile recovery
+- **Session Management**: Application JWT with secure token exchange mechanism
+- **Recovery System**: Automatic orphaned user detection and profile creation
+- **Authorization**: Role-based access control with comprehensive error handling
 
 ### Database Schema
 - **Users**: Enhanced with provider ID fields for security
@@ -56,10 +58,11 @@ BidScents is a sophisticated secondhand luxury perfume marketplace built as a fu
 
 ### Authentication Flow
 1. User authenticates via Supabase (email/password, social login)
-2. Supabase JWT validated on server
-3. Local user profile created/linked with provider ID
-4. Application JWT issued for API access
-5. Session stored securely in PostgreSQL
+2. Supabase JWT validated on server via token exchange endpoint
+3. Local user profile automatically created/linked with provider ID mapping
+4. Application JWT issued for secure API access
+5. Automatic recovery system handles profile creation failures
+6. Frontend recovery UI provides seamless user experience
 
 ### Product Listing Flow
 1. Seller uploads product details and images
@@ -120,7 +123,13 @@ BidScents is a sophisticated secondhand luxury perfume marketplace built as a fu
 - Encrypted message storage with secure key management
 
 ## Changelog
-- June 17, 2025. Initial setup
+- June 17, 2025: Authentication system critical fix implemented
+  - Resolved orphaned user issue where auth.users existed without public.users
+  - Added comprehensive profile recovery mechanisms
+  - Implemented robust error handling and automatic retry logic
+  - Enhanced JWT token exchange system for secure session management
+  - Created detailed auth.md documentation for developer reference
+- June 17, 2025: Initial setup
 
 ## User Preferences
 
