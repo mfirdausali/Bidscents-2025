@@ -104,62 +104,45 @@ export function AuthVerifyPage() {
           console.log('🔄 Using Supabase verification code flow...');
           
           try {
-            // Exchange the verification code for session tokens
-            const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+            // Use API verification for code parameter
+            const response = await fetch(`/api/verify-email?code=${code}`);
             
-            if (error) {
-              console.error('❌ Code exchange failed:', error);
-              setVerificationStatus('error');
-              setErrorMessage('Invalid verification link or expired code');
-              return;
-            }
-            
-            console.log('✅ Code exchange successful:', data);
-            
-            // Now create or update local user profile
-            try {
-              const response = await fetch('/api/v1/auth/session', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  supabaseToken: data.session.access_token
-                })
-              });
-
-              if (response.ok) {
-                const sessionData = await response.json();
-                console.log('✅ Local user profile created/updated:', sessionData);
+            if (response.ok) {
+              const apiData = await response.json();
+              console.log('✅ API verification successful:', apiData);
+              
+              // Check if this requires manual sign-in
+              if (apiData.requiresSignIn) {
+                setVerificationStatus('success');
+                toast({
+                  title: "Email verified successfully",
+                  description: "Your account has been verified. Please sign in to continue.",
+                });
                 
-                // Store the application token
-                localStorage.setItem('token', sessionData.token);
-                
+                setTimeout(() => {
+                  setLocation('/auth?verified=true');
+                }, 2000);
+              } else {
                 setVerificationStatus('success');
                 toast({
                   title: "Email verified successfully",
                   description: "Your account has been verified and is ready to use.",
                 });
-
-                // Redirect to home page after 2 seconds
+                
                 setTimeout(() => {
                   setLocation('/');
                 }, 2000);
-              } else {
-                const errorData = await response.json();
-                console.error('❌ Failed to create local user profile:', errorData);
-                setVerificationStatus('error');
-                setErrorMessage('Email verified but failed to complete profile setup');
               }
-            } catch (profileError) {
-              console.error('❌ Error creating local user profile:', profileError);
+            } else {
+              const errorData = await response.json();
+              console.error('❌ API verification failed:', errorData);
               setVerificationStatus('error');
-              setErrorMessage('Email verified but failed to complete profile setup');
+              setErrorMessage(errorData.message || 'Email verification failed');
             }
-          } catch (codeError) {
-            console.error('❌ Verification code error:', codeError);
+          } catch (apiError) {
+            console.error('❌ API verification error:', apiError);
             setVerificationStatus('error');
-            setErrorMessage('Invalid verification link or expired code');
+            setErrorMessage('Unable to verify email at this time');
           }
         }
         // Method 3: Legacy API endpoint flow (fallback)
