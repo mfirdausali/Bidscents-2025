@@ -27,12 +27,14 @@ export function AuthVerifyPage() {
         const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
         const type = hashParams.get('type') || searchParams.get('type');
         const token = searchParams.get('token'); // For legacy API endpoint support
+        const code = searchParams.get('code'); // Supabase verification code
 
         console.log('🔄 Processing email verification:', { 
           type, 
           hasAccessToken: !!accessToken,
           hasRefreshToken: !!refreshToken,
           hasToken: !!token,
+          hasCode: !!code,
           hashKeys: Array.from(hashParams.keys()),
           searchKeys: Array.from(searchParams.keys())
         });
@@ -97,7 +99,70 @@ export function AuthVerifyPage() {
             setErrorMessage('Email verified but failed to complete profile setup');
           }
         } 
-        // Method 2: Legacy API endpoint flow (fallback)
+        // Method 2: Supabase verification code flow
+        else if (code) {
+          console.log('🔄 Using Supabase verification code flow...');
+          
+          try {
+            // Exchange the verification code for session tokens
+            const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+            
+            if (error) {
+              console.error('❌ Code exchange failed:', error);
+              setVerificationStatus('error');
+              setErrorMessage('Invalid verification link or expired code');
+              return;
+            }
+            
+            console.log('✅ Code exchange successful:', data);
+            
+            // Now create or update local user profile
+            try {
+              const response = await fetch('/api/v1/auth/session', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  supabaseToken: data.session.access_token
+                })
+              });
+
+              if (response.ok) {
+                const sessionData = await response.json();
+                console.log('✅ Local user profile created/updated:', sessionData);
+                
+                // Store the application token
+                localStorage.setItem('token', sessionData.token);
+                
+                setVerificationStatus('success');
+                toast({
+                  title: "Email verified successfully",
+                  description: "Your account has been verified and is ready to use.",
+                });
+
+                // Redirect to home page after 2 seconds
+                setTimeout(() => {
+                  setLocation('/');
+                }, 2000);
+              } else {
+                const errorData = await response.json();
+                console.error('❌ Failed to create local user profile:', errorData);
+                setVerificationStatus('error');
+                setErrorMessage('Email verified but failed to complete profile setup');
+              }
+            } catch (profileError) {
+              console.error('❌ Error creating local user profile:', profileError);
+              setVerificationStatus('error');
+              setErrorMessage('Email verified but failed to complete profile setup');
+            }
+          } catch (codeError) {
+            console.error('❌ Verification code error:', codeError);
+            setVerificationStatus('error');
+            setErrorMessage('Invalid verification link or expired code');
+          }
+        }
+        // Method 3: Legacy API endpoint flow (fallback)
         else if (token) {
           console.log('🔄 Using legacy API endpoint flow...');
           
