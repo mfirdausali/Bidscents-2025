@@ -1,0 +1,29 @@
+
+OBJECT STORAGE DOWNLOAD SUMMARY
+Generated: 2025-06-16T23:29:14.531Z
+
+DATABASE RECORDS:
+- Product Images: 86
+- Profile Images: 5
+- Cover Photos: 5
+- Message Files: 1
+- Total in Database: 97
+
+DOWNLOAD RESULTS:
+- Files Attempted: 97
+- Files Downloaded: 93
+- Success Rate: 95.9%
+
+DOWNLOAD LOCATIONS:
+- Product Images: ./downloads/product-images/
+- Profile Images: ./downloads/profile-images/
+- Cover Photos: ./downloads/cover-photos/
+- Message Files: ./downloads/message-files/
+- Unknown Files: ./downloads/unknown/
+
+BUCKET INFORMATION:
+- Main Bucket ID: replit-objstore-0eba980b-4a8f-47b6-90af-f554bb8688e2
+- Message Bucket ID: replit-objstore-94260517-cd41-4021-b194-9f9e53fa8889
+
+NOTE: Files that couldn't be downloaded may have been deleted from object storage
+or the file IDs in the database may be outdated.
