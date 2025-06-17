@@ -40,18 +40,44 @@ if (!supabaseUrl || !supabaseKey) {
   }
 }
 
-// Create a Supabase client with auth configuration
-console.log('🔧 Creating Supabase client instance...');
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-  }
-});
+// Global singleton to prevent multiple GoTrueClient instances on server
+declare global {
+  var __serverSupabaseClient: any | undefined;
+}
 
-// Log client creation for debugging multiple instance issue
-console.log('✅ Supabase client created successfully');
-console.log('🔍 Client instance ID:', Math.random().toString(36).substr(2, 9));
+function createServerSupabaseClient() {
+  // Check if we already have a global instance
+  if (globalThis.__serverSupabaseClient) {
+    return globalThis.__serverSupabaseClient;
+  }
+
+  // Ensure we have valid credentials
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase credentials for server client');
+  }
+
+  // Create new instance with server-optimized configuration
+  const client = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: false, // Server doesn't need auto-refresh
+      persistSession: false,   // Server doesn't persist sessions
+    },
+    // Add server identification
+    global: {
+      headers: {
+        'X-Client-Info': 'bidscents-server-client'
+      }
+    }
+  });
+
+  // Store globally to prevent recreation
+  globalThis.__serverSupabaseClient = client;
+  
+  return client;
+}
+
+// Create a single Supabase client instance for server
+export const supabase = createServerSupabaseClient();
 
 // Test the connection
 export async function testSupabaseConnection() {

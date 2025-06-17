@@ -3096,7 +3096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get product details
       console.log(`Looking up product ID ${auction.productId} for auction ${auctionId}`);
-      const product = await storage.getProduct(auction.productId);
+      const product = await storage.getProductById(auction.productId);
       
       if (!product) {
         console.warn(`Product ${auction.productId} not found for auction ${auctionId}`);

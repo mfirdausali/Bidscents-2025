@@ -9,26 +9,39 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase credentials');
 }
 
-// Ensure single instance creation to fix "Multiple GoTrueClient instances detected" warning
-let supabaseInstance: ReturnType<typeof createClient> | null = null;
+// Global singleton to prevent multiple GoTrueClient instances
+declare global {
+  var __supabaseClient: any | undefined;
+}
 
 function createSupabaseClient() {
-  if (supabaseInstance) {
-    console.log('🔧 Reusing existing Supabase client instance');
-    return supabaseInstance;
+  // Check if we already have a global instance
+  if (globalThis.__supabaseClient) {
+    return globalThis.__supabaseClient;
   }
 
-  console.log('🔧 Creating new Supabase client instance');
-  supabaseInstance = createClient(supabaseUrl, supabaseKey, {
+  // Create new instance with optimized configuration
+  const client = createClient(supabaseUrl, supabaseKey, {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
-      flowType: 'pkce'
+      flowType: 'pkce',
+      // Reduce token refresh frequency to prevent multiple instances
+      storageKey: 'supabase.auth.token'
+    },
+    // Optimize connection settings
+    global: {
+      headers: {
+        'X-Client-Info': 'bidscents-web-client'
+      }
     }
   });
+
+  // Store globally to prevent recreation
+  globalThis.__supabaseClient = client;
   
-  return supabaseInstance;
+  return client;
 }
 
 // Create a single Supabase client instance
