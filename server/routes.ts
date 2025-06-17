@@ -218,6 +218,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/v1/auth/lookup-email', authRoutes.lookupEmail);
   app.get('/api/v1/auth/me', requireAuth, authRoutes.me);
   app.post('/api/v1/auth/logout', authRoutes.logout);
+  app.post('/api/v1/auth/recover-profile', authRoutes.recoverProfile);
+  app.get('/api/v1/auth/check-orphaned', requireAuth, authRoutes.checkOrphanedUsers);
+  app.post('/api/v1/auth/repair-orphaned', requireAuth, authRoutes.repairOrphanedUsers);
   
   // Raw query middleware specifically for Billplz redirect
   // This captures the original query string before Express parses it

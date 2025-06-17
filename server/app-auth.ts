@@ -226,11 +226,11 @@ export const authRoutes = {
       
       console.log('✅ Backend: Session created successfully for user:', localUser.email);
       res.json(response);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Backend: Session creation error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
+        message: error?.message || 'Unknown error',
+        stack: error?.stack,
+        name: error?.name
       });
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -290,5 +290,176 @@ export const authRoutes = {
   // Logout (client-side only - just remove token)
   logout: async (req: Request, res: Response) => {
     res.json({ message: 'Logged out successfully' });
+  },
+
+  // Recovery endpoint for orphaned users (exist in auth.users but not public.users)
+  recoverProfile: async (req: Request, res: Response) => {
+    try {
+      const { supabaseToken } = req.body;
+      
+      if (!supabaseToken) {
+        return res.status(400).json({ error: 'Supabase token required' });
+      }
+
+      console.log('🔄 Recovery: Verifying Supabase JWT...');
+      // Verify the Supabase JWT
+      const { data: { user }, error } = await supabase.auth.getUser(supabaseToken);
+      
+      if (error || !user) {
+        console.error('❌ Recovery: Invalid Supabase token:', error);
+        return res.status(401).json({ error: 'Invalid Supabase token' });
+      }
+
+      if (!user.email) {
+        return res.status(400).json({ error: 'User email is required' });
+      }
+
+      console.log('🔄 Recovery: Checking for existing local user...');
+      // Check if user already exists in public.users
+      let localUser = await storage.getUserByEmail(user.email);
+      
+      if (localUser) {
+        console.log('✅ Recovery: User profile already exists');
+        // User exists, just return the profile
+        const appToken = generateAppJWT(localUser.id, localUser.email, user.id, localUser.isSeller);
+        
+        return res.json({
+          token: appToken,
+          user: {
+            id: localUser.id,
+            email: localUser.email,
+            username: localUser.username,
+            firstName: localUser.firstName,
+            lastName: localUser.lastName,
+            isSeller: localUser.isSeller,
+          },
+          recovered: false
+        });
+      }
+
+      console.log('🔄 Recovery: Creating missing user profile...');
+      // User doesn't exist in public.users, create it
+      const newUserData = {
+        email: user.email,
+        username: user.email.split('@')[0],
+        firstName: user.user_metadata?.first_name || user.user_metadata?.firstName || null,
+        lastName: user.user_metadata?.last_name || user.user_metadata?.lastName || null,
+        providerId: user.id,
+        provider: 'supabase',
+        isVerified: !!user.email_confirmed_at
+      };
+      
+      // Handle username conflicts
+      let baseUsername = newUserData.username;
+      let counter = 0;
+      let usernameExists = true;
+      
+      while (usernameExists) {
+        const existingUser = await storage.getUserByUsername(newUserData.username);
+        if (!existingUser) {
+          usernameExists = false;
+        } else {
+          counter++;
+          newUserData.username = `${baseUsername}${counter}`;
+          
+          // Prevent infinite loops
+          if (counter > 9999) {
+            newUserData.username = `${baseUsername}${Date.now()}`;
+            break;
+          }
+        }
+      }
+
+      localUser = await storage.createUser(newUserData);
+      console.log('✅ Recovery: Successfully created user profile:', localUser.email);
+
+      // Generate application JWT
+      const appToken = generateAppJWT(localUser.id, localUser.email, user.id, localUser.isSeller);
+
+      res.json({
+        token: appToken,
+        user: {
+          id: localUser.id,
+          email: localUser.email,
+          username: localUser.username,
+          firstName: localUser.firstName,
+          lastName: localUser.lastName,
+          isSeller: localUser.isSeller,
+        },
+        recovered: true
+      });
+    } catch (error: any) {
+      console.error('❌ Recovery: Profile recovery error:', {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack
+      });
+      res.status(500).json({ error: 'Profile recovery failed' });
+    }
+  },
+
+  // Admin endpoint to check for orphaned users
+  checkOrphanedUsers: async (req: Request, res: Response) => {
+    try {
+      // This endpoint requires admin access - implement admin check here
+      const authReq = req as AuthenticatedRequest;
+      if (!authReq.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const adminUser = await storage.getUser(authReq.user.id);
+      if (!adminUser?.isAdmin) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      // Call the Supabase function to count orphaned users
+      const { data, error } = await supabase.rpc('count_orphaned_users');
+      
+      if (error) {
+        console.error('Error checking orphaned users:', error);
+        return res.status(500).json({ error: 'Failed to check orphaned users' });
+      }
+
+      res.json({ orphanedCount: data || 0 });
+    } catch (error) {
+      console.error('Error in checkOrphanedUsers:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+
+  // Admin endpoint to repair orphaned users
+  repairOrphanedUsers: async (req: Request, res: Response) => {
+    try {
+      // This endpoint requires admin access
+      const authReq = req as AuthenticatedRequest;
+      if (!authReq.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const adminUser = await storage.getUser(authReq.user.id);
+      if (!adminUser?.isAdmin) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      // Call the Supabase function to repair orphaned users
+      const { data, error } = await supabase.rpc('repair_orphaned_users');
+      
+      if (error) {
+        console.error('Error repairing orphaned users:', error);
+        return res.status(500).json({ error: 'Failed to repair orphaned users' });
+      }
+
+      const results = data || [];
+      const successful = results.filter((r: any) => r.success).length;
+      const failed = results.filter((r: any) => !r.success).length;
+
+      res.json({ 
+        repaired: successful,
+        failed: failed,
+        results: results
+      });
+    } catch (error) {
+      console.error('Error in repairOrphanedUsers:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 };
