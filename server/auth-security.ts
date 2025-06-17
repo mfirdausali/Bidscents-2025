@@ -111,6 +111,14 @@ export function generateSecureJWT(user: any, supabaseId: string): string {
  */
 export function verifySecureJWT(token: string): any {
   try {
+    // First decode the token without verification to see its contents
+    const unverified = jwt.decode(token) as any;
+    console.log('🔍 JWT DEBUG - Token payload:', JSON.stringify(unverified, null, 2));
+    console.log('🔍 JWT DEBUG - Expected audience: bidscents-users');
+    console.log('🔍 JWT DEBUG - Token audience:', unverified?.aud || 'NO AUDIENCE CLAIM');
+    console.log('🔍 JWT DEBUG - Expected issuer: bidscents-marketplace');
+    console.log('🔍 JWT DEBUG - Token issuer:', unverified?.iss || 'NO ISSUER CLAIM');
+
     const decoded = jwt.verify(token, VALIDATED_JWT_SECRET, {
       issuer: 'bidscents-marketplace',
       audience: 'bidscents-users',
@@ -123,8 +131,10 @@ export function verifySecureJWT(token: string): any {
       decoded.needsRefresh = true;
     }
 
+    console.log('✅ JWT DEBUG - Token verification successful');
     return decoded;
   } catch (error: any) {
+    console.log('❌ JWT DEBUG - Verification failed:', error.message);
     auditLog('JWT_VERIFICATION_FAILED', { error: error.message });
     throw new Error('Invalid or expired token');
   }
@@ -306,17 +316,24 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
  */
 export function verifyWebSocketAuth(token: string): any | null {
   try {
+    console.log('🔍 WEBSOCKET AUTH DEBUG - Starting verification for token:', token.substring(0, 50) + '...');
+    
     const decoded = verifySecureJWT(token);
+    
+    console.log('🔍 WEBSOCKET AUTH DEBUG - JWT verification successful, decoded:', JSON.stringify(decoded, null, 2));
     
     // Additional WebSocket-specific security checks
     if (decoded.isBanned) {
+      console.log('🔍 WEBSOCKET AUTH DEBUG - User is banned:', decoded.userId);
       auditLog('BANNED_USER_WEBSOCKET_ACCESS_ATTEMPT', { userId: decoded.userId });
       return null;
     }
 
+    console.log('🔍 WEBSOCKET AUTH DEBUG - All checks passed for user:', decoded.userId);
     auditLog('WEBSOCKET_AUTH_SUCCESS', { userId: decoded.userId });
     return decoded;
   } catch (error: any) {
+    console.log('🔍 WEBSOCKET AUTH DEBUG - Verification failed:', error.message);
     auditLog('WEBSOCKET_AUTH_FAILED', { error: error.message });
     return null;
   }
