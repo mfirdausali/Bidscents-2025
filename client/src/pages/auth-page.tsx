@@ -314,6 +314,37 @@ export default function AuthPage() {
                             "Sign In with Email"
                           )}
                         </Button>
+                        
+                        {/* Facebook Login Button */}
+                        <Button 
+                          type="button"
+                          variant="outline" 
+                          className="w-full bg-[#1877F2] text-white hover:bg-[#166FE5] border-[#1877F2] hover:border-[#166FE5]"
+                          disabled={signInWithFacebookMutation.isPending}
+                          onClick={() => signInWithFacebookMutation.mutate()}
+                        >
+                          {signInWithFacebookMutation.isPending ? (
+                            <span className="flex items-center">
+                              <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full"></span>
+                              Connecting...
+                            </span>
+                          ) : (
+                            <span className="flex items-center">
+                              <FaFacebook className="mr-2 h-4 w-4" />
+                              Continue with Facebook
+                            </span>
+                          )}
+                        </Button>
+                        
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">or</span>
+                          </div>
+                        </div>
+                        
                         <Button 
                           type="button" 
                           variant="ghost"
@@ -381,6 +412,37 @@ export default function AuthPage() {
                             "Sign In"
                           )}
                         </Button>
+                        
+                        {/* Facebook Login Button */}
+                        <Button 
+                          type="button"
+                          variant="outline" 
+                          className="w-full bg-[#1877F2] text-white hover:bg-[#166FE5] border-[#1877F2] hover:border-[#166FE5]"
+                          disabled={signInWithFacebookMutation.isPending}
+                          onClick={() => signInWithFacebookMutation.mutate()}
+                        >
+                          {signInWithFacebookMutation.isPending ? (
+                            <span className="flex items-center">
+                              <span className="animate-spin mr-2 h-4 w-4 border-b-2 border-white rounded-full"></span>
+                              Connecting...
+                            </span>
+                          ) : (
+                            <span className="flex items-center">
+                              <FaFacebook className="mr-2 h-4 w-4" />
+                              Continue with Facebook
+                            </span>
+                          )}
+                        </Button>
+                        
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">or</span>
+                          </div>
+                        </div>
+                        
                         <Button 
                           type="button" 
                           variant="ghost"

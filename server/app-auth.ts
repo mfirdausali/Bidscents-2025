@@ -210,12 +210,48 @@ export const authRoutes = {
       if (!localUser) {
         console.log('🔄 Backend: Creating new local user profile...');
         
-        // Generate unique username
-        let baseUsername = user.email.split('@')[0];
-        let username = baseUsername;
-        let counter = 0;
+        // Determine provider from app_metadata
+        const authProvider = user.app_metadata?.provider || 'email';
+        console.log('🔍 Backend: Detected auth provider:', authProvider);
+        
+        // Generate unique username based on provider
+        let baseUsername: string;
+        let firstName = null;
+        let lastName = null;
+        
+        if (authProvider === 'facebook') {
+          // Facebook user data handling
+          firstName = user.user_metadata?.full_name?.split(' ')[0] || 
+                     user.user_metadata?.name?.split(' ')[0] || 
+                     user.user_metadata?.first_name ||
+                     user.email.split('@')[0];
+          lastName = user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || 
+                    user.user_metadata?.name?.split(' ').slice(1).join(' ') || 
+                    user.user_metadata?.last_name || 
+                    null;
+          
+          // Use name or email for username base
+          baseUsername = user.user_metadata?.preferred_username ||
+                        user.user_metadata?.name?.toLowerCase().replace(/\s+/g, '') ||
+                        firstName?.toLowerCase() ||
+                        user.email.split('@')[0];
+          
+          console.log('📘 Backend: Facebook user data:', {
+            fullName: user.user_metadata?.full_name,
+            firstName,
+            lastName,
+            baseUsername
+          });
+        } else {
+          // Email/password user data handling
+          firstName = user.user_metadata?.first_name || user.user_metadata?.firstName || null;
+          lastName = user.user_metadata?.last_name || user.user_metadata?.lastName || null;
+          baseUsername = user.email.split('@')[0];
+        }
         
         // Ensure username uniqueness
+        let username = baseUsername;
+        let counter = 0;
         while (await storage.getUserByUsername(username)) {
           counter++;
           username = `${baseUsername}${counter}`;
@@ -228,11 +264,12 @@ export const authRoutes = {
         const newUserData = {
           email: user.email,
           username: username,
-          firstName: user.user_metadata?.first_name || user.user_metadata?.firstName || null,
-          lastName: user.user_metadata?.last_name || user.user_metadata?.lastName || null,
+          firstName,
+          lastName,
           providerId: user.id,
-          provider: 'supabase',
-          isVerified: !!user.email_confirmed_at
+          provider: authProvider,
+          isVerified: !!user.email_confirmed_at,
+          profileImage: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
         };
         
         console.log('🔄 Backend: Creating user with data:', newUserData);
@@ -252,17 +289,20 @@ export const authRoutes = {
       } else {
         console.log('✅ Backend: Found existing local user:', localUser.email);
         
-        // Update provider ID if missing
-        if (!localUser.providerId) {
-          console.log('🔄 Backend: Updating missing provider ID...');
+        // Update provider ID if missing or update provider info
+        const authProvider = user.app_metadata?.provider || 'email';
+        if (!localUser.providerId || localUser.provider !== authProvider) {
+          console.log('🔄 Backend: Updating provider information...');
           try {
             localUser = await storage.updateUser(localUser.id, {
               providerId: user.id,
-              provider: 'supabase'
+              provider: authProvider,
+              isVerified: !!user.email_confirmed_at,
+              profileImage: localUser.profileImage || user.user_metadata?.avatar_url || user.user_metadata?.picture || null
             });
           } catch (updateError: any) {
-            console.error('❌ Backend: Failed to update provider ID:', updateError);
-            // Continue with session creation even if provider ID update fails
+            console.error('❌ Backend: Failed to update provider info:', updateError);
+            // Continue with session creation even if provider update fails
           }
         }
       }
