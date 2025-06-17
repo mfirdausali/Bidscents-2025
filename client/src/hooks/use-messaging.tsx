@@ -508,10 +508,14 @@ export function useMessaging() {
   
   // Get conversation with a specific user
   const getConversation = useCallback(async (userId: number, productId?: number) => {
-    console.log('Fetching conversation with userId:', userId, 'productId:', productId);
+    console.log('🔍 FETCHING CONVERSATION');
+    console.log('  ➤ Target user ID:', userId);
+    console.log('  ➤ Product ID:', productId);
+    console.log('  ➤ Current user ID:', user?.id);
+    console.log('  ➤ Messages in global state:', messages.length);
     
     if (!user) {
-      console.error('User is not authenticated');
+      console.error('❌ User is not authenticated for conversation fetch');
       toast({
         title: 'Authentication Error',
         description: 'You must be logged in to view conversations.',
@@ -526,23 +530,39 @@ export function useMessaging() {
         url += `?productId=${productId}`;
       }
       
-      console.log('Fetching conversation from URL:', url);
+      console.log('🌐 Making API request to:', url);
       
       // Fetch conversation data with authentication
       const res = await apiRequest('GET', url);
-      console.log('Conversation API response status:', res.status);
+      console.log('📊 API response status:', res.status);
+      console.log('📊 API response headers:', Object.fromEntries(res.headers.entries()));
       
       if (!res.ok) {
         const errorText = await res.text();
-        console.error('Error response from conversation API:', errorText);
+        console.error('❌ Error response from conversation API:', errorText);
         throw new Error(`Failed to fetch conversation: ${res.status} ${res.statusText}`);
       }
       
       const data = await res.json();
-      console.log('Conversation data received:', data);
+      console.log('📥 Conversation data received:');
+      console.log('  ➤ Message count:', data.length);
+      console.log('  ➤ Messages preview:', data.slice(0, 3).map((msg: any) => ({
+        id: msg.id,
+        content: msg.content?.substring(0, 30) + '...',
+        senderId: msg.senderId,
+        receiverId: msg.receiverId,
+        createdAt: msg.createdAt
+      })));
+      
+      // Check if these messages are already in global state
+      const existingIds = new Set(messages.map(m => m.id));
+      const newMessages = data.filter((msg: any) => !existingIds.has(msg.id));
+      console.log('🔄 Messages already in state:', data.length - newMessages.length);
+      console.log('🆕 New messages found:', newMessages.length);
+      
       return data as Message[];
     } catch (error: any) {
-      console.error('Error fetching conversation:', error);
+      console.error('❌ Error fetching conversation:', error);
       toast({
         title: 'Error Loading Conversation',
         description: error.message || 'Failed to load conversation history.',
@@ -550,7 +570,7 @@ export function useMessaging() {
       });
       return [];
     }
-  }, [user, toast]);
+  }, [user, toast, messages.length]);
 
   // Send an action message (for transactions/confirmations)
   const sendActionMessage = useCallback((receiverId: number, productId: number, actionType: 'INITIATE' | 'CONFIRM_PAYMENT' | 'CONFIRM_DELIVERY' | 'REVIEW') => {

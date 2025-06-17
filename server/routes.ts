@@ -197,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
               
               // Save message to database
-              const savedMessage = await storage.createMessage(messageData);
+              const savedMessage = await storage.sendMessage(messageData);
               console.log('✅ SERVER: Message saved with ID:', savedMessage.id);
               
               // Get user details for response
@@ -269,9 +269,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
             } catch (error) {
               console.error('❌ SERVER: Error processing send_message:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
               ws.send(JSON.stringify({
                 type: 'error',
-                message: 'Failed to send message: ' + error.message
+                message: 'Failed to send message: ' + errorMessage
               }));
             }
             break;
