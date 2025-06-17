@@ -123,6 +123,14 @@ BidScents is a sophisticated secondhand luxury perfume marketplace built as a fu
 - Encrypted message storage with secure key management
 
 ## Changelog
+- June 17, 2025: Email verification system comprehensive fix
+  - Fixed critical authentication bug where users existed in auth.users but not public.users
+  - Created missing `/api/verify-email` endpoint with proper Supabase JWT validation
+  - Consolidated dual verification pages into unified system supporting both token flows
+  - Implemented automatic user profile creation during email verification process
+  - Enhanced error handling with clear user feedback for verification failures
+  - Updated routing to ensure all verification URLs work consistently
+  - Verified complete authentication flow from registration to profile access
 - June 17, 2025: Authentication system critical fix implemented
   - Resolved orphaned user issue where auth.users existed without public.users
   - Added comprehensive profile recovery mechanisms
