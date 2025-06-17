@@ -209,17 +209,36 @@ export function useMessaging() {
           
           // Handle sent message confirmation
           if (data.type === 'message_sent') {
-            console.log('Message sent confirmation received:', data.message);
+            console.log('🚀 Message sent confirmation received:', data.message);
+            console.log('📊 Current messages state before adding:', messages.length, 'messages');
             
             // Add the message to our state only if it doesn't already exist
             setMessages(prev => {
               // Check if message already exists in our state
               const exists = prev.some(msg => msg.id === data.message.id);
+              console.log('🔍 Message exists check - ID:', data.message.id, 'Exists:', exists);
+              
               if (!exists) {
-                return [data.message, ...prev];
+                const newMessages = [data.message, ...prev];
+                console.log('✅ Adding new message to state. New count:', newMessages.length);
+                console.log('📝 New message details:', {
+                  id: data.message.id,
+                  content: data.message.content,
+                  senderId: data.message.senderId,
+                  receiverId: data.message.receiverId
+                });
+                return newMessages;
+              } else {
+                console.log('⚠️ Message already exists in state, not adding duplicate');
+                return prev;
               }
-              return prev;
             });
+            
+            // Dispatch update event
+            const messagingEvent = new CustomEvent('messaging:message_sent', {
+              detail: data.message
+            });
+            window.dispatchEvent(messagingEvent);
           }
           
           // Handle messages read confirmation
@@ -358,10 +377,15 @@ export function useMessaging() {
 
   // Send a message
   const sendMessage = useCallback((receiverId: number, content: string, productId?: number) => {
-    console.log('Attempting to send message to receiverId:', receiverId, 'with productId:', productId);
+    console.log('📤 SEND MESSAGE INITIATED');
+    console.log('  ➤ Receiver ID:', receiverId);
+    console.log('  ➤ Content length:', content.length);
+    console.log('  ➤ Product ID:', productId);
+    console.log('  ➤ Current user ID:', user?.id);
+    console.log('  ➤ Messages in state:', messages.length);
     
     if (!socketRef.current) {
-      console.error('WebSocket is not initialized');
+      console.error('❌ WebSocket is not initialized');
       toast({
         title: 'Connection Error',
         description: 'WebSocket connection not initialized. Please try again later.',
@@ -371,7 +395,7 @@ export function useMessaging() {
     }
     
     if (socketRef.current.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not open. Current state:', socketRef.current.readyState);
+      console.error('❌ WebSocket is not open. Current state:', socketRef.current.readyState);
       toast({
         title: 'Connection Error',
         description: 'Not connected to messaging server. Please try again.',
@@ -381,7 +405,7 @@ export function useMessaging() {
     }
 
     if (!user) {
-      console.error('User is not authenticated');
+      console.error('❌ User is not authenticated');
       toast({
         title: 'Authentication Error',
         description: 'You must be logged in to send messages.',
@@ -398,15 +422,16 @@ export function useMessaging() {
         ...(productId && { productId }),
       };
 
-      console.log('Sending WebSocket message:', message);
+      console.log('📡 Sending WebSocket message:', message);
       const messageJson = JSON.stringify(message);
-      console.log('Serialized message:', messageJson);
+      console.log('📦 Serialized message:', messageJson);
       
       socketRef.current.send(messageJson);
-      console.log('Message sent successfully');
+      console.log('✅ Message sent to WebSocket server successfully');
+      console.log('⏳ Waiting for server confirmation...');
       return true;
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ Error sending message:', error);
       toast({
         title: 'Send Error',
         description: 'Failed to send your message. Please try again.',
@@ -414,7 +439,7 @@ export function useMessaging() {
       });
       return false;
     }
-  }, [user, toast]);
+  }, [user, toast, messages.length]);
 
   // Mark a message as read
   const markAsRead = useCallback((messageId?: number, senderId?: number) => {

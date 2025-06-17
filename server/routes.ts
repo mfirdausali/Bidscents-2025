@@ -144,6 +144,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             break;
             
+          case 'send_message':
+            // Handle modern send_message format from frontend
+            console.log('🔥 SERVER: Processing send_message request');
+            console.log('📥 Message data:', {
+              type: data.type,
+              receiverId: data.receiverId,
+              content: data.content?.substring(0, 50) + '...',
+              productId: data.productId
+            });
+            
+            // Get authenticated user from WebSocket client
+            const clientInfo = clients.get(ws);
+            if (!clientInfo) {
+              console.error('❌ SERVER: User not authenticated for send_message');
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Not authenticated'
+              }));
+              break;
+            }
+            
+            if (!data.receiverId || !data.content) {
+              console.error('❌ SERVER: Missing required fields for send_message');
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Missing receiverId or content'
+              }));
+              break;
+            }
+            
+            try {
+              console.log('💾 SERVER: Encrypting and saving message to database');
+              
+              // Encrypt the message content
+              const encryptedContent = encryptMessage(data.content);
+              
+              // Create message data
+              const messageData = {
+                senderId: clientInfo.userId,
+                receiverId: data.receiverId,
+                content: encryptedContent,
+                productId: data.productId || null,
+                isRead: false,
+              };
+              
+              console.log('📝 SERVER: Creating message with data:', {
+                senderId: messageData.senderId,
+                receiverId: messageData.receiverId,
+                hasContent: !!messageData.content,
+                productId: messageData.productId
+              });
+              
+              // Save message to database
+              const savedMessage = await storage.createMessage(messageData);
+              console.log('✅ SERVER: Message saved with ID:', savedMessage.id);
+              
+              // Get user details for response
+              const sender = await storage.getUser(clientInfo.userId);
+              const receiver = await storage.getUser(data.receiverId);
+              
+              // Get product details if productId provided
+              let product = null;
+              if (data.productId) {
+                try {
+                  product = await storage.getProductById(data.productId);
+                } catch (err) {
+                  console.warn('SERVER: Could not fetch product details:', err);
+                }
+              }
+              
+              // Create detailed message response
+              const messageResponse = {
+                id: savedMessage.id,
+                senderId: savedMessage.senderId,
+                receiverId: savedMessage.receiverId,
+                content: data.content, // Send original content (not encrypted)
+                productId: savedMessage.productId,
+                isRead: savedMessage.isRead,
+                createdAt: savedMessage.createdAt,
+                sender: sender ? {
+                  id: sender.id,
+                  username: sender.username,
+                  profileImage: sender.profileImage
+                } : undefined,
+                receiver: receiver ? {
+                  id: receiver.id,
+                  username: receiver.username,
+                  profileImage: receiver.profileImage
+                } : undefined,
+                product: product ? {
+                  id: product.id,
+                  name: product.name,
+                  price: product.price,
+                  imageUrl: product.imageUrl
+                } : undefined
+              };
+              
+              console.log('📤 SERVER: Sending confirmation to sender');
+              // Send confirmation to sender
+              ws.send(JSON.stringify({
+                type: 'message_sent',
+                message: messageResponse
+              }));
+              
+              // Send message to receiver if they're connected
+              let receiverNotified = false;
+              clients.forEach((receiverInfo, receiverWs) => {
+                if (receiverWs.readyState === WebSocket.OPEN && receiverInfo.userId === data.receiverId) {
+                  console.log('📨 SERVER: Sending message to receiver');
+                  receiverWs.send(JSON.stringify({
+                    type: 'new_message',
+                    message: messageResponse
+                  }));
+                  receiverNotified = true;
+                }
+              });
+              
+              if (!receiverNotified) {
+                console.log('⚠️ SERVER: Receiver not connected, message saved for later');
+              }
+              
+              console.log('✅ SERVER: send_message processing complete');
+              
+            } catch (error) {
+              console.error('❌ SERVER: Error processing send_message:', error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to send message: ' + error.message
+              }));
+            }
+            break;
+            
           case 'chat_message':
             // Handle, store, and broadcast chat messages
             if (data.senderId && data.receiverId && data.content) {
