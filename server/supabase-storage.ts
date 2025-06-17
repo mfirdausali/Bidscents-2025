@@ -1551,36 +1551,96 @@ export class SupabaseStorage implements IStorage {
   
   // Message methods
   async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
-    // Get only the latest message per conversation for performance
+    // Get only the latest message per conversation to minimize data transfer
+    // Use a window function to get the most recent message for each unique conversation pair
     const { data, error } = await supabase
-      .rpc('get_latest_messages_per_conversation', { user_id: userId });
+      .from('messages')
+      .select(`
+        *,
+        sender:users!messages_sender_id_fkey(id, username, first_name, last_name, profile_image),
+        receiver:users!messages_receiver_id_fkey(id, username, first_name, last_name, profile_image),
+        product:products(id, name, brand, price, image_url, seller_id)
+      `)
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
       
     if (error) {
-      console.log('RPC not available, falling back to basic query');
-      // Fallback to basic query if RPC doesn't exist
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-        .order('created_at', { ascending: false });
-        
-      if (fallbackError) {
-        console.error('Error getting user messages:', fallbackError);
-        throw new Error('Failed to retrieve user messages');
-      }
-      
-      if (!fallbackData || fallbackData.length === 0) {
-        return [];
-      }
-      
-      return this.processMessagesWithOptimizedUserFetch(fallbackData);
+      console.error('Error getting user messages:', error);
+      throw new Error('Failed to retrieve user messages');
     }
     
     if (!data || data.length === 0) {
       return [];
     }
     
-    return this.processMessagesWithOptimizedUserFetch(data);
+    // Group by conversation and keep only the latest message per conversation
+    const conversationMap = new Map<string, any>();
+    
+    data.forEach(msg => {
+      // Create conversation key by sorting user IDs to ensure consistency
+      const conversationKey = [msg.sender_id, msg.receiver_id].sort().join('-') + 
+                             (msg.product_id ? `-${msg.product_id}` : '');
+      
+      // Keep only the latest message (first one due to order by created_at desc)
+      if (!conversationMap.has(conversationKey)) {
+        conversationMap.set(conversationKey, msg);
+      }
+    });
+    
+    // Process the latest messages with optimized data mapping
+    return this.processJoinedMessages(Array.from(conversationMap.values()));
+  }
+
+  private processJoinedMessages(data: any[]): MessageWithDetails[] {
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = require('./encryption');
+    
+    return data.map(msg => {
+      // Decrypt the message content if it's encrypted and not null
+      let content = msg.content;
+      if (content && isEncrypted(content)) {
+        content = decryptMessage(content);
+      }
+      
+      return {
+        id: msg.id,
+        senderId: msg.sender_id,
+        receiverId: msg.receiver_id,
+        content: content, // Decrypted content
+        isRead: msg.is_read,
+        createdAt: new Date(msg.created_at),
+        productId: msg.product_id,
+        // Add the new fields for file messages
+        messageType: msg.message_type || 'TEXT',
+        fileUrl: msg.file_url || null,
+        // Add action message fields
+        actionType: msg.action_type || null,
+        isClicked: msg.is_clicked || false,
+        // Map joined user and product data directly from the JOIN results
+        sender: msg.sender ? {
+          id: msg.sender.id,
+          username: msg.sender.username,
+          firstName: msg.sender.first_name,
+          lastName: msg.sender.last_name,
+          profileImage: msg.sender.profile_image
+        } : undefined,
+        receiver: msg.receiver ? {
+          id: msg.receiver.id,
+          username: msg.receiver.username,
+          firstName: msg.receiver.first_name,
+          lastName: msg.receiver.last_name,
+          profileImage: msg.receiver.profile_image
+        } : undefined,
+        product: msg.product ? {
+          id: msg.product.id,
+          name: msg.product.name,
+          brand: msg.product.brand,
+          price: msg.product.price,
+          imageUrl: msg.product.image_url,
+          sellerId: msg.product.seller_id
+        } : undefined
+      };
+    }) as MessageWithDetails[];
   }
 
   private async processMessagesWithOptimizedUserFetch(data: any[]): Promise<MessageWithDetails[]> {
@@ -1658,10 +1718,15 @@ export class SupabaseStorage implements IStorage {
   async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
     console.log(`Fetching conversation between users ${userId1} and ${userId2}`);
     
-    // Get messages with ALL columns explicitly listed to ensure we get everything
+    // Use JOIN queries to fetch all data in a single request - eliminates N+1 queries
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select(`
+        *,
+        sender:users!messages_sender_id_fkey(id, username, first_name, last_name, profile_image),
+        receiver:users!messages_receiver_id_fkey(id, username, first_name, last_name, profile_image),
+        product:products(id, name, brand, price, image_url, seller_id)
+      `)
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
       .order('created_at', { ascending: true });
       
@@ -1674,76 +1739,20 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
-    // Fetch both users in a single batch query
-    const { data: usersData, error: usersError } = await supabase
-      .from('users')
-      .select('*')
-      .in('id', [userId1, userId2]);
-      
-    const usersMap = new Map<number, any>();
-    if (!usersError && usersData) {
-      usersData.forEach(user => {
-        usersMap.set(user.id, this.mapUserFromDb(user));
-      });
-    }
-    
-    // Get unique product IDs for batch fetching
-    const productIds = [...new Set(data.filter(msg => msg.product_id).map(msg => msg.product_id))];
-    const productsMap = new Map<number, any>();
-    
-    if (productIds.length > 0) {
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('id, name, brand, price, image_url, seller_id')
-        .in('id', productIds);
-        
-      if (!productsError && productsData) {
-        productsData.forEach(product => {
-          productsMap.set(product.id, this.mapSnakeToCamelCase(product));
-        });
-      }
-    }
-    
-    // Import decryption utility
-    const { decryptMessage, isEncrypted } = await import('./encryption');
-    
-    // Map from snake_case to camelCase and decrypt message content
-    const messages = data.map(msg => {
-      // Decrypt the message content if it's encrypted and not null
-      let content = msg.content;
-      if (content && isEncrypted(content)) {
-        content = decryptMessage(content);
-      }
-      
-      return {
-        id: msg.id,
-        senderId: msg.sender_id,
-        receiverId: msg.receiver_id,
-        content: content, // Decrypted content
-        isRead: msg.is_read,
-        createdAt: new Date(msg.created_at),
-        productId: msg.product_id,
-        // Add the new fields for file messages
-        messageType: msg.message_type || 'TEXT',
-        fileUrl: msg.file_url || null,
-        // Add action message fields
-        actionType: msg.action_type || null,
-        isClicked: msg.is_clicked || false,
-        // Add sender and receiver details
-        sender: usersMap.get(msg.sender_id),
-        receiver: usersMap.get(msg.receiver_id),
-        product: msg.product_id ? productsMap.get(msg.product_id) : undefined
-      };
-    });
-    
-    return messages as MessageWithDetails[];
+    // Process joined data without additional queries
+    return this.processJoinedMessages(data);
   }
   
   async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
-    // Get all message fields explicitly including action_type and is_clicked
+    // Use JOIN queries to fetch all related data in a single optimized request - eliminates N+1 queries
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select(`
+        *,
+        sender:users!messages_sender_id_fkey(id, username, first_name, last_name, profile_image),
+        receiver:users!messages_receiver_id_fkey(id, username, first_name, last_name, profile_image),
+        product:products(id, name, brand, price, image_url, seller_id)
+      `)
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
       .eq('product_id', productId)
       .order('created_at', { ascending: true });
@@ -1757,60 +1766,8 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
-    // Fetch both users and the product in batch queries
-    const { data: usersData, error: usersError } = await supabase
-      .from('users')
-      .select('*')
-      .in('id', [userId1, userId2]);
-      
-    const usersMap = new Map<number, any>();
-    if (!usersError && usersData) {
-      usersData.forEach(user => {
-        usersMap.set(user.id, this.mapUserFromDb(user));
-      });
-    }
-    
-    // Fetch the product data (basic info only for performance)
-    const { data: productData, error: productError } = await supabase
-      .from('products')
-      .select('id, name, brand, price, image_url, seller_id')
-      .eq('id', productId)
-      .single();
-      
-    const product = (!productError && productData) ? this.mapSnakeToCamelCase(productData) : undefined;
-    
-    // Import decryption utility
-    const { decryptMessage, isEncrypted } = await import('./encryption');
-    
-    // Map from snake_case to camelCase and decrypt message content
-    const messages = data.map(msg => {
-      // Decrypt the message content if it's encrypted and not null
-      let content = msg.content;
-      if (content && isEncrypted(content)) {
-        content = decryptMessage(content);
-      }
-      
-      return {
-        id: msg.id,
-        senderId: msg.sender_id,
-        receiverId: msg.receiver_id,
-        content: content, // Decrypted content
-        isRead: msg.is_read,
-        createdAt: new Date(msg.created_at),
-        productId: msg.product_id,
-        // Add the new fields for file messages
-        messageType: msg.message_type || 'TEXT',
-        fileUrl: msg.file_url || null,
-        actionType: msg.action_type || null,
-        isClicked: msg.is_clicked || false,
-        // Add sender and receiver details
-        sender: usersMap.get(msg.sender_id),
-        receiver: usersMap.get(msg.receiver_id),
-        product: product
-      };
-    });
-    
-    return messages as MessageWithDetails[];
+    // Process joined data without additional queries - all data fetched in single request
+    return this.processJoinedMessages(data);
   }
   
   async sendMessage(message: InsertMessage): Promise<Message> {

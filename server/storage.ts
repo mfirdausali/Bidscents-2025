@@ -1098,37 +1098,82 @@ export class DatabaseStorage implements IStorage {
 
   // Message methods
   async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
-    const userMessages = await db.select()
-      .from(messages)
-      .where(
-        or(
-          eq(messages.senderId, userId),
-          eq(messages.receiverId, userId)
-        )
+    // Use JOIN queries to fetch all related data in a single optimized request
+    const userMessages = await db.select({
+      message: messages,
+      sender: users,
+      receiver: {
+        id: sql<number>`receiver_user.id`,
+        username: sql<string>`receiver_user.username`,
+        firstName: sql<string>`receiver_user.first_name`,
+        lastName: sql<string>`receiver_user.last_name`,
+        profileImage: sql<string>`receiver_user.profile_image`
+      },
+      product: products
+    })
+    .from(messages)
+    .leftJoin(users, eq(messages.senderId, users.id))
+    .leftJoin(sql`users as receiver_user`, sql`messages.receiver_id = receiver_user.id`)
+    .leftJoin(products, eq(messages.productId, products.id))
+    .where(
+      or(
+        eq(messages.senderId, userId),
+        eq(messages.receiverId, userId)
       )
-      .orderBy(messages.createdAt);
+    )
+    .orderBy(desc(messages.createdAt));
+
+    // Group by conversation and keep only the latest message per conversation
+    const conversationMap = new Map<string, any>();
     
-    return this.addMessageDetails(userMessages);
+    userMessages.forEach(row => {
+      const msg = row.message;
+      // Create conversation key by sorting user IDs to ensure consistency
+      const conversationKey = [msg.senderId, msg.receiverId].sort().join('-') + 
+                             (msg.productId ? `-${msg.productId}` : '');
+      
+      // Keep only the latest message (first one due to order by created_at desc)
+      if (!conversationMap.has(conversationKey)) {
+        conversationMap.set(conversationKey, row);
+      }
+    });
+    
+    return this.processJoinedMessageData(Array.from(conversationMap.values()));
   }
   
   async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
-    const conversation = await db.select()
-      .from(messages)
-      .where(
-        or(
-          and(
-            eq(messages.senderId, userId1),
-            eq(messages.receiverId, userId2)
-          ),
-          and(
-            eq(messages.senderId, userId2),
-            eq(messages.receiverId, userId1)
-          )
+    // Use JOIN queries to fetch all data in a single optimized request
+    const conversation = await db.select({
+      message: messages,
+      sender: users,
+      receiver: {
+        id: sql<number>`receiver_user.id`,
+        username: sql<string>`receiver_user.username`,
+        firstName: sql<string>`receiver_user.first_name`,
+        lastName: sql<string>`receiver_user.last_name`,
+        profileImage: sql<string>`receiver_user.profile_image`
+      },
+      product: products
+    })
+    .from(messages)
+    .leftJoin(users, eq(messages.senderId, users.id))
+    .leftJoin(sql`users as receiver_user`, sql`messages.receiver_id = receiver_user.id`)
+    .leftJoin(products, eq(messages.productId, products.id))
+    .where(
+      or(
+        and(
+          eq(messages.senderId, userId1),
+          eq(messages.receiverId, userId2)
+        ),
+        and(
+          eq(messages.senderId, userId2),
+          eq(messages.receiverId, userId1)
         )
       )
-      .orderBy(messages.createdAt);
+    )
+    .orderBy(messages.createdAt);
     
-    return this.addMessageDetails(conversation);
+    return this.processJoinedMessageData(conversation);
   }
   
   async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
