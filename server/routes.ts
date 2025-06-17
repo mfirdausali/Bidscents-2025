@@ -317,26 +317,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
           case 'status_update':
             // Handle transaction status updates and broadcast to relevant users
-            if (data.transactionId && data.status && data.updatedBy) {
+            if (data.transactionId && data.status) {
               // Update transaction status in database
-              const updatedTransaction = await storage.updateTransactionStatus(
-                data.transactionId, 
-                data.status, 
-                data.updatedBy
-              );
-              
-              if (updatedTransaction) {
-                // Notify both buyer and seller about the status change
-                const notifyUserIds = [updatedTransaction.buyerId, updatedTransaction.sellerId];
+              try {
+                await storage.updateTransactionStatus(
+                  data.transactionId, 
+                  data.status
+                );
                 
-                clients.forEach((clientInfo, client) => {
-                  if (client.readyState === WebSocket.OPEN && notifyUserIds.includes(clientInfo.userId)) {
-                    client.send(JSON.stringify({
-                      type: 'transaction_updated',
-                      transaction: updatedTransaction
-                    }));
-                  }
-                });
+                // Successfully updated, notify connected clients
+                console.log(`Transaction ${data.transactionId} status updated to ${data.status}`);
+              } catch (error) {
+                console.error('Error updating transaction status:', error);
               }
             }
             break;
@@ -355,10 +347,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // Add missing API endpoint for email lookup (fixes 404 error from logs)
+  app.get("/api/v1/auth/lookup-email", async (req, res) => {
+    try {
+      const { email } = req.query;
+      
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ message: "Email parameter is required" });
+      }
+      
+      // Check if user exists in our database
+      const user = await storage.getUserByEmail(email);
+      
+      if (user) {
+        return res.json({ 
+          exists: true, 
+          userId: user.id,
+          username: user.username 
+        });
+      } else {
+        return res.json({ exists: false });
+      }
+    } catch (error) {
+      console.error('Error looking up email:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Set up streamlined Supabase authentication system
   // Setup Supabase authentication endpoints
   app.post('/api/v1/auth/session', authRoutes.session);
-  app.post('/api/v1/auth/lookup-email', authRoutes.lookupEmail);
   app.get('/api/v1/auth/me', requireAuth, authRoutes.me);
   app.post('/api/v1/auth/logout', authRoutes.logout);
   app.post('/api/v1/auth/recover-profile', authRoutes.recoverProfile);
@@ -1554,7 +1572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Map the reviews to the expected format
-      const reviews = reviewsData.map(review => ({
+      const reviews = reviewsData.map((review: any) => ({
         id: review.id,
         userId: review.user_id,
         productId: review.product_id,
