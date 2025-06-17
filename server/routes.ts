@@ -1591,7 +1591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate average rating
       let averageRating = 0;
       if (reviews.length > 0) {
-        const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+        const totalRating = reviews.reduce((sum: number, review: any) => sum + review.rating, 0);
         averageRating = totalRating / reviews.length;
       }
       
@@ -2312,10 +2312,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // we only need to handle file URLs and image URLs for existing product data
       
       // Collect unique product IDs that already have product data for image enhancement
-      const productIdsWithData = [...new Set(conversation
+      const productIdsWithData = Array.from(new Set(conversation
         .filter(msg => msg.messageType === 'ACTION' && msg.productId && msg.product)
         .map(msg => msg.productId!)
-      )];
+      ));
       
       // Fetch product images for existing products to enhance with main image
       const productImagesMap = new Map();
@@ -2825,7 +2825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Check for reserve price
           const hasReservePrice = auction.reservePrice !== null && auction.reservePrice > 0;
           const reserveNotMet = hasReservePrice && 
-            (auction.currentBid === null || auction.currentBid < auction.reservePrice);
+            (auction.currentBid === null || auction.currentBid < (auction.reservePrice || 0));
             
           if (reserveNotMet) {
             // Reserve price wasn't met, update status to 'reserve_not_met'
