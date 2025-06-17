@@ -48,6 +48,11 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  // Check for old JWT token format and force refresh if needed
+  useEffect(() => {
+    checkTokenAndRefreshIfNeeded();
+  }, []);
   
   // Check for authentication state and get user profile using the secure endpoint
   const {
