@@ -2290,62 +2290,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Enhance messages with file URLs and product images
-      // First, collect all product IDs from ACTION messages
-      const productIdsToFetch = conversation
-        .filter(msg => msg.messageType === 'ACTION' && msg.productId)
-        .map(msg => msg.productId);
+      // Since the optimized storage methods already fetch product data in batches,
+      // we only need to handle file URLs and image URLs for existing product data
       
-      // Fetch product images for all relevant products at once
+      // Collect unique product IDs that already have product data for image enhancement
+      const productIdsWithData = [...new Set(conversation
+        .filter(msg => msg.messageType === 'ACTION' && msg.productId && msg.product)
+        .map(msg => msg.productId!)
+      )];
+      
+      // Fetch product images for existing products to enhance with main image
       const productImagesMap = new Map();
-      if (productIdsToFetch.length > 0) {
+      if (productIdsWithData.length > 0) {
         try {
           // Fetch product images for all products in one batch
-          for (const productId of productIdsToFetch) {
-            if (productId) {
-              const productImages = await storage.getProductImages(productId);
-              if (productImages && productImages.length > 0) {
-                // Find the main image (order 0)
-                const mainImage = productImages.find((img: any) => img.imageOrder === 0);
-                if (mainImage && mainImage.imageUrl) {
-                  productImagesMap.set(productId, objectStorage.getImagePublicUrl(mainImage.imageUrl));
-                }
+          for (const productId of productIdsWithData) {
+            const productImages = await storage.getProductImages(productId);
+            if (productImages && productImages.length > 0) {
+              // Find the main image (order 0)
+              const mainImage = productImages.find((img: any) => img.imageOrder === 0);
+              if (mainImage && mainImage.imageUrl) {
+                productImagesMap.set(productId, objectStorage.getImagePublicUrl(mainImage.imageUrl));
               }
             }
           }
         } catch (error) {
           console.error('Error fetching product images for transaction messages:', error);
-        }
-      }
-      
-      // First, pre-fetch all missing product data for action messages
-      const missingProductIds: number[] = [];
-      for (const msg of conversation) {
-        if (msg.messageType === 'ACTION' && msg.productId && !msg.product) {
-          missingProductIds.push(msg.productId);
-        }
-      }
-      
-      // Create a product data lookup map
-      const productDataMap = new Map<number, any>();
-      if (missingProductIds.length > 0) {
-        try {
-          // Fetch each product data individually
-          for (const productId of missingProductIds) {
-            const productData = await storage.getProductById(productId);
-            if (productData) {
-              // Create a simple object with just the fields we need
-              const simplifiedProduct = {
-                id: productData.id,
-                name: productData.name,
-                price: productData.price || 0,
-                imageUrl: productData.imageUrl || null
-              };
-              productDataMap.set(productId, simplifiedProduct);
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching missing product data:', error);
         }
       }
       
@@ -2360,46 +2330,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fileUrl = objectStorage.getMessageFilePublicUrl(msg.fileUrl);
         }
         
-        // For action messages with products, add or enhance the product data
+        // For action messages with products, enhance with main image URL if available
         let productWithImage = msg.product;
-        if (msg.messageType === 'ACTION' && msg.productId) {
-          // If we don't have product data, get it from our pre-fetched map
-          if (!productWithImage && productDataMap.has(msg.productId)) {
-            productWithImage = productDataMap.get(msg.productId);
-          }
-          
-          // Add the image URL if we have it from our batch fetch
+        if (msg.messageType === 'ACTION' && msg.productId && productWithImage) {
+          // Add the main product image URL if available from our batch fetch
           if (productImagesMap.has(msg.productId)) {
             const imageUrl = productImagesMap.get(msg.productId);
-            if (productWithImage && imageUrl) {
-              // Add image URL to existing product data
-              productWithImage = {
-                ...productWithImage,
-                imageUrl: imageUrl
-              };
-            } else if (imageUrl) {
-              // Create a minimal product object with image
-              productWithImage = {
-                id: msg.productId,
-                name: "Product " + msg.productId,
-                price: 0, // Default price
-                brand: "", // Empty brand
-                description: null,
-                imageUrl: imageUrl,
-                stockQuantity: 0,
-                categoryId: null,
-                sellerId: msg.senderId,
-                isNew: null,
-                isFeatured: false,
-                featuredAt: null,
-                featuredUntil: null,
-                createdAt: new Date(),
-                remainingPercentage: null,
-                status: "available",
-                concentrationType: null,
-                volume: null
-              };
-            }
+            productWithImage = {
+              ...productWithImage,
+              imageUrl: imageUrl
+            };
           }
         }
         

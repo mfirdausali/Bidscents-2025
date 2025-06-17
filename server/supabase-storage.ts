@@ -1551,72 +1551,104 @@ export class SupabaseStorage implements IStorage {
   
   // Message methods
   async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
-    // First get all messages without trying to join users
+    // Get only the latest message per conversation for performance
     const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-      .order('created_at', { ascending: false });
+      .rpc('get_latest_messages_per_conversation', { user_id: userId });
       
     if (error) {
-      console.error('Error getting user messages:', error);
-      throw new Error('Failed to retrieve user messages');
+      console.log('RPC not available, falling back to basic query');
+      // Fallback to basic query if RPC doesn't exist
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+        
+      if (fallbackError) {
+        console.error('Error getting user messages:', fallbackError);
+        throw new Error('Failed to retrieve user messages');
+      }
+      
+      if (!fallbackData || fallbackData.length === 0) {
+        return [];
+      }
+      
+      return this.processMessagesWithOptimizedUserFetch(fallbackData);
     }
     
     if (!data || data.length === 0) {
       return [];
     }
     
-    // Create a unique set of user IDs from sender_id and receiver_id
+    return this.processMessagesWithOptimizedUserFetch(data);
+  }
+
+  private async processMessagesWithOptimizedUserFetch(data: any[]): Promise<MessageWithDetails[]> {
+    // Collect all unique user IDs and product IDs in batch
     const userIds = new Set<number>();
+    const productIds = new Set<number>();
+    
     data.forEach(msg => {
       userIds.add(msg.sender_id);
       userIds.add(msg.receiver_id);
+      if (msg.product_id) productIds.add(msg.product_id);
     });
     
-    // Fetch user details for all users involved in messages
-    const users: Record<number, any> = {};
+    // Fetch all users in one query using IN clause
+    const usersMap = new Map<number, any>();
+    if (userIds.size > 0) {
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .in('id', Array.from(userIds));
+        
+      if (!usersError && usersData) {
+        usersData.forEach(user => {
+          usersMap.set(user.id, this.mapUserFromDb(user));
+        });
+      }
+    }
     
-    // We'll use the getUser method to fetch each user since we know it works
-    for (const uid of userIds) {
-      try {
-        const user = await this.getUser(uid);
-        if (user) {
-          users[uid] = user;
-        }
-      } catch (err) {
-        console.warn(`Could not fetch user ${uid}:`, err);
-        // Continue with other users even if one fails
+    // Fetch all products in one query (basic info only for performance)
+    const productsMap = new Map<number, any>();
+    if (productIds.size > 0) {
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, brand, price, image_url, seller_id')
+        .in('id', Array.from(productIds));
+        
+      if (!productsError && productsData) {
+        productsData.forEach(product => {
+          productsMap.set(product.id, this.mapSnakeToCamelCase(product));
+        });
       }
     }
     
     // Import decryption utility
     const { decryptMessage, isEncrypted } = await import('./encryption');
     
-    // Map from snake_case to camelCase and decrypt message content
+    // Map messages with their details
     const messages = data.map(msg => {
-      // Decrypt the message content if it's encrypted
       let content = msg.content;
-      if (isEncrypted(content)) {
+      if (content && isEncrypted(content)) {
         content = decryptMessage(content);
       }
-      
-      // No need to log raw message fields anymore
       
       return {
         id: msg.id,
         senderId: msg.sender_id,
         receiverId: msg.receiver_id,
-        content: content, // Decrypted content
+        content: content,
         isRead: msg.is_read,
         createdAt: new Date(msg.created_at),
         productId: msg.product_id,
-        // Add the new fields for file messages
         messageType: msg.message_type || 'TEXT',
         fileUrl: msg.file_url || null,
-        // Add sender and receiver details if available
-        sender: users[msg.sender_id],
-        receiver: users[msg.receiver_id]
+        actionType: msg.action_type || null,
+        isClicked: msg.is_clicked || false,
+        sender: usersMap.get(msg.sender_id),
+        receiver: usersMap.get(msg.receiver_id),
+        product: msg.product_id ? productsMap.get(msg.product_id) : undefined
       };
     });
     
@@ -1642,9 +1674,35 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
-    // We only need these two users
-    const user1 = await this.getUser(userId1);
-    const user2 = await this.getUser(userId2);
+    // Fetch both users in a single batch query
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('*')
+      .in('id', [userId1, userId2]);
+      
+    const usersMap = new Map<number, any>();
+    if (!usersError && usersData) {
+      usersData.forEach(user => {
+        usersMap.set(user.id, this.mapUserFromDb(user));
+      });
+    }
+    
+    // Get unique product IDs for batch fetching
+    const productIds = [...new Set(data.filter(msg => msg.product_id).map(msg => msg.product_id))];
+    const productsMap = new Map<number, any>();
+    
+    if (productIds.length > 0) {
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, brand, price, image_url, seller_id')
+        .in('id', productIds);
+        
+      if (!productsError && productsData) {
+        productsData.forEach(product => {
+          productsMap.set(product.id, this.mapSnakeToCamelCase(product));
+        });
+      }
+    }
     
     // Import decryption utility
     const { decryptMessage, isEncrypted } = await import('./encryption');
@@ -1672,8 +1730,9 @@ export class SupabaseStorage implements IStorage {
         actionType: msg.action_type || null,
         isClicked: msg.is_clicked || false,
         // Add sender and receiver details
-        sender: msg.sender_id === userId1 ? user1 : user2,
-        receiver: msg.receiver_id === userId1 ? user1 : user2
+        sender: usersMap.get(msg.sender_id),
+        receiver: usersMap.get(msg.receiver_id),
+        product: msg.product_id ? productsMap.get(msg.product_id) : undefined
       };
     });
     
@@ -1684,7 +1743,7 @@ export class SupabaseStorage implements IStorage {
     // Get all message fields explicitly including action_type and is_clicked
     const { data, error } = await supabase
       .from('messages')
-      .select('id, sender_id, receiver_id, content, is_read, created_at, message_type, action_type, is_clicked, product_id, encrypted_content, attachment_url, attachment_type, file_url')
+      .select('*')
       .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
       .eq('product_id', productId)
       .order('created_at', { ascending: true });
@@ -1698,9 +1757,27 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
-    // We only need these two users
-    const user1 = await this.getUser(userId1);
-    const user2 = await this.getUser(userId2);
+    // Fetch both users and the product in batch queries
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('*')
+      .in('id', [userId1, userId2]);
+      
+    const usersMap = new Map<number, any>();
+    if (!usersError && usersData) {
+      usersData.forEach(user => {
+        usersMap.set(user.id, this.mapUserFromDb(user));
+      });
+    }
+    
+    // Fetch the product data (basic info only for performance)
+    const { data: productData, error: productError } = await supabase
+      .from('products')
+      .select('id, name, brand, price, image_url, seller_id')
+      .eq('id', productId)
+      .single();
+      
+    const product = (!productError && productData) ? this.mapSnakeToCamelCase(productData) : undefined;
     
     // Import decryption utility
     const { decryptMessage, isEncrypted } = await import('./encryption');
@@ -1724,9 +1801,12 @@ export class SupabaseStorage implements IStorage {
         // Add the new fields for file messages
         messageType: msg.message_type || 'TEXT',
         fileUrl: msg.file_url || null,
+        actionType: msg.action_type || null,
+        isClicked: msg.is_clicked || false,
         // Add sender and receiver details
-        sender: msg.sender_id === userId1 ? user1 : user2,
-        receiver: msg.receiver_id === userId1 ? user1 : user2
+        sender: usersMap.get(msg.sender_id),
+        receiver: usersMap.get(msg.receiver_id),
+        product: product
       };
     });
     
