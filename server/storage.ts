@@ -32,6 +32,7 @@ interface CartItemWithProduct extends CartItem {
 // Removed session dependencies - using Supabase as sole IdP
 import { db } from "./db";
 import { eq, and, gte, lte, like, ilike, asc, desc, sql, or, isNull } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import pkg from "pg";
 const { Pool } = pkg;
 
@@ -1362,42 +1363,61 @@ export class DatabaseStorage implements IStorage {
   }
   
   private async addMessageDetails(messagesList: Message[]): Promise<MessageWithDetails[]> {
+    if (messagesList.length === 0) return [];
+    
     // Import decryption utility
     const { decryptMessage, isEncrypted } = await import('./encryption');
     
-    return Promise.all(
-      messagesList.map(async (message) => {
-        // Get sender
-        const [sender] = message.senderId ? 
-          await db.select().from(users).where(eq(users.id, message.senderId)) : 
-          [];
-        
-        // Get receiver
-        const [receiver] = message.receiverId ? 
-          await db.select().from(users).where(eq(users.id, message.receiverId)) : 
-          [];
-        
-        // Get product if applicable
-        let product;
-        if (message.productId) {
-          product = await this.getProductById(message.productId);
-        }
-        
-        // Decrypt message content if it's encrypted
-        let content = message.content;
-        if (isEncrypted(content)) {
-          content = decryptMessage(content);
-        }
-        
-        return {
-          ...message,
-          content, // Replace with decrypted content
-          sender,
-          receiver,
-          product
-        };
-      })
-    );
+    // Get all unique user IDs and product IDs in batch
+    const userIds = new Set<number>();
+    const productIds = new Set<number>();
+    
+    messagesList.forEach(message => {
+      if (message.senderId) userIds.add(message.senderId);
+      if (message.receiverId) userIds.add(message.receiverId);
+      if (message.productId) productIds.add(message.productId);
+    });
+    
+    // Fetch all users in one query
+    const usersMap = new Map<number, User>();
+    if (userIds.size > 0) {
+      const usersResult = await db.select()
+        .from(users)
+        .where(inArray(users.id, Array.from(userIds)));
+      
+      usersResult.forEach(user => {
+        usersMap.set(user.id, user);
+      });
+    }
+    
+    // Fetch all products in one query (basic product info only)
+    const productsMap = new Map<number, Product>();
+    if (productIds.size > 0) {
+      const productsResult = await db.select()
+        .from(products)
+        .where(inArray(products.id, Array.from(productIds)));
+      
+      productsResult.forEach(product => {
+        productsMap.set(product.id, product);
+      });
+    }
+    
+    // Map messages with their details
+    return messagesList.map(message => {
+      // Decrypt message content if it's encrypted
+      let content = message.content;
+      if (content && isEncrypted(content)) {
+        content = decryptMessage(content);
+      }
+      
+      return {
+        ...message,
+        content,
+        sender: message.senderId ? usersMap.get(message.senderId) : undefined,
+        receiver: message.receiverId ? usersMap.get(message.receiverId) : undefined,
+        product: message.productId ? productsMap.get(message.productId) : undefined
+      };
+    });
   }
 
   // Helper methods
