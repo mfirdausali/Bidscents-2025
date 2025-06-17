@@ -123,6 +123,15 @@ BidScents is a sophisticated secondhand luxury perfume marketplace built as a fu
 - Encrypted message storage with secure key management
 
 ## Changelog
+- June 17, 2025: Authentication system critical login fix implemented
+  - Fixed login failure where HTML was returned instead of JSON responses
+  - Added missing POST route for `/api/v1/auth/lookup-email` endpoint
+  - Resolved username-to-email lookup functionality for authentication
+  - Implemented global singleton pattern for Supabase clients to prevent multiple GoTrueClient instances
+  - Fixed auction endpoint method calls from `storage.getProduct()` to `storage.getProductById()`
+  - Eliminated 500 errors on auction and message endpoints through comprehensive error handling
+  - Enhanced JWT token exchange system between Supabase and application tokens
+  - Verified complete authentication flow from username/email login to successful session creation
 - June 17, 2025: Messaging system N+1 query optimization completed
   - Eliminated N+1 query problems in message fetching methods across all storage implementations
   - Optimized getUserMessages, getConversation, and getConversationForProduct methods with batch data fetching

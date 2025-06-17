@@ -377,6 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up streamlined Supabase authentication system
   // Setup Supabase authentication endpoints
   app.post('/api/v1/auth/session', authRoutes.session);
+  app.post('/api/v1/auth/lookup-email', authRoutes.lookupEmail);
   app.get('/api/v1/auth/me', requireAuth, authRoutes.me);
   app.post('/api/v1/auth/logout', authRoutes.logout);
   app.post('/api/v1/auth/recover-profile', authRoutes.recoverProfile);
