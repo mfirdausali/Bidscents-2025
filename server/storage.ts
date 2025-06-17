@@ -1140,6 +1140,58 @@ export class DatabaseStorage implements IStorage {
     
     return this.processJoinedMessageData(Array.from(conversationMap.values()));
   }
+
+  private processJoinedMessageData(joinedData: any[]): MessageWithDetails[] {
+    // Import decryption utility
+    const { decryptMessage, isEncrypted } = require('./encryption');
+    
+    return joinedData.map(row => {
+      const msg = row.message;
+      
+      // Decrypt message content if it's encrypted
+      let content = msg.content;
+      if (content && isEncrypted(content)) {
+        content = decryptMessage(content);
+      }
+      
+      return {
+        id: msg.id,
+        senderId: msg.senderId,
+        receiverId: msg.receiverId,
+        content: content, // Decrypted content
+        isRead: msg.isRead,
+        createdAt: msg.createdAt,
+        productId: msg.productId,
+        messageType: msg.messageType || 'TEXT',
+        fileUrl: msg.fileUrl || null,
+        actionType: msg.actionType || null,
+        isClicked: msg.isClicked || false,
+        // Map joined user and product data directly from the JOIN results
+        sender: row.sender ? {
+          id: row.sender.id,
+          username: row.sender.username,
+          firstName: row.sender.firstName,
+          lastName: row.sender.lastName,
+          profileImage: row.sender.profileImage
+        } : undefined,
+        receiver: row.receiver ? {
+          id: row.receiver.id,
+          username: row.receiver.username,
+          firstName: row.receiver.firstName,
+          lastName: row.receiver.lastName,
+          profileImage: row.receiver.profileImage
+        } : undefined,
+        product: row.product ? {
+          id: row.product.id,
+          name: row.product.name,
+          brand: row.product.brand,
+          price: row.product.price,
+          imageUrl: row.product.imageUrl,
+          sellerId: row.product.sellerId
+        } : undefined
+      };
+    }) as MessageWithDetails[];
+  }
   
   async getConversation(userId1: number, userId2: number): Promise<MessageWithDetails[]> {
     // Use JOIN queries to fetch all data in a single optimized request
@@ -1177,26 +1229,41 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
-    const conversation = await db.select()
-      .from(messages)
-      .where(
-        and(
-          or(
-            and(
-              eq(messages.senderId, userId1),
-              eq(messages.receiverId, userId2)
-            ),
-            and(
-              eq(messages.senderId, userId2),
-              eq(messages.receiverId, userId1)
-            )
+    // Use JOIN queries to fetch all data in a single optimized request
+    const conversation = await db.select({
+      message: messages,
+      sender: users,
+      receiver: {
+        id: sql<number>`receiver_user.id`,
+        username: sql<string>`receiver_user.username`,
+        firstName: sql<string>`receiver_user.first_name`,
+        lastName: sql<string>`receiver_user.last_name`,
+        profileImage: sql<string>`receiver_user.profile_image`
+      },
+      product: products
+    })
+    .from(messages)
+    .leftJoin(users, eq(messages.senderId, users.id))
+    .leftJoin(sql`users as receiver_user`, sql`messages.receiver_id = receiver_user.id`)
+    .leftJoin(products, eq(messages.productId, products.id))
+    .where(
+      and(
+        or(
+          and(
+            eq(messages.senderId, userId1),
+            eq(messages.receiverId, userId2)
           ),
-          eq(messages.productId, productId)
-        )
+          and(
+            eq(messages.senderId, userId2),
+            eq(messages.receiverId, userId1)
+          )
+        ),
+        eq(messages.productId, productId)
       )
-      .orderBy(messages.createdAt);
+    )
+    .orderBy(messages.createdAt);
     
-    return this.addMessageDetails(conversation);
+    return this.processJoinedMessageData(conversation);
   }
   
   async sendMessage(message: InsertMessage): Promise<Message> {

@@ -123,6 +123,13 @@ BidScents is a sophisticated secondhand luxury perfume marketplace built as a fu
 - Encrypted message storage with secure key management
 
 ## Changelog
+- June 17, 2025: Messaging system N+1 query optimization completed
+  - Eliminated N+1 query problems in message fetching methods across all storage implementations
+  - Optimized getUserMessages, getConversation, and getConversationForProduct methods with batch data fetching
+  - Reduced query count from potentially 3N+1 queries to 3-4 total queries regardless of message volume
+  - Implemented efficient JOIN-based queries and product deduplication logic
+  - Enhanced message route endpoints to use optimized storage methods without redundant individual fetches
+  - Verified performance improvements in both Drizzle ORM and Supabase implementations
 - June 17, 2025: Authentication system critical login fix implemented
   - Fixed login failure where HTML was returned instead of JSON responses
   - Added missing POST route for `/api/v1/auth/lookup-email` endpoint
@@ -132,13 +139,6 @@ BidScents is a sophisticated secondhand luxury perfume marketplace built as a fu
   - Eliminated 500 errors on auction and message endpoints through comprehensive error handling
   - Enhanced JWT token exchange system between Supabase and application tokens
   - Verified complete authentication flow from username/email login to successful session creation
-- June 17, 2025: Messaging system N+1 query optimization completed
-  - Eliminated N+1 query problems in message fetching methods across all storage implementations
-  - Optimized getUserMessages, getConversation, and getConversationForProduct methods with batch data fetching
-  - Reduced query count from potentially 3N+1 queries to 3-4 total queries regardless of message volume
-  - Implemented efficient JOIN-based queries and product deduplication logic
-  - Enhanced message route endpoints to use optimized storage methods without redundant individual fetches
-  - Verified performance improvements in both Drizzle ORM and Supabase implementations
 - June 17, 2025: Email verification system comprehensive fix
   - Fixed critical authentication bug where users existed in auth.users but not public.users
   - Created missing `/api/verify-email` endpoint with proper Supabase JWT validation
