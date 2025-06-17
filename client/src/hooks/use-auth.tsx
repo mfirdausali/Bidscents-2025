@@ -86,6 +86,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
               const errorData = await response.json();
               console.error('❌ Frontend: Token exchange failed with error:', errorData);
+              
+              // Handle profile creation failure - attempt recovery
+              if (errorData.code === 'PROFILE_CREATION_FAILED') {
+                console.log('🔄 Frontend: Attempting profile recovery...');
+                try {
+                  const recoveryResponse = await apiRequest("POST", "/api/v1/auth/recover-profile", {
+                    supabaseToken: session.access_token
+                  });
+                  
+                  if (recoveryResponse.ok) {
+                    const recoveryData = await recoveryResponse.json();
+                    console.log('✅ Frontend: Profile recovery successful');
+                    setAuthToken(recoveryData.token);
+                    queryClient.setQueryData(["/api/v1/auth/me"], recoveryData.user);
+                    refetchUser();
+                    
+                    if (recoveryData.recovered) {
+                      toast({
+                        title: "Account Recovered",
+                        description: "Your account profile has been successfully recovered.",
+                      });
+                    }
+                  } else {
+                    console.error('❌ Frontend: Profile recovery failed');
+                    toast({
+                      title: "Authentication Error",
+                      description: "Unable to complete profile setup. Please try signing in again.",
+                      variant: "destructive",
+                    });
+                    // Sign out the user from Supabase to force re-authentication
+                    await supabase.auth.signOut();
+                  }
+                } catch (recoveryError) {
+                  console.error('❌ Frontend: Profile recovery request failed:', recoveryError);
+                  toast({
+                    title: "Authentication Error",
+                    description: "Unable to recover your profile. Please contact support.",
+                    variant: "destructive",
+                  });
+                }
+              } else {
+                toast({
+                  title: "Authentication Error",
+                  description: errorData.error || "Authentication failed",
+                  variant: "destructive",
+                });
+              }
             }
           } catch (error) {
             console.error("❌ Frontend: Token exchange request failed:", error);

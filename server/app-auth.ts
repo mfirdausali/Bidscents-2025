@@ -188,24 +188,79 @@ export const authRoutes = {
       }
 
       console.log('🔄 Backend: Looking up local user by email:', user.email);
-      // Find or create local user profile - simplified approach
+      // Find or create local user profile with enhanced error handling
       let localUser = await storage.getUserByEmail(user.email);
       
       if (!localUser) {
-        console.log('🔄 Backend: Creating new local user');
-        // Create new user
+        console.log('🔄 Backend: No local user found, checking by provider ID...');
+        // Also check by provider ID in case email was changed
+        localUser = await storage.getUserByProviderId(user.id);
+        
+        if (localUser && localUser.email !== user.email) {
+          console.log('🔄 Backend: Found user by provider ID but email mismatch, updating email...');
+          // Update email if it changed in Supabase
+          localUser = await storage.updateUser(localUser.id, { email: user.email });
+        }
+      }
+      
+      if (!localUser) {
+        console.log('🔄 Backend: Creating new local user profile...');
+        
+        // Generate unique username
+        let baseUsername = user.email.split('@')[0];
+        let username = baseUsername;
+        let counter = 0;
+        
+        // Ensure username uniqueness
+        while (await storage.getUserByUsername(username)) {
+          counter++;
+          username = `${baseUsername}${counter}`;
+          if (counter > 9999) {
+            username = `${baseUsername}${Date.now()}`;
+            break;
+          }
+        }
+        
         const newUserData = {
           email: user.email,
-          username: user.email.split('@')[0],
-          firstName: user.user_metadata?.first_name || null,
-          lastName: user.user_metadata?.last_name || null,
+          username: username,
+          firstName: user.user_metadata?.first_name || user.user_metadata?.firstName || null,
+          lastName: user.user_metadata?.last_name || user.user_metadata?.lastName || null,
+          providerId: user.id,
+          provider: 'supabase',
+          isVerified: !!user.email_confirmed_at
         };
-        console.log('🔄 Backend: New user data:', newUserData);
         
-        localUser = await storage.createUser(newUserData);
-        console.log('✅ Backend: Created local user:', localUser);
+        console.log('🔄 Backend: Creating user with data:', newUserData);
+        
+        try {
+          localUser = await storage.createUser(newUserData);
+          console.log('✅ Backend: Successfully created local user profile');
+        } catch (createError: any) {
+          console.error('❌ Backend: Failed to create user profile:', createError);
+          // If user creation fails, return a specific error that frontend can handle
+          return res.status(500).json({ 
+            error: 'Failed to create user profile',
+            code: 'PROFILE_CREATION_FAILED',
+            details: createError?.message
+          });
+        }
       } else {
-        console.log('✅ Backend: Found existing local user:', localUser);
+        console.log('✅ Backend: Found existing local user:', localUser.email);
+        
+        // Update provider ID if missing
+        if (!localUser.providerId) {
+          console.log('🔄 Backend: Updating missing provider ID...');
+          try {
+            localUser = await storage.updateUser(localUser.id, {
+              providerId: user.id,
+              provider: 'supabase'
+            });
+          } catch (updateError: any) {
+            console.error('❌ Backend: Failed to update provider ID:', updateError);
+            // Continue with session creation even if provider ID update fails
+          }
+        }
       }
 
       console.log('🔄 Backend: Generating application JWT...');
