@@ -109,14 +109,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const decoded = verifyWebSocketAuth(data.token);
                 
                 if (decoded) {
-                  clients.set(ws, { 
-                    userId: decoded.userId, 
-                    username: decoded.username,
-                    email: decoded.email,
-                    supabaseId: decoded.supabaseId
-                  });
-                  console.log(`User authenticated via JWT: ${decoded.username} (ID: ${decoded.userId})`);
-                  ws.send(JSON.stringify({ type: 'auth_success' }));
+                  // Get user details from database to ensure we have complete profile
+                  const user = await storage.getUser(decoded.userId);
+                  if (user) {
+                    clients.set(ws, { 
+                      userId: decoded.userId, 
+                      username: user.username
+                    });
+                    console.log(`User authenticated via JWT: ${user.username} (ID: ${decoded.userId})`);
+                    ws.send(JSON.stringify({ 
+                      type: 'auth_success',
+                      userId: decoded.userId,
+                      username: user.username 
+                    }));
+                  } else {
+                    console.log('WebSocket authentication failed: user not found in database');
+                    ws.send(JSON.stringify({ type: 'auth_failed', message: 'User profile not found' }));
+                    ws.close();
+                  }
                 } else {
                   console.log('WebSocket authentication failed: invalid token');
                   ws.send(JSON.stringify({ type: 'auth_failed', message: 'Invalid authentication token' }));
@@ -2967,27 +2977,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const data = JSON.parse(messageData.toString());
         
-        // Handle authentication
-        if (data.type === 'auth') {
-          userId = parseInt(data.userId);
-          if (isNaN(userId)) {
-            ws.send(JSON.stringify({ type: 'error', message: 'Invalid user ID' }));
-            return;
-          }
-          
-          // Store connection for this user
-          connectedUsers.set(userId, ws);
-          console.log(`User ${userId} authenticated on WebSocket`);
-          
-          // Send connection confirmation
-          ws.send(JSON.stringify({ type: 'auth_success', userId }));
+        // JWT-based authentication is handled earlier in the switch statement
+        // This old authentication logic is removed to prevent conflicts
+        
+        // Check if user is authenticated via JWT (stored in clients Map)
+        const clientInfo = clients.get(ws);
+        if (!clientInfo && data.type !== 'joinAuction' && data.type !== 'leaveAuction' && data.type !== 'auth') {
+          ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
           return;
         }
         
-        // Most message types require authentication, except for auction viewing
-        if (!userId && data.type !== 'joinAuction' && data.type !== 'leaveAuction') {
-          ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
-          return;
+        // Update userId from clientInfo for compatibility with existing code
+        if (clientInfo) {
+          userId = clientInfo.userId;
         }
         
         // For auction room messages, use guest mode if no user ID
