@@ -3040,14 +3040,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   return server;
 }
-            
-            // Get product info with detailed images
-            const product = await storage.getProductById(actionMessageData.productId);
-            if (!product) {
-              throw new Error('Product not found');
-            }
-            
-            // Get product images for this product
             let productImageUrl = product.imageUrl;
             try {
               // Get the first image as the main product image
