@@ -641,18 +641,30 @@ export const authRoutes = {
         }
       }
 
+      // Ensure we have a valid user from token verification
+      if (!user) {
+        console.log('❌ No user data available for verification');
+        return res.status(400).json({
+          error: 'Verification failed',
+          message: 'Unable to process verification request'
+        });
+      }
+
       console.log('✅ Token verified successfully for user:', user.email);
+      
+      // TypeScript assertion - we know user is not null at this point
+      const verifiedUser = user;
 
       // Check if user profile exists in local database
-      let localUser = await storage.getUserByEmail(user.email!);
+      let localUser = await storage.getUserByEmail(verifiedUser.email!);
       
       if (!localUser) {
         console.log('🔄 Creating user profile for email verification...');
         // Create user profile if it doesn't exist
-        const authProvider = user.app_metadata?.provider || 'email';
+        const authProvider = verifiedUser.app_metadata?.provider || 'email';
         
         // Generate unique username
-        let baseUsername = user.email!.split('@')[0];
+        let baseUsername = verifiedUser.email!.split('@')[0];
         let username = baseUsername;
         let counter = 0;
         
@@ -666,14 +678,14 @@ export const authRoutes = {
         }
         
         const newUserData = {
-          email: user.email!,
+          email: verifiedUser.email!,
           username: username,
-          firstName: user.user_metadata?.first_name || user.user_metadata?.firstName || null,
-          lastName: user.user_metadata?.last_name || user.user_metadata?.lastName || null,
-          providerId: user.id,
+          firstName: verifiedUser.user_metadata?.first_name || verifiedUser.user_metadata?.firstName || null,
+          lastName: verifiedUser.user_metadata?.last_name || verifiedUser.user_metadata?.lastName || null,
+          providerId: verifiedUser.id,
           provider: authProvider,
           isVerified: true, // Mark as verified since they completed email verification
-          profileImage: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+          profileImage: verifiedUser.user_metadata?.avatar_url || verifiedUser.user_metadata?.picture || null
         };
         
         localUser = await storage.createUser(newUserData);
@@ -683,8 +695,8 @@ export const authRoutes = {
         // Update verification status
         await storage.updateUser(localUser.id, { 
           isVerified: true,
-          providerId: user.id,
-          provider: user.app_metadata?.provider || 'email'
+          providerId: verifiedUser.id,
+          provider: verifiedUser.app_metadata?.provider || 'email'
         });
       }
 
