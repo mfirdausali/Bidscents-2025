@@ -16,6 +16,7 @@ import { apiRequest, queryClient, setAuthToken, removeAuthToken } from "../lib/q
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
+import { checkTokenAndRefreshIfNeeded } from "../utils/force-token-refresh";
 
 type AuthContextType = {
   user: SelectUser | null;

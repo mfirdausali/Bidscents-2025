@@ -73,17 +73,21 @@ export async function verifySupabaseAuth(req: Request, res: Response, next: Next
  * Generate application-specific JWT
  */
 export function generateAppJWT(userId: number, email: string, supabaseId: string, isSeller?: boolean): string {
-  return jwt.sign(
-    { 
-      userId, 
-      email, 
-      supabaseId,
-      isSeller,
-      type: 'app_token' 
-    },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
-  );
+  const payload = {
+    userId, 
+    email, 
+    supabaseId,
+    isSeller: isSeller || false,
+    type: 'app_token',
+    iat: Math.floor(Date.now() / 1000),
+  };
+
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN,
+    issuer: 'bidscents-marketplace',
+    audience: 'bidscents-users',
+    algorithm: 'HS256'
+  });
 }
 
 /**
