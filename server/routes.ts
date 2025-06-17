@@ -97,7 +97,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
-        console.log('Received WebSocket message:', data);
+        console.log('[HANDLER 1] Received WebSocket message:', data);
         
         // Handle different message types
         switch (data.type) {
@@ -2967,54 +2967,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up recurring check for featured product expiration (every 30 minutes)
   setInterval(checkAndUpdateExpiredFeaturedProducts, 30 * 60 * 1000);
   
-  // WebSocket connection handler
-  wss.on('connection', (ws: WebSocket) => {
-    console.log('New WebSocket connection established');
-    let userId: number | null = null;
-    
-    // Handle messages from clients
-    ws.on('message', async (messageData: string) => {
-      try {
-        const data = JSON.parse(messageData.toString());
-        
-        // JWT-based authentication is handled earlier in the switch statement
-        // This old authentication logic is removed to prevent conflicts
-        
-        // Check if user is authenticated via JWT (stored in clients Map)
-        const clientInfo = clients.get(ws);
-        if (!clientInfo && data.type !== 'joinAuction' && data.type !== 'leaveAuction' && data.type !== 'auth') {
-          ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
-          return;
+  // GET /api/auctions - Get all auctions
+  app.get('/api/auctions', async (req, res) => {
+    try {
+      const auctions = await storage.getAuctions();
+      
+      // Enhance auctions with bid counts
+      const enhancedAuctions = await Promise.all(auctions.map(async (auction) => {
+        const bids = await storage.getBidsForAuction(auction.id);
+        return {
+          ...auction,
+          bidCount: bids.length
+        };
+      }));
+      
+      res.json(enhancedAuctions);
+    } catch (error) {
+      console.error('Error getting auctions:', error);
+      res.status(500).json({ message: 'Error retrieving auctions' });
+    }
+  });
+  
+  // GET /api/auctions/:id - Get auction by ID
+  app.get('/api/auctions/:id', async (req, res) => {
+    try {
+      const auctionId = parseInt(req.params.id);
+      const auction = await storage.getAuctionById(auctionId);
+      
+      if (!auction) {
+        return res.status(404).json({ message: 'Auction not found' });
+      }
+      
+      // Get bids for this auction
+      const bids = await storage.getBidsForAuction(auction.id);
+      
+      // Enhance bids with bidder usernames
+      const enhancedBids = await Promise.all(bids.map(async (bid) => {
+        try {
+          const bidder = await storage.getUser(bid.bidderId);
+          return {
+            ...bid,
+            bidder: bidder?.username || `User #${bid.bidderId}`
+          };
+        } catch (err) {
+          console.warn(`Could not fetch username for bidder ${bid.bidderId}:`, err);
+          return {
+            ...bid,
+            bidder: `User #${bid.bidderId}`
+          };
         }
-        
-        // Update userId from clientInfo for compatibility with existing code
-        if (clientInfo) {
-          userId = clientInfo.userId;
-        }
-        
-        // For auction room messages, use guest mode if no user ID
-        if (data.type === 'joinAuction' || data.type === 'leaveAuction') {
-          // Allow guest access, but don't reset userId if it's already set
-          if (!userId && data.userId && data.userId === 'guest') {
-            console.log('Guest user joining auction room');
-            // We're not setting a numeric userId so the user stays in guest mode
-          }
-        }
-        
-        // Handle sending an action message (for transactions)
-        if (data.type === 'send_action_message') {
-          try {
-            // Validate action message data
-            const actionMessageSchema = z.object({
-              senderId: z.number(),
-              receiverId: z.number(),
-              productId: z.number(),
-              actionType: z.enum(['INITIATE', 'CONFIRM_PAYMENT', 'CONFIRM_DELIVERY', 'REVIEW']),
-            });
-            
-            // Ensure userId is not null before using it
-            if (userId === null) {
-              throw new Error('User ID is required to send an action message');
+      }));
+      
+      // Get product details
+      console.log(`Looking up product ID ${auction.productId} for auction ${auctionId}`);
+      const product = await storage.getProduct(auction.productId);
+      
+      if (!product) {
+        console.warn(`Product ${auction.productId} not found for auction ${auctionId}`);
+        return res.status(404).json({ message: 'Product not found for this auction' });
+      }
+      
+      res.json({
+        ...auction,
+        product,
+        bids: enhancedBids
+      });
+    } catch (error) {
+      console.error('Error getting auction:', error);
+      res.status(500).json({ message: 'Error retrieving auction' });
+    }
+  });
+
+  return server;
+}
             }
             
             const actionMessageData = actionMessageSchema.parse({
