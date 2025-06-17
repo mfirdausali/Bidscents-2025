@@ -239,6 +239,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Facebook Sign In
+  const signInWithFacebookMutation = useMutation({
+    mutationFn: async () => {
+      console.log('🔄 Starting Facebook authentication');
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo: `${window.location.origin}/auth-callback`,
+          scopes: 'email public_profile'
+        }
+      });
+
+      if (error) {
+        console.error('❌ Facebook authentication error:', error);
+        throw error;
+      }
+
+      console.log('✅ Facebook OAuth initiated successfully');
+      return data;
+    },
+    onSuccess: () => {
+      console.log('Facebook OAuth redirect initiated');
+      // Note: The actual authentication completion will be handled by the auth callback
+    },
+    onError: (error: Error) => {
+      console.error('Facebook authentication failed:', error);
+      toast({
+        title: "Facebook Login Failed",
+        description: error.message || "Unable to authenticate with Facebook. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Password reset
   const resetPasswordMutation = useMutation({
     mutationFn: async ({ email }: { email: string }) => {
@@ -265,37 +300,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Facebook login
-  const signInWithFacebookMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'facebook',
-        options: {
-          redirectTo: `${window.location.origin}/auth-callback`,
-        }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      return data;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Redirecting to Facebook",
-        description: "You'll be redirected to Facebook to complete the login process.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Facebook login failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   return (
     <AuthContext.Provider
       value={{
@@ -314,7 +318,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
