@@ -365,6 +365,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/v1/auth/check-orphaned', requireAuth, authRoutes.checkOrphanedUsers);
   app.post('/api/v1/auth/repair-orphaned', requireAuth, authRoutes.repairOrphanedUsers);
   
+  // Email verification endpoint for handling Supabase email confirmation links
+  app.get('/api/verify-email', authRoutes.verifyEmail);
+  
   // Raw query middleware specifically for Billplz redirect
   // This captures the original query string before Express parses it
   app.use('/api/payments/process-redirect', (req: Request & { rawQuery?: string }, res: Response, next: NextFunction) => {

@@ -158,8 +158,8 @@ export default function AuthPage() {
       username: registerData.username,
       email: registerData.email,
       password: registerData.password,
-      firstName: registerData.firstName,
-      lastName: registerData.lastName
+      firstName: registerData.firstName ?? undefined,
+      lastName: registerData.lastName ?? undefined
     });
   };
 

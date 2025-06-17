@@ -560,5 +560,114 @@ export const authRoutes = {
       console.error('Error in repairOrphanedUsers:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
+  },
+
+  // Email verification endpoint for handling Supabase email confirmation
+  verifyEmail: async (req: Request, res: Response) => {
+    try {
+      console.log('🔄 Email verification request received');
+      console.log('Query params:', req.query);
+      console.log('Headers:', req.headers);
+
+      // Extract token from query parameters or headers
+      const token = req.query.token as string || req.query.access_token as string;
+      
+      if (!token) {
+        console.log('❌ No verification token provided');
+        return res.status(400).json({ 
+          error: 'Missing verification token',
+          message: 'Invalid verification link or missing parameters'
+        });
+      }
+
+      console.log('🔄 Verifying Supabase JWT token...');
+      
+      // Verify the Supabase JWT token
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      
+      if (error) {
+        console.error('❌ Supabase token verification failed:', error);
+        return res.status(401).json({ 
+          error: 'Invalid verification token',
+          message: 'Invalid verification link or missing parameters'
+        });
+      }
+      
+      if (!user) {
+        console.log('❌ No user data returned from token verification');
+        return res.status(401).json({ 
+          error: 'Invalid verification token',
+          message: 'Invalid verification link or missing parameters'
+        });
+      }
+
+      console.log('✅ Token verified successfully for user:', user.email);
+
+      // Check if user profile exists in local database
+      let localUser = await storage.getUserByEmail(user.email!);
+      
+      if (!localUser) {
+        console.log('🔄 Creating user profile for email verification...');
+        // Create user profile if it doesn't exist
+        const authProvider = user.app_metadata?.provider || 'email';
+        
+        // Generate unique username
+        let baseUsername = user.email!.split('@')[0];
+        let username = baseUsername;
+        let counter = 0;
+        
+        while (await storage.getUserByUsername(username)) {
+          counter++;
+          username = `${baseUsername}${counter}`;
+          if (counter > 9999) {
+            username = `${baseUsername}${Date.now()}`;
+            break;
+          }
+        }
+        
+        const newUserData = {
+          email: user.email!,
+          username: username,
+          firstName: user.user_metadata?.first_name || user.user_metadata?.firstName || null,
+          lastName: user.user_metadata?.last_name || user.user_metadata?.lastName || null,
+          providerId: user.id,
+          provider: authProvider,
+          isVerified: true, // Mark as verified since they completed email verification
+          profileImage: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+        };
+        
+        localUser = await storage.createUser(newUserData);
+        console.log('✅ User profile created successfully during email verification');
+      } else {
+        console.log('✅ User profile already exists, updating verification status...');
+        // Update verification status
+        await storage.updateUser(localUser.id, { 
+          isVerified: true,
+          providerId: user.id,
+          provider: user.app_metadata?.provider || 'email'
+        });
+      }
+
+      console.log('✅ Email verification completed successfully');
+      res.json({ 
+        success: true, 
+        message: 'Email verified successfully',
+        user: {
+          id: localUser.id,
+          email: localUser.email,
+          username: localUser.username,
+          isVerified: true
+        }
+      });
+    } catch (error: any) {
+      console.error('❌ Email verification error:', {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack
+      });
+      res.status(500).json({ 
+        error: 'Email verification failed',
+        message: 'An unexpected error occurred during verification'
+      });
+    }
   }
 };
