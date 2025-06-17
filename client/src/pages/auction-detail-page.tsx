@@ -119,11 +119,16 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
       
       // First authenticate if the user is logged in
       if (user?.id && socket.current?.readyState === WebSocket.OPEN) {
-        console.log("Authenticating WebSocket with user ID:", user.id);
-        socket.current.send(JSON.stringify({
-          type: 'auth',
-          userId: user.id
-        }));
+        const appToken = localStorage.getItem('app_token');
+        if (appToken) {
+          console.log("🔐 Authenticating auction WebSocket with JWT token");
+          socket.current.send(JSON.stringify({
+            type: 'auth',
+            token: appToken
+          }));
+        } else {
+          console.log("⚠️ No app token found for auction WebSocket authentication");
+        }
       }
       
       // Then join auction room (regardless of authentication status)

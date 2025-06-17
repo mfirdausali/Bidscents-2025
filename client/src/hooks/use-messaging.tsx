@@ -37,7 +37,7 @@ export interface Message {
 // WebSocket message types
 interface WebSocketAuthMessage {
   type: 'auth';
-  userId: number;
+  token: string;
 }
 
 interface WebSocketSendMessage {
@@ -136,27 +136,29 @@ export function useMessaging() {
         // Reset reconnect attempts on successful connection
         reconnectAttempts = 0;
         
-        // Authenticate with the server using JWT token
+        // Authenticate with the server using application JWT token
         if (user?.id) {
-          // Get the JWT token from localStorage or sessionStorage
-          const token = localStorage.getItem('supabase.auth.token') || sessionStorage.getItem('supabase.auth.token');
+          // Get the application JWT token from localStorage
+          const appToken = localStorage.getItem('app_token');
           
-          if (token) {
+          if (appToken) {
             const authMessage = { 
               type: 'auth', 
-              userId: user.id,
-              token: token
+              token: appToken
             };
-            console.log('Sending JWT authentication message to WebSocket server');
+            console.log('🔐 Sending application JWT authentication to WebSocket server');
             socket.send(JSON.stringify(authMessage));
           } else {
-            // Fallback to user ID authentication
-            const authMessage = { type: 'auth', userId: user.id };
-            console.log('Sending user ID authentication message to WebSocket server:', authMessage);
-            socket.send(JSON.stringify(authMessage));
+            console.error('❌ Cannot authenticate WebSocket - no app token found');
+            setError('Authentication required. Please log in again.');
+            toast({
+              title: 'Authentication Error',
+              description: 'Please log in again to use messaging features.',
+              variant: 'destructive',
+            });
           }
         } else {
-          console.error('Cannot authenticate WebSocket - user ID is missing');
+          console.error('❌ Cannot authenticate WebSocket - user ID is missing');
         }
       });
 

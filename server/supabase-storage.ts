@@ -1892,6 +1892,30 @@ export class SupabaseStorage implements IStorage {
   }
   
   /**
+   * Add a new message (alternative method name for compatibility)
+   */
+  async addMessage(message: InsertMessage): Promise<Message> {
+    return this.sendMessage(message);
+  }
+
+  /**
+   * Update transaction status
+   */
+  async updateTransactionStatus(transactionId: number, status: string): Promise<void> {
+    console.log(`Updating transaction ${transactionId} status to: ${status}`);
+    
+    const { error } = await supabase
+      .from('transactions')
+      .update({ status: status })
+      .eq('id', transactionId);
+      
+    if (error) {
+      console.error('Error updating transaction status:', error);
+      throw new Error(`Failed to update transaction status: ${error.message}`);
+    }
+  }
+
+  /**
    * Update an action message status to mark it as clicked/confirmed
    */
   async updateActionMessageStatus(messageId: number, isClicked: boolean): Promise<MessageWithDetails | null> {
