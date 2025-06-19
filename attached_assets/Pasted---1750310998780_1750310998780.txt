@@ -1,0 +1,97 @@
+ 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+ [LaunchDarkly] LaunchDarkly client initialized
+/@mfafirdausali:1 Attestation check for Topics on https://replit.com/ failed.
+/@mfafirdausali:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+ Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'battery'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'layout-animations'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'navigation-override'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'oversized-images'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'publickey-credentials'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'speaker-selection'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'unoptimized-images'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'unsized-media'.
+_ @ framework-43f372cdaab5f068.js:1
+ Unrecognized feature: 'pointer-lock'.
+_ @ framework-43f372cdaab5f068.js:1
+ Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-43f372cdaab5f068.js:1
+ Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-43f372cdaab5f068.js:1
+workspace_iframe.html:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+workspace_iframe.html:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.html:32 Unrecognized feature: 'battery'.
+workspace_iframe.html:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.html:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.html:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.html:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.html:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.html:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.html:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.html:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.html:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+ [vite] connecting...
+ WebSocket connection to 'wss://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/?token=mxF_SXdGkCGv' failed: 
+t @ eruda.js:2
+eruda.js:2 Uncaught (in promise) 
+ Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Mt.forEach.n.<computed> @ eruda.js:2
+Console.js:61 [JWT] Getting token from localStorage: token present
+Console.js:61 [JWT] Getting token from localStorage: token present
+Console.js:61 [JWT] Getting token from localStorage: token present
+Console.js:61 Supabase auth state changed: TOKEN_REFRESHED
+Console.js:61 Supabase auth state changed: INITIAL_SESSION
+Console.js:61 [JWT] Getting token from localStorage: token present
+Console.js:61 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+Console.js:61 Attempting WebSocket connection...
+Console.js:61 WebSocket URL: wss://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/ws
+Console.js:61 [JWT] Getting token from localStorage: token present
+Console.js:61 WebSocket connection established
+Console.js:61 🔐 Sending application JWT authentication to WebSocket server
+cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/api/messages:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+Console.js:61 Error fetching messages: Error: 500: {"message":"require is not defined"}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:59:3)
+    at async fetchMessages (use-messaging.tsx:358:21)
+Mt.forEach.n.<computed> @ Console.js:61
+Console.js:61 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+Console.js:61 WebSocket message received: {"type":"auth_success","userId":32,"username":"admin"}
+Console.js:61 Authentication successful for user: 32
+_app-42e86ef635691cd5.js:38 [Violation] 'requestAnimationFrame' handler took 63ms
+[Violation] Forced reflow while executing JavaScript took 63ms

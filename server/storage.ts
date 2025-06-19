@@ -1138,12 +1138,12 @@ export class DatabaseStorage implements IStorage {
       }
     });
     
-    return this.processJoinedMessageData(Array.from(conversationMap.values()));
+    return await this.processJoinedMessageData(Array.from(conversationMap.values()));
   }
 
-  private processJoinedMessageData(joinedData: any[]): MessageWithDetails[] {
+  private async processJoinedMessageData(joinedData: any[]): Promise<MessageWithDetails[]> {
     // Import decryption utility
-    const { decryptMessage, isEncrypted } = require('./encryption');
+    const { decryptMessage, isEncrypted } = await import('./encryption');
     
     return joinedData.map(row => {
       const msg = row.message;
@@ -1225,7 +1225,7 @@ export class DatabaseStorage implements IStorage {
     )
     .orderBy(messages.createdAt);
     
-    return this.processJoinedMessageData(conversation);
+    return await this.processJoinedMessageData(conversation);
   }
   
   async getConversationForProduct(userId1: number, userId2: number, productId: number): Promise<MessageWithDetails[]> {
@@ -1263,7 +1263,7 @@ export class DatabaseStorage implements IStorage {
     )
     .orderBy(messages.createdAt);
     
-    return this.processJoinedMessageData(conversation);
+    return await this.processJoinedMessageData(conversation);
   }
   
   async sendMessage(message: InsertMessage): Promise<Message> {
