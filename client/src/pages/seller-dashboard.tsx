@@ -69,6 +69,7 @@ import {
   Timer,
   Tag,
   Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -2799,6 +2800,20 @@ export default function SellerDashboard() {
                     <FormItem>
                       <FormLabel>Product Images (up to 5)</FormLabel>
                       <div className="flex flex-col gap-2">
+                        {/* Authenticity Alert */}
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                          <div className="flex items-start space-x-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-sm font-medium text-amber-800">
+                                Important: Use Only Your Own Photos
+                              </p>
+                              <p className="text-xs text-amber-700 mt-1">
+                                Please upload authentic pictures of the actual perfume from your personal collection. Using photos from the internet or other sources is not allowed and may result in listing removal.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                         <div className="border rounded-md p-4 bg-gray-50">
                           <div className="flex items-center justify-center w-full">
                             <label
