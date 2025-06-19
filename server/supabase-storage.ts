@@ -1588,12 +1588,12 @@ export class SupabaseStorage implements IStorage {
     });
     
     // Process the latest messages with optimized data mapping
-    return this.processJoinedMessages(Array.from(conversationMap.values()));
+    return await this.processJoinedMessages(Array.from(conversationMap.values()));
   }
 
-  private processJoinedMessages(data: any[]): MessageWithDetails[] {
+  private async processJoinedMessages(data: any[]): Promise<MessageWithDetails[]> {
     // Import decryption utility
-    const { decryptMessage, isEncrypted } = require('./encryption');
+    const { decryptMessage, isEncrypted } = await import('./encryption');
     
     return data.map(msg => {
       // Decrypt the message content if it's encrypted and not null
