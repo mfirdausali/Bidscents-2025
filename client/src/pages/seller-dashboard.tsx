@@ -145,8 +145,8 @@ const auctionSchema = z.object({
   buyNowPrice: z.number().optional(),
   bidIncrement: z
     .number()
-    .min(1, { message: "Bid increment must be at least 1" })
-    .default(5),
+    .min(0.10, { message: "Bid increment must be at least RM0.10" })
+    .default(0.10),
   auctionEndDate: z
     .date()
     .min(new Date(), { message: "End date must be in the future" }),
@@ -319,7 +319,7 @@ export default function SellerDashboard() {
       startingPrice: 0,
       reservePrice: undefined,
       buyNowPrice: undefined,
-      bidIncrement: 5,
+      bidIncrement: 0.10,
       auctionEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
       imageUrl: "",
       stockQuantity: 1,
@@ -662,7 +662,7 @@ export default function SellerDashboard() {
           startingPrice: product.auction.startingPrice || product.price,
           reservePrice: product.auction.reservePrice || 0,
           buyNowPrice: product.auction.buyNowPrice || 0,
-          bidIncrement: product.auction.bidIncrement || 5,
+          bidIncrement: product.auction.bidIncrement || 0.10,
           auctionEndDate: endsAtDate,
           imageUrl: product.imageUrl || "",
           stockQuantity: product.stockQuantity,
@@ -704,7 +704,7 @@ export default function SellerDashboard() {
                   startingPrice: auctionData.startingPrice || product.price,
                   reservePrice: auctionData.reservePrice || 0,
                   buyNowPrice: auctionData.buyNowPrice || 0,
-                  bidIncrement: auctionData.bidIncrement || 5,
+                  bidIncrement: auctionData.bidIncrement || 0.10,
                   auctionEndDate: endsAtDate,
                   imageUrl: product.imageUrl || "",
                   stockQuantity: product.stockQuantity,
@@ -733,7 +733,7 @@ export default function SellerDashboard() {
                 startingPrice: product.price,
                 reservePrice: 0,
                 buyNowPrice: 0,
-                bidIncrement: 5,
+                bidIncrement: 0.10,
                 auctionEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
                 imageUrl: product.imageUrl || "",
                 stockQuantity: product.stockQuantity,
@@ -2511,9 +2511,9 @@ export default function SellerDashboard() {
                         <FormControl>
                           <Input
                             type="number"
-                            min="1"
-                            step="1"
-                            placeholder="5"
+                            min="0.10"
+                            step="0.10"
+                            placeholder="0.10"
                             {...field}
                             onChange={(e) =>
                               field.onChange(parseFloat(e.target.value))

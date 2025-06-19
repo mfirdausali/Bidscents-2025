@@ -145,7 +145,7 @@ export const auctions = pgTable("auctions", {
   buyNowPrice: doublePrecision("buy_now_price"),
   currentBid: doublePrecision("current_bid"),
   currentBidderId: integer("current_bidder_id").references(() => users.id),
-  bidIncrement: doublePrecision("bid_increment").notNull().default(5.0),
+  bidIncrement: doublePrecision("bid_increment").notNull().default(0.10),
   startsAt: timestamp("starts_at").defaultNow().notNull(),
   endsAt: timestamp("ends_at").notNull(),
   status: text("status").notNull().default("active"),
