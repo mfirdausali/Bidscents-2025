@@ -13,6 +13,7 @@ import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { useAuth } from "@/hooks/use-supabase-auth";
 import { formatDateTime } from "@/lib/date-utils";
+import { formatCurrency } from "@/lib/utils";
 
 interface Bid {
   id: number;
@@ -295,11 +296,6 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     return () => clearInterval(interval);
   }, [auctionData?.endsAt]);
   
-  // Format currency (memoized)
-  const formatCurrency = useCallback((amount: number | null | undefined) => {
-    if (amount === null || amount === undefined) return 'N/A';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'MYR' }).format(amount).replace('MYR', 'RM');
-  }, []);
   
   // Handle bid submission
   const handleBidSubmit = (e: React.FormEvent) => {
