@@ -581,10 +581,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Found auction ${auctionId} for product ${auction.productId}`);
               
               // Check if auction is active
-              const now = new Date();
+              const currentTime = new Date();
               const endsAt = new Date(auction.endsAt);
-              if (now > endsAt) {
-                console.log(`Bid rejected: Auction ${auctionId} has ended at ${endsAt}, current time is ${now}`);
+              if (currentTime > endsAt) {
+                console.log(`Bid rejected: Auction ${auctionId} has ended at ${endsAt}, current time is ${currentTime}`);
                 ws.send(JSON.stringify({ 
                   type: 'error', 
                   message: 'Auction has ended' 
@@ -3536,7 +3536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WebSocket server already initialized earlier
   
   // Map of connected users: userId -> WebSocket connection
-  const connectedUsers = new Map<number, WebSocket>();
+  // Using the connectedUsers Map declared earlier at line 102
   
   // Helper function to send notification to a specific user
   function notifyUser(userId: number, data: any) {
@@ -3556,7 +3556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
   
   // Map of auction rooms: auctionId -> Set of WebSocket connections
-  const auctionRooms = new Map<number, Set<WebSocket>>();
+  // Using the auctionRooms Map declared earlier at line 99
   
   // Start the auction expiry check process - initial call
   // Commented out to reduce log noise
