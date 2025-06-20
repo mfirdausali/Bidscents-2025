@@ -668,7 +668,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                 <span className="text-gray-600">Bid Increment:</span>
                 <span>{formatCurrency(auctionData.bidIncrement)}</span>
               </div>
-              {auctionData.buyNowPrice && (
+              {!!auctionData.buyNowPrice && (
                 <div className="flex justify-between mb-2">
                   <span className="text-gray-600">Buy Now Price:</span>
                   <span className="font-bold">{formatCurrency(auctionData.buyNowPrice)}</span>
@@ -699,7 +699,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                       </Button>
                     </form>
                     
-                    {auctionData.buyNowPrice && (
+                    {!!auctionData.buyNowPrice && (
                       <Button 
                         onClick={handleBuyNow} 
                         variant="outline" 
