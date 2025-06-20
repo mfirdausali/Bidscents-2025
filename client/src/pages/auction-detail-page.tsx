@@ -12,6 +12,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
 import { useAuth } from "@/hooks/use-supabase-auth";
+import { formatDateTime } from "@/lib/date-utils";
 
 interface Bid {
   id: number;
@@ -815,7 +816,7 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
                             <div className="text-right">
                               <div className="font-semibold">{formatCurrency(bid.amount)}</div>
                               <div className="text-sm text-gray-500">
-                                {new Date(bid.placedAt).toLocaleString()}
+                                {formatDateTime(bid.placedAt)}
                               </div>
                             </div>
                           </div>

@@ -25,6 +25,7 @@ import {
   XCircle, Tag, CircleAlert
 } from "lucide-react";
 import { ListingsTab } from "./admin-dashboard-listings";
+import { formatDate } from "@/lib/date-utils";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -352,7 +353,7 @@ export default function AdminDashboard() {
                           <TableCell>#{order.id}</TableCell>
                           <TableCell>{order.userId}</TableCell>
                           <TableCell>${order.total.toFixed(2)}</TableCell>
-                          <TableCell>{new Date(order.createdAt!).toLocaleDateString()}</TableCell>
+                          <TableCell>{formatDate(order.createdAt!)}</TableCell>
                           <TableCell>
                             {order.status === "pending" && (
                               <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">Pending</span>

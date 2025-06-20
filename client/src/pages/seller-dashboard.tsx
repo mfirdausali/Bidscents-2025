@@ -7,6 +7,7 @@ import {
   Category,
   InsertAuction,
 } from "@shared/schema";
+import { formatDate, formatTime, formatDateTimeNice } from "@/lib/date-utils";
 // Removed legacy boost option selector import
 import { Header } from "@/components/ui/header";
 import { Footer } from "@/components/ui/footer";
@@ -2038,15 +2039,7 @@ export default function SellerDashboard() {
                                   </TableCell>
                                   <TableCell>
                                     {featuredUntilDate
-                                      ? featuredUntilDate.toLocaleDateString() +
-                                        " " +
-                                        featuredUntilDate.toLocaleTimeString(
-                                          [],
-                                          {
-                                            hour: "2-digit",
-                                            minute: "2-digit",
-                                          },
-                                        )
+                                      ? formatDateTimeNice(featuredUntilDate)
                                       : "N/A"}
                                   </TableCell>
                                   <TableCell>
