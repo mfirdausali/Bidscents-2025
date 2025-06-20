@@ -1658,13 +1658,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized: You can only create auctions for your own products" });
       }
       
-      console.log("Validated auction data:", req.body);
-      console.log("End date format:", req.body.endsAt);
+      console.log("[AUCTION-CREATE] ===== Creating New Auction =====");
+      console.log("[AUCTION-CREATE] Server timezone offset:", new Date().getTimezoneOffset(), "minutes");
+      console.log("[AUCTION-CREATE] Server local time:", new Date().toString());
+      console.log("[AUCTION-CREATE] Server UTC time:", new Date().toISOString());
+      console.log("[AUCTION-CREATE] Received auction data:", req.body);
+      console.log("[AUCTION-CREATE] End date received:", req.body.endsAt);
+      
+      // Parse and analyze the end date
+      const receivedEndDate = new Date(req.body.endsAt);
+      const msUntilEnd = receivedEndDate.getTime() - new Date().getTime();
+      const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
+      
+      console.log("[AUCTION-CREATE] End date analysis:");
+      console.log("  - Parsed end date (UTC):", receivedEndDate.toISOString());
+      console.log("  - Parsed end date (local):", receivedEndDate.toString());
+      console.log("  - MS until auction ends:", msUntilEnd);
+      console.log("  - Hours until auction ends:", hoursUntilEnd.toFixed(2));
       
       // Set starts_at to current date if not specified
       if (!req.body.startsAt) {
         req.body.startsAt = new Date().toISOString();
-        console.log("Setting starts_at to current time:", req.body.startsAt);
+        console.log("[AUCTION-CREATE] Setting starts_at to current time:", req.body.startsAt);
       }
       
       // Parse the auction data
@@ -3351,10 +3366,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Function to check for expired auctions and handle them
   async function checkAndProcessExpiredAuctions() {
     const timestamp = new Date().toISOString();
-    // console.log(`[${timestamp}] Checking for expired auctions...`);
+    console.log(`[AUCTION-CHECK] ===== Starting Auction Expiry Check at ${timestamp} =====`);
+    
+    // Log server environment details
+    console.log(`[AUCTION-CHECK] Server timezone offset: ${new Date().getTimezoneOffset()} minutes`);
+    console.log(`[AUCTION-CHECK] Server local time: ${new Date().toString()}`);
+    console.log(`[AUCTION-CHECK] Server UTC time: ${new Date().toISOString()}`);
+    console.log(`[AUCTION-CHECK] Process TZ env: ${process.env.TZ || 'not set'}`);
+    
     try {
       // Get only active auctions - more efficient
       const auctions = await storage.getActiveAuctions();
+      console.log(`[AUCTION-CHECK] Found ${auctions.length} active auctions to check`);
       
       // IMPORTANT: Timezone handling approach
       // - All dates are stored in UTC in the database (as ISO strings)
@@ -3363,15 +3386,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // - This ensures consistency across different user timezones
       const now = new Date();
       
-      // console.log(`Current server time (UTC): ${now.toISOString()}`);
-      
       // Filter for active auctions that have passed their end time
       const expiredAuctions = auctions.filter(auction => {
         const auctionEndDate = new Date(auction.endsAt);
-        // Compare the dates directly - both should be in UTC
-        const isExpired = auctionEndDate.getTime() < now.getTime();
+        const msUntilEnd = auctionEndDate.getTime() - now.getTime();
+        const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
+        const isExpired = msUntilEnd < 0;
         
-        console.log(`Auction #${auction.id}: endsAt=${auctionEndDate.toISOString()}, current=${now.toISOString()}, expired=${isExpired}`);
+        console.log(`[AUCTION-CHECK] Auction #${auction.id}:`);
+        console.log(`  - endsAt (stored): ${auction.endsAt}`);
+        console.log(`  - endsAt (parsed): ${auctionEndDate.toISOString()}`);
+        console.log(`  - endsAt (local): ${auctionEndDate.toString()}`);
+        console.log(`  - current time (UTC): ${now.toISOString()}`);
+        console.log(`  - current time (local): ${now.toString()}`);
+        console.log(`  - ms until end: ${msUntilEnd}`);
+        console.log(`  - hours until end: ${hoursUntilEnd.toFixed(2)}`);
+        console.log(`  - is expired: ${isExpired}`);
         
         return isExpired;
       });

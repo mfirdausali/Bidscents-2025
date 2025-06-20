@@ -1229,7 +1229,7 @@ export class SupabaseStorage implements IStorage {
   }
   
   async getActiveAuctions(): Promise<Auction[]> {
-    console.log('Getting active auctions from Supabase');
+    console.log('[AUCTION-DB] Getting active auctions from Supabase');
     const { data, error } = await supabase
       .from('auctions')
       .select('*')
@@ -1238,6 +1238,16 @@ export class SupabaseStorage implements IStorage {
     if (error) {
       console.error('Error getting active auctions:', error);
       return [];
+    }
+    
+    console.log(`[AUCTION-DB] Found ${data?.length || 0} active auctions`);
+    if (data && data.length > 0) {
+      console.log('[AUCTION-DB] Sample auction data:', {
+        id: data[0].id,
+        ends_at_raw: data[0].ends_at,
+        ends_at_parsed: new Date(data[0].ends_at).toISOString(),
+        ends_at_local: new Date(data[0].ends_at).toString()
+      });
     }
     
     // Map snake_case to camelCase
@@ -1329,7 +1339,21 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createAuction(auction: InsertAuction): Promise<Auction> {
-    console.log(`Creating auction with data: ${JSON.stringify(auction)}`);
+    console.log(`[AUCTION-DB] ===== Creating Auction in Database =====`);
+    console.log(`[AUCTION-DB] Input data: ${JSON.stringify(auction)}`);
+    
+    // Analyze the end time
+    const endDate = new Date(auction.endsAt);
+    const now = new Date();
+    const msUntilEnd = endDate.getTime() - now.getTime();
+    const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
+    
+    console.log(`[AUCTION-DB] End time analysis:`);
+    console.log(`  - endsAt received: ${auction.endsAt}`);
+    console.log(`  - endsAt parsed (UTC): ${endDate.toISOString()}`);
+    console.log(`  - endsAt parsed (local): ${endDate.toString()}`);
+    console.log(`  - current time (UTC): ${now.toISOString()}`);
+    console.log(`  - hours until end: ${hoursUntilEnd.toFixed(2)}`);
     
     // Convert camelCase to snake_case for DB
     const dbAuction = {
@@ -1346,7 +1370,7 @@ export class SupabaseStorage implements IStorage {
       status: auction.status || 'active',
     };
     
-    console.log(`Prepared DB auction data: ${JSON.stringify(dbAuction)}`);
+    console.log(`[AUCTION-DB] Data being sent to Supabase: ${JSON.stringify(dbAuction)}`);
     const { data, error } = await supabase
       .from('auctions')
       .insert([dbAuction])
@@ -1375,7 +1399,9 @@ export class SupabaseStorage implements IStorage {
       updatedAt: data.updated_at,
     };
     
-    console.log(`Successfully created auction: ${JSON.stringify(mappedAuction)}`);
+    console.log(`[AUCTION-DB] Raw data from Supabase after insert:`, data);
+    console.log(`[AUCTION-DB] Stored ends_at:`, data.ends_at);
+    console.log(`[AUCTION-DB] Successfully created auction: ${JSON.stringify(mappedAuction)}`);
     return mappedAuction as Auction;
   }
 

@@ -1037,6 +1037,20 @@ export default function SellerDashboard() {
         ? data.auctionEndDate
         : new Date(data.auctionEndDate);
 
+    // DEBUG: Log timezone information
+    console.log("[AUCTION-CLIENT] ===== Creating Auction (Client Side) =====");
+    console.log("[AUCTION-CLIENT] Browser timezone offset:", new Date().getTimezoneOffset(), "minutes");
+    console.log("[AUCTION-CLIENT] Browser timezone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
+    console.log("[AUCTION-CLIENT] Current browser time (local):", new Date().toString());
+    console.log("[AUCTION-CLIENT] Current browser time (UTC):", new Date().toISOString());
+    console.log("[AUCTION-CLIENT] Selected end date (local):", endDate.toString());
+    console.log("[AUCTION-CLIENT] Selected end date (UTC):", endDate.toISOString());
+    
+    const msUntilEnd = endDate.getTime() - new Date().getTime();
+    const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
+    console.log("[AUCTION-CLIENT] MS until auction ends:", msUntilEnd);
+    console.log("[AUCTION-CLIENT] Hours until auction ends:", hoursUntilEnd.toFixed(2));
+
     // Generate ISO string with timezone information
     const endsAtWithTz = endDate.toISOString();
 
