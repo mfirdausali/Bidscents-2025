@@ -700,7 +700,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.log(`Successfully created bid with ID ${bid.id}`);
                 
                 // Step 4: Check if bid is in last 5 minutes and extend auction
-                const timeUntilEnd = endsAt.getTime() - now.getTime();
+                const timeUntilEnd = endsAt.getTime() - now;
                 const EXTENSION_THRESHOLD = 5 * 60 * 1000; // 5 minutes
                 const EXTENSION_TIME = 5 * 60 * 1000; // Extend by 5 minutes
                 
