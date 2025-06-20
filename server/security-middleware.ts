@@ -46,7 +46,7 @@ export function configureSecurityMiddleware(app: Application) {
   app.use(cors(corsOptions));
   
   // Configure Helmet for security headers
-  app.use(helmet({
+  const helmetOptions: any = {
     // Content Security Policy
     contentSecurityPolicy: {
       directives: {
@@ -95,7 +95,6 @@ export function configureSecurityMiddleware(app: Application) {
         formAction: ["'self'"],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
-        upgradeInsecureRequests: process.env.NODE_ENV === 'production',
       },
     },
     
@@ -119,7 +118,14 @@ export function configureSecurityMiddleware(app: Application) {
     permittedCrossDomainPolicies: false,
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     xssFilter: true,
-  }));
+  };
+
+  // Add upgradeInsecureRequests only in production to avoid CSP directive value errors
+  if (process.env.NODE_ENV === 'production') {
+    helmetOptions.contentSecurityPolicy.directives.upgradeInsecureRequests = [];
+  }
+
+  app.use(helmet(helmetOptions));
   
   // Additional security headers not covered by Helmet
   app.use((req, res, next) => {
