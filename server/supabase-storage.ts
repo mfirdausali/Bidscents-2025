@@ -1549,6 +1549,33 @@ export class SupabaseStorage implements IStorage {
     console.log(`Successfully updated previous bids for auction ${auctionId}`);
   }
   
+  async createBidAuditEntry(entry: {
+    auctionId: number;
+    userId: number;
+    attemptedAmount: number;
+    status: string;
+    reason?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    const { error } = await supabase
+      .from('bid_audit_trail')
+      .insert({
+        auction_id: entry.auctionId,
+        user_id: entry.userId,
+        attempted_amount: entry.attemptedAmount,
+        status: entry.status,
+        reason: entry.reason,
+        ip_address: entry.ipAddress,
+        user_agent: entry.userAgent
+      });
+    
+    if (error) {
+      console.error('Error creating bid audit entry:', error);
+      // Don't throw - audit logging should not break the bid flow
+    }
+  }
+  
   // Message methods
   async getUserMessages(userId: number): Promise<MessageWithDetails[]> {
     // Get only the latest message per conversation to minimize data transfer

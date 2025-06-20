@@ -90,8 +90,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Connected clients map with user information
   const clients = new Map<WebSocket, { userId: number; username: string }>();
   
+  // Rate limiting for bid submissions
+  const bidRateLimiter = new Map<number, { count: number; resetTime: number }>();
+  const BID_RATE_LIMIT = 5; // Maximum bids per window
+  const BID_RATE_WINDOW = 60000; // 1 minute window
+  
+  // Auction rooms for real-time updates
+  const auctionRooms = new Map<number, Set<WebSocket>>();
+  
+  // Connected users for notifications
+  const connectedUsers = new Map<number, WebSocket>();
+  
+  // Extend WebSocket type to include joinedAuctions
+  interface ExtendedWebSocket extends WebSocket {
+    joinedAuctions?: Set<number>;
+  }
+  
   // WebSocket connection handler
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws: ExtendedWebSocket) => {
     console.log('WebSocket client connected');
     
     // Handle messages from client
@@ -117,6 +133,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       userId: decoded.userId, 
                       username: user.username
                     });
+                    
+                    // Add to connectedUsers map for notifications
+                    connectedUsers.set(decoded.userId, ws);
+                    
                     console.log(`User authenticated via JWT: ${user.username} (ID: ${decoded.userId})`);
                     ws.send(JSON.stringify({ 
                       type: 'auth_success',
@@ -333,6 +353,492 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             break;
+            
+          case 'joinAuction':
+            try {
+              // Validate auction ID
+              const auctionId = parseInt(data.auctionId);
+              if (isNaN(auctionId)) {
+                ws.send(JSON.stringify({ type: 'error', message: 'Invalid auction ID' }));
+                return;
+              }
+              
+              // Get the auction room, create if it doesn't exist
+              let room = auctionRooms.get(auctionId);
+              if (!room) {
+                room = new Set<WebSocket>();
+                auctionRooms.set(auctionId, room);
+              }
+              
+              // Add this connection to the room
+              room.add(ws);
+              
+              // Track which auctions this connection has joined
+              if (!ws.joinedAuctions) {
+                ws.joinedAuctions = new Set<number>();
+              }
+              ws.joinedAuctions.add(auctionId);
+              
+              // Get user info for logging
+              const userInfo = clients.get(ws);
+              const userId = userInfo?.userId || 'guest';
+              
+              console.log(`User ${userId} joined auction room ${auctionId}`);
+              ws.send(JSON.stringify({ 
+                type: 'joinedAuction', 
+                auctionId, 
+                message: `Joined auction room ${auctionId}` 
+              }));
+              
+              // Notify about active viewers
+              const viewerCount = room.size;
+              Array.from(room).forEach(connection => {
+                if (connection.readyState === WebSocket.OPEN) {
+                  connection.send(JSON.stringify({
+                    type: 'auctionViewers',
+                    auctionId,
+                    count: viewerCount
+                  }));
+                }
+              });
+              
+            } catch (error: any) {
+              console.error('Error joining auction room:', error);
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: 'Failed to join auction room: ' + (error.message || 'Unknown error')
+              }));
+            }
+            break;
+            
+          case 'leaveAuction':
+            try {
+              const auctionId = parseInt(data.auctionId);
+              if (isNaN(auctionId)) {
+                ws.send(JSON.stringify({ type: 'error', message: 'Invalid auction ID' }));
+                return;
+              }
+              
+              // Remove connection from the room
+              const room = auctionRooms.get(auctionId);
+              if (room) {
+                room.delete(ws);
+                
+                // Remove from tracked auctions
+                if (ws.joinedAuctions) {
+                  ws.joinedAuctions.delete(auctionId);
+                }
+                
+                // If room is empty, delete it
+                if (room.size === 0) {
+                  auctionRooms.delete(auctionId);
+                } else {
+                  // Notify remaining users about viewer count
+                  Array.from(room).forEach(connection => {
+                    if (connection.readyState === WebSocket.OPEN) {
+                      connection.send(JSON.stringify({
+                        type: 'auctionViewers',
+                        auctionId,
+                        count: room.size
+                      }));
+                    }
+                  });
+                }
+                
+                const userInfo = clients.get(ws);
+                const userId = userInfo?.userId || 'guest';
+                console.log(`User ${userId} left auction room ${auctionId}`);
+                ws.send(JSON.stringify({ 
+                  type: 'leftAuction', 
+                  auctionId,
+                  message: `Left auction room ${auctionId}` 
+                }));
+              }
+              
+            } catch (error: any) {
+              console.error('Error leaving auction room:', error);
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: 'Failed to leave auction room: ' + (error.message || 'Unknown error')
+              }));
+            }
+            break;
+            
+          case 'placeBid':
+            try {
+              // Get authenticated user from WebSocket client
+              const bidderInfo = clients.get(ws);
+              let userId = bidderInfo?.userId;
+              
+              // For placing bids, we need to verify the user is actually logged in
+              if (!userId) {
+                console.log('Bid attempt rejected: WebSocket not authenticated');
+                
+                // Try to get the user ID from the message data
+                if (data.userId) {
+                  // Check if this user exists in our database
+                  try {
+                    console.log(`Verifying user ${data.userId} for bid...`);
+                    const user = await storage.getUser(data.userId);
+                    
+                    if (user) {
+                      console.log(`User ${data.userId} verified for bid through lookup`);
+                      // Use the verified user ID
+                      userId = data.userId;
+                    } else {
+                      console.log(`User ${data.userId} not found in database`);
+                      ws.send(JSON.stringify({ 
+                        type: 'error', 
+                        message: 'You must be logged in to place a bid' 
+                      }));
+                      // Log failed attempt
+                      await storage.createBidAuditEntry({
+                        auctionId: parseInt(data.auctionId),
+                        userId: data.userId || 0,
+                        attemptedAmount: parseFloat(data.amount) || 0,
+                        status: 'failed',
+                        reason: 'User not authenticated'
+                      });
+                      return;
+                    }
+                  } catch (err) {
+                    console.error(`Error verifying user ${data.userId}:`, err);
+                    ws.send(JSON.stringify({ 
+                      type: 'error', 
+                      message: 'Authentication error. Please try logging in again.' 
+                    }));
+                    return;
+                  }
+                } else {
+                  console.log('Bid attempt rejected: No user ID provided');
+                  ws.send(JSON.stringify({ 
+                    type: 'error', 
+                    message: 'You must be logged in to place a bid' 
+                  }));
+                  return;
+                }
+              }
+              
+              console.log(`Processing bid from user ${userId}...`);
+              const { auctionId, amount } = data;
+              
+              // Check rate limit for this user
+              const now = Date.now();
+              const userRateLimit = bidRateLimiter.get(userId);
+              
+              if (userRateLimit) {
+                // Check if rate limit window has expired
+                if (now > userRateLimit.resetTime) {
+                  // Reset the rate limit
+                  bidRateLimiter.set(userId, { count: 1, resetTime: now + BID_RATE_WINDOW });
+                } else if (userRateLimit.count >= BID_RATE_LIMIT) {
+                  // User has exceeded rate limit
+                  const timeRemaining = Math.ceil((userRateLimit.resetTime - now) / 1000);
+                  console.log(`Rate limit exceeded for user ${userId}. ${timeRemaining}s remaining.`);
+                  ws.send(JSON.stringify({ 
+                    type: 'error', 
+                    message: `Too many bid attempts. Please wait ${timeRemaining} seconds before trying again.` 
+                  }));
+                  // Log rate limited attempt
+                  await storage.createBidAuditEntry({
+                    auctionId: parseInt(auctionId),
+                    userId: userId,
+                    attemptedAmount: parseFloat(amount),
+                    status: 'rate_limited',
+                    reason: `Rate limit exceeded. ${BID_RATE_LIMIT} bids per ${BID_RATE_WINDOW/1000}s`
+                  });
+                  return;
+                } else {
+                  // Increment bid count
+                  userRateLimit.count++;
+                }
+              } else {
+                // First bid from this user
+                bidRateLimiter.set(userId, { count: 1, resetTime: now + BID_RATE_WINDOW });
+              }
+              
+              // Validate auction ID and bid amount
+              if (isNaN(parseInt(auctionId)) || isNaN(parseFloat(amount))) {
+                console.log(`Bid validation failed: Invalid auction ID ${auctionId} or amount ${amount}`);
+                ws.send(JSON.stringify({ 
+                  type: 'error', 
+                  message: 'Invalid auction ID or bid amount' 
+                }));
+                return;
+              }
+              
+              console.log(`Fetching auction ${auctionId} for bid validation...`);
+              // Get the auction
+              const auction = await storage.getAuctionById(parseInt(auctionId));
+              if (!auction) {
+                console.log(`Bid rejected: Auction ${auctionId} not found`);
+                ws.send(JSON.stringify({ 
+                  type: 'error', 
+                  message: 'Auction not found' 
+                }));
+                return;
+              }
+              console.log(`Found auction ${auctionId} for product ${auction.productId}`);
+              
+              // Check if auction is active
+              const now = new Date();
+              const endsAt = new Date(auction.endsAt);
+              if (now > endsAt) {
+                console.log(`Bid rejected: Auction ${auctionId} has ended at ${endsAt}, current time is ${now}`);
+                ws.send(JSON.stringify({ 
+                  type: 'error', 
+                  message: 'Auction has ended' 
+                }));
+                // Log auction ended attempt
+                await storage.createBidAuditEntry({
+                  auctionId: parseInt(auctionId),
+                  userId: userId,
+                  attemptedAmount: parseFloat(amount),
+                  status: 'auction_ended',
+                  reason: `Auction ended at ${endsAt.toISOString()}`
+                });
+                return;
+              }
+              
+              // Check if the bid is high enough
+              const minBid = (auction.currentBid || auction.startingPrice) + auction.bidIncrement;
+              if (parseFloat(amount) < minBid) {
+                console.log(`Bid rejected: Amount ${amount} is less than minimum bid ${minBid}`);
+                ws.send(JSON.stringify({ 
+                  type: 'error', 
+                  message: `Bid must be at least ${minBid}` 
+                }));
+                // Log invalid amount attempt
+                await storage.createBidAuditEntry({
+                  auctionId: parseInt(auctionId),
+                  userId: userId,
+                  attemptedAmount: parseFloat(amount),
+                  status: 'invalid_amount',
+                  reason: `Bid ${amount} below minimum ${minBid}`
+                });
+                return;
+              }
+              
+              // Anti-fraud validation
+              const bidAmount = parseFloat(amount);
+              
+              // Check for suspiciously high bids (more than 10x current bid)
+              if (auction.currentBid && bidAmount > auction.currentBid * 10) {
+                console.log(`Suspicious bid detected: ${bidAmount} is more than 10x current bid ${auction.currentBid}`);
+                ws.send(JSON.stringify({ 
+                  type: 'error', 
+                  message: 'Your bid appears unusually high. Please confirm the amount and try again.' 
+                }));
+                // Log suspicious bid
+                await storage.createBidAuditEntry({
+                  auctionId: parseInt(auctionId),
+                  userId: userId,
+                  attemptedAmount: bidAmount,
+                  status: 'suspicious_amount',
+                  reason: `Bid ${bidAmount} is ${(bidAmount/auction.currentBid).toFixed(1)}x current bid`
+                });
+                return;
+              }
+              
+              // Check for rapid successive bids from same user (potential bot)
+              const recentBids = await storage.getBidsForAuction(parseInt(auctionId));
+              const userRecentBids = recentBids
+                .filter(b => b.bidderId === userId)
+                .filter(b => new Date(b.placedAt).getTime() > Date.now() - 60000); // Last minute
+              
+              if (userRecentBids.length >= 3) {
+                console.log(`Rapid bidding detected: User ${userId} has placed ${userRecentBids.length} bids in last minute`);
+                ws.send(JSON.stringify({ 
+                  type: 'error', 
+                  message: 'Too many rapid bids. Please wait a moment before bidding again.' 
+                }));
+                // Log rapid bidding
+                await storage.createBidAuditEntry({
+                  auctionId: parseInt(auctionId),
+                  userId: userId,
+                  attemptedAmount: bidAmount,
+                  status: 'rapid_bidding',
+                  reason: `${userRecentBids.length} bids in last 60 seconds`
+                });
+                return;
+              }
+              
+              console.log(`Bid validation successful. Processing bid of ${amount} on auction ${auctionId} by user ${userId}...`);
+              
+              // Step 2: Set any previous winning bids to not winning
+              try {
+                console.log(`Resetting previous winning bids for auction ${auctionId}...`);
+                // This needs to be a direct database call since our storage interface doesn't have this method
+                const { error: updateError } = await supabase
+                  .from('bids')
+                  .update({ is_winning: false })
+                  .eq('auction_id', auctionId)
+                  .eq('is_winning', true);
+                  
+                if (updateError) {
+                  console.error('Error updating previous bids:', updateError);
+                  // Continue with new bid placement anyway
+                } else {
+                  console.log(`Successfully reset previous winning bids for auction ${auctionId}`);
+                }
+              } catch (err) {
+                console.error('Exception updating previous bids:', err);
+                // Continue with new bid placement anyway
+              }
+              
+              // Step 3: Create the bid in the database
+              console.log(`Creating new bid record for auction ${auctionId} by user ${userId} with amount ${amount}...`);
+              
+              try {
+                // Create the new bid
+                const bid = await storage.createBid({
+                  auctionId: parseInt(auctionId),
+                  bidderId: userId,
+                  amount: parseFloat(amount),
+                  isWinning: true // This new bid becomes the winning bid
+                });
+                console.log(`Successfully created bid with ID ${bid.id}`);
+                
+                // Step 4: Check if bid is in last 5 minutes and extend auction
+                const timeUntilEnd = endsAt.getTime() - now.getTime();
+                const EXTENSION_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+                const EXTENSION_TIME = 5 * 60 * 1000; // Extend by 5 minutes
+                
+                let auctionExtended = false;
+                let newEndsAt = auction.endsAt;
+                
+                if (timeUntilEnd < EXTENSION_THRESHOLD && timeUntilEnd > 0) {
+                  // Bid placed in last 5 minutes, extend auction
+                  newEndsAt = new Date(endsAt.getTime() + EXTENSION_TIME).toISOString();
+                  auctionExtended = true;
+                  console.log(`Extending auction ${auctionId} by 5 minutes due to last-minute bid`);
+                }
+                
+                // Step 5: Update the auction's current bid and bidder
+                console.log(`Updating auction ${auctionId} with new current bid ${amount} and bidder ${userId}...`);
+                const updateData: any = {
+                  currentBid: parseFloat(amount),
+                  currentBidderId: userId
+                };
+                
+                if (auctionExtended) {
+                  updateData.endsAt = newEndsAt;
+                }
+                
+                await storage.updateAuction(parseInt(auctionId), updateData);
+                console.log(`Successfully updated auction ${auctionId}`);
+                
+                // Store the previous highest bidder for outbid notification
+                const previousHighestBidderId = auction.currentBidderId;
+                
+                // Get bidder information
+                console.log(`Fetching bidder details for user ${userId}...`);
+                const bidder = await storage.getUser(userId);
+                console.log(`Bidder details: ${bidder ? 'Found' : 'Not found'}`);
+                
+                // Add bidder name to bid
+                const bidWithDetails = {
+                  ...bid,
+                  bidder: bidder?.username || `User #${userId}`
+                };
+                console.log(`Enhanced bid with bidder name: ${bidWithDetails.bidder}`);
+                
+                // Step 5: Notify all users in the auction room
+                console.log(`Preparing to notify all users in auction room ${auctionId} about the new bid...`);
+                const room = auctionRooms.get(parseInt(auctionId));
+                
+                if (room) {
+                  // Get updated auction data to include in the notification
+                  console.log(`Fetching updated auction data for notification...`);
+                  const updatedAuction = await storage.getAuctionById(parseInt(auctionId));
+                  
+                  if (!updatedAuction) {
+                    console.error(`Could not fetch updated auction data for ID ${auctionId}`);
+                    // Continue with notification using just the bid information
+                  } else {
+                    console.log(`Updated auction data retrieved. Current bid: ${updatedAuction.currentBid}, current bidder: ${updatedAuction.currentBidderId}`);
+                  }
+                  
+                  console.log(`Broadcasting bid update to ${room.size} connected clients in room...`);
+                  let notifiedCount = 0;
+                  
+                  Array.from(room).forEach(connection => {
+                    if (connection.readyState === WebSocket.OPEN) {
+                      // Create the message payload
+                      const payload: any = {
+                        type: 'newBid',
+                        auctionId: parseInt(auctionId),
+                        bid: bidWithDetails,
+                        auctionExtended: auctionExtended
+                      };
+                      
+                      // Only include auction data if we successfully retrieved it
+                      if (updatedAuction) {
+                        payload.auction = updatedAuction;
+                      }
+                      
+                      // Add extension notification if auction was extended
+                      if (auctionExtended) {
+                        payload.extensionMessage = 'Auction extended by 5 minutes due to last-minute bid!';
+                        payload.newEndsAt = newEndsAt;
+                      }
+                      
+                      connection.send(JSON.stringify(payload));
+                      notifiedCount++;
+                    }
+                  });
+                  
+                  console.log(`Successfully notified ${notifiedCount} clients about the new bid`);
+                } else {
+                  console.log(`No auction room found for auctionId ${auctionId}, skipping notification`);
+                }
+                
+                // Send success response to the bidder
+                console.log(`Sending bid acceptance confirmation to bidder...`);
+                ws.send(JSON.stringify({
+                  type: 'bidAccepted',
+                  bid: bidWithDetails,
+                  message: `Your bid of $${parseFloat(amount).toFixed(2)} was accepted`
+                }));
+                
+                console.log(`✅ Successfully completed bid process: User ${userId} placed bid of ${amount} on auction ${auctionId}`);
+                
+                // Log successful bid
+                await storage.createBidAuditEntry({
+                  auctionId: parseInt(auctionId),
+                  userId: userId,
+                  attemptedAmount: parseFloat(amount),
+                  status: 'success',
+                  reason: auctionExtended ? 'Bid placed, auction extended' : 'Bid placed successfully'
+                });
+                
+                // Send outbid notification to previous highest bidder
+                if (previousHighestBidderId && previousHighestBidderId !== userId) {
+                  const outbidConnection = connectedUsers.get(previousHighestBidderId);
+                  if (outbidConnection && outbidConnection.readyState === WebSocket.OPEN) {
+                    console.log(`Sending outbid notification to user ${previousHighestBidderId}`);
+                    outbidConnection.send(JSON.stringify({
+                      type: 'outbid',
+                      auctionId: parseInt(auctionId),
+                      newBid: bidWithDetails,
+                      message: `You've been outbid on an auction! New bid: RM${parseFloat(amount).toFixed(2)}`
+                    }));
+                  }
+                }
+              } catch (err) {
+                console.error(`Error in bid creation process:`, err);
+                throw err;
+              }
+              return;
+            } catch (error: any) {
+              console.error('Error placing bid:', error);
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: 'Failed to place bid: ' + (error.message || 'Unknown error')
+              }));
+              return;
+            }
+            break;
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -343,8 +849,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Handle disconnection
     ws.on('close', () => {
       console.log('WebSocket client disconnected');
+      
+      // Get user info before removing from clients map
+      const userInfo = clients.get(ws);
+      const userId = userInfo?.userId;
+      
       // Remove client from connected clients map
       clients.delete(ws);
+      
+      // Clean up user connection in connectedUsers map
+      if (userId) {
+        console.log(`User ${userId} disconnected from WebSocket`);
+        connectedUsers.delete(userId);
+      }
+      
+      // Clean up auction room memberships
+      if (ws.joinedAuctions) {
+        ws.joinedAuctions.forEach(auctionId => {
+          const room = auctionRooms.get(auctionId);
+          if (room) {
+            room.delete(ws);
+            if (room.size === 0) {
+              auctionRooms.delete(auctionId);
+            } else {
+              // Notify remaining users about viewer count
+              Array.from(room).forEach(connection => {
+                if (connection.readyState === WebSocket.OPEN) {
+                  connection.send(JSON.stringify({
+                    type: 'auctionViewers',
+                    auctionId,
+                    count: room.size
+                  }));
+                }
+              });
+            }
+          }
+        });
+      }
     });
   });
   
@@ -2814,20 +3355,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get only active auctions - more efficient
       const auctions = await storage.getActiveAuctions();
-      // Get current time and add 1 hour to match BST timezone used by the database
-      const now = new Date();
-      now.setHours(now.getHours() + 1); // Add 1 hour to match BST
       
-      // console.log(`Current server time: ${new Date().toISOString()}`);
-      // console.log(`Adjusted time for BST: ${now.toISOString()}`);
+      // IMPORTANT: Timezone handling approach
+      // - All dates are stored in UTC in the database (as ISO strings)
+      // - Server comparisons are done in UTC (no timezone adjustments)
+      // - Client displays dates in user's local timezone using toLocaleString() functions
+      // - This ensures consistency across different user timezones
+      const now = new Date();
+      
+      // console.log(`Current server time (UTC): ${now.toISOString()}`);
       
       // Filter for active auctions that have passed their end time
       const expiredAuctions = auctions.filter(auction => {
         const auctionEndDate = new Date(auction.endsAt);
-        // Compare the dates directly using the BST-adjusted current time
+        // Compare the dates directly - both should be in UTC
         const isExpired = auctionEndDate.getTime() < now.getTime();
         
-        console.log(`Auction #${auction.id}: endsAt=${auctionEndDate.toISOString()}, BST-adjusted current=${now.toISOString()}, expired=${isExpired}`);
+        console.log(`Auction #${auction.id}: endsAt=${auctionEndDate.toISOString()}, current=${now.toISOString()}, expired=${isExpired}`);
         
         return isExpired;
       });

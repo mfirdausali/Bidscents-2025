@@ -163,6 +163,19 @@ export const bids = pgTable("bids", {
   isWinning: boolean("is_winning").default(false),
 });
 
+// Bid audit trail for tracking all bid attempts
+export const bidAuditTrail = pgTable("bid_audit_trail", {
+  id: serial("id").primaryKey(),
+  auctionId: integer("auction_id").references(() => auctions.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  attemptedAmount: doublePrecision("attempted_amount").notNull(),
+  status: text("status").notNull(), // success, failed, rate_limited, invalid_amount, auction_ended, etc.
+  reason: text("reason"), // Detailed reason for failure
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Payments table for Billplz
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
@@ -376,6 +389,9 @@ export type InsertAuction = z.infer<typeof insertAuctionSchema>;
 
 export type Bid = typeof bids.$inferSelect;
 export type InsertBid = z.infer<typeof insertBidSchema>;
+
+export type BidAuditTrail = typeof bidAuditTrail.$inferSelect;
+export type InsertBidAuditTrail = typeof bidAuditTrail.$inferInsert;
 
 export type Payment = typeof payments.$inferSelect & {
   product_id?: string | number | null; // Added for compatibility with database structure
