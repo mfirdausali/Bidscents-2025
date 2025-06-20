@@ -16,23 +16,35 @@ export function configureSecurityMiddleware(app: Application) {
       const allowedOrigins = [
         process.env.APP_URL || 'http://localhost:5000',
         'https://bidscents.replit.app',
-        // Add any other allowed origins here
       ];
+
+      // Add current Replit domain dynamically
+      if (process.env.REPLIT_DOMAINS) {
+        allowedOrigins.push(`https://${process.env.REPLIT_DOMAINS}`);
+      }
       
-      // In development, allow localhost origins
-      if (process.env.NODE_ENV === 'development') {
+      // In development or non-production, allow localhost origins and be more permissive
+      if (process.env.NODE_ENV !== 'production') {
         allowedOrigins.push(
           'http://localhost:3000',
+          'http://localhost:5000',
           'http://localhost:5173',
           'http://127.0.0.1:5000',
           'http://127.0.0.1:3000',
           'http://127.0.0.1:5173'
         );
+        
+        // Allow any .replit.dev domain in development
+        if (origin && origin.includes('.replit.dev')) {
+          return callback(null, true);
+        }
       }
       
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
+        console.log(`CORS blocked origin: ${origin}`);
+        console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
