@@ -1,0 +1,1006 @@
+import type { Express, Request, Response, NextFunction } from "express";
+import { createServer, type Server } from "http";
+import { setupAuth } from "./auth";
+import { storage } from "./storage";
+import { insertProductSchema, insertReviewSchema, insertProductImageSchema } from "@shared/schema";
+import { productImages } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+import multer from "multer";
+import * as objectStorage from "./object-storage"; // Import the entire module to access all properties
+import path from "path"; // Added import for path
+import { supabase } from "./supabase"; // Import Supabase for server-side operations
+import { createClient } from '@supabase/supabase-js';
+import { users } from "@shared/schema"; // Import the users schema for database updates
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Set up authentication routes
+  setupAuth(app);
+
+  // Password reset endpoint - server-side fallback for when client-side methods fail
+  app.post("/api/update-password", async (req, res) => {
+    try {
+      console.log('SERVER API: Password reset request received');
+      
+      // Validate the request body
+      const resetSchema = z.object({
+        token: z.string().min(1, "Token is required"),
+        password: z.string().min(6, "Password must be at least 6 characters")
+      });
+      
+      const { token, password } = resetSchema.parse(req.body);
+      
+      // Log the request for debugging (not including the password)
+      console.log(`SERVER API: Token type: ${token.startsWith('ey') ? 'JWT Token' : 'Custom Token'}`);
+      console.log(`SERVER API: Token length: ${token.length} characters`);
+      
+      // Try multiple approaches to update the password
+      let approachResults = [];
+      
+      // APPROACH 1: Direct updateUser with token
+      try {
+        console.log('SERVER API: Approach 1 - Setting session with token');
+        
+        // First try setting the session with the token
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        });
+        
+        if (sessionError) {
+          console.error('SERVER API: Session error:', sessionError.message);
+          approachResults.push(`Approach 1 failed: ${sessionError.message}`);
+        } else {
+          console.log('SERVER API: Session set successfully', !!sessionData.session);
+          
+          // Now try to update the password
+          const { error: updateError } = await supabase.auth.updateUser({
+            password: password
+          });
+          
+          if (!updateError) {
+            console.log('SERVER API: Password updated successfully');
+            return res.status(200).json({ message: "Password updated successfully" });
+          } else {
+            console.error('SERVER API: Update error after session:', updateError.message);
+            approachResults.push(`Update failed after session: ${updateError.message}`);
+          }
+        }
+      } catch (err: any) {
+        console.error('SERVER API: Approach 1 exception:', err.message);
+        approachResults.push(`Approach 1 exception: ${err.message}`);
+      }
+      
+      // APPROACH 2: Attempt to decode JWT and use admin capabilities if available
+      try {
+        console.log('SERVER API: Approach 2 - Trying to extract user ID from token');
+        
+        // Basic JWT parsing - this is a simplified approach
+        const tokenParts = token.split('.');
+        if (tokenParts.length === 3) {
+          try {
+            const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+            const userId = payload.sub;
+            
+            if (userId) {
+              console.log('SERVER API: Extracted user ID from token:', userId);
+              approachResults.push(`Found user ID: ${userId}`);
+              
+              // APPROACH 2B: Use the admin API with the user ID
+              try {
+                console.log('SERVER API: Attempting admin update with extracted user ID');
+                
+                // Create a new admin client with admin key
+                const adminKey = process.env.SUPABASE_KEY;
+                if (adminKey && adminKey.startsWith('ey')) {
+                  const adminClient = createClient(
+                    process.env.SUPABASE_URL || '',
+                    adminKey,
+                    {
+                      auth: {
+                        autoRefreshToken: false,
+                        persistSession: false
+                      }
+                    }
+                  );
+                  
+                  // First get the user from auth to retrieve their email
+                  const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(userId);
+                  
+                  if (userError) {
+                    console.error('SERVER API: Failed to get user data:', userError.message);
+                    approachResults.push(`Failed to get user data: ${userError.message}`);
+                  } else if (userData?.user) {
+                    console.log('SERVER API: Retrieved user data for:', userData.user.email);
+                    
+                    // Now update the password in auth.users
+                    const { error } = await adminClient.auth.admin.updateUserById(
+                      userId,
+                      { password: password }
+                    );
+                    
+                    if (error) {
+                      console.error('SERVER API: Admin update failed:', error.message);
+                      approachResults.push(`Admin update failed: ${error.message}`);
+                    } else {
+                      console.log('SERVER API: Password updated successfully in auth.users');
+                      return res.status(200).json({ message: "Password updated successfully" });
+                    }
+                  }
+                } else {
+                  console.log('SERVER API: No valid admin key available');
+                  approachResults.push('No valid admin key available');
+                }
+              } catch (adminErr: any) {
+                console.error('SERVER API: Admin update exception:', adminErr.message);
+                approachResults.push(`Admin update exception: ${adminErr.message}`);
+              }
+            } else {
+              approachResults.push(`No user ID in token`);
+            }
+          } catch (err: any) {
+            console.error('SERVER API: Failed to parse token payload');
+            approachResults.push(`Token payload parsing failed: ${err.message}`);
+          }
+        } else {
+          approachResults.push(`Token does not appear to be a valid JWT format`);
+        }
+      } catch (err: any) {
+        console.error('SERVER API: Approach 2 exception:', err.message);
+        approachResults.push(`Approach 2 exception: ${err.message}`);
+      }
+      
+      // APPROACH 3: Last resort - try the original Supabase auth flow with a fresh client
+      try {
+        console.log('SERVER API: Approach 3 - Last resort direct method');
+        
+        // Create a separate client for this attempt
+        const resetClient = createClient(
+          process.env.SUPABASE_URL || '',
+          process.env.SUPABASE_KEY || '',
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false
+            }
+          }
+        );
+        
+        // First try setting a session with this new client
+        const { error: sessionError } = await resetClient.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        });
+        
+        if (sessionError) {
+          console.error('SERVER API: Approach 3 session error:', sessionError.message);
+          approachResults.push(`Approach 3 session error: ${sessionError.message}`);
+        } else {
+          // Try with a direct approach
+          const { error } = await resetClient.auth.updateUser({ password });
+          
+          if (!error) {
+            console.log('SERVER API: Password updated successfully with approach 3');
+            return res.status(200).json({ message: "Password updated successfully" });
+          } else {
+            console.error('SERVER API: Update error with approach 3:', error.message);
+            approachResults.push(`Approach 3 update error: ${error.message}`);
+          }
+        }
+      } catch (err: any) {
+        console.error('SERVER API: Approach 3 exception:', err.message);
+        approachResults.push(`Approach 3 exception: ${err.message}`);
+      }
+      
+      // If we got this far, all approaches failed - return detailed information
+      console.error('SERVER API: All password reset approaches failed');
+      return res.status(400).json({ 
+        message: "Invalid or expired password reset token. Please request a new password reset link.",
+        details: approachResults
+      });
+    } catch (error: any) {
+      console.error('SERVER API: Password reset error:', error);
+      
+      // Handle different types of errors
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid request data", 
+          details: error.errors 
+        });
+      }
+      
+      return res.status(400).json({ // Changed from 500 to 400 to ensure client can handle it consistently
+        message: "Failed to reset password: " + (error.message || "Unknown error") 
+      });
+    }
+  });
+
+  // Configure multer for file uploads
+  const upload = multer({
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB max file size
+    },
+    fileFilter: (_req, file, cb) => {
+      // Accept only image files
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    }
+  });
+
+  // Serve social media preview image
+  app.get('/social-preview.jpg', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/public/social-preview.jpg'));
+  });
+
+  // Categories endpoints
+  app.get("/api/categories", async (_req, res, next) => {
+    try {
+      const categories = await storage.getAllCategories();
+      res.json(categories);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Products endpoints
+  app.get("/api/products", async (req, res, next) => {
+    try {
+      const { category, brand, minPrice, maxPrice, search } = req.query;
+      const products = await storage.getProducts({
+        categoryId: category ? Number(category) : undefined,
+        brand: brand as string | undefined,
+        minPrice: minPrice ? Number(minPrice) : undefined,
+        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        search: search as string | undefined,
+      });
+      res.json(products);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/products/featured", async (_req, res, next) => {
+    try {
+      const products = await storage.getFeaturedProducts();
+      res.json(products);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/products/:id", async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const product = await storage.getProductById(id);
+
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      res.json(product);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/products", async (req, res, next) => {
+    try {
+      // First check if the user is authenticated via session
+      if (!req.isAuthenticated()) {
+        // If not, try to get current user ID from the query parameters
+        if (!req.body.sellerId) {
+          return res.status(403).json({ message: "Unauthorized: User not authenticated" });
+        }
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(req.body.sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        
+        // User is verified as a seller, proceed with the same seller ID
+        const validatedData = insertProductSchema.parse(req.body);
+        const product = await storage.createProduct(validatedData);
+        return res.status(201).json(product);
+      }
+      
+      // Normal path for authenticated users
+      if (!req.user.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+
+      const validatedData = insertProductSchema.parse({
+        ...req.body,
+        sellerId: req.user.id,
+      });
+
+      const product = await storage.createProduct(validatedData);
+      res.status(201).json(product);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/products/:id", async (req, res, next) => {
+    try {
+      // First check if the user is authenticated via session
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.body.sellerId) {
+        // If not via session, check if sellerId was provided in the request body
+        sellerId = parseInt(req.body.sellerId.toString());
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
+      }
+
+      const id = parseInt(req.params.id);
+      const product = await storage.getProductById(id);
+
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (product.sellerId !== sellerId) {
+        return res.status(403).json({ message: "Unauthorized: You can only edit your own products" });
+      }
+
+      const validatedData = insertProductSchema.parse({
+        ...req.body,
+        sellerId: sellerId, // Use the determined sellerId
+      });
+
+      const updatedProduct = await storage.updateProduct(id, validatedData);
+      res.json(updatedProduct);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/products/:id", async (req, res, next) => {
+    try {
+      // First check if the user is authenticated via session
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.query.sellerId) {
+        // If not via session, check if sellerId was provided in the query parameter
+        sellerId = parseInt(req.query.sellerId as string);
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
+      }
+
+      const id = parseInt(req.params.id);
+      const product = await storage.getProductById(id);
+
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (product.sellerId !== sellerId) {
+        return res.status(403).json({ message: "Unauthorized: You can only delete your own products" });
+      }
+
+      // Delete all associated images first
+      try {
+        const productImages = await storage.getProductImages(id);
+        for (const image of productImages) {
+          // If the image is not a placeholder, delete from object storage
+          if (image.imageUrl && !image.imageUrl.startsWith('image-id-')) {
+            await objectStorage.deleteProductImage(image.imageUrl);
+          }
+          await storage.deleteProductImage(image.id);
+        }
+      } catch (err) {
+        console.error("Error deleting product images:", err);
+        // Continue with product deletion even if image deletion fails
+      }
+
+      await storage.deleteProduct(id);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get all images for a product
+  app.get("/api/products/:id/images", async (req, res, next) => {
+    try {
+      const productId = parseInt(req.params.id);
+      console.log(`GET /api/products/${productId}/images`);
+      
+      // Get images directly from Supabase
+      const { data: images, error } = await supabase
+        .from('product_images')
+        .select('*')
+        .eq('product_id', productId)
+        .order('image_order', { ascending: true });
+        
+      if (error) {
+        console.error('Error retrieving product images:', error);
+        return res.status(500).json({ message: "Failed to retrieve product images" });
+      }
+      
+      console.log(`Found ${images?.length || 0} images for product ${productId}`);
+      res.json(images || []);
+    } catch (error) {
+      console.error("Error in GET /api/products/:id/images:", error);
+      next(error);
+    }
+  });
+
+  // Simplified endpoint to handle image upload in a single step 
+  app.post("/api/products/:id/images", upload.single('image'), async (req, res, next) => {
+    try {
+      console.log(`POST /api/products/:id/images - Starting image upload process`);
+      
+      // Check authentication
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+        console.log(`User authenticated via session, seller ID: ${sellerId}`);
+      } else if (req.query.sellerId) {
+        // If not via session, check if sellerId was provided in query
+        sellerId = parseInt(req.query.sellerId as string);
+        console.log(`Using seller ID from query: ${sellerId}`);
+        
+        // Verify user exists and is a seller
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', sellerId)
+          .single();
+          
+        if (userError || !user) {
+          console.error('User verification error:', userError);
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!user.is_seller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
+      }
+
+      // Get product ID from URL
+      const productId = parseInt(req.params.id);
+      console.log(`Product ID from URL: ${productId}`);
+      
+      // Verify the product exists and belongs to the seller
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+      
+      if (productError || !product) {
+        console.error('Product verification error:', productError);
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      if (product.seller_id !== sellerId) {
+        return res.status(403).json({ message: "Unauthorized: You can only add images to your own products" });
+      }
+      
+      // Make sure we have a file
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+      
+      // Determine image order
+      const imageOrder = req.body.imageOrder ? parseInt(req.body.imageOrder) : 0;
+      console.log(`Using image order: ${imageOrder}`);
+      
+      // STEP 1: Generate a new UUID for the image
+      const uuid = objectStorage.generateImageId();
+      console.log(`Generated image UUID: ${uuid}`);
+      
+      // STEP 2: Add record in product_images table
+      const { data: imageRecord, error: insertError } = await supabase
+        .from('product_images')
+        .insert({
+          product_id: productId,
+          image_url: uuid,  // Store just the UUID in the database
+          image_order: imageOrder,
+          image_name: req.file.originalname || 'unnamed'
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('Error inserting image record:', insertError);
+        return res.status(500).json({ message: "Failed to create image record in database" });
+      }
+      
+      console.log(`Image record created with ID: ${imageRecord.id}`);
+      
+      // STEP 3: Upload image to object storage
+      console.log(`Uploading file to object storage with UUID: ${uuid}`);
+      const uploadResult = await objectStorage.uploadProductImage(
+        req.file.buffer,
+        uuid,  // Use UUID as the storage key
+        req.file.mimetype
+      );
+      
+      console.log('Upload result:', uploadResult);
+      
+      if (!uploadResult.success) {
+        // Clean up database record if upload fails
+        console.error('Upload to object storage failed, removing database record');
+        await supabase
+          .from('product_images')
+          .delete()
+          .eq('id', imageRecord.id);
+          
+        return res.status(500).json({ message: "Failed to upload image to storage" });
+      }
+      
+      // STEP 4: Return success with image details
+      res.status(201).json({
+        id: imageRecord.id,
+        productId: imageRecord.product_id,
+        imageUrl: imageRecord.image_url,
+        imageOrder: imageRecord.image_order,
+        message: "Image uploaded successfully"
+      });
+    } catch (error) {
+      console.error("Error in POST /api/products/:id/images:", error);
+      next(error);
+    }
+  });
+
+  app.delete("/api/product-images/:id", async (req, res, next) => {
+    try {
+      // First check if the user is authenticated via session
+      let sellerId = 0;
+      if (req.isAuthenticated() && req.user) {
+        if (!req.user.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+        sellerId = req.user.id;
+      } else if (req.query.sellerId) {
+        // If not via session, check if sellerId was provided in the query parameter
+        sellerId = parseInt(req.query.sellerId as string);
+        
+        // Verify user exists and is a seller
+        const userCheck = await storage.getUser(sellerId);
+        if (!userCheck) {
+          return res.status(403).json({ message: "Unauthorized: User not found" });
+        }
+        
+        if (!userCheck.isSeller) {
+          return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Unauthorized: User not authenticated" });
+      }
+
+      const id = parseInt(req.params.id);
+
+      // Query the database for the specific image by ID using Supabase
+      const { data: imageData, error: imageError } = await supabase
+        .from('product_images')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (imageError || !imageData) {
+        console.log('Error retrieving image for deletion:', imageError);
+        return res.status(404).json({ message: "Image not found" });
+      }
+      
+      const image = imageData;
+
+      // Check if the product belongs to the seller
+      const productId = image.productId;
+      console.log(`Checking product ID for deletion: ${productId}`);
+      
+      if (!productId) {
+        return res.status(400).json({ message: "Invalid product ID in image metadata" });
+      }
+      
+      const product = await storage.getProductById(productId);
+      if (!product) {
+        console.log(`Product ${productId} not found during image deletion`);
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (product.sellerId !== sellerId) {
+        return res.status(403).json({ message: "Unauthorized: You can only delete images from your own products" });
+      }
+      
+      // Delete the image from object storage if it's not a placeholder
+      if (image.imageUrl && !image.imageUrl.startsWith('image-id-')) {
+        await objectStorage.deleteProductImage(image.imageUrl);
+      }
+
+      await storage.deleteProductImage(id);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Cart endpoints
+  app.get("/api/cart", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const cartItems = await storage.getCartItems(req.user.id);
+      res.json(cartItems);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+
+  // Reviews endpoints
+  app.get("/api/products/:id/reviews", async (req, res, next) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const reviews = await storage.getProductReviews(productId);
+      res.json(reviews);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/reviews", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const validatedData = insertReviewSchema.parse({
+        ...req.body,
+        userId: req.user.id,
+      });
+
+      // Check if the product exists
+      const product = await storage.getProductById(validatedData.productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Check if user already reviewed this product
+      const existingReview = await storage.getUserProductReview(req.user.id, validatedData.productId);
+      if (existingReview) {
+        return res.status(400).json({ message: "You have already reviewed this product" });
+      }
+
+      const review = await storage.createReview(validatedData);
+      res.status(201).json(review);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Seller-specific endpoints
+  app.get("/api/seller/products", async (req, res, next) => {
+    try {
+      // Check if user is authenticated via session
+      if (req.isAuthenticated() && req.user.isSeller) {
+        const products = await storage.getSellerProducts(req.user.id);
+        return res.json(products);
+      }
+      
+      // If not authenticated via session, check for sellerId in query parameter
+      const sellerId = req.query.sellerId ? parseInt(req.query.sellerId as string) : null;
+      if (!sellerId) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+      
+      // Verify user exists and is a seller
+      const userCheck = await storage.getUser(sellerId);
+      if (!userCheck) {
+        return res.status(403).json({ message: "Unauthorized: User not found" });
+      }
+      
+      if (!userCheck.isSeller) {
+        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+      }
+      
+      // User is verified as a seller, get their products
+      const products = await storage.getSellerProducts(sellerId);
+      res.json(products);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Public seller profile endpoints
+  app.get("/api/sellers/:id", async (req, res, next) => {
+    try {
+      const sellerId = parseInt(req.params.id);
+      const seller = await storage.getUser(sellerId);
+
+      if (!seller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+
+      if (!seller.isSeller) {
+        return res.status(404).json({ message: "User is not a seller" });
+      }
+
+      // Return seller profile directly since password is no longer in the schema
+      res.json(seller);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/sellers/:id/products", async (req, res, next) => {
+    try {
+      const sellerId = parseInt(req.params.id);
+      const page = req.query.page ? parseInt(req.query.page as string) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 12;
+      const category = req.query.category as string | undefined;
+      const sort = req.query.sort as string | undefined;
+
+      // Verify the seller exists
+      const seller = await storage.getUser(sellerId);
+      if (!seller || !seller.isSeller) {
+        return res.status(404).json({ message: "Seller not found" });
+      }
+
+      // Get all products for this seller
+      const products = await storage.getSellerProducts(sellerId);
+
+      // Filter by category if provided
+      let filteredProducts = products;
+      if (category && category !== "all") {
+        filteredProducts = products.filter(p => {
+          return p.category?.name.toLowerCase() === category.toLowerCase();
+        });
+      }
+
+      // Sort products based on sort option
+      if (sort) {
+        filteredProducts = [...filteredProducts].sort((a, b) => {
+          if (sort === "price-low") return a.price - b.price;
+          if (sort === "price-high") return b.price - a.price;
+          if (sort === "rating") {
+            const aRating = a.averageRating || 0;
+            const bRating = b.averageRating || 0;
+            return bRating - aRating;
+          }
+          // Default: newest first (by ID as a proxy for creation time)
+          return b.id - a.id;
+        });
+      }
+
+      // Calculate pagination
+      const totalProducts = filteredProducts.length;
+      const totalPages = Math.ceil(totalProducts / limit);
+      const offset = (page - 1) * limit;
+      const paginatedProducts = filteredProducts.slice(offset, offset + limit);
+
+      res.json({
+        products: paginatedProducts,
+        pagination: {
+          page,
+          limit,
+          totalProducts,
+          totalPages
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin-specific endpoints
+  app.get("/api/admin/users", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/admin/users/:id/ban", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+
+      const id = parseInt(req.params.id);
+      const { isBanned } = z.object({ isBanned: z.boolean() }).parse(req.body);
+
+      // Prevent admins from banning themselves or other admins
+      const userToBan = await storage.getUser(id);
+      if (!userToBan) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (userToBan.isAdmin) {
+        return res.status(403).json({ message: "Cannot ban administrator accounts" });
+      }
+
+      const updatedUser = await storage.banUser(id, isBanned);
+      res.json(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/admin/orders", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+
+      const orders = await storage.getAllOrders();
+      res.json(orders);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/admin/orders/:id/status", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin account required" });
+      }
+
+      const id = parseInt(req.params.id);
+      const { status } = z.object({ 
+        status: z.enum(["pending", "processing", "shipped", "delivered", "cancelled"])
+      }).parse(req.body);
+
+      const order = await storage.getOrderById(id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const updatedOrder = await storage.updateOrderStatus(id, status);
+      res.json(updatedOrder);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Endpoint to serve images
+  app.get('/api/images/:imageId', async (req, res, next) => {
+    try {
+      const { imageId } = req.params;
+      
+      console.log(`Attempting to retrieve image with ID: ${imageId}`);
+
+      // Determine content type based on file extension or default to jpeg
+      let contentType = 'image/jpeg';
+      if (imageId.endsWith('.png')) contentType = 'image/png';
+      if (imageId.endsWith('.gif')) contentType = 'image/gif';
+      if (imageId.endsWith('.webp')) contentType = 'image/webp';
+
+      // Get the image from Replit Object Storage using the function from object-storage.ts
+      const imageBuffer = await objectStorage.getImageFromStorage(imageId);
+
+      if (imageBuffer) {
+        console.log(`Image ${imageId} found - serving with content type ${contentType}`);
+        // If we have the image, send it back with the appropriate content type
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+        return res.send(imageBuffer);
+      }
+
+      console.log(`Image ${imageId} not found in storage`);
+      // If we get here, the image was not found
+      res.status(404).json({ message: 'Image not found' });
+    } catch (error) {
+      console.error('Error serving image:', error);
+      next(error);
+    }
+  });
+
+  // Facebook OAuth callback endpoint
+  app.post('/api/auth/sync-oauth-user', async (req, res) => {
+    try {
+      const { email, providerId, provider } = req.body;
+
+      if (!email || !providerId || !provider) {
+        return res.status(400).json({ message: 'Missing required OAuth information' });
+      }
+
+      // First, check if we already have a user with this email
+      let user = await storage.getUserByEmail(email);
+
+      if (user) {
+        // User exists - log them in
+        req.login(user, (err) => {
+          if (err) {
+            console.error('Error in OAuth login session:', err);
+            return res.status(500).json({ message: 'Failed to create session' });
+          }
+          return res.status(200).json({ user });
+        });
+      } else {
+        // User doesn't exist - create a new account
+        // Generate a username from email
+        const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+        let username = baseUsername;
+        let counter = 1;
+        
+        // Check if username is taken, if so, increment counter until we find a free one
+        while (await storage.getUserByUsername(username)) {
+          username = `${baseUsername}${counter}`;
+          counter++;
+        }
+
+        // Create the user
+        const newUser = await storage.createUser({
+          email,
+          username,
+          firstName: null,
+          lastName: null,
+          address: null,
+          profileImage: null,
+          walletBalance: 0,
+          isSeller: true,
+          isAdmin: false,
+          isBanned: false
+        });
+
+        // Log the new user in
+        req.login(newUser, (err) => {
+          if (err) {
+            console.error('Error in OAuth registration session:', err);
+            return res.status(500).json({ message: 'Failed to create session' });
+          }
+          return res.status(201).json({ user: newUser });
+        });
+      }
+    } catch (error) {
+      console.error('Error syncing OAuth user:', error);
+      res.status(500).json({ message: 'Failed to process OAuth login' });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}

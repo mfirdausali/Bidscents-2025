@@ -1,0 +1,35 @@
+ [vite] connecting...
+ WebSocket connection to 'wss://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/?token=nkbITds3O5py' failed: 
+setupWebSocket @ client:536
+client:536 Uncaught (in promise) 
+ Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+ 🔧 Creating new Supabase client instance
+ Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+_GoTrueClient @ @supabase_supabase-js.js:5163
+ Supabase auth state changed: INITIAL_SESSION
+auth:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) 
+ [JWT] Getting token from localStorage: no token
+ Supabase auth state changed: SIGNED_IN
+ 🔄 Frontend: Starting token exchange with Supabase token
+ [JWT] Getting token from localStorage: no token
+ 🔄 Frontend: Token exchange response status: 200
+ ✅ Frontend: Token exchange successful, setting auth token
+queryClient.ts:20 [JWT] Storing token in localStorage
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+protected-route.tsx:14 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+use-messaging.tsx:91 Attempting WebSocket connection...
+use-messaging.tsx:101 WebSocket URL: wss://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/ws
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+use-messaging.tsx:135 WebSocket connection established
+use-messaging.tsx:149 🔐 Sending application JWT authentication to WebSocket server
+use-messaging.tsx:168 WebSocket message received: {"type":"connected","message":"Connected to BidScents messaging server"}
+use-messaging.tsx:173 Connected to messaging server: Connected to BidScents messaging server
+use-messaging.tsx:168 WebSocket message received: {"type":"error","message":"Invalid user ID"}
+use-messaging.tsx:272 WebSocket error: Invalid user ID
+(anonymous) @ use-messaging.tsx:272
+protected-route.tsx:14 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+use-messaging.tsx:168 WebSocket message received: {"type":"auth_success"}
+use-messaging.tsx:179 Authentication successful for user: undefined

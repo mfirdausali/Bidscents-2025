@@ -1,0 +1,143 @@
+client:495 [vite] connecting...
+client:536 WebSocket connection to 'wss://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/?token=u1JJBUi53GHS' failed: 
+setupWebSocket @ client:536
+(anonymous) @ client:531
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=u1JJBUi53GHS' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+setupWebSocket @ client:536
+fallback @ client:509
+(anonymous) @ client:555
+chunk-276SZO74.js?v=b85139e5:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+supabase.ts:21 🔧 Creating new Supabase client instance
+reset-password.tsx:63 Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+_GoTrueClient @ @supabase_supabase-js.js?v=b85139e5:5163
+SupabaseAuthClient @ @supabase_supabase-js.js?v=b85139e5:7142
+_initSupabaseAuthClient @ @supabase_supabase-js.js?v=b85139e5:7340
+SupabaseClient @ @supabase_supabase-js.js?v=b85139e5:7213
+createClient @ @supabase_supabase-js.js?v=b85139e5:7380
+(anonymous) @ reset-password.tsx:63
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+use-supabase-auth.tsx:60 Supabase auth state changed: SIGNED_IN
+use-supabase-auth.tsx:64 🔄 Frontend: Starting token exchange with Supabase token
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+use-supabase-auth.tsx:70 🔄 Frontend: Token exchange response status: 200
+use-supabase-auth.tsx:74 ✅ Frontend: Token exchange successful, setting auth token
+queryClient.ts:20 [JWT] Storing token in localStorage
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+use-supabase-auth.tsx:60 Supabase auth state changed: INITIAL_SESSION
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+use-supabase-auth.tsx:60 Supabase auth state changed: SIGNED_OUT
+queryClient.ts:28 [JWT] Removing token from localStorage
+queryClient.ts:15 [JWT] Getting token from localStorage: no token
+queryClient.ts:15 [JWT] Getting token from localStorage: no token
+queryClient.ts:76 
+            
+            
+           GET https://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/api/v1/auth/me 401 (Unauthorized)
+(anonymous) @ queryClient.ts:76
+fetchFn @ @tanstack_react-query.js?v=b85139e5:881
+run @ @tanstack_react-query.js?v=b85139e5:513
+start @ @tanstack_react-query.js?v=b85139e5:555
+fetch @ @tanstack_react-query.js?v=b85139e5:969
+(anonymous) @ @tanstack_react-query.js?v=b85139e5:1810
+(anonymous) @ @tanstack_react-query.js?v=b85139e5:1809
+batch @ @tanstack_react-query.js?v=b85139e5:603
+refetchQueries @ @tanstack_react-query.js?v=b85139e5:1808
+(anonymous) @ @tanstack_react-query.js?v=b85139e5:1794
+batch @ @tanstack_react-query.js?v=b85139e5:603
+invalidateQueries @ @tanstack_react-query.js?v=b85139e5:1787
+(anonymous) @ use-supabase-auth.tsx:89
+(anonymous) @ @supabase_supabase-js.js?v=b85139e5:6641
+_notifyAllSubscribers @ @supabase_supabase-js.js?v=b85139e5:6639
+_removeSession @ @supabase_supabase-js.js?v=b85139e5:6669
+await in _removeSession
+(anonymous) @ @supabase_supabase-js.js?v=b85139e5:6341
+await in (anonymous)
+_useSession @ @supabase_supabase-js.js?v=b85139e5:5959
+await in _useSession
+_signOut @ @supabase_supabase-js.js?v=b85139e5:6325
+(anonymous) @ @supabase_supabase-js.js?v=b85139e5:6321
+(anonymous) @ @supabase_supabase-js.js?v=b85139e5:5926
+(anonymous) @ @supabase_supabase-js.js?v=b85139e5:5067
+/auth:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) <input data-replit-metadata=​"client/​src/​pages/​auth-page.tsx:​374:​26" data-component-name=​"Input" type=​"password" class=​"flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:​border-0 file:​bg-transparent file:​text-sm file:​font-medium file:​text-foreground placeholder:​text-muted-foreground focus-visible:​outline-none focus-visible:​ring-2 focus-visible:​ring-ring focus-visible:​ring-offset-2 disabled:​cursor-not-allowed disabled:​opacity-50" id=​"login-password" name=​"password" placeholder=​"Enter your password" data-gtm-form-interact-field-id=​"1">​flex
+queryClient.ts:15 [JWT] Getting token from localStorage: no token
+use-supabase-auth.tsx:60 Supabase auth state changed: SIGNED_IN
+use-supabase-auth.tsx:64 🔄 Frontend: Starting token exchange with Supabase token
+queryClient.ts:15 [JWT] Getting token from localStorage: no token
+use-supabase-auth.tsx:70 🔄 Frontend: Token exchange response status: 200
+use-supabase-auth.tsx:74 ✅ Frontend: Token exchange successful, setting auth token
+queryClient.ts:20 [JWT] Storing token in localStorage
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+protected-route.tsx:14 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+use-messaging.tsx:91 Attempting WebSocket connection...
+use-messaging.tsx:101 WebSocket URL: wss://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/ws
+queryClient.ts:15 [JWT] Getting token from localStorage: token present
+use-messaging.tsx:135 WebSocket connection established
+use-messaging.tsx:149 🔐 Sending application JWT authentication to WebSocket server
+use-messaging.tsx:168 WebSocket message received: {"type":"connected","message":"Connected to BidScents messaging server"}
+use-messaging.tsx:173 Connected to messaging server: Connected to BidScents messaging server
+use-messaging.tsx:168 WebSocket message received: {"type":"error","message":"Invalid user ID"}
+use-messaging.tsx:272 WebSocket error: Invalid user ID
+(anonymous) @ use-messaging.tsx:272
+protected-route.tsx:14 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+use-messaging.tsx:168 WebSocket message received: {"type":"auth_failed","message":"Invalid authentication token"}
+use-messaging.tsx:287 WebSocket connection closed with code: 1005
+use-messaging.tsx:294 Connection closed. Reconnecting in 2000ms... (1/3)
+use-messaging.tsx:91 Attempting WebSocket connection...
+use-messaging.tsx:101 WebSocket URL: wss://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/ws
+protected-route.tsx:14 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+use-messaging.tsx:135 WebSocket connection established
+use-messaging.tsx:149 🔐 Sending application JWT authentication to WebSocket server
+use-messaging.tsx:168 WebSocket message received: {"type":"connected","message":"Connected to BidScents messaging server"}
+use-messaging.tsx:173 Connected to messaging server: Connected to BidScents messaging server
+use-messaging.tsx:168 WebSocket message received: {"type":"error","message":"Invalid user ID"}
+use-messaging.tsx:272 WebSocket error: Invalid user ID
+(anonymous) @ use-messaging.tsx:272
+protected-route.tsx:14 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+use-messaging.tsx:168 WebSocket message received: {"type":"auth_failed","message":"Invalid authentication token"}
+use-messaging.tsx:287 WebSocket connection closed with code: 1005
+use-messaging.tsx:294 Connection closed. Reconnecting in 2000ms... (1/3)
+use-messaging.tsx:91 Attempting WebSocket connection...
+use-messaging.tsx:101 WebSocket URL: wss://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/ws
+protected-route.tsx:14 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+use-messaging.tsx:135 WebSocket connection established
+use-messaging.tsx:149 🔐 Sending application JWT authentication to WebSocket server
+use-messaging.tsx:168 WebSocket message received: {"type":"connected","message":"Connected to BidScents messaging server"}
+use-messaging.tsx:173 Connected to messaging server: Connected to BidScents messaging server
+use-messaging.tsx:168 WebSocket message received: {"type":"error","message":"Invalid user ID"}
+use-messaging.tsx:272 WebSocket error: Invalid user ID
+(anonymous) @ use-messaging.tsx:272
+protected-route.tsx:14 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+use-messaging.tsx:168 WebSocket message received: {"type":"auth_failed","message":"Invalid authentication token"}
+use-messaging.tsx:287 WebSocket connection closed with code: 1005
+use-messaging.tsx:294 Connection closed. Reconnecting in 2000ms... (1/3)
+use-messaging.tsx:91 Attempting WebSocket connection...
+use-messaging.tsx:101 WebSocket URL: wss://cd7c7903-ed80-4775-9725-e9e0ce8332f4-00-1jqxa0uhnujhm.riker.replit.dev/ws
+use-messaging.tsx:135 WebSocket connection established
+use-messaging.tsx:149 🔐 Sending application JWT authentication to WebSocket server
+use-messaging.tsx:168 WebSocket message received: {"type":"connected","message":"Connected to BidScents messaging server"}
+use-messaging.tsx:173 Connected to messaging server: Connected to BidScents messaging server
+ WebSocket message received: {"type":"error","message":"Invalid user ID"}
+ WebSocket error: Invalid user ID
+(anonymous) @ use-messaging.tsx:156
+ 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false
+ WebSocket message received: {"type":"auth_failed","message":"Invalid authentication token"}
+ WebSocket connection closed with code: 1005
+ Connection closed. Reconnecting in 2000ms... (1/3)
+ 🛡️ ProtectedRoute: /messages User: ID 32 isSeller:true Loading: false

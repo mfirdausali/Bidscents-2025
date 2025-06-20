@@ -1,0 +1,574 @@
+index-xuTrPVyW.js:410 🔧 Creating new Supabase client instance
+index-xuTrPVyW.js:409 Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+ou @ index-xuTrPVyW.js:409
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:410 Supabase auth state changed: INITIAL_SESSION
+/auth:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) <input type=​"password" class=​"flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:​border-0 file:​bg-transparent file:​text-sm file:​font-medium file:​text-foreground placeholder:​text-muted-foreground focus-visible:​outline-none focus-visible:​ring-2 focus-visible:​ring-ring focus-visible:​ring-offset-2 disabled:​cursor-not-allowed disabled:​opacity-50" id=​"login-password" name=​"password" placeholder=​"Enter your password" data-gtm-form-interact-field-id=​"1">​
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+/api/v1/auth/lookup-email:1 
+            
+            
+           Failed to load resource: the server responded with a status of 404 ()
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:410 Supabase auth state changed: SIGNED_IN
+index-xuTrPVyW.js:410 🔄 Frontend: Starting token exchange with Supabase token
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:410 🔄 Frontend: Token exchange response status: 200
+index-xuTrPVyW.js:410 ✅ Frontend: Token exchange successful, setting auth token
+index-xuTrPVyW.js:48 [JWT] Storing token in localStorage
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 Attempting WebSocket connection...
+index-xuTrPVyW.js:410 WebSocket URL: wss://bidscents.com/ws
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 WebSocket connection established
+index-xuTrPVyW.js:410 🔐 Sending application JWT authentication to WebSocket server
+index-xuTrPVyW.js:410 WebSocket message received: {"type":"auth_success","userId":191,"username":"mfirdaus12+20250617"}
+index-xuTrPVyW.js:410 Authentication successful for user: 191
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 Cleaning up WebSocket connection...
+index-xuTrPVyW.js:410 Closing WebSocket connection on cleanup
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 WebSocket connection closed with code: 1005
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 WebSocket connected
+index-xuTrPVyW.js:454 🔐 Authenticating auction WebSocket with JWT token
+index-xuTrPVyW.js:454 Joining auction room 12 as 191
+/api/auctions/12:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+/api/auctions/12:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+/api/auctions/12:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 Auction detail error condition triggered: Object
+_b @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 WebSocket disconnected
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 WebSocket connected
+index-xuTrPVyW.js:454 🔐 Authenticating auction WebSocket with JWT token
+index-xuTrPVyW.js:454 Joining auction room 12 as 191
+/api/auctions/12:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+/api/auctions/12:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+/api/auctions/12:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 Auction detail error condition triggered: Object
+_b @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 WebSocket disconnected
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 Attempting WebSocket connection...
+index-xuTrPVyW.js:410 WebSocket URL: wss://bidscents.com/ws
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 🔍 FETCHING CONVERSATION
+index-xuTrPVyW.js:410   ➤ Target user ID: 196
+index-xuTrPVyW.js:410   ➤ Product ID: 179
+index-xuTrPVyW.js:410   ➤ Current user ID: 191
+index-xuTrPVyW.js:410   ➤ Messages in global state: 0
+index-xuTrPVyW.js:410 🌐 Making API request to: /api/messages/conversation/196?productId=179
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 WebSocket connection established
+index-xuTrPVyW.js:410 🔐 Sending application JWT authentication to WebSocket server
+/api/messages/conversation/196?productId=179:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:410 ❌ Error fetching conversation: Error: 500: {"message":"Failed to retrieve product conversation"}
+    at gC (index-xuTrPVyW.js:48:43537)
+    at async $t (index-xuTrPVyW.js:48:44281)
+    at async index-xuTrPVyW.js:410:45010
+    at async index-xuTrPVyW.js:463:42854
+(anonymous) @ index-xuTrPVyW.js:410
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 WebSocket message received: {"type":"auth_success","userId":191,"username":"mfirdaus12+20250617"}
+index-xuTrPVyW.js:410 Authentication successful for user: 191
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 Cleaning up WebSocket connection...
+index-xuTrPVyW.js:410 Closing WebSocket connection on cleanup
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 WebSocket connection closed with code: 1005
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 Attempting WebSocket connection...
+index-xuTrPVyW.js:410 WebSocket URL: wss://bidscents.com/ws
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 🔍 FETCHING CONVERSATION
+index-xuTrPVyW.js:410   ➤ Target user ID: 161
+index-xuTrPVyW.js:410   ➤ Product ID: 176
+index-xuTrPVyW.js:410   ➤ Current user ID: 191
+index-xuTrPVyW.js:410   ➤ Messages in global state: 0
+index-xuTrPVyW.js:410 🌐 Making API request to: /api/messages/conversation/161?productId=176
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 WebSocket connection established
+index-xuTrPVyW.js:410 🔐 Sending application JWT authentication to WebSocket server
+/api/messages/conversation/161?productId=176:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:410 ❌ Error fetching conversation: Error: 500: {"message":"Failed to retrieve product conversation"}
+    at gC (index-xuTrPVyW.js:48:43537)
+    at async $t (index-xuTrPVyW.js:48:44281)
+    at async index-xuTrPVyW.js:410:45010
+    at async index-xuTrPVyW.js:463:42854
+(anonymous) @ index-xuTrPVyW.js:410
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 WebSocket message received: {"type":"auth_success","userId":191,"username":"mfirdaus12+20250617"}
+index-xuTrPVyW.js:410 Authentication successful for user: 191
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 Supabase auth state changed: SIGNED_IN
+index-xuTrPVyW.js:410 🔄 Frontend: Starting token exchange with Supabase token
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 🔄 Frontend: Token exchange response status: 200
+index-xuTrPVyW.js:410 ✅ Frontend: Token exchange successful, setting auth token
+index-xuTrPVyW.js:48 [JWT] Storing token in localStorage
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 Cleaning up WebSocket connection...
+index-xuTrPVyW.js:410 Closing WebSocket connection on cleanup
+index-xuTrPVyW.js:410 Attempting WebSocket connection...
+index-xuTrPVyW.js:410 WebSocket URL: wss://bidscents.com/ws
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 WebSocket connection closed with code: 1005
+index-xuTrPVyW.js:410 WebSocket connection established
+index-xuTrPVyW.js:410 🔐 Sending application JWT authentication to WebSocket server
+index-xuTrPVyW.js:463 🛡️ ProtectedRoute: /messages User: ID 191 isSeller:true Loading: false
+index-xuTrPVyW.js:410 Cleaning up WebSocket connection...
+index-xuTrPVyW.js:410 Closing WebSocket connection on cleanup
+index-xuTrPVyW.js:410 Attempting WebSocket connection...
+index-xuTrPVyW.js:410 WebSocket URL: wss://bidscents.com/ws
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 WebSocket connection closed with code: 1005
+index-xuTrPVyW.js:410 WebSocket connection established
+index-xuTrPVyW.js:410 🔐 Sending application JWT authentication to WebSocket server
+index-xuTrPVyW.js:410 WebSocket message received: {"type":"auth_success","userId":191,"username":"mfirdaus12+20250617"}
+index-xuTrPVyW.js:410 Authentication successful for user: 191
+index-xuTrPVyW.js:410 📤 SEND MESSAGE INITIATED
+index-xuTrPVyW.js:410   ➤ Receiver ID: 161
+index-xuTrPVyW.js:410   ➤ Content length: 98
+index-xuTrPVyW.js:410   ➤ Product ID: 176
+index-xuTrPVyW.js:410   ➤ Current user ID: 191
+index-xuTrPVyW.js:410   ➤ Messages in state: 0
+index-xuTrPVyW.js:410 📡 Sending WebSocket message: Object
+index-xuTrPVyW.js:410 📦 Serialized message: {"type":"send_message","receiverId":161,"content":"Hi fragrancetycoon, I am interested in buying \"Nasomatto Black Afgano Extrait De Parfum\" from you.","productId":176}
+index-xuTrPVyW.js:410 ✅ Message sent to WebSocket server successfully
+index-xuTrPVyW.js:410 ⏳ Waiting for server confirmation...
+index-xuTrPVyW.js:410 WebSocket message received: {"type":"message_sent","message":{"id":478,"senderId":191,"receiverId":161,"content":"Hi fragrancetycoon, I am interested in buying \"Nasomatto Black Afgano Extrait De Parfum\" from you.","productId":176,"isRead":false,"createdAt":"2025-06-17T13:52:03.474Z","sender":{"id":191,"username":"mfirdaus12+20250617","profileImage":null},"receiver":{"id":161,"username":"fragrancetycoon","profileImage":null},"product":{"id":176,"name":"Nasomatto Black Afgano Extrait De Parfum","price":300,"imageUrl":"blob:https://bidscents.com/b4df09f2-9c7a-40c5-98a9-7e52b934c348"}}}
+index-xuTrPVyW.js:410 🚀 Message sent confirmation received: Object
+index-xuTrPVyW.js:410 📊 Current messages state before adding: 0 messages
+index-xuTrPVyW.js:410 🔍 Message exists check - ID: 478 Exists: false
+index-xuTrPVyW.js:410 ✅ Adding new message to state. New count: 1
+index-xuTrPVyW.js:410 📝 New message details: Object
+index-xuTrPVyW.js:410 Cleaning up WebSocket connection...
+index-xuTrPVyW.js:410 Closing WebSocket connection on cleanup
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 WebSocket connection closed with code: 1005
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 WebSocket connected
+index-xuTrPVyW.js:454 🔐 Authenticating auction WebSocket with JWT token
+index-xuTrPVyW.js:454 Joining auction room 12 as 191
+/api/auctions/12:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+/api/auctions/12:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+/api/auctions/12:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 ()
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 Auction detail error condition triggered: Object
+_b @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:410 Supabase auth state changed: SIGNED_IN
+index-xuTrPVyW.js:410 🔄 Frontend: Starting token exchange with Supabase token
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 🔄 Frontend: Token exchange response status: 200
+index-xuTrPVyW.js:410 ✅ Frontend: Token exchange successful, setting auth token
+index-xuTrPVyW.js:48 [JWT] Storing token in localStorage
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 Auction detail error condition triggered: Object
+_b @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 Auction detail error condition triggered: Object
+_b @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:410 Supabase auth state changed: SIGNED_OUT
+index-xuTrPVyW.js:48 [JWT] Removing token from localStorage
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:454 WebSocket disconnected
+index-xuTrPVyW.js:48 
+            
+            
+           GET https://bidscents.com/api/v1/auth/me 401 (Unauthorized)
+(anonymous) @ index-xuTrPVyW.js:48
+a @ index-xuTrPVyW.js:48
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+batch @ index-xuTrPVyW.js:48
+refetchQueries @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+batch @ index-xuTrPVyW.js:48
+invalidateQueries @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:410
+(anonymous) @ index-xuTrPVyW.js:410
+_notifyAllSubscribers @ index-xuTrPVyW.js:410
+_removeSession @ index-xuTrPVyW.js:410
+await in _removeSession
+(anonymous) @ index-xuTrPVyW.js:410
+await in (anonymous)
+_useSession @ index-xuTrPVyW.js:410
+await in _useSession
+_signOut @ index-xuTrPVyW.js:410
+(anonymous) @ index-xuTrPVyW.js:410
+(anonymous) @ index-xuTrPVyW.js:410
+(anonymous) @ index-xuTrPVyW.js:409
+index-xuTrPVyW.js:454 WebSocket connection to 'wss://bidscents.com/ws' failed: WebSocket is closed before the connection is established.
+(anonymous) @ index-xuTrPVyW.js:454
+ig @ index-xuTrPVyW.js:40
+Cc @ index-xuTrPVyW.js:40
+Bo @ index-xuTrPVyW.js:40
+$D @ index-xuTrPVyW.js:40
+ha @ index-xuTrPVyW.js:40
+Ow @ index-xuTrPVyW.js:40
+sa @ index-xuTrPVyW.js:38
+(anonymous) @ index-xuTrPVyW.js:40
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:454 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}
+w.current.onerror @ index-xuTrPVyW.js:454
+index-xuTrPVyW.js:454 WebSocket disconnected
+index-xuTrPVyW.js:454 
+            
+            
+           GET https://bidscents.com/api/auctions/12 500 (Internal Server Error)
+queryFn @ index-xuTrPVyW.js:454
+a @ index-xuTrPVyW.js:48
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+batch @ index-xuTrPVyW.js:48
+refetchQueries @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+batch @ index-xuTrPVyW.js:48
+invalidateQueries @ index-xuTrPVyW.js:48
+u @ index-xuTrPVyW.js:454
+(anonymous) @ index-xuTrPVyW.js:48
+sM @ index-xuTrPVyW.js:37
+aM @ index-xuTrPVyW.js:37
+oM @ index-xuTrPVyW.js:37
+sw @ index-xuTrPVyW.js:37
+F_ @ index-xuTrPVyW.js:37
+(anonymous) @ index-xuTrPVyW.js:37
+dv @ index-xuTrPVyW.js:40
+o_ @ index-xuTrPVyW.js:37
+Am @ index-xuTrPVyW.js:37
+$x @ index-xuTrPVyW.js:37
+NM @ index-xuTrPVyW.js:37
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+await in queryFn
+a @ index-xuTrPVyW.js:48
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+batch @ index-xuTrPVyW.js:48
+refetchQueries @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+batch @ index-xuTrPVyW.js:48
+invalidateQueries @ index-xuTrPVyW.js:48
+u @ index-xuTrPVyW.js:454
+(anonymous) @ index-xuTrPVyW.js:48
+sM @ index-xuTrPVyW.js:37
+aM @ index-xuTrPVyW.js:37
+oM @ index-xuTrPVyW.js:37
+sw @ index-xuTrPVyW.js:37
+F_ @ index-xuTrPVyW.js:37
+(anonymous) @ index-xuTrPVyW.js:37
+dv @ index-xuTrPVyW.js:40
+o_ @ index-xuTrPVyW.js:37
+Am @ index-xuTrPVyW.js:37
+$x @ index-xuTrPVyW.js:37
+NM @ index-xuTrPVyW.js:37
+/auth:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) <input type=​"password" class=​"flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:​border-0 file:​bg-transparent file:​text-sm file:​font-medium file:​text-foreground placeholder:​text-muted-foreground focus-visible:​outline-none focus-visible:​ring-2 focus-visible:​ring-ring focus-visible:​ring-offset-2 disabled:​cursor-not-allowed disabled:​opacity-50" id=​"login-password" name=​"password" placeholder=​"Enter your password" data-gtm-form-interact-field-id=​"3">​flex
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:410 Supabase auth state changed: SIGNED_IN
+index-xuTrPVyW.js:410 🔄 Frontend: Starting token exchange with Supabase token
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: no token
+index-xuTrPVyW.js:410 🔄 Frontend: Token exchange response status: 200
+index-xuTrPVyW.js:410 ✅ Frontend: Token exchange successful, setting auth token
+index-xuTrPVyW.js:48 [JWT] Storing token in localStorage
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:48 [JWT] Getting token from localStorage: token present
+index-xuTrPVyW.js:454 WebSocket connected
+index-xuTrPVyW.js:454 🔐 Authenticating auction WebSocket with JWT token
+index-xuTrPVyW.js:454 Joining auction room 12 as 191
+index-xuTrPVyW.js:454 
+            
+            
+           GET https://bidscents.com/api/auctions/12 500 (Internal Server Error)
+queryFn @ index-xuTrPVyW.js:454
+a @ index-xuTrPVyW.js:48
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+pc @ index-xuTrPVyW.js:48
+onSubscribe @ index-xuTrPVyW.js:48
+subscribe @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+X_ @ index-xuTrPVyW.js:38
+Nh @ index-xuTrPVyW.js:40
+Bo @ index-xuTrPVyW.js:40
+$D @ index-xuTrPVyW.js:40
+ha @ index-xuTrPVyW.js:40
+Ow @ index-xuTrPVyW.js:40
+sa @ index-xuTrPVyW.js:38
+(anonymous) @ index-xuTrPVyW.js:40
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+await in queryFn
+a @ index-xuTrPVyW.js:48
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+pc @ index-xuTrPVyW.js:48
+onSubscribe @ index-xuTrPVyW.js:48
+subscribe @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+X_ @ index-xuTrPVyW.js:38
+Nh @ index-xuTrPVyW.js:40
+Bo @ index-xuTrPVyW.js:40
+$D @ index-xuTrPVyW.js:40
+ha @ index-xuTrPVyW.js:40
+Ow @ index-xuTrPVyW.js:40
+sa @ index-xuTrPVyW.js:38
+(anonymous) @ index-xuTrPVyW.js:40
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+index-xuTrPVyW.js:454 
+            
+            
+           GET https://bidscents.com/api/auctions/12 500 (Internal Server Error)
+queryFn @ index-xuTrPVyW.js:454
+a @ index-xuTrPVyW.js:48
+b @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.then
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.catch
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+pc @ index-xuTrPVyW.js:48
+onSubscribe @ index-xuTrPVyW.js:48
+subscribe @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+X_ @ index-xuTrPVyW.js:38
+Nh @ index-xuTrPVyW.js:40
+Bo @ index-xuTrPVyW.js:40
+$D @ index-xuTrPVyW.js:40
+ha @ index-xuTrPVyW.js:40
+Ow @ index-xuTrPVyW.js:40
+sa @ index-xuTrPVyW.js:38
+(anonymous) @ index-xuTrPVyW.js:40
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+await in queryFn
+a @ index-xuTrPVyW.js:48
+b @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.then
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.catch
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+pc @ index-xuTrPVyW.js:48
+onSubscribe @ index-xuTrPVyW.js:48
+subscribe @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+X_ @ index-xuTrPVyW.js:38
+Nh @ index-xuTrPVyW.js:40
+Bo @ index-xuTrPVyW.js:40
+$D @ index-xuTrPVyW.js:40
+ha @ index-xuTrPVyW.js:40
+Ow @ index-xuTrPVyW.js:40
+sa @ index-xuTrPVyW.js:38
+(anonymous) @ index-xuTrPVyW.js:40
+index-xuTrPVyW.js:454 Fetching auction data for ID: 12
+index-xuTrPVyW.js:454 
+            
+            
+           GET https://bidscents.com/api/auctions/12 500 (Internal Server Error)
+queryFn @ index-xuTrPVyW.js:454
+a @ index-xuTrPVyW.js:48
+b @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.then
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.catch
+b @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.then
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.catch
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+pc @ index-xuTrPVyW.js:48
+onSubscribe @ index-xuTrPVyW.js:48
+subscribe @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+X_ @ index-xuTrPVyW.js:38
+Nh @ index-xuTrPVyW.js:40
+Bo @ index-xuTrPVyW.js:40
+$D @ index-xuTrPVyW.js:40
+ha @ index-xuTrPVyW.js:40
+Ow @ index-xuTrPVyW.js:40
+sa @ index-xuTrPVyW.js:38
+(anonymous) @ index-xuTrPVyW.js:40
+index-xuTrPVyW.js:454 Failed to fetch auction with status: 500
+queryFn @ index-xuTrPVyW.js:454
+await in queryFn
+a @ index-xuTrPVyW.js:48
+b @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.then
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.catch
+b @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.then
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.catch
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+pc @ index-xuTrPVyW.js:48
+onSubscribe @ index-xuTrPVyW.js:48
+subscribe @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+X_ @ index-xuTrPVyW.js:38
+Nh @ index-xuTrPVyW.js:40
+Bo @ index-xuTrPVyW.js:40
+$D @ index-xuTrPVyW.js:40
+ha @ index-xuTrPVyW.js:40
+Ow @ index-xuTrPVyW.js:40
+sa @ index-xuTrPVyW.js:38
+(anonymous) @ index-xuTrPVyW.js:40
+index-xuTrPVyW.js:454 Auction detail error condition triggered: {auctionError: Error: Failed to fetch auction: 500
+    at queryFn (https://bidscents.com/assets/index-xuTrPVyW.js:…, auctionData: 'No auction data'}
+_b @ index-xuTrPVyW.js:454
+nv @ index-xuTrPVyW.js:38
+eg @ index-xuTrPVyW.js:40
+Fk @ index-xuTrPVyW.js:40
+Ok @ index-xuTrPVyW.js:40
+FD @ index-xuTrPVyW.js:40
+kf @ index-xuTrPVyW.js:40
+Ow @ index-xuTrPVyW.js:40
+sa @ index-xuTrPVyW.js:38
+(anonymous) @ index-xuTrPVyW.js:40
+setTimeout
+I4 @ index-xuTrPVyW.js:48
+o @ index-xuTrPVyW.js:48
+batch @ index-xuTrPVyW.js:48
+Bs @ index-xuTrPVyW.js:48
+c @ index-xuTrPVyW.js:48
+h @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.catch
+b @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.then
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.catch
+b @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.then
+(anonymous) @ index-xuTrPVyW.js:48
+Promise.catch
+b @ index-xuTrPVyW.js:48
+start @ index-xuTrPVyW.js:48
+fetch @ index-xuTrPVyW.js:48
+pc @ index-xuTrPVyW.js:48
+onSubscribe @ index-xuTrPVyW.js:48
+subscribe @ index-xuTrPVyW.js:48
+(anonymous) @ index-xuTrPVyW.js:48
+X_ @ index-xuTrPVyW.js:38
+Nh @ index-xuTrPVyW.js:40
+Bo @ index-xuTrPVyW.js:40
+$D @ index-xuTrPVyW.js:40
+ha @ index-xuTrPVyW.js:40
+Ow @ index-xuTrPVyW.js:40
+sa @ index-xuTrPVyW.js:38
+(anonymous) @ index-xuTrPVyW.js:40
