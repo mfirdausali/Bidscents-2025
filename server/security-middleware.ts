@@ -95,7 +95,7 @@ export function configureSecurityMiddleware(app: Application) {
         formAction: ["'self'"],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
-        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : undefined,
+        upgradeInsecureRequests: process.env.NODE_ENV === 'production',
       },
     },
     
