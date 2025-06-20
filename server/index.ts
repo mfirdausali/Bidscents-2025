@@ -4,8 +4,13 @@ import { secureRoutes } from "./secure-routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { testConnection } from "./db";
 import { testSupabaseConnection } from "./supabase";
+import { configureSecurityMiddleware } from "./security-middleware";
 
 const app = express();
+
+// Configure security middleware BEFORE other middleware
+configureSecurityMiddleware(app);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

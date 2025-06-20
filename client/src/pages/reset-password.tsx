@@ -24,9 +24,13 @@ type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 // IMPORTANT: We use a direct Supabase client for password reset
 // This avoids conflicts with any other Supabase instances
-// We need hardcoded values here since env vars aren't available client-side
-const SUPABASE_URL = 'https://rjazuitnzsximznfcbfw.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqYXp1aXRuenN4aW16bmZjYmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyNTY4MzgsImV4cCI6MjA1NDgzMjgzOH0.7I6R0fOmUvM-GKYpT1aT9vfIVkgdp8XESSRDwYPFu3k';
+// Use environment variables for security
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('Missing Supabase credentials for password reset. Please configure environment variables.');
+}
 
 // A function to parse the token from the URL hash
 function parseHashFragment() {

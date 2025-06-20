@@ -1,7 +1,13 @@
 import CryptoJS from 'crypto-js';
 
-// Secret key for encryption/decryption - in production, this should be stored in environment variables
-const SECRET_KEY = process.env.MESSAGE_ENCRYPTION_KEY || 'BidScents-SecureMessageKey-2025';
+// Secret key for encryption/decryption - must be provided via environment variables
+const SECRET_KEY = process.env.MESSAGE_ENCRYPTION_KEY;
+
+if (!SECRET_KEY) {
+  console.error('CRITICAL: MESSAGE_ENCRYPTION_KEY environment variable is not set!');
+  console.error('Please generate a secure key using: openssl rand -hex 32');
+  throw new Error('Missing required MESSAGE_ENCRYPTION_KEY environment variable');
+}
 
 /**
  * Encrypts a message using AES encryption

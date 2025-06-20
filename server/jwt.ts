@@ -1,8 +1,14 @@
 import jwt from 'jsonwebtoken';
 import { User } from '../shared/schema';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const JWT_EXPIRES_IN = '24h';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+
+if (!JWT_SECRET) {
+  console.error('CRITICAL: JWT_SECRET environment variable is not set!');
+  console.error('Please generate a secure key using: openssl rand -hex 64');
+  throw new Error('Missing required JWT_SECRET environment variable');
+}
 
 /**
  * Generate a JWT token for a user
@@ -10,14 +16,13 @@ const JWT_EXPIRES_IN = '24h';
  * @returns The signed JWT token
  */
 export function generateToken(user: User): string {
+  // SECURITY: Only include essential, non-sensitive data in JWT
+  // Sensitive data like email, admin status should be fetched from server when needed
   const payload = {
     id: user.id,
     username: user.username,
-    email: user.email,
-    providerId: user.providerId,
-    provider: user.provider,
-    isAdmin: user.isAdmin,
-    isBanned: user.isBanned
+    // REMOVED: email, isAdmin, isBanned - these should not be in client-accessible tokens
+    // These values should be fetched from the server when needed
   };
 
   return jwt.sign(payload, JWT_SECRET, {
@@ -40,7 +45,11 @@ export function verifyToken(token: string): any | null {
     });
     return decoded;
   } catch (error: any) {
-    console.error('JWT verification failed:', error.message);
+    // SECURITY: Don't log JWT errors in production as they may contain sensitive info
+    // In development, you can enable this for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.error('JWT verification failed:', error.message);
+    }
     return null;
   }
 }

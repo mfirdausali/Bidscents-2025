@@ -26,6 +26,7 @@ import { generateSellerPreview } from './social-preview';
 import * as billplz from './billplz';
 import crypto from 'crypto';
 import { requireAuth, getUserFromToken, authRoutes, AuthenticatedRequest } from './app-auth';
+import { authLimiter, passwordResetLimiter, apiLimiter, userLookupLimiter, adminLimiter } from './rate-limiter';
 
 /**
  * Helper function to determine if we're in a sandbox environment
@@ -347,8 +348,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
-  // Add missing API endpoint for email lookup (fixes 404 error from logs)
-  app.get("/api/v1/auth/lookup-email", async (req, res) => {
+  // SECURITY: Email lookup endpoint now requires authentication AND rate limiting
+  // This endpoint was previously exposing user emails without authentication
+  app.get("/api/v1/auth/lookup-email", userLookupLimiter, requireAuth, async (req, res) => {
     try {
       const { email } = req.query;
       
@@ -356,31 +358,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email parameter is required" });
       }
       
-      // Check if user exists in our database
+      // Only allow authenticated users to check if emails exist
+      // This prevents user enumeration attacks
       const user = await storage.getUserByEmail(email);
       
       if (user) {
+        // Only return minimal information, no sensitive data
         return res.json({ 
-          exists: true, 
-          userId: user.id,
-          username: user.username 
+          exists: true
+          // REMOVED: userId and username to prevent information disclosure
         });
       } else {
         return res.json({ exists: false });
       }
     } catch (error) {
-      console.error('Error looking up email:', error);
+      // Don't log full error details in production
+      console.error('Email lookup error');
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  // Set up streamlined Supabase authentication system
-  // Setup Supabase authentication endpoints
-  app.post('/api/v1/auth/session', authRoutes.session);
-  app.post('/api/v1/auth/lookup-email', authRoutes.lookupEmail);
+  // Set up streamlined Supabase authentication system with rate limiting
+  // SECURITY: All auth endpoints now have rate limiting to prevent brute force attacks
+  app.post('/api/v1/auth/session', authLimiter, authRoutes.session);
+  app.post('/api/v1/auth/lookup-email', userLookupLimiter, authRoutes.lookupEmail);
   app.get('/api/v1/auth/me', requireAuth, authRoutes.me);
   app.post('/api/v1/auth/logout', authRoutes.logout);
-  app.post('/api/v1/auth/recover-profile', authRoutes.recoverProfile);
+  app.post('/api/v1/auth/recover-profile', passwordResetLimiter, authRoutes.recoverProfile);
   app.get('/api/v1/auth/check-orphaned', requireAuth, authRoutes.checkOrphanedUsers);
   app.post('/api/v1/auth/repair-orphaned', requireAuth, authRoutes.repairOrphanedUsers);
   
@@ -1676,15 +1680,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin-specific endpoints
-  app.get("/api/admin/users", async (req, res, next) => {
+  // Admin-specific endpoints with rate limiting
+  app.get("/api/admin/users", adminLimiter, async (req, res, next) => {
     try {
       const user = await getAuthenticatedUser(req); if (!user || !user.isAdmin) {
         return res.status(403).json({ message: "Unauthorized: Admin account required" });
       }
 
       const users = await storage.getAllUsers();
-      res.json(users);
+      
+      // SECURITY: Sanitize user data before sending to client
+      // Never send passwords or other sensitive data to the frontend
+      const sanitizedUsers = users.map(u => ({
+        id: u.id,
+        username: u.username,
+        email: u.email, // Only admins can see emails
+        firstName: u.firstName,
+        lastName: u.lastName,
+        displayName: u.displayName,
+        isAdmin: u.isAdmin,
+        isBanned: u.isBanned,
+        createdAt: u.createdAt,
+        lastActiveAt: u.lastActiveAt,
+        // REMOVED: password, wallet, bankAccount, and other sensitive fields
+      }));
+      
+      res.json(sanitizedUsers);
     } catch (error) {
       next(error);
     }
