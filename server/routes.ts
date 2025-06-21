@@ -3388,7 +3388,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Filter for active auctions that have passed their end time
       const expiredAuctions = auctions.filter(auction => {
-        const auctionEndDate = new Date(auction.endsAt);
+        // Fix: Ensure proper UTC parsing of PostgreSQL timestamps
+        // PostgreSQL returns: "2025-06-20 16:41:53.967+00" which needs proper parsing
+        const endsAtString = auction.endsAt.toString();
+        const auctionEndDate = endsAtString.includes('T') 
+          ? new Date(endsAtString)
+          : new Date(endsAtString.replace(' ', 'T'));
         const msUntilEnd = auctionEndDate.getTime() - now.getTime();
         const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
         const isExpired = msUntilEnd < 0;

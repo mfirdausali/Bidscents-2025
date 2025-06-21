@@ -1,0 +1,31 @@
+--- Fix for Auction Date Parsing Issue ---
+
+In server/routes.ts, update the checkAndProcessExpiredAuctions function around line 3387:
+
+REPLACE:
+```javascript
+const auctionEndDate = new Date(auction.endsAt);
+```
+
+WITH:
+```javascript
+// Ensure proper UTC parsing of PostgreSQL timestamps
+// PostgreSQL returns: "2025-06-20 16:41:53.967+00"
+// We need to ensure it's parsed as UTC
+const auctionEndDate = new Date(auction.endsAt.replace(' ', 'T'));
+```
+
+OR, for a more robust solution:
+
+```javascript
+// Force UTC interpretation
+const endsAtString = auction.endsAt.toString();
+const auctionEndDate = endsAtString.includes('T') 
+  ? new Date(endsAtString)
+  : new Date(endsAtString.replace(' ', 'T'));
+```
+
+EXPLANATION:
+PostgreSQL returns timestamps as "2025-06-20 16:41:53.967+00" (with space)
+JavaScript's Date constructor might misinterpret this format
+Converting to ISO format "2025-06-20T16:41:53.967+00" (with T) ensures correct parsing
