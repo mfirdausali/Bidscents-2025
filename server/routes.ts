@@ -1662,8 +1662,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[AUCTION-CREATE] Server timezone offset:", new Date().getTimezoneOffset(), "minutes");
       console.log("[AUCTION-CREATE] Server local time:", new Date().toString());
       console.log("[AUCTION-CREATE] Server UTC time:", new Date().toISOString());
+      console.log("[AUCTION-CREATE] Process TZ env:", process.env.TZ || 'not set');
       console.log("[AUCTION-CREATE] Received auction data:", req.body);
       console.log("[AUCTION-CREATE] End date received:", req.body.endsAt);
+      
+      // CRITICAL: Check for timezone offset warning
+      const serverTzOffset = new Date().getTimezoneOffset();
+      if (serverTzOffset !== 0) {
+        console.warn(`[AUCTION-CREATE] WARNING: Server has ${serverTzOffset} minute offset from UTC!`);
+        console.warn(`[AUCTION-CREATE] This may cause auctions to expire ${Math.abs(serverTzOffset / 60)} hours early/late!`);
+      }
       
       // Parse and analyze the end date
       const receivedEndDate = new Date(req.body.endsAt);
@@ -3369,10 +3377,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`[AUCTION-CHECK] ===== Starting Auction Expiry Check at ${timestamp} =====`);
     
     // Log server environment details
+    console.log(`[AUCTION-CHECK] ===== Auction Expiry Check =====`);
     console.log(`[AUCTION-CHECK] Server timezone offset: ${new Date().getTimezoneOffset()} minutes`);
     console.log(`[AUCTION-CHECK] Server local time: ${new Date().toString()}`);
     console.log(`[AUCTION-CHECK] Server UTC time: ${new Date().toISOString()}`);
     console.log(`[AUCTION-CHECK] Process TZ env: ${process.env.TZ || 'not set'}`);
+    console.log(`[AUCTION-CHECK] Node version: ${process.version}`);
+    
+    // IMPORTANT: Log if timezone offset might cause issues
+    const tzOffset = new Date().getTimezoneOffset();
+    if (tzOffset !== 0) {
+      console.warn(`[AUCTION-CHECK] WARNING: Server timezone offset is ${tzOffset} minutes from UTC!`);
+      console.warn(`[AUCTION-CHECK] This may cause auctions to expire ${Math.abs(tzOffset / 60)} hours off schedule.`);
+    }
     
     try {
       // Get only active auctions - more efficient
@@ -3391,9 +3408,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fix: Ensure proper UTC parsing of PostgreSQL timestamps
         // PostgreSQL returns: "2025-06-20 16:41:53.967+00" which needs proper parsing
         const endsAtString = auction.endsAt.toString();
-        const auctionEndDate = endsAtString.includes('T') 
-          ? new Date(endsAtString)
-          : new Date(endsAtString.replace(' ', 'T'));
+        
+        // CRITICAL FIX: Force UTC interpretation of timestamps
+        let auctionEndDate;
+        if (endsAtString.includes('+00')) {
+          // PostgreSQL format with timezone: "2025-06-20 16:41:53.967+00"
+          // Replace space with T for proper ISO format
+          const isoString = endsAtString.replace(' ', 'T');
+          auctionEndDate = new Date(isoString);
+        } else if (endsAtString.includes('T') && endsAtString.endsWith('Z')) {
+          // Already in ISO format with Z
+          auctionEndDate = new Date(endsAtString);
+        } else if (endsAtString.includes('T')) {
+          // ISO format without timezone - append Z for UTC
+          auctionEndDate = new Date(endsAtString + 'Z');
+        } else {
+          // PostgreSQL format without timezone - convert to ISO and append Z
+          auctionEndDate = new Date(endsAtString.replace(' ', 'T') + 'Z');
+        }
+        
         const msUntilEnd = auctionEndDate.getTime() - now.getTime();
         const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
         const isExpired = msUntilEnd < 0;
