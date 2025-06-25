@@ -15,7 +15,8 @@ import { productImages } from "@shared/schema";
 import { db } from "./db";
 import { z } from "zod";
 import multer from "multer";
-import * as objectStorage from "./object-storage"; // Import the entire module to access all properties
+import * as supabaseFileStorage from "./supabase-file-storage"; // Import Supabase storage implementation
+import { IMAGE_TYPES } from "./types/index.js";
 import path from "path"; // Added import for path
 import { supabase } from "./supabase"; // Import Supabase for server-side operations
 import { createClient } from '@supabase/supabase-js';
@@ -1248,36 +1249,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate the image
-      const validationResult = await objectStorage.validateImage(
-        req.file.buffer,
-        800, // Max width for profile photos
-        800, // Max height for profile photos
-        2    // Max size in MB
-      );
-
-      if (!validationResult.valid) {
-        return res.status(400).json({ message: validationResult.message });
+      try {
+        await supabaseFileStorage.validateFileSize(req.file.buffer, 2 * 1024 * 1024);
+        await supabaseFileStorage.validateImageDimensions(req.file.buffer, 800, 800);
+      } catch (error: any) {
+        return res.status(400).json({ message: error.message });
       }
 
       // Upload the profile image
-      const uploadResult = await objectStorage.uploadProfileImage(
+      const fileId = await supabaseFileStorage.uploadFile(
         req.file.buffer,
-        user.id,
+        IMAGE_TYPES.PROFILE,
         req.file.mimetype
       );
 
-      if (!uploadResult.success) {
-        return res.status(500).json({ message: "Failed to upload profile image" });
-      }
-
       // Update the user record in the database with the new avatar URL
       const updatedUser = await storage.updateUser(user.id, {
-        avatarUrl: uploadResult.url
+        avatarUrl: fileId
       });
 
       return res.json({
         message: "Profile image uploaded successfully",
-        imageUrl: objectStorage.getImagePublicUrl(uploadResult.url),
+        imageUrl: await supabaseFileStorage.getPublicUrl(fileId),
         user: updatedUser
       });
     } catch (error) {
@@ -1299,36 +1292,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate the image - cover photos can be larger
-      const validationResult = await objectStorage.validateImage(
-        req.file.buffer,
-        2048, // Max width for cover photos
-        1024, // Max height for cover photos
-        5     // Max size in MB
-      );
-
-      if (!validationResult.valid) {
-        return res.status(400).json({ message: validationResult.message });
+      try {
+        await supabaseFileStorage.validateFileSize(req.file.buffer, 5 * 1024 * 1024);
+        await supabaseFileStorage.validateImageDimensions(req.file.buffer, 2048, 1024);
+      } catch (error: any) {
+        return res.status(400).json({ message: error.message });
       }
 
       // Upload the cover photo
-      const uploadResult = await objectStorage.uploadCoverPhoto(
+      const fileId = await supabaseFileStorage.uploadFile(
         req.file.buffer,
-        user.id,
+        IMAGE_TYPES.COVER,
         req.file.mimetype
       );
 
-      if (!uploadResult.success) {
-        return res.status(500).json({ message: "Failed to upload cover photo" });
-      }
-
       // Update the user record in the database with the new cover photo URL
       const updatedUser = await storage.updateUser(user.id, {
-        coverPhoto: uploadResult.url
+        coverPhoto: fileId
       });
 
       return res.json({
         message: "Cover photo uploaded successfully",
-        imageUrl: objectStorage.getImagePublicUrl(uploadResult.url),
+        imageUrl: await supabaseFileStorage.getPublicUrl(fileId),
         user: updatedUser
       });
     } catch (error) {
@@ -1824,7 +1809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const image of productImages) {
           // Always try to delete from object storage if we have an imageUrl
           if (image.imageUrl) {
-            const deleteResult = await objectStorage.deleteProductImage(image.imageUrl);
+            await supabaseFileStorage.deleteFile(image.imageUrl);
             console.log(`Deleted image ${image.imageUrl} from storage: ${deleteResult ? 'success' : 'failed'}`);
           }
           // Also remove from database
@@ -1898,34 +1883,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No image file provided" });
       }
       
-      // Generate a UUID for the image
-      const uuid = objectStorage.generateImageId();
+      // Upload the file to storage first
+      const fileId = await supabaseFileStorage.uploadFile(
+        req.file.buffer,
+        IMAGE_TYPES.PRODUCT,
+        req.file.mimetype
+      );
       
-      // Create image record in database
+      // Create image record in database with the file ID
       const productImage = await storage.createProductImage({
         productId,
-        imageUrl: uuid,
+        imageUrl: fileId,
         imageOrder: req.body.imageOrder ? parseInt(req.body.imageOrder) : 0,
         imageName: req.file.originalname || 'unnamed'
       });
       
-      // Upload the file to object storage
-      const uploadResult = await objectStorage.uploadProductImage(
-        req.file.buffer,
-        uuid,
-        req.file.mimetype
-      );
-      
-      if (!uploadResult.success) {
-        // Clean up if upload fails
-        await storage.deleteProductImage(productImage.id);
-        return res.status(500).json({ message: "Failed to upload image to storage" });
-      }
-      
       // Return success response
       res.status(201).json({
         ...productImage,
-        url: objectStorage.getImagePublicUrl(uuid),
+        url: await supabaseFileStorage.getPublicUrl(fileId),
         message: "Image uploaded successfully"
       });
     } catch (error) {
@@ -1982,7 +1958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Delete the image from object storage
       if (image.imageUrl) {
-        const deleteResult = await objectStorage.deleteProductImage(image.imageUrl);
+        await supabaseFileStorage.deleteFile(image.imageUrl);
         console.log(`Deleted individual image ${image.imageUrl} from storage: ${deleteResult ? 'success' : 'failed'}`);
       }
       
@@ -2389,7 +2365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const image of productImages) {
           // Delete from object storage
           if (image.imageUrl) {
-            const deleteResult = await objectStorage.deleteProductImage(image.imageUrl);
+            await supabaseFileStorage.deleteFile(image.imageUrl);
             console.log(`Deleted image ${image.imageUrl} from storage: ${deleteResult ? 'success' : 'failed'}`);
           }
           // Delete from database
@@ -2440,16 +2416,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Upload the file to the message files bucket
       console.log("Uploading file to object storage...");
-      const uploadResult = await objectStorage.uploadMessageFile(
+      const fileId = await supabaseFileStorage.uploadFile(
         req.file.buffer,
+        IMAGE_TYPES.MESSAGE_FILE,
         req.file.mimetype
       );
-      
-      if (!uploadResult.success) {
-        console.log("File upload to object storage failed:", uploadResult);
-        return res.status(500).json({ message: "Failed to upload file" });
-      }
-      console.log(`File uploaded successfully with ID: ${uploadResult.url}`);
+      console.log(`File uploaded successfully with ID: ${fileId}`);
       
       // Create a new message with type FILE
       console.log("Creating message record in database...");
@@ -2473,7 +2445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: null, // Content is null for FILE type messages
         product_id: req.body.productId ? parseInt(req.body.productId) : null,
         message_type: 'FILE', // Set message type to FILE
-        file_url: uploadResult.url
+        file_url: fileId
       };
       
       console.log("Inserting message with payload:", messagePayload);
@@ -2510,7 +2482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receiverId: messageData.receiver_id,
         productId: messageData.product_id,
         messageType: messageData.message_type,
-        fileUrl: objectStorage.getMessageFilePublicUrl(uploadResult.url),
+        fileUrl: await supabaseFileStorage.getPublicUrl(fileId),
         createdAt: messageData.created_at
       };
       
@@ -2540,12 +2512,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Attempting to retrieve message file with ID: ${fileId}, preview mode: ${isPreview}`);
 
-      // Get the file from Replit Object Storage
-      const fileBuffer = await objectStorage.getMessageFileFromStorage(fileId);
+      // Get the file from Supabase Storage
+      const { buffer: fileBuffer, mimetype } = await supabaseFileStorage.downloadFile(fileId);
 
       if (fileBuffer) {
-        // Get content type from metadata if available, or try to detect from file signature
-        let contentType = 'application/octet-stream';
+        // Use the mimetype from storage or detect from file signature
+        let contentType = mimetype || 'application/octet-stream';
         
         // Check file signatures to determine content type
         if (fileBuffer.length > 8) {
@@ -2609,13 +2581,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (imageId.endsWith('.gif')) contentType = 'image/gif';
       if (imageId.endsWith('.webp')) contentType = 'image/webp';
 
-      // Get the image from Replit Object Storage using the function from object-storage.ts
-      const imageBuffer = await objectStorage.getImageFromStorage(imageId);
+      // Get the image from Supabase Storage
+      const { buffer: imageBuffer, mimetype } = await supabaseFileStorage.downloadFile(imageId);
 
       if (imageBuffer) {
-        console.log(`Image ${imageId} found - serving with content type ${contentType}`);
+        console.log(`Image ${imageId} found - serving with content type ${mimetype || contentType}`);
         // If we have the image, send it back with the appropriate content type
-        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Type', mimetype || contentType);
         res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
         return res.send(imageBuffer);
       }
@@ -2816,23 +2788,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Attempting to upload image to object storage with ID: ${imageUrl}`);
       console.log(`Image size: ${req.file.size} bytes, type: ${req.file.mimetype}`);
       
-      // Upload the file to object storage
-      const uploadResult = await objectStorage.uploadProductImage(
+      // Upload the file to storage (re-upload with same ID)
+      await supabaseFileStorage.uploadFile(
         req.file.buffer,
-        imageUrl,
+        IMAGE_TYPES.PRODUCT,
         req.file.mimetype
       );
       
-      console.log(`Upload result:`, uploadResult);
-      
-      if (!uploadResult.success) {
-        return res.status(500).json({ message: "Failed to upload image to storage" });
-      }
+      console.log(`File re-uploaded successfully`);
       
       // Return success response
       res.status(200).json({
         ...foundProductImage,
-        url: objectStorage.getImagePublicUrl(imageUrl),
+        url: await supabaseFileStorage.getPublicUrl(imageUrl),
         message: "Image uploaded successfully"
       });
     } catch (error) {
@@ -2909,7 +2877,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Find the main image (order 0)
               const mainImage = productImages.find((img: any) => img.imageOrder === 0);
               if (mainImage && mainImage.imageUrl) {
-                productImagesMap.set(productId, objectStorage.getImagePublicUrl(mainImage.imageUrl));
+                const publicUrl = await supabaseFileStorage.getPublicUrl(mainImage.imageUrl);
+                productImagesMap.set(productId, publicUrl);
               }
             }
           }
@@ -2919,14 +2888,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Process each message
-      const decryptedConversation = conversation.map(msg => {
+      const decryptedConversation = await Promise.all(conversation.map(async msg => {
         // Check if this is a file message (has fileUrl and/or message_type is FILE)
         const isFileMessage = msg.messageType === 'FILE' || msg.fileUrl;
         
         // For file messages, we need to generate a public URL
         let fileUrl = null;
         if (isFileMessage && msg.fileUrl) {
-          fileUrl = objectStorage.getMessageFilePublicUrl(msg.fileUrl);
+          fileUrl = await supabaseFileStorage.getPublicUrl(msg.fileUrl);
         }
         
         // For action messages with products, enhance with main image URL if available
@@ -2957,7 +2926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         return mappedMsg;
-      });
+      }));
       
       res.json(decryptedConversation);
     } catch (error) {

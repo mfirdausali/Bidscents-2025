@@ -377,6 +377,8 @@ export const authRoutes = {
         firstName: user.firstName,
         lastName: user.lastName,
         profileImage: user.profileImage,
+        avatarUrl: user.avatarUrl,
+        coverPhoto: user.coverPhoto,
         isEmailVerified: user.isVerified,
         isSeller: user.isSeller,
       });
