@@ -3409,22 +3409,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // PostgreSQL returns: "2025-06-20 16:41:53.967+00" which needs proper parsing
         const endsAtString = auction.endsAt.toString();
         
-        // CRITICAL FIX: Force UTC interpretation of timestamps
+        // URGENT HOTFIX: Simplified UTC timestamp parsing
+        // PostgreSQL returns timestamps like "2025-06-20 16:41:53.967+00" which JavaScript parses correctly
+        // The previous "fix" was actually breaking valid timestamps by converting to invalid ISO format
         let auctionEndDate;
-        if (endsAtString.includes('+00')) {
-          // PostgreSQL format with timezone: "2025-06-20 16:41:53.967+00"
-          // Replace space with T for proper ISO format
-          const isoString = endsAtString.replace(' ', 'T');
-          auctionEndDate = new Date(isoString);
-        } else if (endsAtString.includes('T') && endsAtString.endsWith('Z')) {
-          // Already in ISO format with Z
-          auctionEndDate = new Date(endsAtString);
-        } else if (endsAtString.includes('T')) {
-          // ISO format without timezone - append Z for UTC
-          auctionEndDate = new Date(endsAtString + 'Z');
-        } else {
-          // PostgreSQL format without timezone - convert to ISO and append Z
-          auctionEndDate = new Date(endsAtString.replace(' ', 'T') + 'Z');
+        
+        // Simply use the timestamp as-is - JavaScript handles PostgreSQL format correctly
+        auctionEndDate = new Date(endsAtString);
+        
+        // Validate that the date parsed correctly
+        if (isNaN(auctionEndDate.getTime())) {
+          console.error(`[AUCTION-CHECK] ERROR: Invalid timestamp format for auction #${auction.id}: "${endsAtString}"`);
+          // Skip this auction if timestamp is invalid
+          return false;
         }
         
         const msUntilEnd = auctionEndDate.getTime() - now.getTime();
