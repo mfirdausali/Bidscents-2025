@@ -180,6 +180,9 @@ export default function MessagesPage() {
   const [sellerProducts, setSellerProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   
+  // State for conversation unread counts that can be updated independently
+  const [conversationUnreadCounts, setConversationUnreadCounts] = useState<Map<number, number>>(new Map());
+
   // Group messages by conversation (unique user pairs)
   const conversations = React.useMemo(() => {
     if (!user || !messages.length) return [];
@@ -227,17 +230,26 @@ export default function MessagesPage() {
       
       if (!existingConversation || 
           new Date(message.createdAt) > new Date(existingConversation.lastMessage.createdAt)) {
+        // Use override count if available, otherwise calculate normally
+        const overrideCount = conversationUnreadCounts.get(otherUserId);
+        const calculatedUnreadCount = isUnread ? 1 : (existingConversation?.unreadCount || 0);
+        
         conversationMap.set(otherUserId, {
           userId: otherUserId,
           username: otherUsername,
           profileImage: otherUserImage,
           lastMessage: message,
-          unreadCount: isUnread ? 1 : (existingConversation?.unreadCount || 0),
+          unreadCount: overrideCount !== undefined ? overrideCount : calculatedUnreadCount,
           productInfo: productInfo || existingConversation?.productInfo
         });
       } else if (isUnread) {
         // Update unread count for existing conversation
-        existingConversation.unreadCount += 1;
+        const overrideCount = conversationUnreadCounts.get(otherUserId);
+        if (overrideCount !== undefined) {
+          existingConversation.unreadCount = overrideCount;
+        } else {
+          existingConversation.unreadCount += 1;
+        }
         conversationMap.set(otherUserId, existingConversation);
       }
     });
@@ -246,7 +258,7 @@ export default function MessagesPage() {
     return Array.from(conversationMap.values()).sort((a, b) => 
       new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
     );
-  }, [messages, user]);
+  }, [messages, user, conversationUnreadCounts]);
   
   // Fetch conversation messages when a user is selected
   const loadConversation = useCallback(async (userId: number, productId?: number) => {
@@ -277,8 +289,18 @@ export default function MessagesPage() {
               )
             );
             
-            // Also ensure we update the unread message count in the header
-            // This will be handled by the WebSocket notification in useUnreadMessages
+            // Update conversation unread count to 0 for this user
+            setConversationUnreadCounts(prev => {
+              const newCounts = new Map(prev);
+              newCounts.set(userId, 0);
+              console.log('📊 [MessagesPage] Updated conversation unread count for user', userId, 'to 0');
+              return newCounts;
+            });
+            
+            // Force refresh the unread count in the header
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('unread-messages:force-refresh'));
+            }, 300);
           }
         }
       } else {
@@ -1006,6 +1028,52 @@ export default function MessagesPage() {
       window.removeEventListener('messaging:action_confirmed', handleActionConfirmed);
     };
   }, [selectedConversation, user?.id]);
+  
+  // Listen for message read events to update conversation unread counts
+  useEffect(() => {
+    const handleMessageReadEvents = (event: CustomEvent) => {
+      const data = event.detail;
+      console.log('📨 [MessagesPage] Received messaging event:', data.type, data);
+      
+      // Handle messages marked as read
+      if (data.type === 'messages_read' && data.senderId && user?.id) {
+        console.log('📬 [MessagesPage] Messages marked as read from sender:', data.senderId);
+        // Update conversation unread count to 0 for this sender
+        setConversationUnreadCounts(prev => {
+          const newCounts = new Map(prev);
+          newCounts.set(data.senderId, 0);
+          console.log('📊 [MessagesPage] Updated conversation unread count for sender', data.senderId, 'to 0');
+          return newCounts;
+        });
+      }
+      
+      // Handle new messages to increment unread counts
+      if (data.type === 'new_message' && data.message?.senderId && data.message?.receiverId === user?.id) {
+        const senderId = data.message.senderId;
+        console.log('📩 [MessagesPage] New message from sender:', senderId);
+        
+        // Only increment if we're not currently viewing this conversation
+        if (!selectedConversation || selectedConversation.userId !== senderId) {
+          setConversationUnreadCounts(prev => {
+            const newCounts = new Map(prev);
+            const currentCount = newCounts.get(senderId) || 0;
+            newCounts.set(senderId, currentCount + 1);
+            console.log('📊 [MessagesPage] Incremented unread count for sender', senderId, 'to', currentCount + 1);
+            return newCounts;
+          });
+        }
+      }
+    };
+
+    // Add event listeners for messaging events
+    window.addEventListener('messaging:update' as any, handleMessageReadEvents);
+    window.addEventListener('messaging:read' as any, handleMessageReadEvents);
+    
+    return () => {
+      window.removeEventListener('messaging:update' as any, handleMessageReadEvents);
+      window.removeEventListener('messaging:read' as any, handleMessageReadEvents);
+    };
+  }, [user?.id, selectedConversation]);
   
   if (!user) {
     return (

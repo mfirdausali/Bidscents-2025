@@ -35,11 +35,12 @@ export function useUnreadMessages() {
       }
       
       const data = await response.json();
+      console.log('📊 [UnreadMessages] Fetched unread count:', data.count);
       return data.count;
     },
     enabled: !!user, // Only run the query if the user is logged in
     refetchInterval: 30000, // Refetch every 30 seconds
-    staleTime: 10000, // Consider data stale after 10 seconds
+    staleTime: 5000, // Consider data stale after 5 seconds for faster updates
     retry: 3,
   });
 
@@ -49,16 +50,27 @@ export function useUnreadMessages() {
     // Set up an event listener for the custom message events
     const handleCustomMessageEvent = (event: CustomEvent) => {
       const data = event.detail;
+      console.log('🔔 [UnreadMessages] Received messaging event:', data.type, data);
       
       // Check if this is a new message for the current user
       if (data.type === 'new_message' && data.message?.receiverId === user?.id) {
-        console.log('New message detected, refreshing unread count');
-        refetch();
+        console.log('📩 [UnreadMessages] New message detected, refreshing unread count');
+        // Use a small delay to ensure the server has processed the message
+        setTimeout(() => {
+          refetch();
+        }, 500);
       }
       
       // Check if messages were marked as read
       if (data.type === 'messages_read') {
-        console.log('Messages marked as read, refreshing unread count');
+        console.log('✅ [UnreadMessages] Messages marked as read, refreshing unread count');
+        // Immediate refresh for read events
+        refetch();
+      }
+      
+      // Also listen for direct message read events
+      if (data.type === 'message_read') {
+        console.log('✅ [UnreadMessages] Single message marked as read, refreshing count');
         refetch();
       }
     };
@@ -66,18 +78,37 @@ export function useUnreadMessages() {
     // Add the event listener
     window.addEventListener('messaging:update' as any, handleCustomMessageEvent);
     
+    // Also listen for specific read events
+    window.addEventListener('messaging:read' as any, handleCustomMessageEvent);
+    
     // Clean up on unmount
     return () => {
       window.removeEventListener('messaging:update' as any, handleCustomMessageEvent);
+      window.removeEventListener('messaging:read' as any, handleCustomMessageEvent);
     };
   }, [user, refetch]);
   
   // Always refresh the count when the component mounts
   useEffect(() => {
     if (user) {
+      console.log('👤 [UnreadMessages] User logged in, fetching initial unread count');
       refetch();
     }
   }, [user, refetch]);
+
+  // Add a manual refresh function for external components to trigger
+  useEffect(() => {
+    const handleForceRefresh = () => {
+      console.log('🔄 [UnreadMessages] Force refresh triggered');
+      refetch();
+    };
+
+    window.addEventListener('unread-messages:force-refresh', handleForceRefresh);
+    
+    return () => {
+      window.removeEventListener('unread-messages:force-refresh', handleForceRefresh);
+    };
+  }, [refetch]);
 
   // This function can be called to manually refresh the unread count
   const refreshUnreadCount = () => {

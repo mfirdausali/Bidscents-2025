@@ -243,7 +243,7 @@ export function useMessaging() {
           
           // Handle messages read confirmation
           if (data.type === 'messages_read') {
-            console.log('Messages marked as read:', data);
+            console.log('✅ [WebSocket] Messages marked as read:', data);
             
             // Update message read state in our local messages list
             setMessages(prev => {
@@ -258,11 +258,18 @@ export function useMessaging() {
               });
             });
             
-            // Dispatch custom event for unread count update
+            // Dispatch multiple events for better synchronization
             const messagingEvent = new CustomEvent('messaging:update', {
               detail: data
             });
             window.dispatchEvent(messagingEvent);
+            
+            const readEvent = new CustomEvent('messaging:read', {
+              detail: data
+            });
+            window.dispatchEvent(readEvent);
+            
+            console.log('📡 [WebSocket] Dispatched read events for data:', data);
           }
           
           // Handle transaction action confirmation
@@ -489,7 +496,7 @@ export function useMessaging() {
         });
       });
       
-      // Dispatch custom event for unread count update
+      // Dispatch multiple events for better synchronization
       const messagingEvent = new CustomEvent('messaging:update', {
         detail: {
           type: 'messages_read',
@@ -498,6 +505,18 @@ export function useMessaging() {
         }
       });
       window.dispatchEvent(messagingEvent);
+      
+      // Also dispatch a specific read event
+      const readEvent = new CustomEvent('messaging:read', {
+        detail: {
+          type: 'message_read',
+          messageId,
+          senderId
+        }
+      });
+      window.dispatchEvent(readEvent);
+      
+      console.log('✅ [Messaging] Dispatched read events for messageId:', messageId, 'senderId:', senderId);
       
       return true;
     } catch (error) {
