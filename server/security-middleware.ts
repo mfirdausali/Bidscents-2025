@@ -24,18 +24,28 @@ export function configureSecurityMiddleware(app: Application) {
       const allowedOrigins = [
         process.env.APP_URL || 'http://localhost:5000',
         'https://bidscents.replit.app',
-        // Add any other allowed origins here
       ];
+
+      // Add current Replit domain dynamically
+      if (process.env.REPLIT_DOMAINS) {
+        allowedOrigins.push(`https://${process.env.REPLIT_DOMAINS}`);
+      }
       
-      // In development, allow localhost origins
-      if (process.env.NODE_ENV === 'development') {
+      // In development or non-production, allow localhost origins and be more permissive
+      if (process.env.NODE_ENV !== 'production') {
         allowedOrigins.push(
           'http://localhost:3000',
+          'http://localhost:5000',
           'http://localhost:5173',
           'http://127.0.0.1:5000',
           'http://127.0.0.1:3000',
           'http://127.0.0.1:5173'
         );
+        
+        // Allow any .replit.dev domain in development
+        if (origin && origin.includes('.replit.dev')) {
+          return callback(null, true);
+        }
       }
       
       if (allowedOrigins.indexOf(origin) !== -1) {
@@ -43,6 +53,7 @@ export function configureSecurityMiddleware(app: Application) {
         callback(null, true);
       } else {
         console.error(`[SECURITY] Rejected CORS origin: ${origin}`);
+        console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -56,7 +67,7 @@ export function configureSecurityMiddleware(app: Application) {
   app.use(cors(corsOptions));
   
   // Configure Helmet for security headers
-  app.use(helmet({
+  const helmetOptions: any = {
     // Content Security Policy
     contentSecurityPolicy: {
       directives: {
@@ -105,7 +116,6 @@ export function configureSecurityMiddleware(app: Application) {
         formAction: ["'self'"],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
-        ...(process.env.NODE_ENV === 'production' && { upgradeInsecureRequests: [] }),
       },
     },
     
@@ -129,7 +139,14 @@ export function configureSecurityMiddleware(app: Application) {
     permittedCrossDomainPolicies: false,
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     xssFilter: true,
-  }));
+  };
+
+  // Add upgradeInsecureRequests only in production to avoid CSP directive value errors
+  if (process.env.NODE_ENV === 'production') {
+    helmetOptions.contentSecurityPolicy.directives.upgradeInsecureRequests = [];
+  }
+
+  app.use(helmet(helmetOptions));
   
   // Additional security headers not covered by Helmet
   app.use((req, res, next) => {
