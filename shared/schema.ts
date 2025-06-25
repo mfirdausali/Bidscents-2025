@@ -8,7 +8,7 @@ export const messageTypeEnum = pgEnum('message_type', ['TEXT', 'ACTION', 'FILE']
 export const actionTypeEnum = pgEnum('action_type', ['INITIATE', 'CONFIRM_PAYMENT', 'CONFIRM_DELIVERY', 'REVIEW']);
 export const transactionStatusEnum = pgEnum('transaction_status', ['WAITING_PAYMENT', 'WAITING_DELIVERY', 'WAITING_REVIEW', 'COMPLETED', 'CANCELLED']);
 
-// Users table
+// Users table - CORRECTED to match actual database schema
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -20,7 +20,7 @@ export const users = pgTable("users", {
   profileImage: text("profile_image"),
   avatarUrl: text("avatar_url"), // Profile photo stored in object storage
   coverPhoto: text("cover_photo"), // Cover photo stored in object storage
-  walletBalance: doublePrecision("wallet_balance").default(0).notNull(),
+  walletBalance: decimal("wallet_balance", { precision: 12, scale: 2 }).default("0").notNull(),
   isSeller: boolean("is_seller").default(true).notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   isBanned: boolean("is_banned").default(false).notNull(),
@@ -29,7 +29,10 @@ export const users = pgTable("users", {
   location: text("location"),
   bio: text("bio"),
   providerId: text("provider_id"), // Stores the ID from the auth provider (e.g., Supabase user UUID)
-  provider: text("provider"), // The authentication provider used (e.g., 'supabase', 'facebook')
+  provider: text("provider").default("supabase"), // The authentication provider used (e.g., 'supabase', 'facebook')
+  supabaseUserId: text("supabase_user_id"), // Direct reference to auth.users.id for faster lookups
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Categories table
@@ -49,26 +52,27 @@ export const boostPackages = pgTable("boost_packages", {
   durationHours: integer("duration_hours").notNull(), // 15 or 36 hours
   effectivePrice: decimal("effective_price", { precision: 10, scale: 2 }), // Price per item
   isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow()
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 
-// Products table
+// Products table - CORRECTED financial precision
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   brand: text("brand").notNull(),
   description: text("description"),
-  price: doublePrecision("price").notNull(),
+  price: decimal("price", { precision: 12, scale: 2 }).notNull(),
   imageUrl: text("image_url"), // OBSOLETE: This field is no longer used. Images stored in product_images table
   stockQuantity: integer("stock_quantity").notNull().default(1), // Most secondhand items have quantity 1
   categoryId: integer("category_id").references(() => categories.id),
   sellerId: integer("seller_id").references(() => users.id).notNull(),
   isNew: boolean("is_new").default(false), // In secondhand context: like new condition
   isFeatured: boolean("is_featured").default(false),
-  featuredAt: timestamp("featured_at"), // When the product was featured
-  featuredUntil: timestamp("featured_until"), // When the featured status expires
+  featuredAt: timestamp("featured_at", { withTimezone: true }), // When the product was featured
+  featuredUntil: timestamp("featured_until", { withTimezone: true }), // When the featured status expires
   featuredDurationHours: integer("featured_duration_hours"), // Duration in hours
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   // Secondhand perfume specific fields
   remainingPercentage: integer("remaining_percentage").default(100), // How full is the bottle (1-100%)
   batchCode: text("batch_code"), // Authenticity batch code
@@ -89,39 +93,40 @@ export const productImages = pgTable("product_images", {
   imageUrl: text("image_url").notNull(),
   imageOrder: integer("image_order").default(0).notNull(), // The order/position of the image
   imageName: text("image_name"), // Original file name or generated name
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// Reviews table
+// Reviews table - CORRECTED financial precision
 export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
   productId: integer("product_id").references(() => products.id).notNull(),
   sellerId: integer("seller_id").references(() => users.id),
-  rating: doublePrecision("rating").notNull(),
+  rating: decimal("rating", { precision: 3, scale: 2 }).notNull(),
   comment: text("comment"),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// Orders table
+// Orders table - CORRECTED financial precision and timestamps
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
-  total: doublePrecision("total").notNull(),
+  total: decimal("total", { precision: 12, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// Order items table
+// Order items table - CORRECTED financial precision
 export const orderItems = pgTable("order_items", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id").references(() => orders.id).notNull(),
   productId: integer("product_id").references(() => products.id).notNull(),
   quantity: integer("quantity").notNull(),
-  price: doublePrecision("price").notNull(),
+  price: decimal("price", { precision: 12, scale: 2 }).notNull(),
 });
 
-// Messages table
+// Messages table - CORRECTED timestamps
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
@@ -129,54 +134,54 @@ export const messages = pgTable("messages", {
   content: text("content"), // Encrypted message content (nullable)
   productId: integer("product_id").references(() => products.id), // Optional reference to product
   isRead: boolean("is_read").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   messageType: messageTypeEnum("message_type").notNull().default('TEXT'),
   actionType: actionTypeEnum("action_type"),
   isClicked: boolean("is_clicked").default(false),
   fileUrl: text("file_url").default('NULL'),
 });
 
-// Auctions table
+// Auctions table - CORRECTED financial precision and timestamps to match actual database
 export const auctions = pgTable("auctions", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").references(() => products.id).notNull(),
-  startingPrice: doublePrecision("starting_price").notNull(),
-  reservePrice: doublePrecision("reserve_price"),
-  buyNowPrice: doublePrecision("buy_now_price"),
-  currentBid: doublePrecision("current_bid"),
+  startingPrice: decimal("starting_price", { precision: 12, scale: 2 }).notNull(),
+  reservePrice: decimal("reserve_price", { precision: 12, scale: 2 }),
+  buyNowPrice: decimal("buy_now_price", { precision: 12, scale: 2 }),
+  currentBid: decimal("current_bid", { precision: 12, scale: 2 }),
   currentBidderId: integer("current_bidder_id").references(() => users.id),
-  bidIncrement: doublePrecision("bid_increment").notNull().default(0.10),
-  startsAt: timestamp("starts_at").defaultNow().notNull(),
-  endsAt: timestamp("ends_at").notNull(),
+  bidIncrement: decimal("bid_increment", { precision: 8, scale: 2 }).notNull().default("5.00"), // Corrected default to match DB
+  startsAt: timestamp("starts_at", { withTimezone: true }).defaultNow().notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
   status: text("status").notNull().default("active"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// Bids table
+// Bids table - CORRECTED financial precision and timestamps
 export const bids = pgTable("bids", {
   id: serial("id").primaryKey(),
   auctionId: integer("auction_id").references(() => auctions.id).notNull(),
   bidderId: integer("bidder_id").references(() => users.id).notNull(),
-  amount: doublePrecision("amount").notNull(),
-  placedAt: timestamp("placed_at").defaultNow().notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  placedAt: timestamp("placed_at", { withTimezone: true }).defaultNow().notNull(),
   isWinning: boolean("is_winning").default(false),
 });
 
-// Bid audit trail for tracking all bid attempts
+// Bid audit trail for tracking all bid attempts - CORRECTED financial precision and timestamps
 export const bidAuditTrail = pgTable("bid_audit_trail", {
   id: serial("id").primaryKey(),
   auctionId: integer("auction_id").references(() => auctions.id).notNull(),
   userId: integer("user_id").references(() => users.id).notNull(),
-  attemptedAmount: doublePrecision("attempted_amount").notNull(),
+  attemptedAmount: decimal("attempted_amount", { precision: 12, scale: 2 }).notNull(),
   status: text("status").notNull(), // success, failed, rate_limited, invalid_amount, auction_ended, etc.
   reason: text("reason"), // Detailed reason for failure
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// Payments table for Billplz
+// Payments table for Billplz - CORRECTED timestamps
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
@@ -189,25 +194,25 @@ export const payments = pgTable("payments", {
   boost_option_id: integer("boost_option_id"), // Reference to the selected boost option
   productIds: text("product_ids").array(), // Product IDs to boost
   paymentChannel: text("payment_channel"), // Payment channel used (from Billplz)
-  paidAt: timestamp("paid_at"), // When payment was completed
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  paidAt: timestamp("paid_at", { withTimezone: true }), // When payment was completed
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   metadata: jsonb("metadata"), // Additional data related to the payment
 });
 
-// Transactions table
+// Transactions table - CORRECTED financial precision and timestamps
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").references(() => products.id).notNull(),
   sellerId: integer("seller_id").references(() => users.id).notNull(),
   buyerId: integer("buyer_id").references(() => users.id).notNull(),
-  amount: doublePrecision("amount").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   status: transactionStatusEnum("status").notNull().default('WAITING_PAYMENT'),
 });
 
-// Zod schemas for data validation
+// Zod schemas for data validation - Updated to include new fields
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   // password removed as it's now managed in auth.users
@@ -228,6 +233,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   bio: true,
   providerId: true, // Auth provider's user ID for secure linking
   provider: true, // The authentication provider used
+  supabaseUserId: true, // Direct Supabase reference
 });
 
 export const insertProductSchema = createInsertSchema(products).pick({

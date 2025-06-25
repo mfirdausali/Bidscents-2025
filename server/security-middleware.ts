@@ -10,8 +10,16 @@ export function configureSecurityMiddleware(app: Application) {
   // Configure CORS
   const corsOptions: cors.CorsOptions = {
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
+      // SECURITY FIX: Reject requests with no origin in production
+      if (!origin) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[SECURITY] Allowing request with no origin (development mode)');
+          return callback(null, true);
+        } else {
+          console.error('[SECURITY] Rejected request with no origin header');
+          return callback(new Error('Origin header required'));
+        }
+      }
       
       const allowedOrigins = [
         process.env.APP_URL || 'http://localhost:5000',
@@ -31,8 +39,10 @@ export function configureSecurityMiddleware(app: Application) {
       }
       
       if (allowedOrigins.indexOf(origin) !== -1) {
+        console.log(`[SECURITY] Allowed CORS origin: ${origin}`);
         callback(null, true);
       } else {
+        console.error(`[SECURITY] Rejected CORS origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -95,7 +105,7 @@ export function configureSecurityMiddleware(app: Application) {
         formAction: ["'self'"],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
-        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : undefined,
+        ...(process.env.NODE_ENV === 'production' && { upgradeInsecureRequests: [] }),
       },
     },
     

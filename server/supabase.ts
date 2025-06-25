@@ -82,17 +82,25 @@ export const supabase = createServerSupabaseClient();
 // Test the connection
 export async function testSupabaseConnection() {
   try {
+    // Check if we're in demo mode
+    if (process.env.DEMO_MODE === 'true') {
+      console.log('🔧 Demo mode: Skipping Supabase connection test');
+      return true;
+    }
+    
     const { data, error } = await supabase.from('users').select('count');
     
     if (error) {
       console.error('Supabase connection test failed:', error.message);
+      console.log('💡 Tip: Set DEMO_MODE=true in .env to run without Supabase');
       return false;
     }
     
-    console.log('Supabase connection successful');
+    console.log('✅ Supabase connection successful');
     return true;
   } catch (error) {
     console.error('Supabase connection test failed:', error);
+    console.log('💡 Tip: Set DEMO_MODE=true in .env to run without real Supabase connection');
     return false;
   }
 }

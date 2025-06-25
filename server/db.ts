@@ -16,14 +16,21 @@ const pool = new Pool({
 export const db = drizzle(pool, { schema }) as PostgresJsDatabase<typeof schema>;
 
 export async function testConnection() {
+  // Check if we're in demo mode
+  if (process.env.DEMO_MODE === 'true') {
+    console.log('🔧 Demo mode: Skipping database connection tests');
+    return;
+  }
+  
   // First test the direct PostgreSQL connection (needed for session store)
   let pgConnected = false;
   try {
     await pool.query('SELECT NOW()');
-    console.log('PostgreSQL direct connection successful');
+    console.log('✅ PostgreSQL direct connection successful');
     pgConnected = true;
   } catch (error) {
     console.error('PostgreSQL direct connection failed:', error);
+    console.log('💡 Tip: Set DEMO_MODE=true in .env to run without database');
   }
   
   // Then test the Supabase connection

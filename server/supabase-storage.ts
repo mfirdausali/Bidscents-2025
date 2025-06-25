@@ -1355,6 +1355,19 @@ export class SupabaseStorage implements IStorage {
     console.log(`  - current time (UTC): ${now.toISOString()}`);
     console.log(`  - hours until end: ${hoursUntilEnd.toFixed(2)}`);
     
+    // CRITICAL FIX: Normalize timestamps to UTC before storing
+    const startsAtNormalized = auction.startsAt 
+      ? new Date(auction.startsAt).toISOString()
+      : new Date().toISOString();
+    
+    const endsAtNormalized = new Date(auction.endsAt).toISOString();
+    
+    console.log(`[AUCTION-DB] Timestamp normalization:`);
+    console.log(`  - Original endsAt: ${auction.endsAt}`);
+    console.log(`  - Normalized endsAt: ${endsAtNormalized}`);
+    console.log(`  - Original startsAt: ${auction.startsAt}`);
+    console.log(`  - Normalized startsAt: ${startsAtNormalized}`);
+    
     // Convert camelCase to snake_case for DB
     const dbAuction = {
       product_id: auction.productId,
@@ -1364,9 +1377,9 @@ export class SupabaseStorage implements IStorage {
       current_bid: auction.currentBid,
       current_bidder_id: auction.currentBidderId,
       bid_increment: auction.bidIncrement,
-      // Always set starts_at to current timestamp if not provided
-      starts_at: auction.startsAt || new Date().toISOString(),
-      ends_at: auction.endsAt, // Should be in 'YYYY-MM-DD HH:MM:SS' format
+      // Store normalized UTC timestamps
+      starts_at: startsAtNormalized,
+      ends_at: endsAtNormalized,
       status: auction.status || 'active',
     };
     

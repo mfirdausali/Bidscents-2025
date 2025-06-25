@@ -27,6 +27,7 @@ import * as billplz from './billplz';
 import crypto from 'crypto';
 import { requireAuth, getUserFromToken, authRoutes, AuthenticatedRequest } from './app-auth';
 import { authLimiter, passwordResetLimiter, apiLimiter, userLookupLimiter, adminLimiter } from './rate-limiter';
+import { validateCSRF, provideCSRFToken, getCSRFTokenEndpoint } from './csrf-protection';
 
 /**
  * Helper function to determine if we're in a sandbox environment
@@ -932,6 +933,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email verification endpoint for handling Supabase email confirmation links
   app.get('/api/verify-email', authRoutes.verifyEmail);
   
+  // SECURITY: CSRF protection endpoints
+  app.get('/api/csrf-token', getCSRFTokenEndpoint);
+  
   // Raw query middleware specifically for Billplz redirect
   // This captures the original query string before Express parses it
   app.use('/api/payments/process-redirect', (req: Request & { rawQuery?: string }, res: Response, next: NextFunction) => {
@@ -1422,43 +1426,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products", async (req, res, next) => {
+  app.post("/api/products", validateCSRF, async (req, res, next) => {
     try {
-      // First check if the user is authenticated via session
-      const user = await getAuthenticatedUser(req); if (!user) {
-        // If not, try to get current user ID from the query parameters
-        if (!req.body.sellerId) {
-          return res.status(403).json({ message: "Unauthorized: User not authenticated" });
-        }
-        
-        // Verify user exists and is a seller
-        const userCheck = await storage.getUser(req.body.sellerId);
-        if (!userCheck) {
-          return res.status(403).json({ message: "Unauthorized: User not found" });
-        }
-        
-        if (!userCheck.isSeller) {
-          return res.status(403).json({ message: "Unauthorized: Seller account required" });
-        }
-        
-        // User is verified as a seller, proceed with the same seller ID
-        const validatedData = insertProductSchema.parse(req.body);
-        const product = await storage.createProduct(validatedData);
-        return res.status(201).json(product);
+      // SECURITY FIX: Require proper authentication - no bypass allowed
+      const user = await getAuthenticatedUser(req);
+      if (!user) {
+        return res.status(401).json({ 
+          message: "Authentication required", 
+          code: "AUTH_REQUIRED" 
+        });
       }
       
-      // Normal path for authenticated users
+      // SECURITY FIX: Verify user is a seller
       if (!user.isSeller) {
-        return res.status(403).json({ message: "Unauthorized: Seller account required" });
+        return res.status(403).json({ 
+          message: "Seller account required", 
+          code: "SELLER_REQUIRED" 
+        });
       }
-
-      const validatedData = insertProductSchema.parse({
-        ...req.body,
-        sellerId: user.id,
-      });
-
-      const product = await storage.createProduct(validatedData);
-      res.status(201).json(product);
+      
+      // SECURITY FIX: Always use authenticated user's ID, ignore any sellerId in request body
+      const productData = {
+        ...insertProductSchema.parse(req.body),
+        sellerId: user.id // Force seller ID to authenticated user
+      };
+      
+      console.log(`[SECURITY] Product creation by authenticated seller ID: ${user.id}`);
+      const product = await storage.createProduct(productData);
+      return res.status(201).json(product);
     } catch (error) {
       next(error);
     }
@@ -1603,7 +1598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Auction endpoints
-  app.post("/api/auctions", async (req, res, next) => {
+  app.post("/api/auctions", validateCSRF, async (req, res, next) => {
     try {
       console.log("POST /api/auctions called with body:", req.body);
       
@@ -2420,7 +2415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Message file upload endpoint
-  app.post("/api/messages/upload-file", requireAuth, messageFileUpload.single('file'), async (req: AuthenticatedRequest, res, next) => {
+  app.post("/api/messages/upload-file", validateCSRF, requireAuth, messageFileUpload.single('file'), async (req: AuthenticatedRequest, res, next) => {
     try {
       console.log("File upload request received");
 
@@ -2971,7 +2966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Confirm transaction action
-  app.post("/api/messages/action/confirm", requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  app.post("/api/messages/action/confirm", validateCSRF, requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
       // Validate request body
       const schema = z.object({
@@ -3196,7 +3191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Submit a review for a completed transaction
-  app.post("/api/messages/submit-review/:messageId", requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  app.post("/api/messages/submit-review/:messageId", validateCSRF, requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
       // Validate request parameters and body
       const messageId = parseInt(req.params.messageId, 10);
@@ -3330,7 +3325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark messages as read
-  app.post("/api/messages/mark-read", requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  app.post("/api/messages/mark-read", validateCSRF, requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
       // Validate request body
       const schema = z.object({
@@ -3405,38 +3400,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Filter for active auctions that have passed their end time
       const expiredAuctions = auctions.filter(auction => {
-        // Fix: Ensure proper UTC parsing of PostgreSQL timestamps
-        // PostgreSQL returns: "2025-06-20 16:41:53.967+00" which needs proper parsing
+        // COMPREHENSIVE UTC FIX: Ensure all timestamp operations are in UTC
         const endsAtString = auction.endsAt.toString();
         
-        // URGENT HOTFIX: Simplified UTC timestamp parsing
-        // PostgreSQL returns timestamps like "2025-06-20 16:41:53.967+00" which JavaScript parses correctly
-        // The previous "fix" was actually breaking valid timestamps by converting to invalid ISO format
-        let auctionEndDate;
-        
-        // Simply use the timestamp as-is - JavaScript handles PostgreSQL format correctly
-        auctionEndDate = new Date(endsAtString);
-        
-        // Validate that the date parsed correctly
-        if (isNaN(auctionEndDate.getTime())) {
-          console.error(`[AUCTION-CHECK] ERROR: Invalid timestamp format for auction #${auction.id}: "${endsAtString}"`);
-          // Skip this auction if timestamp is invalid
+        // Parse the PostgreSQL timestamp
+        let auctionEndDateUTC;
+        try {
+          auctionEndDateUTC = new Date(endsAtString);
+          
+          // Validate that the date parsed correctly
+          if (isNaN(auctionEndDateUTC.getTime())) {
+            console.error(`[AUCTION-CHECK] ERROR: Invalid timestamp format for auction #${auction.id}: "${endsAtString}"`);
+            return false;
+          }
+        } catch (parseError) {
+          console.error(`[AUCTION-CHECK] ERROR: Failed to parse timestamp for auction #${auction.id}: "${endsAtString}"`, parseError);
           return false;
         }
         
-        const msUntilEnd = auctionEndDate.getTime() - now.getTime();
+        // CRITICAL FIX: Force UTC comparison by using explicit UTC time
+        // Create current time explicitly in UTC to avoid any timezone issues
+        const nowUTC = new Date();
+        
+        // Calculate time difference using UTC milliseconds (always UTC)
+        const msUntilEnd = auctionEndDateUTC.getTime() - nowUTC.getTime();
         const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
         const isExpired = msUntilEnd < 0;
         
         console.log(`[AUCTION-CHECK] Auction #${auction.id}:`);
         console.log(`  - endsAt (stored): ${auction.endsAt}`);
-        console.log(`  - endsAt (parsed): ${auctionEndDate.toISOString()}`);
-        console.log(`  - endsAt (local): ${auctionEndDate.toString()}`);
-        console.log(`  - current time (UTC): ${now.toISOString()}`);
-        console.log(`  - current time (local): ${now.toString()}`);
+        console.log(`  - endsAt (parsed UTC): ${auctionEndDateUTC.toISOString()}`);
+        console.log(`  - endsAt (parsed local): ${auctionEndDateUTC.toString()}`);
+        console.log(`  - current time (UTC): ${nowUTC.toISOString()}`);
+        console.log(`  - current time (local): ${nowUTC.toString()}`);
         console.log(`  - ms until end: ${msUntilEnd}`);
         console.log(`  - hours until end: ${hoursUntilEnd.toFixed(2)}`);
         console.log(`  - is expired: ${isExpired}`);
+        console.log(`  - TIMEZONE CHECK: Server TZ offset = ${nowUTC.getTimezoneOffset()} minutes`);
         
         return isExpired;
       });
