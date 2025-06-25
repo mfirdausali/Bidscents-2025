@@ -110,7 +110,11 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     
     // Setup WebSocket connection
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    // Determine the correct host and port
+    const isDevelopment = import.meta.env.DEV;
+    const host = isDevelopment ? 'localhost:3000' : window.location.host;
+    const wsUrl = `${protocol}//${host}/ws`;
+    console.log('🎯 [AuctionDetail] WebSocket URL:', wsUrl, '(dev mode:', isDevelopment, ')');
     
     // Create WebSocket connection
     socket.current = new WebSocket(wsUrl);

@@ -79,6 +79,7 @@ export function useMessaging() {
     const maxReconnectAttempts = 3;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     let isCleanupPhase = false;
+    let isConnectionStable = false;
     
     // Setup WebSocket connection
     const connectWebSocket = () => {
@@ -97,8 +98,11 @@ export function useMessaging() {
       }
       
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      console.log('WebSocket URL:', wsUrl);
+      // Determine the correct host and port
+      const isDevelopment = import.meta.env.DEV;
+      const host = isDevelopment ? 'localhost:3000' : window.location.host;
+      const wsUrl = `${protocol}//${host}/ws`;
+      console.log('WebSocket URL:', wsUrl, '(dev mode:', isDevelopment, ')');
       
       const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
@@ -132,9 +136,10 @@ export function useMessaging() {
 
       // Connection opened
       socket.addEventListener('open', () => {
-        console.log('WebSocket connection established');
+        console.log('✅ [WebSocket] Connection established successfully');
         // Reset reconnect attempts on successful connection
         reconnectAttempts = 0;
+        isConnectionStable = true;
         
         // Authenticate with the server using application JWT token
         if (user?.id) {
@@ -146,7 +151,7 @@ export function useMessaging() {
               type: 'auth', 
               token: appToken
             };
-            console.log('🔐 Sending application JWT authentication to WebSocket server');
+            console.log('🔐 [WebSocket] Sending authentication with app token');
             socket.send(JSON.stringify(authMessage));
           } else {
             console.error('❌ Cannot authenticate WebSocket - no app token found');
@@ -310,18 +315,26 @@ export function useMessaging() {
 
       // Connection closed
       socket.addEventListener('close', (event) => {
-        console.log('WebSocket connection closed with code:', event.code);
+        console.log('❌ [WebSocket] Connection closed with code:', event.code, 'reason:', event.reason);
         setConnected(false);
+        isConnectionStable = false;
         
-        // Attempt to reconnect on unexpected closure (not intentional via cleanup)
-        if (!isCleanupPhase && reconnectAttempts < maxReconnectAttempts) {
+        // Only attempt to reconnect if:
+        // 1. Not in cleanup phase
+        // 2. Haven't exceeded max attempts
+        // 3. Connection was stable (to avoid immediate reconnect loops)
+        if (!isCleanupPhase && reconnectAttempts < maxReconnectAttempts && isConnectionStable) {
           reconnectAttempts++;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
-          console.log(`Connection closed. Reconnecting in ${delay}ms... (${reconnectAttempts}/${maxReconnectAttempts})`);
+          console.log(`🔄 [WebSocket] Reconnecting in ${delay}ms... (${reconnectAttempts}/${maxReconnectAttempts})`);
           
           reconnectTimeout = setTimeout(() => {
-            connectWebSocket();
+            if (!isCleanupPhase) {
+              connectWebSocket();
+            }
           }, delay);
+        } else if (!isCleanupPhase) {
+          console.log('🚫 [WebSocket] Not reconnecting - max attempts reached or connection was unstable');
         }
       });
 
