@@ -1,395 +1,400 @@
-# DigitalOcean Deployment Guide for BidScents
+# BidScents Marketplace - DigitalOcean Production Deployment Guide
 
-## Prerequisites
+This comprehensive guide will help you deploy your BidScents marketplace to DigitalOcean App Platform with proper production configurations.
 
-Before deploying to DigitalOcean, ensure you have:
+## 📋 Prerequisites
 
-1. **DigitalOcean Account** with billing enabled
-2. **GitHub Repository** connected to DigitalOcean
-3. **Supabase Project** with database and storage configured
-4. **Billplz Account** with API credentials
-5. **Domain Name** (optional but recommended)
+1. **DigitalOcean Account** with billing set up
+2. **GitHub Repository** with your code
+3. **Domain Name** (optional but recommended)
+4. **Production Billplz Account** with valid credentials
+5. **Strong Security Keys** for production
 
-## Pre-Deployment Checklist
+## 🔧 Pre-Deployment Setup
 
-### 1. Security Fixes (CRITICAL - Must Complete First)
-
-```bash
-# Generate secure JWT secrets
-openssl rand -base64 64  # For JWT_SECRET
-openssl rand -base64 64  # For REFRESH_SECRET
-
-# Update .env with secure values
-JWT_SECRET="your-generated-64-char-secret"
-REFRESH_SECRET="your-generated-64-char-secret"
-JWT_EXPIRES_IN="24h"
-```
-
-### 2. Database Preparation
+### 1. Prepare Your Repository
 
 ```bash
-# 1. Add missing indexes (run locally first)
-npm run db:generate-indexes
-
-# 2. Run database migrations
-npm run db:push
-
-# 3. Create boost packages
-npx tsx scripts/create-boost-packages.js
-
-# 4. Verify database schema
-npm run db:check
-```
-
-### 3. Build Verification
-
-```bash
-# Test production build locally
-npm run build
-
-# Test production server
-NODE_ENV=production npm start
-
-# Verify health endpoint
-curl http://localhost:5000/health
-curl http://localhost:5000/ready
-```
-
-### 4. Environment Variables
-
-Create a complete `.env.production` file:
-
-```bash
-# Core Settings
-NODE_ENV=production
-PORT=5000
-
-# Database (from Supabase)
-DATABASE_URL=postgresql://postgres:[password]@[host]:5432/postgres?sslmode=require
-
-# Supabase
-SUPABASE_URL=https://[project-id].supabase.co
-SUPABASE_KEY=[service-role-key]  # Keep this secret!
-VITE_SUPABASE_URL=https://[project-id].supabase.co
-VITE_SUPABASE_KEY=[anon-key]  # This is public
-
-# Authentication (use generated secrets)
-JWT_SECRET=[64-character-secret]
-JWT_EXPIRES_IN=24h
-REFRESH_SECRET=[64-character-secret]
-
-# Billplz
-BILLPLZ_BASE_URL=https://www.billplz.com/api/v3
-BILLPLZ_SECRET_KEY=[your-secret-key]
-BILLPLZ_XSIGN_KEY=[your-xsignature-key]
-BILLPLZ_COLLECTION_ID=[your-collection-id]
-
-# URLs (update after deployment)
-APP_URL=https://bidscents.com
-CLIENT_URL=https://bidscents.com
-```
-
-## Step-by-Step Deployment
-
-### Step 1: Prepare Repository
-
-```bash
-# 1. Commit all changes
+# Ensure all changes are committed
 git add .
 git commit -m "feat: prepare for production deployment"
-
-# 2. Push to main branch
 git push origin main
 
-# 3. Create production branch (optional)
-git checkout -b production
-git push origin production
+# Tag the release (optional but recommended)
+git tag -a v1.0.0 -m "Production release v1.0.0"
+git push origin v1.0.0
 ```
 
-### Step 2: Create DigitalOcean App
+### 2. Generate Strong Security Keys
 
-#### Option A: Using DigitalOcean Dashboard
-
-1. Go to [DigitalOcean App Platform](https://cloud.digitalocean.com/apps)
-2. Click "Create App"
-3. Choose GitHub as source
-4. Select your repository and branch
-5. Choose "Singapore (SGP)" region for Malaysian users
-6. Review and create
-
-#### Option B: Using doctl CLI
+Generate strong, unique keys for production:
 
 ```bash
-# Install doctl
-brew install doctl  # macOS
-# or
-snap install doctl  # Ubuntu
+# Generate JWT secret (32+ characters)
+openssl rand -base64 32
 
-# Authenticate
-doctl auth init
-
-# Create app
-doctl apps create --spec .do/app.yaml
+# Generate encryption key (32+ characters)  
+openssl rand -base64 32
 ```
 
-### Step 3: Configure Environment Variables
+### 3. Configure Production Billplz
 
-In DigitalOcean App Platform:
+1. **Sign up for Billplz Production Account**:
+   - Go to https://www.billplz.com
+   - Complete business verification
+   - Get production API credentials
 
-1. Go to your app's Settings
-2. Click on "App-Level Environment Variables"
-3. Add each variable from `.env.production`
-4. Mark sensitive values as "Encrypted"
-5. Save changes
+2. **Create Production Collection**:
+   - Log into Billplz dashboard
+   - Create a new collection for "BidScents Marketplace"
+   - Note the Collection ID
 
-### Step 4: Configure Build Settings
+3. **Get API Keys**:
+   - Copy Secret Key
+   - Copy X-Signature Key
+   - Copy Collection ID
 
-Update build command in App Platform:
+## 🚀 Deployment Options
 
-```bash
-npm ci --production=false && npm run build && npx tsx scripts/create-boost-packages.js
-```
+### Option A: DigitalOcean App Platform (Recommended)
 
-Update run command:
+#### Step 1: Create App via GitHub Integration
 
-```bash
-npm start
-```
+1. **Login to DigitalOcean**:
+   - Go to https://cloud.digitalocean.com
+   - Navigate to "Apps" → "Create App"
 
-### Step 5: Set Up Health Checks
+2. **Connect GitHub Repository**:
+   - Choose "GitHub" as source
+   - Authorize DigitalOcean to access your repos
+   - Select your BidScents repository
+   - Choose `main` branch
+   - Set auto-deploy on push: **Enabled**
 
-In App Platform settings:
-
-- **HTTP Path**: `/health`
-- **Initial Delay**: 30 seconds
-- **Period**: 10 seconds
-- **Timeout**: 5 seconds
-- **Success Threshold**: 1
-- **Failure Threshold**: 3
-
-### Step 6: Configure Domain
-
-1. Go to Settings → Domains
-2. Add your domain
-3. Update DNS records:
+3. **Configure Build Settings**:
+   ```yaml
+   Build Command: npm run build
+   Run Command: npm start
+   Environment: Node.js 18
+   Instance Size: Basic ($5/month to start)
+   Region: Singapore (SGP1) or closest to your users
    ```
-   Type: A
-   Name: @
-   Value: [DigitalOcean provides this]
+
+#### Step 2: Set Environment Variables
+
+In the DigitalOcean dashboard, add these environment variables:
+
+**Database & Authentication:**
+```bash
+NODE_ENV=production
+SUPABASE_URL=https://rjazuitnzsximznfcbfw.supabase.co/
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_URL=https://rjazuitnzsximznfcbfw.supabase.co/
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Security (Mark as SECRET):**
+```bash
+JWT_SECRET=your-generated-jwt-secret-here
+MESSAGE_ENCRYPTION_KEY=your-generated-encryption-key-here
+```
+
+**Billplz Production:**
+```bash
+BILLPLZ_BASE_URL=https://www.billplz.com/api
+BILLPLZ_SECRET_KEY=your-production-billplz-secret  # Mark as SECRET
+BILLPLZ_XSIGN_KEY=your-production-billplz-xsign   # Mark as SECRET
+BILLPLZ_COLLECTION_ID=your-production-collection-id
+```
+
+**Application Settings:**
+```bash
+PORT=5000
+DEMO_MODE=false
+APP_URL=https://your-app-name.ondigitalocean.app
+CLIENT_URL=https://your-app-name.ondigitalocean.app
+JWT_EXPIRES_IN=24h
+```
+
+#### Step 3: Configure Domain (Optional)
+
+1. **Add Custom Domain**:
+   - In DigitalOcean App settings
+   - Go to "Domains" tab
+   - Add your domain (e.g., `bidscents.com`)
+   - Update DNS records as instructed
+
+2. **Update Environment Variables**:
+   ```bash
+   APP_URL=https://yourdomain.com
+   CLIENT_URL=https://yourdomain.com
    ```
-4. Enable "Force HTTPS"
 
-### Step 7: Deploy
+#### Step 4: Deploy and Monitor
 
-```bash
-# Trigger deployment
-git push origin main
+1. **Trigger Deployment**:
+   - Click "Deploy" or push to your main branch
+   - Monitor build logs for any errors
+   - Deployment typically takes 5-10 minutes
 
-# Or manually via dashboard
-# Click "Deploy" button
-```
+2. **Verify Health**:
+   ```bash
+   curl https://your-app-url.com/api/health
+   ```
 
-### Step 8: Post-Deployment Verification
+### Option B: DigitalOcean Droplet with Docker
 
-```bash
-# 1. Check application health
-curl https://your-app.ondigitalocean.app/health
+#### Step 1: Create Droplet
 
-# 2. Test WebSocket connection
-wscat -c wss://your-app.ondigitalocean.app/ws
+1. **Create Ubuntu Droplet**:
+   - Size: 2 GB RAM minimum ($12/month)
+   - Region: Singapore or closest to users
+   - Enable monitoring and backups
 
-# 3. Verify boost packages
-curl https://your-app.ondigitalocean.app/api/boost/packages
+2. **Install Docker**:
+   ```bash
+   sudo apt update
+   sudo apt install docker.io docker-compose
+   sudo systemctl start docker
+   sudo systemctl enable docker
+   sudo usermod -aG docker $USER
+   ```
 
-# 4. Test payment webhook (use ngrok for local testing)
-curl -X POST https://your-app.ondigitalocean.app/api/payments/billplz/webhook \
-  -H "Content-Type: application/json" \
-  -d '{"id":"test","paid":"true","paid_at":"2024-01-01 00:00:00"}'
-```
+#### Step 2: Deploy with Docker
 
-## Monitoring Setup
+1. **Clone Repository**:
+   ```bash
+   git clone https://github.com/your-username/bidscents-marketplace.git
+   cd bidscents-marketplace
+   ```
 
-### 1. Enable DigitalOcean Monitoring
+2. **Configure Environment**:
+   ```bash
+   cp .env.production .env
+   # Edit .env with your production values
+   nano .env
+   ```
 
-```bash
-# In App Platform settings
-# Enable "Insights" for:
-- CPU Usage
-- Memory Usage
-- HTTP Request Rate
-- HTTP Error Rate
-```
+3. **Build and Deploy**:
+   ```bash
+   docker-compose up -d
+   ```
 
-### 2. Set Up Alerts
+4. **Set up Nginx Reverse Proxy** (recommended):
+   ```nginx
+   server {
+       listen 80;
+       server_name yourdomain.com;
+       
+       location / {
+           proxy_pass http://localhost:5000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+       }
+   }
+   ```
 
-Configure alerts for:
-- CPU > 80% for 5 minutes
-- Memory > 85% for 5 minutes
-- HTTP 5xx errors > 10 per minute
-- Restart count > 5 in 5 minutes
+## 🔒 Production Security Checklist
 
-### 3. External Monitoring
+### Essential Security Steps:
 
-Set up UptimeRobot or similar:
-- Monitor: `https://your-domain.com/health`
-- Check interval: 5 minutes
-- Alert contacts: Email, Slack
+1. **✅ Strong Secrets**:
+   - JWT_SECRET: 32+ random characters
+   - MESSAGE_ENCRYPTION_KEY: 32+ random characters
+   - Never use development keys in production
 
-## Troubleshooting
+2. **✅ Environment Variables**:
+   - Mark sensitive keys as "SECRET" in DigitalOcean
+   - Never commit .env files to repository
+   - Use different keys for each environment
 
-### Common Issues
+3. **✅ HTTPS Configuration**:
+   - Enable SSL/TLS (automatic with App Platform)
+   - Update CSP headers for production domain
+   - Verify HSTS is enabled
 
-#### 1. Build Failures
+4. **✅ Database Security**:
+   - Supabase handles this automatically
+   - Enable Row Level Security (RLS) policies
+   - Regular backups (Supabase handles this)
 
-```bash
-# Check build logs
-doctl apps logs [app-id] --type=build
+5. **✅ Rate Limiting**:
+   - Already configured in code
+   - Monitor for abuse
+   - Consider additional DDoS protection
 
-# Common fixes:
-- Ensure all dependencies are in package.json
-- Check Node.js version compatibility
-- Verify build command syntax
-```
+## 🏃‍♂️ Post-Deployment Steps
 
-#### 2. Health Check Failures
-
-```bash
-# Check runtime logs
-doctl apps logs [app-id] --type=run
-
-# Common fixes:
-- Verify PORT environment variable
-- Check database connection string
-- Ensure Supabase keys are correct
-```
-
-#### 3. WebSocket Connection Issues
-
-```bash
-# Test WebSocket endpoint
-wscat -c wss://your-domain.com/ws
-
-# Common fixes:
-- Ensure WebSocket runs on same port
-- Check CORS configuration
-- Verify JWT authentication
-```
-
-#### 4. Payment Webhook Failures
+### 1. Initialize Production Data
 
 ```bash
-# Test webhook endpoint
-curl -X POST https://your-domain.com/api/payments/billplz/webhook
-
-# Common fixes:
-- Verify Billplz keys
-- Check webhook URL in Billplz dashboard
-- Ensure CSRF exemption for webhooks
+# Create boost packages in production database
+# Run this once after deployment
+node scripts/create-boost-packages.js
 ```
 
-## Performance Optimization
+### 2. Test Critical Functionality
 
-### 1. Scaling Configuration
-
-```yaml
-# Update .do/app.yaml for scaling
-instance_count: 2  # Horizontal scaling
-instance_size_slug: professional-s  # Vertical scaling
+**Test Billplz Integration**:
+```bash
+curl https://yourdomain.com/api/boost/packages
 ```
 
-### 2. Resource Monitoring
+**Test Featured Products**:
+```bash
+curl https://yourdomain.com/api/products/featured
+```
+
+**Test Health Endpoint**:
+```bash
+curl https://yourdomain.com/api/health
+```
+
+### 3. Configure Monitoring
+
+1. **DigitalOcean Monitoring**:
+   - Enable alerts for CPU/Memory usage
+   - Set up uptime monitoring
+   - Configure log forwarding
+
+2. **Application Monitoring**:
+   ```bash
+   # Check application logs
+   doctl apps logs your-app-id --follow
+   ```
+
+### 4. Update Billplz Webhook URLs
+
+In your Billplz production dashboard:
+- **Callback URL**: `https://yourdomain.com/api/payments/billplz/webhook`
+- **Redirect URL**: `https://yourdomain.com/boost/payment-result`
+
+## 🐛 Troubleshooting
+
+### Common Issues:
+
+1. **Build Failures**:
+   ```bash
+   # Check if all dependencies are in package.json
+   npm run build
+   
+   # Verify Node.js version compatibility
+   node --version
+   ```
+
+2. **Environment Variable Issues**:
+   ```bash
+   # Test locally with production env
+   NODE_ENV=production npm start
+   
+   # Check variable loading
+   curl https://yourdomain.com/api/health
+   ```
+
+3. **Database Connection Issues**:
+   - Verify Supabase URL and keys
+   - Check security policies
+   - Test database connectivity
+
+4. **Payment Issues**:
+   - Verify Billplz production credentials
+   - Check webhook URLs are accessible
+   - Test with small amounts first
+
+### Monitoring and Logs:
 
 ```bash
+# View application logs
+doctl apps logs your-app-id --type=deploy
+doctl apps logs your-app-id --type=run
+
 # Monitor resource usage
-doctl apps get-metrics [app-id] --resource=cpu
-doctl apps get-metrics [app-id] --resource=memory
+doctl monitoring alert list
 ```
+
+## 📊 Performance Optimization
+
+### 1. Caching Strategy
+- Enable CDN for static assets
+- Implement Redis for session storage (optional)
+- Use Supabase built-in caching
+
+### 2. Scaling Options
+- **Vertical Scaling**: Increase instance size
+- **Horizontal Scaling**: Add more instances (Pro plan)
+- **Database Scaling**: Supabase handles automatically
 
 ### 3. Cost Optimization
+- Start with Basic plan ($5/month)
+- Monitor usage and scale as needed
+- Use DigitalOcean's cost alerts
 
-- Start with `professional-xs` ($12/month)
-- Scale up based on metrics
-- Use autoscaling for traffic spikes
-- Consider static assets CDN
+## 🔄 CI/CD Pipeline
 
-## Maintenance
+Set up automatic deployments:
 
-### Daily Tasks
-- Check health endpoint
-- Monitor error logs
-- Review performance metrics
-
-### Weekly Tasks
-- Review security alerts
-- Check disk usage
-- Analyze slow queries
-
-### Monthly Tasks
-- Update dependencies
-- Review costs
-- Performance analysis
-- Security audit
-
-## Rollback Procedure
-
-If deployment fails:
-
-```bash
-# 1. View deployment history
-doctl apps list-deployments [app-id]
-
-# 2. Rollback to previous deployment
-doctl apps create-deployment [app-id] --previous
-
-# 3. Investigate issues
-doctl apps logs [app-id] --type=build,run
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to DigitalOcean
+on:
+  push:
+    branches: [main]
+    
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Deploy to DigitalOcean
+        uses: digitalocean/app_action@main
+        with:
+          app_name: bidscents-marketplace
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 ```
 
-## Security Hardening
+## 🚨 Emergency Procedures
 
-### 1. Environment Variables
-- Never commit secrets to repository
-- Use DigitalOcean's encrypted variables
-- Rotate keys regularly
+### Rollback Deployment:
+```bash
+# Via DigitalOcean dashboard
+1. Go to Apps → Your App
+2. Click "Deployments" tab
+3. Select previous working deployment
+4. Click "Redeploy"
+```
 
-### 2. Network Security
-- Enable DigitalOcean firewall
-- Restrict database access
-- Use HTTPS only
+### Database Backup:
+```bash
+# Supabase provides automatic backups
+# For manual backup, use Supabase dashboard
+```
 
-### 3. Application Security
-- Keep dependencies updated
-- Enable security headers
-- Implement rate limiting
+## 📞 Support and Maintenance
 
-## Support Resources
+### Regular Maintenance:
+- **Weekly**: Check logs and performance metrics
+- **Monthly**: Review security updates and dependencies
+- **Quarterly**: Review costs and optimization opportunities
 
-- **DigitalOcean Support**: support.digitalocean.com
-- **Community**: digitalocean.com/community
-- **Status Page**: status.digitalocean.com
-- **Documentation**: docs.digitalocean.com/products/app-platform
+### Getting Help:
+- **DigitalOcean Support**: Available 24/7 with paid plans
+- **Community**: DigitalOcean Community forums
+- **Documentation**: https://docs.digitalocean.com/products/app-platform/
 
-## Final Checklist
+---
 
-Before going live:
+## 🎉 Congratulations!
 
-- [ ] All security vulnerabilities fixed
-- [ ] Database indexes created
-- [ ] Environment variables configured
-- [ ] Health checks passing
-- [ ] Domain configured with SSL
-- [ ] Monitoring enabled
-- [ ] Alerts configured
-- [ ] Backup strategy in place
-- [ ] Rollback procedure tested
-- [ ] Documentation updated
+Your BidScents marketplace is now running in production on DigitalOcean! 
 
-## Estimated Costs
+**Next Steps**:
+1. Test all functionality thoroughly
+2. Set up monitoring and alerts
+3. Configure backup strategies
+4. Plan for scaling as your user base grows
 
-- **App Platform**: $12-50/month (based on size)
-- **Database**: Included with Supabase
-- **Domain**: $10-15/year
-- **Monitoring**: Free tier sufficient
-- **Total**: ~$25-65/month
+**Production URL**: `https://your-app-name.ondigitalocean.app`
+**Health Check**: `https://your-app-name.ondigitalocean.app/api/health`
 
-Remember: Start small and scale based on actual usage!
+Your marketplace is now ready to handle real users and payments! 🚀

@@ -4779,6 +4779,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await securityDashboardApi.generateSecurityReport(req, res);
   });
 
+  // Health check endpoint for production monitoring
+  app.get('/api/health', async (req, res) => {
+    try {
+      // Check database connectivity
+      const { data, error } = await supabase
+        .from('users')
+        .select('count')
+        .limit(1);
+      
+      if (error) {
+        return res.status(503).json({
+          status: 'unhealthy',
+          database: 'disconnected',
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      return res.status(200).json({
+        status: 'healthy',
+        database: 'connected',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        version: '1.0.0'
+      });
+    } catch (error) {
+      return res.status(503).json({
+        status: 'unhealthy',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   // Payment verification endpoint for frontend
   app.get('/api/payments/verify-status', async (req, res) => {
     try {

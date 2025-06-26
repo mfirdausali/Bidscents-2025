@@ -1,178 +1,64 @@
-spec:
-  name: bidscents-marketplace
-  region: sgp
-  domains:
-    - domain: bidscents.com
-      type: PRIMARY
-      zone: bidscents.com
-      
-  services:
-    - name: bidscents-web
-      github:
-        repo: mfirdausali/Bidscents-2025
-        branch: main
-        deploy_on_push: true
-        
-      source_dir: /
-      
-      build_command: |
-        echo "Starting build process..."
-        npm ci --production=false
-        npm run build
-        echo "Creating boost packages..."
-        npx tsx scripts/create-boost-packages.js || echo "Boost packages already exist"
-        echo "Build complete!"
-        
-      run_command: npm start
-      
-      environment_slug: node-js
-      instance_size_slug: professional-xs
-      instance_count: 1
-      http_port: 5000
-      
-      envs:
-        # Environment
-        - key: NODE_ENV
-          value: production
-          
-        - key: PORT
-          value: "5000"
-          
-        # Database
-        - key: DATABASE_URL
-          type: SECRET
-          value: "postgresql://username:password@host:port/database?sslmode=require"
-          
-        # Supabase
-        - key: SUPABASE_URL
-          type: SECRET
-          value: "https://your-project.supabase.co"
-          
-        - key: SUPABASE_KEY
-          type: SECRET
-          value: "your-supabase-service-role-key"
-          
-        - key: VITE_SUPABASE_URL
-          type: SECRET
-          value: "https://your-project.supabase.co"
-          
-        - key: VITE_SUPABASE_KEY
-          type: SECRET
-          value: "your-supabase-anon-key"
-          
-        # Authentication
-        - key: JWT_SECRET
-          type: SECRET
-          value: "generate-with-openssl-rand-base64-64"
-          
-        - key: JWT_EXPIRES_IN
-          value: "24h"
-          
-        - key: REFRESH_SECRET
-          type: SECRET
-          value: "generate-with-openssl-rand-base64-64"
-          
-        # Billplz
-        - key: BILLPLZ_BASE_URL
-          value: "https://www.billplz.com/api/v3"
-          
-        - key: BILLPLZ_SECRET_KEY
-          type: SECRET
-          value: "your-billplz-secret-key"
-          
-        - key: BILLPLZ_XSIGN_KEY
-          type: SECRET
-          value: "your-billplz-xsignature-key"
-          
-        - key: BILLPLZ_COLLECTION_ID
-          type: SECRET
-          value: "your-billplz-collection-id"
-          
-        # Application URLs
-        - key: APP_URL
-          value: "https://bidscents.com"
-          
-        - key: CLIENT_URL
-          value: "https://bidscents.com"
-          
-        # Optional Performance Tuning
-        - key: NODE_OPTIONS
-          value: "--max-old-space-size=512"
-          
-        - key: UV_THREADPOOL_SIZE
-          value: "4"
-          
-      health_check:
-        http_path: /health
-        initial_delay_seconds: 30
-        period_seconds: 10
-        timeout_seconds: 5
-        success_threshold: 1
-        failure_threshold: 3
-        
-      # CORS settings handled by application
-      cors:
-        allow_origins:
-          - prefix: https://bidscents.com
-          
-      # Alerts
-      alerts:
-        - rule: DEPLOYMENT_FAILED
-          disabled: false
-          
-        - rule: DEPLOYMENT_LIVE
-          disabled: false
-          
-        - rule: DOMAIN_FAILED
-          disabled: false
-          
-        - rule: DOMAIN_LIVE
-          disabled: false
-          
-  alerts:
-    - rule: CPU_UTILIZATION
-      disabled: false
-      value: 80
-      operator: GREATER_THAN
-      window: FIVE_MINUTES
-      
-    - rule: MEM_UTILIZATION
-      disabled: false
-      value: 85
-      operator: GREATER_THAN
-      window: FIVE_MINUTES
-      
-    - rule: RESTART_COUNT
-      disabled: false
-      value: 5
-      operator: GREATER_THAN
-      window: FIVE_MINUTES
-      
-  # Optional: Add a worker for background jobs
-  # workers:
-  #   - name: bidscents-worker
-  #     github:
-  #       repo: mfirdausali/Bidscents-2025
-  #       branch: main
-  #       deploy_on_push: true
-  #     source_dir: /
-  #     build_command: npm ci --production=false && npm run build
-  #     run_command: npm run worker
-  #     environment_slug: node-js
-  #     instance_size_slug: basic-xxs
-  #     instance_count: 1
-  #     envs:
-  #       # Same environment variables as main service
-  
-  # Optional: Static site for documentation
-  # static_sites:
-  #   - name: bidscents-docs
-  #     github:
-  #       repo: mfirdausali/Bidscents-2025
-  #       branch: main
-  #       deploy_on_push: true
-  #     source_dir: /docs
-  #     build_command: npm run build:docs
-  #     output_dir: /docs/dist
-  #     index_document: index.html
-  #     error_document: 404.html
+# DigitalOcean App Platform Configuration
+name: bidscents-marketplace
+region: sgp1
+
+services:
+- name: bidscents-app
+  source_dir: /
+  github:
+    repo: your-username/bidscents-marketplace  # Update with your GitHub repo
+    branch: main
+  run_command: npm start
+  build_command: npm run build
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  routes:
+  - path: /
+  envs:
+  - key: NODE_ENV
+    value: production
+  - key: SUPABASE_URL
+    value: https://rjazuitnzsximznfcbfw.supabase.co/
+  - key: SUPABASE_KEY
+    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqYXp1aXRuenN4aW16bmZjYmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2Mzc2NDQsImV4cCI6MjA2MDIxMzY0NH0.Nxz6r39jRmCD1lEEglpYaWnSD2nKbLeGnBq2jtnrdqw
+  - key: SUPABASE_SERVICE_ROLE_KEY
+    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqYXp1aXRuenN4aW16bmZjYmZ3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NDYzNzY0NCwiZXhwIjoyMDYwMjEzNjQ0fQ.mI8o9usf8pmYUBIUzXZK0_GD1jIhDgOwSMNNDNO6Kco
+  - key: VITE_SUPABASE_URL
+    value: https://rjazuitnzsximznfcbfw.supabase.co/
+  - key: VITE_SUPABASE_ANON_KEY
+    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqYXp1aXRuenN4aW16bmZjYmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2Mzc2NDQsImV4cCI6MjA2MDIxMzY0NH0.Nxz6r39jRmCD1lEEglpYaWnSD2nKbLeGnBq2jtnrdqw
+  - key: JWT_SECRET
+    type: SECRET
+    value: YOUR_STRONG_JWT_SECRET_KEY
+  - key: JWT_EXPIRES_IN
+    value: "24h"
+  - key: MESSAGE_ENCRYPTION_KEY
+    type: SECRET
+    value: YOUR_STRONG_ENCRYPTION_KEY
+  - key: BILLPLZ_BASE_URL
+    value: https://www.billplz.com/api
+  - key: BILLPLZ_SECRET_KEY
+    type: SECRET
+    value: YOUR_PRODUCTION_BILLPLZ_SECRET_KEY
+  - key: BILLPLZ_XSIGN_KEY
+    type: SECRET
+    value: YOUR_PRODUCTION_BILLPLZ_XSIGN_KEY
+  - key: BILLPLZ_COLLECTION_ID
+    value: YOUR_PRODUCTION_COLLECTION_ID
+  - key: PORT
+    value: "5000"
+  - key: DEMO_MODE
+    value: "false"
+
+domains:
+- domain: your-domain.com  # Update with your domain
+  type: PRIMARY
+- domain: www.your-domain.com  # Update with your domain
+  type: ALIAS
+
+alerts:
+- rule: CPU_UTILIZATION
+  disabled: false
+- rule: MEM_UTILIZATION
+  disabled: false
