@@ -22,7 +22,8 @@ export function getWebSocketUrl(): string {
   let host: string;
   
   if (isDevelopment) {
-    // In development, use localhost:3000 (the server port)
+    // In development, use localhost:3000 (the server port via Vite proxy)
+    // Both frontend and backend are accessible on port 3000 via Vite proxy
     host = 'localhost:3000';
   } else {
     // In production, use the current host
@@ -32,8 +33,15 @@ export function getWebSocketUrl(): string {
   // Ensure host is never undefined or empty
   if (!host || host === 'undefined' || host === 'null') {
     console.error('❌ WebSocket host is invalid:', host);
-    // Fallback to current location host
-    host = window.location.host || 'localhost:3000';
+    console.error('❌ Environment details:', {
+      isDevelopment,
+      'import.meta.env.DEV': import.meta.env.DEV,
+      'import.meta.env.MODE': import.meta.env.MODE,
+      'window.location.hostname': window.location.hostname,
+      'window.location.host': window.location.host
+    });
+    // Fallback to localhost:3000 for development, current host for production
+    host = isDevelopment ? 'localhost:3000' : (window.location.host || 'localhost:3000');
   }
   
   const wsUrl = `${protocol}//${host}/ws`;

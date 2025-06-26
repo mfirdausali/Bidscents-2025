@@ -30,7 +30,12 @@ export function BoostPackageSelector({ onSelectPackage }: BoostPackageSelectorPr
       if (!response.ok) {
         throw new Error('Failed to fetch boost packages');
       }
-      return response.json() as Promise<BoostPackage[]>;
+      const result = await response.json();
+      // Handle both array response (for empty results) and object response
+      if (Array.isArray(result)) {
+        return result as BoostPackage[];
+      }
+      return result.data as BoostPackage[];
     }
   });
   
@@ -70,6 +75,21 @@ export function BoostPackageSelector({ onSelectPackage }: BoostPackageSelectorPr
     );
   }
   
+  // Helper function to format duration
+  const formatDuration = (hours: number): string => {
+    if (hours < 24) {
+      return `${hours} hours`;
+    } else {
+      const days = Math.floor(hours / 24);
+      const remainingHours = hours % 24;
+      if (remainingHours === 0) {
+        return `${days} day${days > 1 ? 's' : ''}`;
+      } else {
+        return `${days} day${days > 1 ? 's' : ''} ${remainingHours} hour${remainingHours > 1 ? 's' : ''}`;
+      }
+    }
+  };
+  
   const standardPackages = packages?.filter(pkg => pkg.package_type === 'standard') || [];
   const premiumPackages = packages?.filter(pkg => pkg.package_type === 'premium') || [];
   
@@ -97,7 +117,7 @@ export function BoostPackageSelector({ onSelectPackage }: BoostPackageSelectorPr
                 price={pkg.price}
                 durationHours={pkg.duration_hours}
                 effectivePrice={pkg.effective_price}
-                duration_formatted={pkg.duration_formatted}
+                duration_formatted={formatDuration(pkg.duration_hours)}
                 onSelect={onSelectPackage}
               />
             ))}
@@ -116,7 +136,7 @@ export function BoostPackageSelector({ onSelectPackage }: BoostPackageSelectorPr
                 price={pkg.price}
                 durationHours={pkg.duration_hours}
                 effectivePrice={pkg.effective_price}
-                duration_formatted={pkg.duration_formatted}
+                duration_formatted={formatDuration(pkg.duration_hours)}
                 onSelect={onSelectPackage}
               />
             ))}

@@ -22,8 +22,9 @@ import { User, Order, ProductWithDetails } from "@shared/schema";
 import { 
   Users, Package, Truck, AlertCircle, CheckCircle, 
   UserX, UserCheck, ShoppingBag, MessageSquare,
-  XCircle, Tag, CircleAlert
+  XCircle, Tag, CircleAlert, Shield
 } from "lucide-react";
+import { Link } from "wouter";
 import { ListingsTab } from "./admin-dashboard-listings";
 import { formatDate } from "@/lib/date-utils";
 
@@ -198,9 +199,17 @@ export default function AdminDashboard() {
       
       <main className="flex-grow bg-gray-50">
         <div className="container mx-auto px-6 py-8">
-          <div className="mb-8">
-            <h1 className="font-playfair text-3xl font-bold mb-2">Admin Dashboard</h1>
-            <p className="text-gray-600">Manage users, products, and orders</p>
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="font-playfair text-3xl font-bold mb-2">Admin Dashboard</h1>
+              <p className="text-gray-600">Manage users, products, and orders</p>
+            </div>
+            <Link href="/admin/security">
+              <Button variant="outline" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Security Dashboard
+              </Button>
+            </Link>
           </div>
           
           {/* Dashboard summary */}

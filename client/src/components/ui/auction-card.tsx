@@ -135,7 +135,7 @@ export function AuctionCard({ product, images }: AuctionProps) {
   return (
     <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 border flex flex-col h-full">
       <div className="relative">
-        <Link href={`/auction/${product.auction.id}`}>
+        <Link href={`/auctions/${product.auction.id}`}>
           <img
             src={
               // Use the first available image from the images array

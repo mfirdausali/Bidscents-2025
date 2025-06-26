@@ -233,8 +233,18 @@ export class SupabaseStorage implements IStorage {
     // Add missing fields that auth.ts is trying to update
     if (userData.providerId !== undefined) dbUserData.provider_id = userData.providerId;
     if (userData.provider !== undefined) dbUserData.provider = userData.provider;
+    if (userData.lastLoginAt !== undefined) dbUserData.last_login_at = userData.lastLoginAt;
+    if (userData.lastLoginIp !== undefined) dbUserData.last_login_ip = userData.lastLoginIp;
+    if (userData.failedLoginAttempts !== undefined) dbUserData.failed_login_attempts = userData.failedLoginAttempts;
     
     console.log(`🔧 Updating user ${id} with fields:`, Object.keys(dbUserData));
+    
+    // Skip empty updates
+    if (Object.keys(dbUserData).length === 0) {
+      console.log(`✅ No fields to update for user ${id}`);
+      // Return the existing user
+      return await this.getUser(id);
+    }
     
     const { data, error } = await supabase
       .from('users')
@@ -243,10 +253,20 @@ export class SupabaseStorage implements IStorage {
       .select()
       .single();
     
-    if (error || !data) {
+    if (error) {
+      // Check if it's a "no rows" error
+      if (error.code === 'PGRST116') {
+        console.error(`❌ User ID ${id} not found in database`);
+        throw new Error(`User with ID ${id} not found`);
+      }
       console.error('❌ Error updating user:', error);
       console.error(`❌ Attempted to update user ID ${id} with:`, dbUserData);
       throw new Error(`Failed to update user: ${error?.message}`);
+    }
+    
+    if (!data) {
+      console.error(`❌ No data returned after updating user ${id}`);
+      throw new Error('Failed to update user: No data returned');
     }
     
     console.log(`✅ Successfully updated user ${id}`);
@@ -425,8 +445,8 @@ export class SupabaseStorage implements IStorage {
     // Start with a base query
     let query = supabase.from('products').select('*');
     
-    // Filter for both active and featured products
-    query = query.or('status.eq.active,status.eq.featured');
+    // Filter for active, featured, and pending products (pending needed for auctions)
+    query = query.or('status.eq.active,status.eq.featured,status.eq.pending');
     
     // Apply filters if provided
     if (filters) {

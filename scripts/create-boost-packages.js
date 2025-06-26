@@ -4,7 +4,11 @@
  * Premium Boost: 36 hours
  */
 
+import dotenv from 'dotenv';
 import { supabase } from '../server/supabase.ts';
+
+// Load environment variables
+dotenv.config();
 
 async function createBoostPackagesTable() {
   console.log('🚀 Creating boost_packages table in Supabase...');
@@ -30,6 +34,7 @@ async function createBoostPackagesTable() {
           price INTEGER NOT NULL,
           duration_hours INTEGER NOT NULL,
           effective_price DECIMAL(10, 2),
+          is_active BOOLEAN DEFAULT TRUE,
           created_at TIMESTAMPTZ DEFAULT NOW()
         );
       `;
@@ -59,7 +64,8 @@ async function createBoostPackagesTable() {
         item_count: 1,
         price: 500, // RM 5.00 in sen
         duration_hours: 15, // 15 hours for Standard
-        effective_price: 5.00
+        effective_price: 5.00,
+        is_active: true
       },
       {
         name: 'Standard Boost (3 Items)',
@@ -67,7 +73,8 @@ async function createBoostPackagesTable() {
         item_count: 3,
         price: 1200, // RM 12.00 in sen
         duration_hours: 15, // 15 hours for Standard
-        effective_price: 4.00
+        effective_price: 4.00,
+        is_active: true
       },
       {
         name: 'Premium Boost (1 Item)',
@@ -75,7 +82,8 @@ async function createBoostPackagesTable() {
         item_count: 1,
         price: 1000, // RM 10.00 in sen
         duration_hours: 36, // 36 hours for Premium
-        effective_price: 10.00
+        effective_price: 10.00,
+        is_active: true
       },
       {
         name: 'Premium Boost (3 Items)',
@@ -83,7 +91,8 @@ async function createBoostPackagesTable() {
         item_count: 3,
         price: 2400, // RM 24.00 in sen
         duration_hours: 36, // 36 hours for Premium
-        effective_price: 8.00
+        effective_price: 8.00,
+        is_active: true
       }
     ];
 

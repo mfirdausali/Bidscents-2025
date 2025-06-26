@@ -9,6 +9,8 @@ import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from './supabase';
 import { storage } from './storage';
+import { auditAuth, auditSecurity, AuditEventType, AuditSeverity, auditLog } from './audit-logger';
+import { trackLoginAttempt, trackSession, updateSessionActivity, deactivateSession } from './security-tracking';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_EXPIRES_IN = '7d';
@@ -171,11 +173,19 @@ export const authRoutes = {
       
       if (error) {
         console.error('❌ Backend: Supabase auth error:', error);
+        const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+        const userAgent = req.headers['user-agent'];
+        await trackLoginAttempt('unknown', false, ipAddress, userAgent, undefined, 'Invalid Supabase token');
+        await auditAuth.loginFailed(req, 'unknown', 'Invalid Supabase token');
         return res.status(401).json({ error: 'Invalid Supabase token' });
       }
       
       if (!user) {
         console.log('❌ Backend: No user returned from Supabase');
+        const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+        const userAgent = req.headers['user-agent'];
+        await trackLoginAttempt('unknown', false, ipAddress, userAgent, undefined, 'No user returned from Supabase');
+        await auditAuth.loginFailed(req, 'unknown', 'No user returned from Supabase');
         return res.status(401).json({ error: 'Invalid Supabase token' });
       }
 
@@ -324,6 +334,30 @@ export const authRoutes = {
       };
       
       console.log('✅ Backend: Session created successfully for user:', localUser.email);
+      
+      // Track successful login
+      const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+      const userAgent = req.headers['user-agent'];
+      await trackLoginAttempt(localUser.email, true, ipAddress, userAgent, localUser.id);
+      
+      // Track session
+      await trackSession(localUser.id, appToken, ipAddress, userAgent);
+      
+      // Update user's last login info (non-critical, don't fail login if this fails)
+      try {
+        await storage.updateUser(localUser.id, {
+          lastLoginAt: new Date(),
+          lastLoginIp: ipAddress,
+          failedLoginAttempts: 0 // Reset failed attempts on successful login
+        });
+      } catch (updateError: any) {
+        console.warn('⚠️ Backend: Failed to update last login info:', updateError.message);
+        // Continue with login - this is non-critical
+      }
+      
+      // Audit successful login
+      await auditAuth.loginSuccess(req, localUser.id, localUser.email);
+      
       res.json(response);
     } catch (error: any) {
       console.error('❌ Backend: Session creation error details:', {
@@ -331,6 +365,10 @@ export const authRoutes = {
         stack: error?.stack,
         name: error?.name
       });
+      
+      // Audit failed login
+      await auditAuth.loginFailed(req, 'unknown', error?.message || 'Internal server error');
+      
       res.status(500).json({ error: 'Internal server error' });
     }
   },
@@ -390,6 +428,16 @@ export const authRoutes = {
 
   // Logout (client-side only - just remove token)
   logout: async (req: Request, res: Response) => {
+    // Deactivate session if token provided
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      await deactivateSession(token);
+    }
+    
+    // Audit logout event
+    await auditAuth.logout(req);
+    
     res.json({ message: 'Logged out successfully' });
   },
 

@@ -34,7 +34,9 @@ export default function BoostCheckoutPage() {
       if (!selectedPackage) return null;
       const response = await fetch(`/api/boost/packages?id=${selectedPackage}`);
       if (!response.ok) throw new Error('Failed to fetch package details');
-      const data = await response.json();
+      const result = await response.json();
+      // Handle both array response and object response
+      const data = Array.isArray(result) ? result : result.data;
       return data[0] as BoostPackage;
     },
     enabled: !!selectedPackage

@@ -205,42 +205,11 @@ export function validateRequest(schema: z.ZodSchema) {
 
 /**
  * CSRF validation middleware for boost operations
+ * @deprecated CSRF protection has been removed from the application
  */
 export function validateBoostCSRF(req: Request, res: Response, next: NextFunction) {
-  // Check if CSRF is bypassed in development/demo mode
-  if (process.env.BYPASS_CSRF === 'true' || process.env.DEMO_MODE === 'true') {
-    return next();
-  }
-  
-  const csrfToken = req.headers['x-csrf-token'] as string;
-  const sessionToken = req.headers['authorization'] as string;
-  
-  if (!csrfToken) {
-    const error = new BoostOrderError(
-      'CSRF token required',
-      BoostErrorCode.UNAUTHORIZED_ACCESS,
-      403,
-      { type: 'csrf_missing' },
-      req.requestId
-    );
-    return next(error);
-  }
-  
-  // Validate CSRF token (implementation depends on your CSRF strategy)
-  try {
-    // This should integrate with your existing CSRF validation logic
-    const { validateCSRF } = require('./csrf-protection');
-    validateCSRF(req, res, next);
-  } catch (error) {
-    const csrfError = new BoostOrderError(
-      'Invalid CSRF token',
-      BoostErrorCode.UNAUTHORIZED_ACCESS,
-      403,
-      { type: 'csrf_invalid' },
-      req.requestId
-    );
-    return next(csrfError);
-  }
+  // CSRF protection has been removed - this is now a no-op
+  return next();
 }
 
 /**

@@ -33,6 +33,14 @@ export const users = pgTable("users", {
   supabaseUserId: text("supabase_user_id"), // Direct reference to auth.users.id for faster lookups
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  // Security fields
+  accountLocked: boolean("account_locked").default(false).notNull(),
+  accountLockedAt: timestamp("account_locked_at", { withTimezone: true }),
+  accountLockedReason: text("account_locked_reason"),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  lastLoginIp: text("last_login_ip"),
+  failedLoginAttempts: integer("failed_login_attempts").default(0).notNull(),
+  role: text("role").default("user").notNull(), // user, seller, admin
 });
 
 // Categories table
@@ -51,7 +59,7 @@ export const boostPackages = pgTable("boost_packages", {
   price: integer("price").notNull(), // Price in sen (e.g., RM 5 = 500 sen)
   durationHours: integer("duration_hours").notNull(), // 15 or 36 hours
   effectivePrice: decimal("effective_price", { precision: 10, scale: 2 }), // Price per item
-  isActive: boolean("is_active").default(true),
+  isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 
@@ -212,6 +220,81 @@ export const transactions = pgTable("transactions", {
   status: transactionStatusEnum("status").notNull().default('WAITING_PAYMENT'),
 });
 
+// Audit logs table for security and compliance tracking
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  eventType: text("event_type").notNull(), // Type of event (login, resource_update, etc.)
+  severity: text("severity").notNull(), // INFO, WARNING, ERROR, CRITICAL
+  userId: integer("user_id").references(() => users.id), // User who performed the action (nullable for anonymous)
+  userEmail: text("user_email"), // Store email separately for audit trail even if user is deleted
+  ipAddress: text("ip_address"), // IP address of the request
+  userAgent: text("user_agent"), // User agent string
+  action: text("action").notNull(), // Human-readable description of the action
+  resourceType: text("resource_type"), // Type of resource affected (product, user, payment, etc.)
+  resourceId: text("resource_id"), // ID of the affected resource
+  details: jsonb("details"), // Additional context and metadata
+  success: boolean("success").notNull(), // Whether the action succeeded
+  errorMessage: text("error_message"), // Error message if action failed
+  requestId: text("request_id"), // Unique request ID for correlation
+  sessionId: text("session_id"), // Session ID for user tracking
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  entityType: text("entity_type"), // For compatibility with security dashboard
+  entityId: text("entity_id"), // For compatibility with security dashboard
+  changes: jsonb("changes"), // Track changes made
+});
+
+// Login attempts table for authentication tracking
+export const loginAttempts = pgTable("login_attempts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  email: text("email").notNull(),
+  ipAddress: text("ip_address").notNull(),
+  userAgent: text("user_agent"),
+  successful: boolean("successful").notNull(),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Sessions table for active session tracking
+export const sessions = pgTable("sessions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  token: text("token").notNull().unique(),
+  ipAddress: text("ip_address").notNull(),
+  userAgent: text("user_agent"),
+  active: boolean("active").default(true).notNull(),
+  lastActivity: timestamp("last_activity", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+// Security alerts table
+export const securityAlerts = pgTable("security_alerts", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // failed_login, rate_limit, suspicious_activity, geographic_anomaly
+  severity: text("severity").notNull(), // critical, high, medium, low
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  status: text("status").notNull().default("new"), // new, acknowledged, resolved
+  metadata: jsonb("metadata"),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  acknowledgedBy: text("acknowledged_by"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Rate limit violations table
+export const rateLimitViolations = pgTable("rate_limit_violations", {
+  id: serial("id").primaryKey(),
+  ipAddress: text("ip_address").notNull(),
+  userId: integer("user_id").references(() => users.id),
+  endpoint: text("endpoint").notNull(),
+  method: text("method").notNull(),
+  violationCount: integer("violation_count").default(1).notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Zod schemas for data validation - Updated to include new fields
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -234,6 +317,14 @@ export const insertUserSchema = createInsertSchema(users).pick({
   providerId: true, // Auth provider's user ID for secure linking
   provider: true, // The authentication provider used
   supabaseUserId: true, // Direct Supabase reference
+  // Security fields
+  accountLocked: true,
+  accountLockedAt: true,
+  accountLockedReason: true,
+  lastLoginAt: true,
+  lastLoginIp: true,
+  failedLoginAttempts: true,
+  role: true,
 });
 
 export const insertProductSchema = createInsertSchema(products).pick({
@@ -362,6 +453,46 @@ export const insertTransactionSchema = createInsertSchema(transactions).pick({
   status: true,
 });
 
+export const insertLoginAttemptSchema = createInsertSchema(loginAttempts).pick({
+  userId: true,
+  email: true,
+  ipAddress: true,
+  userAgent: true,
+  successful: true,
+  failureReason: true,
+});
+
+export const insertSessionSchema = createInsertSchema(sessions).pick({
+  userId: true,
+  token: true,
+  ipAddress: true,
+  userAgent: true,
+  active: true,
+  lastActivity: true,
+  expiresAt: true,
+});
+
+export const insertSecurityAlertSchema = createInsertSchema(securityAlerts).pick({
+  type: true,
+  severity: true,
+  title: true,
+  description: true,
+  status: true,
+  metadata: true,
+  acknowledgedAt: true,
+  acknowledgedBy: true,
+  notes: true,
+});
+
+export const insertRateLimitViolationSchema = createInsertSchema(rateLimitViolations).pick({
+  ipAddress: true,
+  userId: true,
+  endpoint: true,
+  method: true,
+  violationCount: true,
+  windowStart: true,
+});
+
 // Schema for creating boost orders
 export const createBoostOrderSchema = z.object({
   boostPackageId: z.number().int().positive("Boost package ID must be a positive integer"),
@@ -412,6 +543,21 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+export type LoginAttempt = typeof loginAttempts.$inferSelect;
+export type InsertLoginAttempt = z.infer<typeof insertLoginAttemptSchema>;
+
+export type Session = typeof sessions.$inferSelect;
+export type InsertSession = z.infer<typeof insertSessionSchema>;
+
+export type SecurityAlert = typeof securityAlerts.$inferSelect;
+export type InsertSecurityAlert = z.infer<typeof insertSecurityAlertSchema>;
+
+export type RateLimitViolation = typeof rateLimitViolations.$inferSelect;
+export type InsertRateLimitViolation = z.infer<typeof insertRateLimitViolationSchema>;
 
 export type CreateBoostOrder = z.infer<typeof createBoostOrderSchema>;
 

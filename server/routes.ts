@@ -29,7 +29,7 @@ import * as billplz from './billplz';
 import crypto from 'crypto';
 import { requireAuth, getUserFromToken, authRoutes, AuthenticatedRequest } from './app-auth';
 import { authLimiter, passwordResetLimiter, apiLimiter, userLookupLimiter, adminLimiter } from './rate-limiter';
-import { validateCSRF, provideCSRFToken, getCSRFTokenEndpoint } from './csrf-protection';
+import { auditLog, auditMiddleware, auditAuth, auditResource, auditSecurity, auditPayment, auditAdmin, auditFile, AuditEventType, AuditSeverity } from './audit-logger';
 
 // Import boost error handling system
 import {
@@ -61,15 +61,20 @@ import {
 } from './boost-validation';
 
 // Import boost transaction management
+// Using Supabase-based implementation to avoid PostgreSQL role issues
 import {
   executeBoostTransaction,
+  trackBoostOperation as trackOperation,
+  generateBoostTransactionId as generateTransactionId
+} from './boost-supabase';
+
+// Import other functions from boost-transactions (these don't use db)
+import {
   createBoostOrderTransaction,
   processBoostPaymentTransaction,
   expireFeaturedProductsTransaction,
   createIdempotencyKey,
   checkIdempotentOperation,
-  generateTransactionId,
-  trackOperation,
   addRollbackAction
 } from './boost-transactions';
 
@@ -124,6 +129,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         version: "1.0.0"
       });
     }
+  });
+
+  // Preprocessing function for product data to handle type mismatches
+  const preprocessProductData = (data: any) => ({
+    ...data,
+    price: typeof data.price === 'number' ? data.price.toString() : data.price,
+    stockQuantity: typeof data.stockQuantity === 'string' ? parseInt(data.stockQuantity) : data.stockQuantity,
+    remainingPercentage: typeof data.remainingPercentage === 'string' ? parseInt(data.remainingPercentage) : data.remainingPercentage,
+    purchaseYear: typeof data.purchaseYear === 'string' ? parseInt(data.purchaseYear) : data.purchaseYear,
+    categoryId: typeof data.categoryId === 'string' ? parseInt(data.categoryId) : data.categoryId
   });
 
   // Create HTTP server for both Express and WebSocket
@@ -265,6 +280,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Save message to database
               const savedMessage = await storage.sendMessage(messageData);
               console.log('✅ SERVER: Message saved with ID:', savedMessage.id);
+              
+              // Audit message sent
+              await auditLog({
+                eventType: AuditEventType.USER_MESSAGE_SENT,
+                severity: AuditSeverity.INFO,
+                userId: clientInfo.userId,
+                ipAddress: ws._socket?.remoteAddress || 'websocket',
+                userAgent: 'WebSocket Client',
+                action: 'Sent message',
+                resourceType: 'message',
+                resourceId: savedMessage.id,
+                details: {
+                  receiverId: data.receiverId,
+                  productId: data.productId,
+                  hasContent: !!data.content
+                },
+                success: true
+              });
               
               // Get user details for response
               const sender = await storage.getUser(clientInfo.userId);
@@ -744,6 +777,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
                 console.log(`Successfully created bid with ID ${bid.id}`);
                 
+                // Audit bid placement
+                await auditLog({
+                  eventType: AuditEventType.USER_BID_PLACED,
+                  severity: AuditSeverity.INFO,
+                  userId: userId,
+                  ipAddress: ws._socket?.remoteAddress || 'websocket',
+                  userAgent: 'WebSocket Client',
+                  action: 'Placed bid',
+                  resourceType: 'bid',
+                  resourceId: bid.id,
+                  details: {
+                    auctionId: parseInt(auctionId),
+                    amount: parseFloat(amount),
+                    productId: auction.productId
+                  },
+                  success: true
+                });
+                
                 // Step 4: Check if bid is in last 5 minutes and extend auction
                 const timeUntilEnd = endsAt.getTime() - now;
                 const EXTENSION_THRESHOLD = 5 * 60 * 1000; // 5 minutes
@@ -1046,8 +1097,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email verification endpoint for handling Supabase email confirmation links
   app.get('/api/verify-email', authRoutes.verifyEmail);
   
-  // SECURITY: CSRF protection endpoints
-  app.get('/api/csrf-token', getCSRFTokenEndpoint);
   
   // Raw query middleware specifically for Billplz redirect
   // This captures the original query string before Express parses it
@@ -1136,6 +1185,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       console.log(`📝 Payment ${payment.id} status updated to: ${newStatus}`);
+      
+      // Audit payment status update
+      if (newStatus === 'paid') {
+        await auditPayment.success(req, payment.orderId, transaction_id || billId, amount);
+      } else if (newStatus === 'failed') {
+        await auditPayment.failed(req, payment.orderId, `Payment state: ${state}`);
+      }
 
       // **BOOST ACTIVATION LOGIC** - Only activate boost for successful payments
       if (newStatus === 'paid' && payment.paymentType === 'boost') {
@@ -1584,6 +1640,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedUser = await storage.updateUser(user.id, {
         avatarUrl: fileId
       });
+      
+      // Audit file upload
+      await auditFile.upload(req, 'avatar', fileId, req.file.buffer.length);
 
       return res.json({
         message: "Profile image uploaded successfully",
@@ -1722,6 +1781,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { boostPackageId, productIds } = req.body;
         
+        console.log(`🔍 [${requestId}] Debug - Received boost package ID:`, boostPackageId);
+        console.log(`🔍 [${requestId}] Debug - Product IDs:`, productIds);
+        
         // Create idempotency key for this operation
         const idempotencyKey = req.idempotencyKey || createIdempotencyKey(
           user.id, 
@@ -1741,12 +1803,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           trackOperation(txId, 'validate_boost_package');
           
           // Verify boost package exists and is active
+          console.log(`🔍 [${requestId}] Querying boost package with ID: ${boostPackageId}`);
           const { data: boostPackage, error: packageError } = await supabase
             .from('boost_packages')
             .select('*')
             .eq('id', boostPackageId)
             .eq('is_active', true)
             .single();
+
+          console.log(`🔍 [${requestId}] Boost package query result:`, { 
+            found: !!boostPackage, 
+            error: packageError?.message,
+            packageData: boostPackage
+          });
 
           if (packageError || !boostPackage) {
             throw new BoostOrderError(
@@ -1831,26 +1900,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiresAt.setHours(expiresAt.getHours() + 24);
 
           // Create payment record in database
+          // Note: Using existing database schema columns, storing extra data in webhook_payload
+          const paymentMetadata = {
+            boost_package: boostPackage,
+            selected_products: products.map(p => ({ id: p.id, name: p.name })),
+            expires_at: expiresAt.toISOString(),
+            transaction_id: txId,
+            request_id: requestId,
+            payment_type: 'boost',
+            product_ids: productIds
+          };
+          
+          const paymentData = {
+            user_id: user.id.toString(), // Ensure string format to match existing schema
+            order_id: orderId,
+            amount: boostPackage.price,
+            status: 'pending',
+            boost_option_id: boostPackageId,
+            product_id: productIds[0], // Use first product for backward compatibility
+            collection_id: process.env.BILLPLZ_COLLECTION_ID, // Required field from Billplz
+            created_at: new Date().toISOString(),
+            webhook_payload: JSON.stringify(paymentMetadata) // Store metadata in existing column
+          };
+          
+          console.log(`🔍 [${requestId}] Creating payment record with data:`, {
+            ...paymentData,
+            webhook_payload: '[JSON_PAYLOAD]' // Don't log the full JSON
+          });
+          
           const { data: payment, error: paymentError } = await supabase
             .from('payments')
-            .insert({
-              user_id: user.id,
-              order_id: orderId,
-              amount: boostPackage.price,
-              status: 'pending',
-              payment_type: 'boost',
-              boost_option_id: boostPackageId,
-              product_ids: productIds.map(String), // Convert to string array as expected by schema
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              metadata: {
-                boost_package: boostPackage,
-                selected_products: products.map(p => ({ id: p.id, name: p.name })),
-                expires_at: expiresAt.toISOString(),
-                transaction_id: txId,
-                request_id: requestId
-              }
-            })
+            .insert(paymentData)
             .select()
             .single();
 
@@ -1883,7 +1963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               description: `Boost Package: ${boostPackage.name} (${boostPackage.item_count} items for ${boostPackage.duration_hours} hours)`,
               reference_1: orderId,
               reference_2: `boost_${boostPackageId}`,
-              callback_url: `${process.env.APP_URL || 'http://localhost:5000'}/api/payments/billplz-callback`,
+              callback_url: `${process.env.APP_URL || 'http://localhost:5000'}/api/payments/billplz/webhook`,
               redirect_url: `${process.env.CLIENT_URL || 'http://localhost:5173'}/boost/payment-result`
             });
           } catch (billplzError) {
@@ -2195,11 +2275,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products", validateCSRF, async (req, res, next) => {
+  app.post("/api/products", async (req, res, next) => {
     try {
       // SECURITY FIX: Require proper authentication - no bypass allowed
       const user = await getAuthenticatedUser(req);
       if (!user) {
+        await auditSecurity.unauthorizedAccess(req, 'product creation', 'Authentication required');
         return res.status(401).json({ 
           message: "Authentication required", 
           code: "AUTH_REQUIRED" 
@@ -2208,20 +2289,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // SECURITY FIX: Verify user is a seller
       if (!user.isSeller) {
+        await auditSecurity.unauthorizedAccess(req, 'product creation', 'Seller account required');
         return res.status(403).json({ 
           message: "Seller account required", 
           code: "SELLER_REQUIRED" 
         });
       }
       
+      // Preprocess the data to handle type mismatches
+      const processedData = preprocessProductData(req.body);
+      
       // SECURITY FIX: Always use authenticated user's ID, ignore any sellerId in request body
       const productData = {
-        ...insertProductSchema.parse(req.body),
+        ...insertProductSchema.parse(processedData),
         sellerId: user.id // Force seller ID to authenticated user
       };
       
       console.log(`[SECURITY] Product creation by authenticated seller ID: ${user.id}`);
       const product = await storage.createProduct(productData);
+      
+      // Audit product creation
+      await auditResource.create(req, 'product', product.id, {
+        name: product.name,
+        brand: product.brand,
+        price: product.price,
+        sellerId: product.sellerId
+      });
+      
       return res.status(201).json(product);
     } catch (error) {
       next(error);
@@ -2265,12 +2359,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized: You can only edit your own products" });
       }
 
-      const validatedData = insertProductSchema.parse({
+      // Preprocess the data to handle type conversions
+      const preprocessedData = preprocessProductData({
         ...req.body,
         sellerId: sellerId, // Use the determined sellerId
       });
+      
+      const validatedData = insertProductSchema.parse(preprocessedData);
 
       const updatedProduct = await storage.updateProduct(id, validatedData);
+      
+      // Audit product update
+      await auditResource.update(req, 'product', id, {
+        changes: validatedData,
+        sellerId: sellerId
+      });
+      
       res.json(updatedProduct);
     } catch (error) {
       next(error);
@@ -2367,7 +2471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Auction endpoints
-  app.post("/api/auctions", validateCSRF, async (req, res, next) => {
+  app.post("/api/auctions", async (req, res, next) => {
     try {
       console.log("POST /api/auctions called with body:", req.body);
       
@@ -3050,6 +3154,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedUser = await storage.banUser(id, isBanned);
+      
+      // Audit admin ban/unban action
+      if (isBanned) {
+        await auditAdmin.banUser(req, id, `User banned by admin ${user.id}`);
+      } else {
+        await auditLog({
+          eventType: AuditEventType.ADMIN_USER_UNBAN,
+          severity: AuditSeverity.WARNING,
+          userId: user.id,
+          userEmail: user.email,
+          ipAddress: req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || 'unknown',
+          userAgent: req.headers['user-agent'] || 'unknown',
+          action: 'Unbanned user',
+          resourceType: 'user',
+          resourceId: id,
+          success: true
+        });
+      }
+      
       res.json(updatedUser);
     } catch (error) {
       next(error);
@@ -3175,7 +3298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Message file upload endpoint
-  app.post("/api/messages/upload-file", validateCSRF, requireAuth, messageFileUpload.single('file'), async (req: AuthenticatedRequest, res, next) => {
+  app.post("/api/messages/upload-file", requireAuth, messageFileUpload.single('file'), async (req: AuthenticatedRequest, res, next) => {
     try {
       console.log("File upload request received");
 
@@ -3719,7 +3842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Confirm transaction action
-  app.post("/api/messages/action/confirm", validateCSRF, requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  app.post("/api/messages/action/confirm", requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
       // Validate request body
       const schema = z.object({
@@ -3944,7 +4067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Submit a review for a completed transaction
-  app.post("/api/messages/submit-review/:messageId", validateCSRF, requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  app.post("/api/messages/submit-review/:messageId", requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
       // Validate request parameters and body
       const messageId = parseInt(req.params.messageId, 10);
@@ -4078,7 +4201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark messages as read
-  app.post("/api/messages/mark-read", validateCSRF, requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  app.post("/api/messages/mark-read", requireAuth, async (req: AuthenticatedRequest, res, next) => {
     try {
       // Validate request body
       const schema = z.object({
@@ -4135,8 +4258,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // IMPORTANT: Log if timezone offset might cause issues
     const tzOffset = new Date().getTimezoneOffset();
     if (tzOffset !== 0) {
-      console.warn(`[AUCTION-CHECK] WARNING: Server timezone offset is ${tzOffset} minutes from UTC!`);
-      console.warn(`[AUCTION-CHECK] This may cause auctions to expire ${Math.abs(tzOffset / 60)} hours off schedule.`);
+      console.error(`[AUCTION-CHECK] ❌ CRITICAL: Server timezone offset is ${tzOffset} minutes from UTC!`);
+      console.error(`[AUCTION-CHECK] ❌ This WILL cause auctions to expire ${Math.abs(tzOffset / 60)} hours off schedule!`);
+      console.error(`[AUCTION-CHECK] ❌ Server must run with TZ=UTC environment variable set!`);
+    } else {
+      console.log(`[AUCTION-CHECK] ✅ Server timezone is UTC (offset: 0 minutes) - Good!`);
     }
     
     try {
@@ -4178,7 +4304,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Calculate time difference using UTC milliseconds (always UTC)
         const msUntilEnd = auctionEndDateUTC.getTime() - nowUTC.getTime();
         const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
-        const isExpired = msUntilEnd < 0;
+        const minutesUntilEnd = msUntilEnd / (1000 * 60);
+        
+        // SAFEGUARD: Add grace period to prevent premature expiration
+        // Only mark as expired if it's been at least 1 minute past the end time
+        const GRACE_PERIOD_MS = 60 * 1000; // 1 minute grace period
+        const isExpired = msUntilEnd < -GRACE_PERIOD_MS;
+        
+        // SAFEGUARD: Warn if auction appears to have JUST expired
+        if (msUntilEnd < 0 && msUntilEnd > -GRACE_PERIOD_MS) {
+          console.warn(`[AUCTION-CHECK] ⚠️ GRACE PERIOD: Auction #${auction.id} ended ${Math.abs(minutesUntilEnd).toFixed(2)} minutes ago`);
+          console.warn(`[AUCTION-CHECK] ⚠️ Waiting for grace period before marking as expired`);
+        }
+        
+        // SAFEGUARD: Extra validation for auctions that appear to expire too early
+        if (isExpired && hoursUntilEnd > -24) { // If expired within last 24 hours
+          const createdAt = new Date(auction.startsAt);
+          const intendedDuration = auctionEndDateUTC.getTime() - createdAt.getTime();
+          const actualDuration = nowUTC.getTime() - createdAt.getTime();
+          const durationDiff = Math.abs(intendedDuration - actualDuration);
+          
+          // If the actual duration is significantly different from intended (> 1 hour difference)
+          if (durationDiff > 60 * 60 * 1000) {
+            console.error(`[AUCTION-CHECK] ⚠️ SUSPICIOUS EXPIRY: Auction #${auction.id}`);
+            console.error(`[AUCTION-CHECK] ⚠️ Intended duration: ${(intendedDuration / (1000 * 60 * 60)).toFixed(2)} hours`);
+            console.error(`[AUCTION-CHECK] ⚠️ Actual duration: ${(actualDuration / (1000 * 60 * 60)).toFixed(2)} hours`);
+            console.error(`[AUCTION-CHECK] ⚠️ Difference: ${(durationDiff / (1000 * 60 * 60)).toFixed(2)} hours`);
+          }
+        }
         
         console.log(`[AUCTION-CHECK] Auction #${auction.id}:`);
         console.log(`  - endsAt (stored): ${auction.endsAt}`);
@@ -4188,7 +4341,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`  - current time (local): ${nowUTC.toString()}`);
         console.log(`  - ms until end: ${msUntilEnd}`);
         console.log(`  - hours until end: ${hoursUntilEnd.toFixed(2)}`);
-        console.log(`  - is expired: ${isExpired}`);
+        console.log(`  - minutes until end: ${minutesUntilEnd.toFixed(2)}`);
+        console.log(`  - is expired (with grace): ${isExpired}`);
         console.log(`  - TIMEZONE CHECK: Server TZ offset = ${nowUTC.getTimezoneOffset()} minutes`);
         
         return isExpired;
@@ -4566,6 +4720,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error getting auction:', error);
       res.status(500).json({ message: 'Error retrieving auction' });
+    }
+  });
+
+  // Security Dashboard Routes
+  const { securityDashboardApi } = await import('./api/security-dashboard');
+  
+  // Apply admin authentication and rate limiting to all security endpoints
+  app.use('/api/security/*', adminLimiter, requireAuth, async (req: AuthenticatedRequest, res, next) => {
+    // Check if user is admin
+    const user = await storage.getUser(req.user!.id);
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    next();
+  });
+
+  // Authentication metrics
+  app.get('/api/security/auth-metrics', async (req, res) => {
+    await securityDashboardApi.getAuthenticationMetrics(req, res);
+  });
+
+  // Rate limit statistics
+  app.get('/api/security/rate-limits', async (req, res) => {
+    await securityDashboardApi.getRateLimitStats(req, res);
+  });
+
+  // Audit logs
+  app.get('/api/security/audit-logs', async (req, res) => {
+    await securityDashboardApi.getAuditLogs(req, res);
+  });
+
+  // Active sessions
+  app.get('/api/security/sessions', async (req, res) => {
+    await securityDashboardApi.getActiveSessions(req, res);
+  });
+
+  // Security alerts
+  app.get('/api/security/alerts', async (req, res) => {
+    await securityDashboardApi.getSecurityAlerts(req, res);
+  });
+
+  app.post('/api/security/alerts', async (req, res) => {
+    await securityDashboardApi.createSecurityAlert(req, res);
+  });
+
+  app.post('/api/security/alerts/:alertId/acknowledge', async (req, res) => {
+    await securityDashboardApi.acknowledgeAlert(req, res);
+  });
+
+  // Suspicious activity detection
+  app.get('/api/security/suspicious-activity', async (req, res) => {
+    await securityDashboardApi.detectSuspiciousActivity(req, res);
+  });
+
+  // Security reports
+  app.get('/api/security/reports', async (req, res) => {
+    await securityDashboardApi.generateSecurityReport(req, res);
+  });
+
+  // Payment verification endpoint for frontend
+  app.get('/api/payments/verify-status', async (req, res) => {
+    try {
+      const { bill_id } = req.query;
+      
+      if (!bill_id || typeof bill_id !== 'string') {
+        return res.status(400).json({ 
+          error: 'Missing or invalid bill_id parameter' 
+        });
+      }
+      
+      console.log(`🔍 Verifying payment status for bill: ${bill_id}`);
+      
+      // Get payment from our database
+      const payment = await storage.getPaymentByBillId(bill_id);
+      if (!payment) {
+        return res.status(404).json({ 
+          error: 'Payment not found',
+          bill_id 
+        });
+      }
+      
+      // Get fresh status from Billplz API
+      let billplzStatus = null;
+      try {
+        const billDetails = await billplz.getBill(bill_id);
+        billplzStatus = {
+          paid: billDetails.paid,
+          state: billDetails.state,
+          amount: billDetails.amount,
+          paid_at: billDetails.paid_at
+        };
+      } catch (billplzError) {
+        console.warn('Failed to fetch bill details from Billplz:', billplzError.message);
+        // Continue with database status only
+      }
+      
+      return res.json({
+        success: true,
+        payment: {
+          id: payment.id,
+          bill_id: bill_id,
+          status: payment.status,
+          amount: payment.amount,
+          order_id: payment.orderId,
+          created_at: payment.createdAt,
+          updated_at: payment.updatedAt
+        },
+        billplz_status: billplzStatus
+      });
+      
+    } catch (error) {
+      console.error('❌ Error verifying payment status:', error);
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

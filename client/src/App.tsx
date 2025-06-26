@@ -6,6 +6,13 @@ import { useAnalytics } from "./hooks/use-analytics";
 import { AnalyticsProvider } from "./components/analytics/analytics-provider";
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home-page";
+
+// Enable WebSocket interceptor in development to fix URL issues
+if (import.meta.env.DEV) {
+  import('./lib/websocket-interceptor').then(({ setupWebSocketInterceptor }) => {
+    setupWebSocketInterceptor();
+  });
+}
 import AuthPage from "@/pages/auth-page";
 import ProductsPage from "@/pages/products-page";
 import ProductDetailPage from "@/pages/product-detail-page";
@@ -28,6 +35,9 @@ import BuyingGuidePage from "@/pages/buying-guide"; // Import the new component
 import BoostCheckoutPage from "@/pages/boost-checkout"; // Import boost checkout page
 import BoostSuccessPage from "@/pages/boost-success"; // Import boost success page
 import BoostFailurePage from "@/pages/boost-failure"; // Import boost failure page
+import BoostPaymentResult from "@/pages/boost-payment-result"; // Import boost payment result page
+import { SecurityDashboard } from "@/pages/admin/security-dashboard"; // Import security dashboard
+// WebSocket interceptor is loaded above
 
 function Router() {
   // Analytics tracking for all route changes
@@ -53,6 +63,7 @@ function Router() {
       <ProtectedRoute path="/messages" component={MessagesPage} />
       <ProtectedRoute path="/seller/dashboard" component={SellerDashboard} />
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} />
+      <ProtectedRoute path="/admin/security" component={SecurityDashboard} />
       <Route path="/terms-of-service" component={TermsOfServicePage} />
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/buying-guide" component={BuyingGuidePage} /> {/* Added Buying Guide route */}
@@ -61,6 +72,7 @@ function Router() {
       <ProtectedRoute path="/boost/success/:orderId" component={BoostSuccessPage} /> {/* Added Boost Success route with orderId */}
       <ProtectedRoute path="/boost/failure" component={BoostFailurePage} /> {/* Added Boost Failure route */}
       <ProtectedRoute path="/boost/failure/:reason" component={BoostFailurePage} /> {/* Added Boost Failure route with reason */}
+      <ProtectedRoute path="/boost/payment-result" component={BoostPaymentResult} /> {/* Added Boost Payment Result route */}
       <Route component={NotFound} />
     </Switch>
   );

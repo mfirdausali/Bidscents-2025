@@ -149,9 +149,9 @@ const auctionSchema = z.object({
     .number()
     .min(0.10, { message: "Bid increment must be at least RM0.10" })
     .default(0.10),
-  auctionEndDate: z
-    .date()
-    .min(new Date(), { message: "End date must be in the future" }),
+  auctionDuration: z
+    .string()
+    .min(1, { message: "Please select an auction duration" }),
   imageUrl: z
     .string()
     .url({ message: "Please enter a valid image URL" })
@@ -322,7 +322,7 @@ export default function SellerDashboard() {
       reservePrice: undefined,
       buyNowPrice: undefined,
       bidIncrement: 0.10,
-      auctionEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      auctionDuration: "168", // 7 days in hours
       imageUrl: "",
       stockQuantity: 1,
       categoryId: 0,
@@ -647,13 +647,19 @@ export default function SellerDashboard() {
       if (product.auction) {
         console.log("Loading auction data for edit:", product.auction);
 
-        // Convert the date string to a Date object for the form
-        const endsAtDate = product.auction.endsAt
-          ? new Date(product.auction.endsAt)
-          : new Date();
-        // Add a day to ensure the date is in the future when editing
-        if (endsAtDate < new Date()) {
-          endsAtDate.setDate(endsAtDate.getDate() + 1);
+        // Calculate duration from the existing end date
+        let auctionDuration = "168"; // Default to 7 days
+        if (product.auction.endsAt) {
+          const endsAt = new Date(product.auction.endsAt);
+          const now = new Date();
+          const hoursRemaining = Math.max(0, (endsAt.getTime() - now.getTime()) / (1000 * 60 * 60));
+          
+          // Find the closest duration option
+          const durationOptions = [3, 6, 12, 24, 48, 72, 120, 168, 336, 720, 1440];
+          const closestDuration = durationOptions.reduce((prev, curr) => 
+            Math.abs(curr - hoursRemaining) < Math.abs(prev - hoursRemaining) ? curr : prev
+          );
+          auctionDuration = closestDuration.toString();
         }
 
         // Reset the auction form with the auction data
@@ -665,7 +671,7 @@ export default function SellerDashboard() {
           reservePrice: product.auction.reservePrice || 0,
           buyNowPrice: product.auction.buyNowPrice || 0,
           bidIncrement: product.auction.bidIncrement || 0.10,
-          auctionEndDate: endsAtDate,
+          auctionDuration: auctionDuration,
           imageUrl: product.imageUrl || "",
           stockQuantity: product.stockQuantity,
           categoryId: product.categoryId || 1,
@@ -689,13 +695,19 @@ export default function SellerDashboard() {
               console.log("Fetched auction data:", auctionData);
 
               if (auctionData) {
-                // Convert the date string to a Date object
-                const endsAtDate = auctionData.endsAt
-                  ? new Date(auctionData.endsAt)
-                  : new Date();
-                // Add a day to ensure the date is in the future when editing
-                if (endsAtDate < new Date()) {
-                  endsAtDate.setDate(endsAtDate.getDate() + 1);
+                // Calculate duration from the existing end date
+                let auctionDuration = "168"; // Default to 7 days
+                if (auctionData.endsAt) {
+                  const endsAt = new Date(auctionData.endsAt);
+                  const now = new Date();
+                  const hoursRemaining = Math.max(0, (endsAt.getTime() - now.getTime()) / (1000 * 60 * 60));
+                  
+                  // Find the closest duration option
+                  const durationOptions = [3, 6, 12, 24, 48, 72, 120, 168, 336, 720, 1440];
+                  const closestDuration = durationOptions.reduce((prev, curr) => 
+                    Math.abs(curr - hoursRemaining) < Math.abs(prev - hoursRemaining) ? curr : prev
+                  );
+                  auctionDuration = closestDuration.toString();
                 }
 
                 // Reset form with fetched auction data
@@ -707,7 +719,7 @@ export default function SellerDashboard() {
                   reservePrice: auctionData.reservePrice || 0,
                   buyNowPrice: auctionData.buyNowPrice || 0,
                   bidIncrement: auctionData.bidIncrement || 0.10,
-                  auctionEndDate: endsAtDate,
+                  auctionDuration: auctionDuration,
                   imageUrl: product.imageUrl || "",
                   stockQuantity: product.stockQuantity,
                   categoryId: product.categoryId || 1,
@@ -736,7 +748,7 @@ export default function SellerDashboard() {
                 reservePrice: 0,
                 buyNowPrice: 0,
                 bidIncrement: 0.10,
-                auctionEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+                auctionDuration: "168", // 7 days in hours
                 imageUrl: product.imageUrl || "",
                 stockQuantity: product.stockQuantity,
                 categoryId: product.categoryId || 1,
@@ -933,8 +945,9 @@ export default function SellerDashboard() {
     const randomReservePrice = randomStartingPrice + Math.floor(Math.random() * 100) + 20; // +20 to +120
     const randomBuyNowPrice = randomReservePrice + Math.floor(Math.random() * 150) + 30; // +30 to +180
     const randomBidIncrement = [0.10, 0.50, 1.00, 2.00, 5.00][Math.floor(Math.random() * 5)];
-    const randomTimeOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
-    const endDate = new Date(Date.now() + randomTimeOption.minutes * 60 * 1000);
+    // Random duration options: 3, 6, 12, 24, 48, 72 hours
+    const durationOptions = ["3", "6", "12", "24", "48", "72"];
+    const randomDuration = durationOptions[Math.floor(Math.random() * durationOptions.length)];
     const randomRemaining = Math.floor(Math.random() * 60) + 40; // 40-100%
     const randomBatchCode = batchCodes[Math.floor(Math.random() * batchCodes.length)];
     const randomYear = 2020 + Math.floor(Math.random() * 5); // 2020-2024
@@ -949,7 +962,7 @@ export default function SellerDashboard() {
     auctionForm.setValue("reservePrice", randomReservePrice);
     auctionForm.setValue("buyNowPrice", randomBuyNowPrice);
     auctionForm.setValue("bidIncrement", randomBidIncrement);
-    auctionForm.setValue("auctionEndDate", endDate);
+    auctionForm.setValue("auctionDuration", randomDuration);
     auctionForm.setValue("imageUrl", "https://example.com/demo-perfume.jpg");
     auctionForm.setValue("stockQuantity", 1);
     auctionForm.setValue("categoryId", 1); // Assuming 1 is a valid category
@@ -963,8 +976,7 @@ export default function SellerDashboard() {
 
     console.log("🎲 Demo auction data filled:", {
       name: `${randomBrand} ${randomName}`,
-      endTime: randomTimeOption.label,
-      endDate: endDate.toLocaleString()
+      duration: `${randomDuration} hours`
     });
   };
 
@@ -1098,11 +1110,10 @@ export default function SellerDashboard() {
     };
 
     // Create auction data with proper type handling
-    // Format dates with timezone information for timestamptz
-    const endDate =
-      data.auctionEndDate instanceof Date
-        ? data.auctionEndDate
-        : new Date(data.auctionEndDate);
+    // Calculate end date based on duration
+    const durationHours = parseInt(data.auctionDuration);
+    const endDate = new Date();
+    endDate.setHours(endDate.getHours() + durationHours);
 
     // DEBUG: Log timezone information
     console.log("[AUCTION-CLIENT] ===== Creating Auction (Client Side) =====");
@@ -1110,13 +1121,9 @@ export default function SellerDashboard() {
     console.log("[AUCTION-CLIENT] Browser timezone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
     console.log("[AUCTION-CLIENT] Current browser time (local):", new Date().toString());
     console.log("[AUCTION-CLIENT] Current browser time (UTC):", new Date().toISOString());
-    console.log("[AUCTION-CLIENT] Selected end date (local):", endDate.toString());
-    console.log("[AUCTION-CLIENT] Selected end date (UTC):", endDate.toISOString());
-    
-    const msUntilEnd = endDate.getTime() - new Date().getTime();
-    const hoursUntilEnd = msUntilEnd / (1000 * 60 * 60);
-    console.log("[AUCTION-CLIENT] MS until auction ends:", msUntilEnd);
-    console.log("[AUCTION-CLIENT] Hours until auction ends:", hoursUntilEnd.toFixed(2));
+    console.log("[AUCTION-CLIENT] Auction duration (hours):", durationHours);
+    console.log("[AUCTION-CLIENT] Calculated end date (local):", endDate.toString());
+    console.log("[AUCTION-CLIENT] Calculated end date (UTC):", endDate.toISOString());
 
     // Generate ISO string with timezone information
     const endsAtWithTz = endDate.toISOString();
@@ -1405,7 +1412,12 @@ export default function SellerDashboard() {
     queryFn: async () => {
       const response = await fetch("/api/boost/packages");
       if (!response.ok) throw new Error("Failed to fetch boost packages");
-      return response.json();
+      const result = await response.json();
+      // Handle both array response (for empty results) and object response
+      if (Array.isArray(result)) {
+        return result;
+      }
+      return result.data;
     },
   });
 
@@ -1464,22 +1476,14 @@ export default function SellerDashboard() {
 
     try {
       // Create boost order using the modern package system
-      const response = await fetch("/api/boost/create-order", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const response = await apiRequest(
+        "POST",
+        "/api/boost/create-order",
+        {
           boostPackageId: selectedPackageId,
           productIds: boostedProducts,
-        }),
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create boost order");
-      }
+        }
+      );
 
       const orderData = await response.json();
 
@@ -2596,235 +2600,67 @@ export default function SellerDashboard() {
 
                 <FormField
                   control={auctionForm.control}
-                  name="auctionEndDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base">
-                        Auction End Date (Your Local Time)
-                      </FormLabel>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-2">
-                          {/* Date selectors */}
-                          <div>
-                            <FormLabel className="text-xs">Day</FormLabel>
-                            <Select
-                              value={
-                                field.value instanceof Date
-                                  ? String(field.value.getDate())
-                                  : "1"
-                              }
-                              onValueChange={(value) => {
-                                const newDate =
-                                  field.value instanceof Date
-                                    ? new Date(field.value)
-                                    : new Date();
-                                newDate.setDate(parseInt(value));
-                                field.onChange(newDate);
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Day" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from(
-                                  { length: 31 },
-                                  (_, i) => i + 1,
-                                ).map((day) => (
-                                  <SelectItem key={day} value={String(day)}>
-                                    {String(day).padStart(2, "0")}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                  name="auctionDuration"
+                  render={({ field }) => {
+                    // Calculate end date based on selected duration
+                    const calculateEndDate = (durationHours: string) => {
+                      const hours = parseInt(durationHours);
+                      const endDate = new Date();
+                      endDate.setHours(endDate.getHours() + hours);
+                      return endDate;
+                    };
 
-                          <div>
-                            <FormLabel className="text-xs">Month</FormLabel>
-                            <Select
-                              value={
-                                field.value instanceof Date
-                                  ? String(field.value.getMonth())
-                                  : "0"
-                              }
-                              onValueChange={(value) => {
-                                const newDate =
-                                  field.value instanceof Date
-                                    ? new Date(field.value)
-                                    : new Date();
-                                newDate.setMonth(parseInt(value));
-                                field.onChange(newDate);
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Month" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[
-                                  "Jan",
-                                  "Feb",
-                                  "Mar",
-                                  "Apr",
-                                  "May",
-                                  "Jun",
-                                  "Jul",
-                                  "Aug",
-                                  "Sep",
-                                  "Oct",
-                                  "Nov",
-                                  "Dec",
-                                ].map((month, index) => (
-                                  <SelectItem key={index} value={String(index)}>
-                                    {month}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                    const formatEndDate = (durationHours: string) => {
+                      if (!durationHours) return "";
+                      const endDate = calculateEndDate(durationHours);
+                      return endDate.toLocaleString(undefined, {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZoneName: 'short'
+                      });
+                    };
 
-                          <div>
-                            <FormLabel className="text-xs">Year</FormLabel>
-                            <Select
-                              value={
-                                field.value instanceof Date
-                                  ? String(field.value.getFullYear())
-                                  : String(new Date().getFullYear())
-                              }
-                              onValueChange={(value) => {
-                                const newDate =
-                                  field.value instanceof Date
-                                    ? new Date(field.value)
-                                    : new Date();
-                                newDate.setFullYear(parseInt(value));
-                                field.onChange(newDate);
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Year" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from(
-                                  { length: 5 },
-                                  (_, i) => new Date().getFullYear() + i,
-                                ).map((year) => (
-                                  <SelectItem key={year} value={String(year)}>
-                                    {year}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        {/* Time selectors */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <FormLabel className="text-xs">
-                              Hour (24h)
-                            </FormLabel>
-                            <Select
-                              value={
-                                field.value instanceof Date
-                                  ? String(field.value.getHours())
-                                  : "12"
-                              }
-                              onValueChange={(value) => {
-                                const newDate =
-                                  field.value instanceof Date
-                                    ? new Date(field.value)
-                                    : new Date();
-                                newDate.setHours(parseInt(value));
-                                field.onChange(newDate);
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Hour" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: 24 }, (_, i) => i).map(
-                                  (hour) => (
-                                    <SelectItem key={hour} value={String(hour)}>
-                                      {String(hour).padStart(2, "0")}
-                                    </SelectItem>
-                                  ),
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div>
-                            <FormLabel className="text-xs">Minute</FormLabel>
-                            <Select
-                              value={
-                                field.value instanceof Date
-                                  ? String(field.value.getMinutes())
-                                  : "0"
-                              }
-                              onValueChange={(value) => {
-                                const newDate =
-                                  field.value instanceof Date
-                                    ? new Date(field.value)
-                                    : new Date();
-                                newDate.setMinutes(parseInt(value));
-                                field.onChange(newDate);
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Min" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: 60 }, (_, i) => i).map(
-                                  (min) => (
-                                    <SelectItem key={min} value={String(min)}>
-                                      {String(min).padStart(2, "0")}
-                                    </SelectItem>
-                                  ),
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div>
-                            <FormLabel className="text-xs">Second</FormLabel>
-                            <Select
-                              value={
-                                field.value instanceof Date
-                                  ? String(field.value.getSeconds())
-                                  : "0"
-                              }
-                              onValueChange={(value) => {
-                                const newDate =
-                                  field.value instanceof Date
-                                    ? new Date(field.value)
-                                    : new Date();
-                                newDate.setSeconds(parseInt(value));
-                                field.onChange(newDate);
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Sec" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: 60 }, (_, i) => i).map(
-                                  (sec) => (
-                                    <SelectItem key={sec} value={String(sec)}>
-                                      {String(sec).padStart(2, "0")}
-                                    </SelectItem>
-                                  ),
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="text-sm text-muted-foreground">
-                          <Clock className="inline-block mr-1 h-4 w-4" />{" "}
-                          Current timezone:{" "}
-                          {Intl.DateTimeFormat().resolvedOptions().timeZone}
-                        </div>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                    return (
+                      <FormItem>
+                        <FormLabel className="text-base">
+                          Auction Duration
+                        </FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select auction duration" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="3">3 hours</SelectItem>
+                            <SelectItem value="6">6 hours</SelectItem>
+                            <SelectItem value="12">12 hours</SelectItem>
+                            <SelectItem value="24">1 day</SelectItem>
+                            <SelectItem value="48">2 days</SelectItem>
+                            <SelectItem value="72">3 days</SelectItem>
+                            <SelectItem value="120">5 days</SelectItem>
+                            <SelectItem value="168">1 week</SelectItem>
+                            <SelectItem value="336">2 weeks</SelectItem>
+                            <SelectItem value="720">1 month</SelectItem>
+                            <SelectItem value="1440">2 months</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {field.value && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Auction will end on: <strong>{formatEndDate(field.value)}</strong>
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
 
                 <FormField

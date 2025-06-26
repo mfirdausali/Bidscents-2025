@@ -88,7 +88,7 @@ export function BoostPackageCard({
         {itemCount > 1 && (
           <div className="pt-2 border-t">
             <p className="text-xs text-center text-muted-foreground">
-              Effective price: RM {(effectivePrice / 100).toFixed(2)} per product
+              Effective price: RM {effectivePrice.toFixed(2)} per product
             </p>
           </div>
         )}

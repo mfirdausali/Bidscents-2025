@@ -1,6 +1,13 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// CRITICAL: Set server timezone to UTC to prevent auction expiry issues
+// This must be set before any date operations
+process.env.TZ = 'UTC';
+console.log('[TIMEZONE] Server timezone set to UTC');
+console.log('[TIMEZONE] Current UTC time:', new Date().toISOString());
+console.log('[TIMEZONE] Timezone offset:', new Date().getTimezoneOffset(), 'minutes (should be 0)');
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { secureRoutes } from "./secure-routes";

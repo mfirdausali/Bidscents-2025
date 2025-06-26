@@ -1,0 +1,178 @@
+spec:
+  name: bidscents-marketplace
+  region: sgp
+  domains:
+    - domain: bidscents.com
+      type: PRIMARY
+      zone: bidscents.com
+      
+  services:
+    - name: bidscents-web
+      github:
+        repo: mfirdausali/Bidscents-2025
+        branch: main
+        deploy_on_push: true
+        
+      source_dir: /
+      
+      build_command: |
+        echo "Starting build process..."
+        npm ci --production=false
+        npm run build
+        echo "Creating boost packages..."
+        npx tsx scripts/create-boost-packages.js || echo "Boost packages already exist"
+        echo "Build complete!"
+        
+      run_command: npm start
+      
+      environment_slug: node-js
+      instance_size_slug: professional-xs
+      instance_count: 1
+      http_port: 5000
+      
+      envs:
+        # Environment
+        - key: NODE_ENV
+          value: production
+          
+        - key: PORT
+          value: "5000"
+          
+        # Database
+        - key: DATABASE_URL
+          type: SECRET
+          value: "postgresql://username:password@host:port/database?sslmode=require"
+          
+        # Supabase
+        - key: SUPABASE_URL
+          type: SECRET
+          value: "https://your-project.supabase.co"
+          
+        - key: SUPABASE_KEY
+          type: SECRET
+          value: "your-supabase-service-role-key"
+          
+        - key: VITE_SUPABASE_URL
+          type: SECRET
+          value: "https://your-project.supabase.co"
+          
+        - key: VITE_SUPABASE_KEY
+          type: SECRET
+          value: "your-supabase-anon-key"
+          
+        # Authentication
+        - key: JWT_SECRET
+          type: SECRET
+          value: "generate-with-openssl-rand-base64-64"
+          
+        - key: JWT_EXPIRES_IN
+          value: "24h"
+          
+        - key: REFRESH_SECRET
+          type: SECRET
+          value: "generate-with-openssl-rand-base64-64"
+          
+        # Billplz
+        - key: BILLPLZ_BASE_URL
+          value: "https://www.billplz.com/api/v3"
+          
+        - key: BILLPLZ_SECRET_KEY
+          type: SECRET
+          value: "your-billplz-secret-key"
+          
+        - key: BILLPLZ_XSIGN_KEY
+          type: SECRET
+          value: "your-billplz-xsignature-key"
+          
+        - key: BILLPLZ_COLLECTION_ID
+          type: SECRET
+          value: "your-billplz-collection-id"
+          
+        # Application URLs
+        - key: APP_URL
+          value: "https://bidscents.com"
+          
+        - key: CLIENT_URL
+          value: "https://bidscents.com"
+          
+        # Optional Performance Tuning
+        - key: NODE_OPTIONS
+          value: "--max-old-space-size=512"
+          
+        - key: UV_THREADPOOL_SIZE
+          value: "4"
+          
+      health_check:
+        http_path: /health
+        initial_delay_seconds: 30
+        period_seconds: 10
+        timeout_seconds: 5
+        success_threshold: 1
+        failure_threshold: 3
+        
+      # CORS settings handled by application
+      cors:
+        allow_origins:
+          - prefix: https://bidscents.com
+          
+      # Alerts
+      alerts:
+        - rule: DEPLOYMENT_FAILED
+          disabled: false
+          
+        - rule: DEPLOYMENT_LIVE
+          disabled: false
+          
+        - rule: DOMAIN_FAILED
+          disabled: false
+          
+        - rule: DOMAIN_LIVE
+          disabled: false
+          
+  alerts:
+    - rule: CPU_UTILIZATION
+      disabled: false
+      value: 80
+      operator: GREATER_THAN
+      window: FIVE_MINUTES
+      
+    - rule: MEM_UTILIZATION
+      disabled: false
+      value: 85
+      operator: GREATER_THAN
+      window: FIVE_MINUTES
+      
+    - rule: RESTART_COUNT
+      disabled: false
+      value: 5
+      operator: GREATER_THAN
+      window: FIVE_MINUTES
+      
+  # Optional: Add a worker for background jobs
+  # workers:
+  #   - name: bidscents-worker
+  #     github:
+  #       repo: mfirdausali/Bidscents-2025
+  #       branch: main
+  #       deploy_on_push: true
+  #     source_dir: /
+  #     build_command: npm ci --production=false && npm run build
+  #     run_command: npm run worker
+  #     environment_slug: node-js
+  #     instance_size_slug: basic-xxs
+  #     instance_count: 1
+  #     envs:
+  #       # Same environment variables as main service
+  
+  # Optional: Static site for documentation
+  # static_sites:
+  #   - name: bidscents-docs
+  #     github:
+  #       repo: mfirdausali/Bidscents-2025
+  #       branch: main
+  #       deploy_on_push: true
+  #     source_dir: /docs
+  #     build_command: npm run build:docs
+  #     output_dir: /docs/dist
+  #     index_document: index.html
+  #     error_document: 404.html

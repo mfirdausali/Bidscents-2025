@@ -1,5 +1,6 @@
 import helmet from 'helmet';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import type { Application } from 'express';
 
 /**
@@ -13,7 +14,7 @@ export function configureSecurityMiddleware(app: Application) {
       // SECURITY FIX: Reject requests with no origin in production
       if (!origin) {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[SECURITY] Allowing request with no origin (development mode)');
+          // In development, allow requests with no origin (e.g., server-side requests)
           return callback(null, true);
         } else {
           console.error('[SECURITY] Rejected request with no origin header');
@@ -49,7 +50,7 @@ export function configureSecurityMiddleware(app: Application) {
       }
       
       if (allowedOrigins.indexOf(origin) !== -1) {
-        console.log(`[SECURITY] Allowed CORS origin: ${origin}`);
+        // console.log(`[SECURITY] Allowed CORS origin: ${origin}`); // Commented to reduce log noise
         callback(null, true);
       } else {
         console.error(`[SECURITY] Rejected CORS origin: ${origin}`);
@@ -59,12 +60,15 @@ export function configureSecurityMiddleware(app: Application) {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
+    exposedHeaders: ['X-Total-Count', 'X-Page-Count', 'X-CSRF-Token'],
     maxAge: 86400 // 24 hours
   };
   
   app.use(cors(corsOptions));
+  
+  // Configure cookie parser for CSRF double-submit pattern
+  app.use(cookieParser());
   
   // Configure Helmet for security headers
   const helmetOptions: any = {
@@ -88,6 +92,7 @@ export function configureSecurityMiddleware(app: Application) {
         ],
         fontSrc: [
           "'self'",
+          "data:", // Allow base64 encoded fonts
           "https://fonts.gstatic.com",
           "https://cdnjs.cloudflare.com",
         ],

@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState, useEffect } from "react";
+import { createContext, ReactNode, useContext, useState, useEffect, useRef } from "react";
 import {
   useQuery,
   useMutation,
@@ -40,6 +40,9 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  
+  // Track if we're currently exchanging tokens to prevent duplicates
+  const isExchangingTokenRef = useRef(false);
   
   // Check for authentication state and get user profile
   const {
@@ -115,8 +118,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('Supabase auth state changed:', event);
         
         if (event === 'SIGNED_IN' && session) {
+          // Skip if we're already exchanging tokens (e.g., from sign-in mutation)
+          if (isExchangingTokenRef.current) {
+            console.log('🔄 Frontend: Token exchange already in progress, skipping...');
+            return;
+          }
+          
+          // Skip if we already have an app token
+          const existingToken = localStorage.getItem('app_token');
+          if (existingToken) {
+            console.log('✅ Frontend: App token already exists, skipping exchange');
+            return;
+          }
+          
           // Exchange Supabase JWT for application JWT
-          console.log('🔄 Frontend: Starting token exchange with Supabase token');
+          console.log('🔄 Frontend: Starting token exchange from auth state change');
+          isExchangingTokenRef.current = true;
+          
           try {
             const response = await apiRequest("POST", "/api/v1/auth/session", {
               supabaseToken: session.access_token
@@ -136,6 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           } catch (error) {
             console.error("❌ Frontend: Token exchange request failed:", error);
+          } finally {
+            isExchangingTokenRef.current = false;
           }
         } else if (event === 'SIGNED_OUT') {
           // Clear application JWT and user data
@@ -238,7 +258,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
 
-      // The onAuthStateChange listener will handle the token exchange
+      // Exchange Supabase JWT for application JWT immediately
+      if (data.session) {
+        console.log('🔄 Frontend: Starting immediate token exchange from sign-in');
+        isExchangingTokenRef.current = true;
+        
+        try {
+          const response = await apiRequest("POST", "/api/v1/auth/session", {
+            supabaseToken: data.session.access_token
+          });
+
+          if (response.ok) {
+            const tokenData = await response.json();
+            console.log('✅ Frontend: Token exchange successful');
+            setAuthToken(tokenData.token);
+            queryClient.setQueryData(["/api/v1/auth/me"], tokenData.user);
+            // Force immediate refetch to ensure auth state is up to date
+            await queryClient.invalidateQueries({ queryKey: ["/api/v1/auth/me"] });
+          } else {
+            const errorData = await response.json();
+            console.error('❌ Frontend: Token exchange failed:', errorData);
+            throw new Error('Failed to establish session');
+          }
+        } catch (error) {
+          console.error("❌ Frontend: Token exchange error:", error);
+          throw error;
+        } finally {
+          isExchangingTokenRef.current = false;
+        }
+      }
+
       return data.user;
     },
     onSuccess: () => {

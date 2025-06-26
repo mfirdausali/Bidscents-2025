@@ -1,0 +1,65 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          
+      - name: Deploy to DigitalOcean App Platform
+        run: |
+          doctl apps create --spec .do/app.yaml || \
+          doctl apps update ${{ secrets.DIGITALOCEAN_APP_ID }} --spec .do/app.yaml
+          
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for deployment to complete..."
+          sleep 30
+          
+      - name: Check deployment status
+        run: |
+          doctl apps get ${{ secrets.DIGITALOCEAN_APP_ID }}
+          
+      - name: Run post-deployment health check
+        run: |
+          APP_URL=$(doctl apps get ${{ secrets.DIGITALOCEAN_APP_ID }} --format LiveUrl --no-header)
+          echo "Checking health at $APP_URL/health"
+          
+          for i in {1..10}; do
+            if curl -f "$APP_URL/health"; then
+              echo "Health check passed!"
+              exit 0
+            else
+              echo "Health check attempt $i failed, retrying..."
+              sleep 30
+            fi
+          done
+          
+          echo "Health check failed after 10 attempts"
+          exit 1
+          
+      - name: Notify deployment status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Deployment to DigitalOcean ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

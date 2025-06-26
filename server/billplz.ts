@@ -34,7 +34,17 @@ console.log('Environment:', IS_SANDBOX ? 'SANDBOX' : 'PRODUCTION');
 console.log('-------------------------');
 
 if (!BILLPLZ_SECRET_KEY || !BILLPLZ_XSIGN_KEY || !BILLPLZ_COLLECTION_ID) {
-  console.error('Missing required Billplz environment variables');
+  console.error('❌ Missing required Billplz environment variables');
+  console.error('Required variables:');
+  console.error('  - BILLPLZ_SECRET_KEY:', BILLPLZ_SECRET_KEY ? 'Present' : 'MISSING');
+  console.error('  - BILLPLZ_XSIGN_KEY:', BILLPLZ_XSIGN_KEY ? 'Present' : 'MISSING'); 
+  console.error('  - BILLPLZ_COLLECTION_ID:', BILLPLZ_COLLECTION_ID ? 'Present' : 'MISSING');
+  console.error('');
+  console.error('💡 To fix this:');
+  console.error('1. Sign up for a Billplz sandbox account at https://www.billplz-sandbox.com');
+  console.error('2. Get your API key from the dashboard');
+  console.error('3. Create a collection and get the collection ID');
+  console.error('4. Update your .env file with the correct credentials');
 }
 
 /**
@@ -44,6 +54,59 @@ function createAuthHeader(): string {
   // Format should be "API_KEY:" (note the colon at the end with no password)
   const auth = Buffer.from(`${BILLPLZ_SECRET_KEY}:`).toString('base64');
   return `Basic ${auth}`;
+}
+
+/**
+ * Validate Billplz credentials by testing API access
+ */
+export async function validateBillplzCredentials(): Promise<boolean> {
+  if (!BILLPLZ_SECRET_KEY || !BILLPLZ_COLLECTION_ID) {
+    console.error('❌ Billplz credentials not configured');
+    return false;
+  }
+
+  try {
+    console.log('🔍 Validating Billplz credentials...');
+    
+    // Test API access by fetching collections
+    const response = await fetch(`${BILLPLZ_BASE_URL}/v3/collections`, {
+      headers: {
+        'Authorization': createAuthHeader(),
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Billplz credentials are valid');
+      
+      // Check if our collection exists
+      const collections = data.collections || [];
+      const ourCollection = collections.find(c => c.id === BILLPLZ_COLLECTION_ID);
+      
+      if (ourCollection) {
+        console.log(`✅ Collection "${ourCollection.title}" (${BILLPLZ_COLLECTION_ID}) is accessible`);
+        return true;
+      } else {
+        console.error(`❌ Collection ID ${BILLPLZ_COLLECTION_ID} not found`);
+        console.error('Available collections:', collections.map(c => ({ id: c.id, title: c.title })));
+        return false;
+      }
+    } else {
+      const errorText = await response.text();
+      console.error(`❌ Billplz credential validation failed: ${response.status} ${response.statusText}`);
+      console.error('Response:', errorText);
+      
+      if (response.status === 401) {
+        console.error('🔑 Invalid API key - please check BILLPLZ_SECRET_KEY');
+      }
+      
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Error validating Billplz credentials:', error.message);
+    return false;
+  }
 }
 
 /**
@@ -103,7 +166,32 @@ async function billplzRequest(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ Billplz API error: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`Billplz API error: ${response.status} ${response.statusText}`);
+      
+      // Provide specific error messages for common issues
+      let errorMessage = `Billplz API error: ${response.status} ${response.statusText}`;
+      
+      if (response.status === 401) {
+        errorMessage = 'Billplz authentication failed - invalid API credentials. Please check BILLPLZ_SECRET_KEY.';
+      } else if (response.status === 403) {
+        errorMessage = 'Billplz access forbidden - insufficient permissions or invalid collection ID.';
+      } else if (response.status === 422) {
+        errorMessage = 'Billplz validation error - invalid request parameters.';
+      }
+      
+      // Try to parse error response for more details
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error && errorJson.error.message) {
+          errorMessage += ` Details: ${errorJson.error.message}`;
+        }
+      } catch (parseError) {
+        // If we can't parse as JSON, include raw text
+        if (errorText) {
+          errorMessage += ` Response: ${errorText}`;
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const responseData = await response.json();

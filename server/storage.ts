@@ -13,6 +13,7 @@ import type {
   Payment, InsertPayment,
   Transaction, InsertTransaction, TransactionWithDetails
 } from "@shared/schema";
+import { supabase } from './supabase';
 
 // Define cart types since they're removed from schema but still required by the interface
 interface CartItem {
@@ -702,6 +703,22 @@ export class MemStorage implements IStorage {
         averageRating = totalRating / reviews.length;
       }
       
+      // Get auction data if product is an auction
+      let auction: (Auction & { bidCount?: number }) | undefined = undefined;
+      if (product.listingType === 'auction') {
+        // For in-memory storage, find the auction by productId
+        const productAuctions = Array.from(this.auctions.values()).filter(a => a.productId === product.id);
+        if (productAuctions.length > 0) {
+          const auctionData = productAuctions[0];
+          // Count bids for this auction
+          const bidCount = Array.from(this.bids.values()).filter(b => b.auctionId === auctionData.id).length;
+          auction = {
+            ...auctionData,
+            bidCount
+          };
+        }
+      }
+      
       return {
         ...product,
         category,
@@ -709,6 +726,7 @@ export class MemStorage implements IStorage {
         reviews,
         averageRating,
         images,
+        auction,
       };
     }));
   }
@@ -1376,6 +1394,36 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
   
+  // Helper method to convert Supabase payment data to interface format
+  private convertPaymentToInterface(data: any): Payment {
+    // Parse metadata from webhook_payload if it exists
+    let parsedMetadata = {};
+    try {
+      if (data.webhook_payload) {
+        parsedMetadata = JSON.parse(data.webhook_payload);
+      }
+    } catch (e) {
+      console.warn('Failed to parse webhook_payload as JSON:', e);
+    }
+    
+    return {
+      id: data.id,
+      userId: parseInt(data.user_id),
+      orderId: data.order_id,
+      billId: data.bill_id,
+      amount: data.amount,
+      status: data.status,
+      paymentType: parsedMetadata.payment_type || 'boost',
+      boostOptionId: data.boost_option_id,
+      productIds: parsedMetadata.product_ids || (data.product_id ? [data.product_id] : []),
+      paymentChannel: data.payment_channel,
+      paidAt: data.paid_at ? new Date(data.paid_at) : undefined,
+      createdAt: new Date(data.created_at),
+      updatedAt: data.updated_at ? new Date(data.updated_at) : new Date(),
+      metadata: parsedMetadata
+    };
+  }
+
   async getPaymentById(id: number): Promise<Payment | undefined> {
     const result = await db
       .select()
@@ -1387,23 +1435,37 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getPaymentByOrderId(orderId: string): Promise<Payment | undefined> {
-    const result = await db
-      .select()
-      .from(payments)
-      .where(eq(payments.orderId, orderId))
-      .execute();
+    // Use Supabase directly since the schema column names don't match Drizzle
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('order_id', orderId)
+      .single();
       
-    return result[0];
+    if (error) {
+      console.error('Error fetching payment by order ID:', error);
+      return undefined;
+    }
+    
+    // Convert snake_case to camelCase to match interface
+    return data ? this.convertPaymentToInterface(data) : undefined;
   }
   
   async getPaymentByBillId(billId: string): Promise<Payment | undefined> {
-    const result = await db
-      .select()
-      .from(payments)
-      .where(eq(payments.billId, billId))
-      .execute();
+    // Use Supabase directly since the schema column names don't match Drizzle
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('bill_id', billId)
+      .single();
       
-    return result[0];
+    if (error) {
+      console.error('Error fetching payment by bill ID:', error);
+      return undefined;
+    }
+    
+    // Convert snake_case to camelCase to match interface
+    return data ? this.convertPaymentToInterface(data) : undefined;
   }
   
   async getUserPayments(userId: number): Promise<Payment[]> {
@@ -1629,6 +1691,26 @@ export class DatabaseStorage implements IStorage {
         averageRating = totalRating / reviewsResult.length;
       }
       
+      // Get auction data if product is an auction
+      let auction: (Auction & { bidCount?: number }) | undefined = undefined;
+      if (product.listingType === 'auction') {
+        const [auctionResult] = await db.select()
+          .from(auctions)
+          .where(eq(auctions.productId, product.id));
+        
+        if (auctionResult) {
+          // Get bid count for this auction
+          const bidCountResult = await db.select({ count: sql<number>`count(*)` })
+            .from(bids)
+            .where(eq(bids.auctionId, auctionResult.id));
+          
+          auction = {
+            ...auctionResult,
+            bidCount: Number(bidCountResult[0]?.count || 0)
+          };
+        }
+      }
+      
       return {
         ...product,
         category,
@@ -1636,6 +1718,7 @@ export class DatabaseStorage implements IStorage {
         reviews: reviewsResult,
         averageRating,
         images,
+        auction,
       };
     }));
   }
@@ -1889,30 +1972,28 @@ export class DatabaseStorage implements IStorage {
     console.log(`Featured period: ${currentTime.toISOString()} to ${expirationTime.toISOString()}`);
 
     try {
-      // Use database transaction for consistency
-      await db.transaction(async (tx) => {
-        // Update all products with featured status and timestamps
-        for (const productId of productIds) {
-          const [updatedProduct] = await tx
-            .update(products)
-            .set({
-              isFeatured: true,
-              featuredAt: currentTime,
-              featuredUntil: expirationTime,
-              featuredDurationHours: durationHours,
-              status: 'featured',
-              updatedAt: currentTime
-            })
-            .where(eq(products.id, productId))
-            .returning();
+      // NOTE: Bypassing db.transaction due to role permission issues
+      // Update products individually without transaction wrapper
+      for (const productId of productIds) {
+        const [updatedProduct] = await db
+          .update(products)
+          .set({
+            isFeatured: true,
+            featuredAt: currentTime,
+            featuredUntil: expirationTime,
+            featuredDurationHours: durationHours,
+            status: 'featured',
+            updatedAt: currentTime
+          })
+          .where(eq(products.id, productId))
+          .returning();
 
-          if (!updatedProduct) {
-            throw new Error(`Failed to update product ${productId} - product not found`);
-          }
-
-          console.log(`✅ Product ${productId} successfully boosted until ${expirationTime.toISOString()}`);
+        if (!updatedProduct) {
+          throw new Error(`Failed to update product ${productId} - product not found`);
         }
-      });
+
+        console.log(`✅ Product ${productId} successfully boosted until ${expirationTime.toISOString()}`);
+      }
 
       console.log(`🎉 Successfully activated boost for ${productIds.length} products`);
     } catch (error) {

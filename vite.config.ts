@@ -34,4 +34,26 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
   },
+  server: {
+    port: 3000, // Ensure Vite dev server runs on port 3000
+    // Configure HMR WebSocket properly
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 3001, // Use a different port for HMR to avoid conflicts
+      clientPort: 3001
+    },
+    // Proxy API and WebSocket requests to the backend
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true
+      },
+      '/ws': {
+        target: 'ws://localhost:5000',
+        ws: true,
+        changeOrigin: true
+      }
+    }
+  }
 });

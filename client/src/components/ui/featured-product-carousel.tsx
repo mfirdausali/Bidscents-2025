@@ -27,11 +27,16 @@ export function FeaturedProductCarousel() {
     // After a brief fade out, change the product pair
     setTimeout(() => {
       setCurrentIndex((prevIndex) => {
-        // Calculate the new index ensuring it's a multiple of 2
-        const newIndex = prevIndex === 0 
-          ? Math.floor((featuredProducts.length - 1) / 2) * 2 
-          : prevIndex - 2;
-        return newIndex;
+        // Calculate the new index ensuring we don't exceed bounds
+        if (prevIndex === 0) {
+          // Go to the last valid starting position (might be odd number)
+          const lastValidIndex = featuredProducts.length % 2 === 0 
+            ? featuredProducts.length - 2 
+            : featuredProducts.length - 1;
+          return lastValidIndex;
+        } else {
+          return prevIndex - 2;
+        }
       });
       
       // Allow time for the new products to render before fading back in
@@ -50,10 +55,15 @@ export function FeaturedProductCarousel() {
     // After a brief fade out, change the product pair
     setTimeout(() => {
       setCurrentIndex((prevIndex) => {
-        // Calculate the new index ensuring it's a multiple of 2
-        const maxStartIndex = Math.floor((featuredProducts.length - 1) / 2) * 2;
-        const newIndex = prevIndex >= maxStartIndex ? 0 : prevIndex + 2;
-        return newIndex;
+        // Calculate the new index ensuring we have at least one product to show
+        const nextIndex = prevIndex + 2;
+        
+        // If the next index would show us past the end, wrap to beginning
+        if (nextIndex >= featuredProducts.length) {
+          return 0;
+        }
+        
+        return nextIndex;
       });
       
       // Allow time for the new products to render before fading back in
@@ -77,7 +87,7 @@ export function FeaturedProductCarousel() {
     return () => {
       clearInterval(intervalId);
     };
-  }, [featuredProducts, currentIndex, isTransitioning]);
+  }, [featuredProducts, isTransitioning]); // Removed currentIndex to prevent re-creating interval
 
   if (!featuredProducts || featuredProducts.length === 0) {
     return null;
@@ -96,9 +106,9 @@ export function FeaturedProductCarousel() {
 
   // Get current pair of products to display
   const firstProduct = featuredProducts[currentIndex];
-  // Get second product or undefined if not available
+  // Get second product only if available and different from first
   const secondProduct = currentIndex + 1 < featuredProducts.length ? 
-    featuredProducts[currentIndex + 1] : featuredProducts[0];
+    featuredProducts[currentIndex + 1] : null;
 
   // Calculate the number of pagination dots (each dot represents a pair of products)
   const paginationDotsCount = Math.ceil(featuredProducts.length / 2);
@@ -114,7 +124,7 @@ export function FeaturedProductCarousel() {
           <div className="overflow-hidden">
             {/* Apply smooth transition */}
             <div className={`transition-all duration-700 ease-in-out ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 min-h-[400px] lg:min-h-[500px]">
+              <div className={`grid grid-cols-1 ${secondProduct ? 'md:grid-cols-2' : 'md:grid-cols-1 max-w-md mx-auto'} gap-6 lg:gap-8 min-h-[400px] lg:min-h-[500px]`}>
                 {/* First Product */}
                 <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                   <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
@@ -162,58 +172,60 @@ export function FeaturedProductCarousel() {
                   </div>
                 </div>
 
-                {/* Second Product */}
-                <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                  <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
-                    <div className="absolute top-0 left-0 z-10 m-2 flex gap-2">
-                      <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
-                        Featured
-                      </div>
-                      {secondProduct.listingType === "auction" && (
-                        <div className="text-xs bg-amber-500 text-white px-2 py-1 rounded-full uppercase tracking-wider">
-                          Auction
+                {/* Second Product - only render if it exists */}
+                {secondProduct && (
+                  <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                    <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
+                      <div className="absolute top-0 left-0 z-10 m-2 flex gap-2">
+                        <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
+                          Featured
                         </div>
-                      )}
+                        {secondProduct.listingType === "auction" && (
+                          <div className="text-xs bg-amber-500 text-white px-2 py-1 rounded-full uppercase tracking-wider">
+                            Auction
+                          </div>
+                        )}
+                      </div>
+                      <img 
+                        src={getProductImageUrl(secondProduct)} 
+                        alt={secondProduct.name} 
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                    <img 
-                      src={getProductImageUrl(secondProduct)} 
-                      alt={secondProduct.name} 
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="flex-1 p-4 flex flex-col">
+                      <h3 className="font-playfair text-lg font-bold mb-2 line-clamp-2">{secondProduct.name}</h3>
+                      <p className="text-gold font-medium mb-3">RM {secondProduct.price.toFixed(2)}</p>
+                      <div className="mb-3 text-sm text-gray-600 line-clamp-2">
+                        {secondProduct.description || "No description available."}
+                      </div>
+                      <div className="mt-auto">
+                        {secondProduct.listingType === "auction" && secondProduct.auction ? (
+                          <Link href={`/auctions/${secondProduct.auction.id}`} className="w-full">
+                            <Button 
+                              className="w-full bg-amber-500 text-white hover:bg-amber-600 rounded-full text-sm"
+                            >
+                              Bid Now
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Link href={`/products/${secondProduct.id}`} className="w-full">
+                            <Button 
+                              className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
+                            >
+                              View Details
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 p-4 flex flex-col">
-                    <h3 className="font-playfair text-lg font-bold mb-2 line-clamp-2">{secondProduct.name}</h3>
-                    <p className="text-gold font-medium mb-3">RM {secondProduct.price.toFixed(2)}</p>
-                    <div className="mb-3 text-sm text-gray-600 line-clamp-2">
-                      {secondProduct.description || "No description available."}
-                    </div>
-                    <div className="mt-auto">
-                      {secondProduct.listingType === "auction" && secondProduct.auction ? (
-                        <Link href={`/auctions/${secondProduct.auction.id}`} className="w-full">
-                          <Button 
-                            className="w-full bg-amber-500 text-white hover:bg-amber-600 rounded-full text-sm"
-                          >
-                            Bid Now
-                          </Button>
-                        </Link>
-                      ) : (
-                        <Link href={`/products/${secondProduct.id}`} className="w-full">
-                          <Button 
-                            className="w-full bg-purple-600 text-white hover:bg-purple-700 rounded-full text-sm"
-                          >
-                            View Details
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
           
-          {/* Only show navigation arrows if we have more than 2 products */}
-          {featuredProducts.length > 2 && (
+          {/* Only show navigation arrows if we have more than 1 product */}
+          {featuredProducts.length > 1 && (
             <>
               {/* Navigation arrows */}
               <button 

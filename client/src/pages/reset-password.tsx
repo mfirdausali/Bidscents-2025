@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,15 +22,7 @@ const resetPasswordSchema = z.object({
 
 type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
-// IMPORTANT: We use a direct Supabase client for password reset
-// This avoids conflicts with any other Supabase instances
-// Use environment variables for security
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('Missing Supabase credentials for password reset. Please configure environment variables.');
-}
+// Using the shared Supabase client to avoid multiple instances
 
 // A function to parse the token from the URL hash
 function parseHashFragment() {
@@ -63,15 +55,8 @@ function parseHashFragment() {
   return null;
 }
 
-// Create a dedicated client with hash detection disabled - we'll handle it manually
-const passwordResetClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false, // We handle URL parsing ourselves for better control
-    storageKey: 'supabase-password-reset' // Unique storage key to avoid conflicts
-  }
-});
+// Use the shared Supabase client
+const passwordResetClient = supabase;
 
 export default function ResetPasswordPage() {
   const [location, navigate] = useLocation();
