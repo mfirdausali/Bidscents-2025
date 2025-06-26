@@ -8,21 +8,6 @@ import type { Application } from 'express';
  * @param app Express application instance
  */
 export function configureSecurityMiddleware(app: Application) {
-  // Health check middleware - bypass CORS for health checks
-  app.use('/api/health*', (req, res, next) => {
-    // Set permissive CORS headers for health checks
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    
-    // If this is an OPTIONS request, respond immediately
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
-    
-    next();
-  });
-
   // Configure CORS
   const corsOptions: cors.CorsOptions = {
     origin: function (origin, callback) {

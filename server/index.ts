@@ -17,13 +17,30 @@ import { configureSecurityMiddleware } from "./security-middleware";
 const app = express();
 
 // Health check endpoint FIRST - before any middleware
+// This MUST be before configureSecurityMiddleware to avoid CORS issues
 app.get('/api/health', (req, res) => {
+  console.log('[HEALTH] Health check requested from:', req.headers.origin || 'no-origin');
+  
+  // Set CORS headers explicitly for health checks
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     version: '1.0.0'
   });
+});
+
+// Handle OPTIONS requests for health check
+app.options('/api/health', (req, res) => {
+  console.log('[HEALTH] Health check OPTIONS requested');
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(200).end();
 });
 
 // Configure security middleware AFTER health check
