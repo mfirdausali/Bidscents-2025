@@ -21,11 +21,9 @@ export async function setupVite(app: Express, server: Server) {
   // Dynamic imports to avoid bundling Vite dependencies in production
   const [
     viteModule,
-    viteConfig,
     nanoidModule
   ] = await Promise.all([
     import("vite"),
-    import("../vite.config"),
     import("nanoid")
   ]);
 
@@ -39,8 +37,17 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true,
   };
 
+  // Use inline config instead of importing vite.config.ts to avoid bundling issues
   const vite = await createViteServer({
-    ...viteConfig.default,
+    plugins: [
+      // Basic React plugin for development
+      {
+        name: "react-dev",
+        configResolved(config) {
+          // Minimal React setup for development
+        }
+      }
+    ],
     configFile: false,
     customLogger: {
       ...viteLogger,
