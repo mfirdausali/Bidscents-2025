@@ -56,9 +56,9 @@ services:
   - key: DEMO_MODE
     value: "false"
   - key: APP_URL
-    value: https://bidscents-marketplace.ondigitalocean.app
+    value: https://bidscents-2025-scsjl.ondigitalocean.app
   - key: CLIENT_URL
-    value: https://bidscents-marketplace.ondigitalocean.app
+    value: https://bidscents-2025-scsjl.ondigitalocean.app
 
 domains:
 - domain: your-domain.com  # Update with your domain

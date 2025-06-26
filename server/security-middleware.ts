@@ -8,23 +8,41 @@ import type { Application } from 'express';
  * @param app Express application instance
  */
 export function configureSecurityMiddleware(app: Application) {
+  // Health check middleware - bypass CORS for health checks
+  app.use('/api/health*', (req, res, next) => {
+    // Set permissive CORS headers for health checks
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    
+    // If this is an OPTIONS request, respond immediately
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    
+    next();
+  });
+
   // Configure CORS
   const corsOptions: cors.CorsOptions = {
     origin: function (origin, callback) {
-      // SECURITY FIX: Reject requests with no origin in production
+      // Allow requests with no origin for health checks and server-side requests
       if (!origin) {
         if (process.env.NODE_ENV === 'development') {
           // In development, allow requests with no origin (e.g., server-side requests)
           return callback(null, true);
         } else {
-          console.error('[SECURITY] Rejected request with no origin header');
-          return callback(new Error('Origin header required'));
+          // In production, allow requests with no origin for health checks
+          // DigitalOcean health checks may not include origin header
+          console.log('[SECURITY] Allowing request with no origin header (likely health check)');
+          return callback(null, true);
         }
       }
       
       const allowedOrigins = [
         process.env.APP_URL || 'http://localhost:5000',
         'https://bidscents.replit.app',
+        'https://bidscents-2025-scsjl.ondigitalocean.app',
       ];
 
       // Add current Replit domain dynamically
@@ -47,6 +65,12 @@ export function configureSecurityMiddleware(app: Application) {
         if (origin && origin.includes('.replit.dev')) {
           return callback(null, true);
         }
+      }
+      
+      // Allow DigitalOcean App Platform domains
+      if (origin && origin.includes('.ondigitalocean.app')) {
+        console.log(`[SECURITY] Allowed DigitalOcean origin: ${origin}`);
+        return callback(null, true);
       }
       
       if (allowedOrigins.indexOf(origin) !== -1) {
