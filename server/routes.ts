@@ -4779,8 +4779,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await securityDashboardApi.generateSecurityReport(req, res);
   });
 
-  // Health check endpoint for production monitoring
-  app.get('/api/health', async (req, res) => {
+  // Note: Basic health check is defined in server/index.ts before CORS middleware
+
+  // Detailed health check endpoint with database connectivity test
+  app.get('/api/health/detailed', async (req, res) => {
     try {
       // Check database connectivity
       const { data, error } = await supabase

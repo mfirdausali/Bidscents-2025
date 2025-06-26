@@ -13,6 +13,13 @@ services:
   environment_slug: node-js
   instance_count: 1
   instance_size_slug: basic-xxs
+  health_check:
+    http_path: /api/health
+    initial_delay_seconds: 30
+    period_seconds: 10
+    timeout_seconds: 5
+    success_threshold: 1
+    failure_threshold: 3
   routes:
   - path: /
   envs:
@@ -46,10 +53,12 @@ services:
     value: YOUR_PRODUCTION_BILLPLZ_XSIGN_KEY
   - key: BILLPLZ_COLLECTION_ID
     value: YOUR_PRODUCTION_COLLECTION_ID
-  - key: PORT
-    value: "5000"
   - key: DEMO_MODE
     value: "false"
+  - key: APP_URL
+    value: https://bidscents-marketplace.ondigitalocean.app
+  - key: CLIENT_URL
+    value: https://bidscents-marketplace.ondigitalocean.app
 
 domains:
 - domain: your-domain.com  # Update with your domain

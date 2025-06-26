@@ -12,13 +12,21 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { secureRoutes } from "./secure-routes";
 import { serveStatic, log } from "./vite";
-import { testConnection } from "./db";
-import { testSupabaseConnection } from "./supabase";
 import { configureSecurityMiddleware } from "./security-middleware";
 
 const app = express();
 
-// Configure security middleware BEFORE other middleware
+// Health check endpoint FIRST - before any middleware
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0'
+  });
+});
+
+// Configure security middleware AFTER health check
 configureSecurityMiddleware(app);
 
 app.use(express.json());
@@ -54,38 +62,54 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  // Test database connections
-  await testConnection();
-  await testSupabaseConnection();
-  
-  const server = await registerRoutes(app);
+async function startServer() {
+  try {
+    // Test database connections
+    const { testConnection } = await import("./db");
+    const { testSupabaseConnection } = await import("./supabase");
+    
+    await testConnection();
+    await testSupabaseConnection();
+    
+    const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
-  });
+      res.status(status).json({ message });
+      throw err;
+    });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    // Dynamic import to avoid bundling Vite in production
-    const { setupVite } = await import("./vite");
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+    // importantly only setup vite in development and after
+    // setting up all the other routes so the catch-all route
+    // doesn't interfere with the other routes
+    if (app.get("env") === "development") {
+      // Dynamic import to avoid bundling Vite in production
+      const { setupVite } = await import("./vite");
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
+    }
+
+    // Use PORT environment variable for DigitalOcean, fallback to 5000
+    // In production, DigitalOcean will provide the PORT environment variable
+    const port = process.env.PORT ? parseInt(process.env.PORT) : (process.env.NODE_ENV === 'development' ? 3000 : 5000);
+    const host = process.env.NODE_ENV === 'development' ? '127.0.0.1' : '0.0.0.0';
+    server.listen(port, host, () => {
+      log(`serving on port ${port} (host: ${host})`);
+    });
+  } catch (error) {
+    console.error('Server initialization failed, but health check is still available:', error);
+    
+    // Start minimal server with just health check
+    const port = process.env.PORT ? parseInt(process.env.PORT) : (process.env.NODE_ENV === 'development' ? 3000 : 5000);
+    const host = process.env.NODE_ENV === 'development' ? '127.0.0.1' : '0.0.0.0';
+    
+    app.listen(port, host, () => {
+      console.log(`Health check server running on port ${port} (host: ${host})`);
+    });
   }
+}
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = process.env.NODE_ENV === 'development' ? 3000 : 5000;
-  const host = process.env.NODE_ENV === 'development' ? '127.0.0.1' : '0.0.0.0';
-  server.listen(port, host, () => {
-    log(`serving on port ${port} (host: ${host})`);
-  });
-})();
+startServer();
