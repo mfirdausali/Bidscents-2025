@@ -9,11 +9,34 @@ async function throwIfResNotOk(res: Response) {
 
 // Unified token management - using consistent key name
 const TOKEN_KEY = 'app_token';
+const CSRF_TOKEN_KEY = 'csrf_token';
 
 function getAuthToken(): string | null {
   const token = localStorage.getItem(TOKEN_KEY);
   console.log('[JWT] Getting token from localStorage:', token ? 'token present' : 'no token');
   return token;
+}
+
+function getCSRFToken(): string | null {
+  return localStorage.getItem(CSRF_TOKEN_KEY);
+}
+
+function setCSRFToken(token: string): void {
+  localStorage.setItem(CSRF_TOKEN_KEY, token);
+}
+
+async function fetchCSRFToken(): Promise<string | null> {
+  try {
+    const response = await fetch('/api/csrf-token');
+    if (response.ok) {
+      const data = await response.json();
+      setCSRFToken(data.token);
+      return data.token;
+    }
+  } catch (error) {
+    console.error('[CSRF] Failed to fetch CSRF token:', error);
+  }
+  return null;
 }
 
 function setAuthToken(token: string): void {
@@ -48,6 +71,17 @@ export async function apiRequest(
   
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  // Add CSRF token for state-changing operations
+  if (method !== 'GET' && method !== 'HEAD') {
+    let csrfToken = getCSRFToken();
+    if (!csrfToken) {
+      csrfToken = await fetchCSRFToken();
+    }
+    if (csrfToken) {
+      headers["X-CSRF-Token"] = csrfToken;
+    }
   }
 
   const res = await fetch(url, {

@@ -9,7 +9,8 @@ import {
   insertMessageSchema, 
   insertPaymentSchema,
   insertBoostPackageSchema,
-  boostPackages
+  boostPackages,
+  createBoostOrderSchema
 } from "@shared/schema";
 import { productImages } from "@shared/schema";
 import { db } from "./db";
@@ -29,6 +30,48 @@ import crypto from 'crypto';
 import { requireAuth, getUserFromToken, authRoutes, AuthenticatedRequest } from './app-auth';
 import { authLimiter, passwordResetLimiter, apiLimiter, userLookupLimiter, adminLimiter } from './rate-limiter';
 import { validateCSRF, provideCSRFToken, getCSRFTokenEndpoint } from './csrf-protection';
+
+// Import boost error handling system
+import {
+  BoostOrderError,
+  BoostValidationError,
+  BoostPaymentError,
+  BoostBillplzError,
+  BoostRateLimitError,
+  BoostDatabaseError,
+  BoostDuplicateRequestError,
+  BoostErrorCode,
+  BoostErrorMessages,
+  createErrorResponse,
+  logBoostError,
+  handleBoostError
+} from './boost-errors';
+
+// Import boost validation middleware
+import {
+  boostValidationMiddleware,
+  sanitizeRequest,
+  createRateLimiter,
+  validateRequest,
+  validateBoostCSRF,
+  checkIdempotency,
+  storeIdempotentResponse,
+  validateWebhookSignature,
+  generateRequestId
+} from './boost-validation';
+
+// Import boost transaction management
+import {
+  executeBoostTransaction,
+  createBoostOrderTransaction,
+  processBoostPaymentTransaction,
+  expireFeaturedProductsTransaction,
+  createIdempotencyKey,
+  checkIdempotentOperation,
+  generateTransactionId,
+  trackOperation,
+  addRollbackAction
+} from './boost-transactions';
 
 /**
  * Helper function to determine if we're in a sandbox environment
@@ -841,6 +884,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return;
             }
             break;
+            
+          case 'mark_read':
+            // Handle marking messages as read
+            console.log('📖 [WebSocket] Processing mark_read request:', data);
+            
+            // Get authenticated user from WebSocket client
+            const readerInfo = clients.get(ws);
+            if (!readerInfo) {
+              console.error('❌ [WebSocket] User not authenticated for mark_read');
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Not authenticated'
+              }));
+              break;
+            }
+            
+            try {
+              const currentUserId = readerInfo.userId;
+              
+              if (data.messageId) {
+                // Mark a single message as read
+                console.log(`📖 [WebSocket] Marking message ${data.messageId} as read for user ${currentUserId}`);
+                await storage.markMessageAsRead(data.messageId);
+              } else if (data.senderId) {
+                // Mark all messages from a sender as read
+                console.log(`📖 [WebSocket] Marking all messages from sender ${data.senderId} as read for user ${currentUserId}`);
+                await storage.markAllMessagesAsRead(currentUserId, data.senderId);
+              } else {
+                console.error('❌ [WebSocket] mark_read requires either messageId or senderId');
+                ws.send(JSON.stringify({
+                  type: 'error',
+                  message: 'Either messageId or senderId must be provided'
+                }));
+                break;
+              }
+              
+              // Send confirmation back to the client
+              console.log('✅ [WebSocket] Messages marked as read successfully');
+              ws.send(JSON.stringify({
+                type: 'messages_read',
+                messageId: data.messageId,
+                senderId: data.senderId
+              }));
+              
+              // Also notify any connected receiver to update their message list
+              if (data.senderId) {
+                const receiverSocket = connectedUsers.get(data.senderId);
+                if (receiverSocket && receiverSocket.readyState === WebSocket.OPEN) {
+                  console.log(`📡 [WebSocket] Notifying sender ${data.senderId} that their messages were read`);
+                  receiverSocket.send(JSON.stringify({
+                    type: 'messages_read',
+                    messageId: data.messageId,
+                    senderId: data.senderId,
+                    readBy: currentUserId
+                  }));
+                }
+              }
+              
+              console.log('✅ [WebSocket] mark_read processing complete');
+              
+            } catch (error) {
+              console.error('❌ [WebSocket] Error processing mark_read:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to mark messages as read: ' + errorMessage
+              }));
+            }
+            break;
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -953,6 +1065,211 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('> Headers:', JSON.stringify(req.headers, null, 2));
     
     next();
+  });
+
+  // **TASK 2.1: Billplz Webhook Handler**
+  app.post('/api/payments/billplz/webhook', async (req, res) => {
+    console.log('🔔 BILLPLZ WEBHOOK RECEIVED');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('Request headers:', JSON.stringify(req.headers, null, 2));
+
+    try {
+      const xSignature = req.headers['x-signature'] as string;
+      const payload = req.body;
+
+      // Verify webhook signature
+      const isValidSignature = billplz.verifyWebhookSignature(payload, xSignature);
+      if (!isValidSignature) {
+        console.error('❌ Invalid webhook signature');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+
+      console.log('✅ Webhook signature verified');
+
+      // Extract payment information from webhook payload
+      const {
+        id: billId,
+        collection_id,
+        paid,
+        state,
+        amount,
+        paid_amount,
+        due_at,
+        email,
+        mobile,
+        name,
+        paid_at,
+        transaction_id,
+        transaction_status,
+        reference_1,
+        reference_2
+      } = payload;
+
+      console.log(`📦 Processing webhook for bill: ${billId}, status: ${state}, paid: ${paid}`);
+
+      // Find the payment record by bill ID
+      const payment = await storage.getPaymentByBillId(billId);
+      if (!payment) {
+        console.warn(`⚠️ Payment not found for bill ID: ${billId}`);
+        return res.status(404).json({ error: 'Payment not found' });
+      }
+
+      console.log(`💳 Found payment record: ID ${payment.id}, Type: ${payment.paymentType}, Status: ${payment.status}`);
+
+      // Update payment status based on webhook data
+      let newStatus = 'pending';
+      if (paid === true || state === 'paid') {
+        newStatus = 'paid';
+      } else if (state === 'due') {
+        newStatus = 'pending';
+      } else if (state === 'deleted') {
+        newStatus = 'failed';
+      }
+
+      // Update the payment record
+      await storage.updatePaymentStatus(
+        payment.id,
+        newStatus,
+        billId,
+        transaction_id || undefined,
+        paid_at ? new Date(paid_at) : undefined
+      );
+
+      console.log(`📝 Payment ${payment.id} status updated to: ${newStatus}`);
+
+      // **BOOST ACTIVATION LOGIC** - Only activate boost for successful payments
+      if (newStatus === 'paid' && payment.paymentType === 'boost') {
+        console.log('🚀 Processing boost activation for successful payment');
+
+        try {
+          // Get boost package details
+          const boostPackage = await storage.getBoostPackageById(payment.boost_option_id!);
+          if (!boostPackage) {
+            console.error(`❌ Boost package not found: ${payment.boost_option_id}`);
+          } else {
+            // Parse product IDs from payment record
+            const productIds = payment.productIds?.map(id => parseInt(id.toString())) || [];
+            
+            if (productIds.length > 0) {
+              // Activate boost for the products
+              await storage.activateBoostForProducts(productIds, boostPackage.durationHours);
+              console.log(`✨ Boost activated for products: ${productIds.join(', ')} for ${boostPackage.durationHours} hours`);
+            } else {
+              console.error('❌ No product IDs found in payment record');
+            }
+          }
+        } catch (boostError) {
+          console.error('❌ Error activating boost:', boostError);
+          // Don't fail the webhook - payment is still successful
+        }
+      }
+
+      // Return success response to Billplz
+      console.log('✅ Webhook processed successfully');
+      return res.status(200).json({ 
+        status: 'success',
+        message: 'Webhook processed successfully',
+        bill_id: billId,
+        payment_status: newStatus
+      });
+
+    } catch (error) {
+      console.error('❌ Error processing webhook:', error);
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // **TASK 2.3: Billplz Redirect Handler**
+  app.get('/api/payments/billplz/redirect', async (req, res) => {
+    console.log('🔄 BILLPLZ REDIRECT RECEIVED');
+    console.log('Query parameters:', JSON.stringify(req.query, null, 2));
+
+    try {
+      // Extract Billplz parameters from query string
+      const billplzParams = req.query as any;
+      const billId = billplzParams['billplz[id]'];
+      const xSignature = billplzParams['billplz[x_signature]'];
+
+      if (!billId) {
+        console.error('❌ Missing bill ID in redirect');
+        return res.redirect(`${process.env.CLIENT_URL}/payment/error?error=missing_bill_id`);
+      }
+
+      // Build raw query string for signature verification
+      const rawQuery = new URL(req.protocol + '://' + req.get('host') + req.originalUrl).search.substring(1);
+      
+      // Verify redirect signature
+      const isValidSignature = billplz.verifyRedirectSignature(rawQuery, xSignature);
+      if (!isValidSignature) {
+        console.error('❌ Invalid redirect signature');
+        return res.redirect(`${process.env.CLIENT_URL}/payment/error?error=invalid_signature`);
+      }
+
+      console.log('✅ Redirect signature verified');
+
+      // Get fresh payment status from Billplz API
+      let billDetails;
+      try {
+        billDetails = await billplz.getBill(billId);
+        console.log('📄 Bill details from API:', JSON.stringify(billDetails, null, 2));
+      } catch (apiError) {
+        console.error('❌ Error fetching bill details:', apiError);
+        return res.redirect(`${process.env.CLIENT_URL}/payment/error?error=api_error`);
+      }
+
+      // Find our payment record
+      const payment = await storage.getPaymentByBillId(billId);
+      if (!payment) {
+        console.warn(`⚠️ Payment not found for bill ID: ${billId}`);
+        return res.redirect(`${process.env.CLIENT_URL}/payment/error?error=payment_not_found`);
+      }
+
+      // Determine redirect based on payment status
+      const isPaid = billDetails.paid === true || billDetails.state === 'paid';
+      
+      if (isPaid) {
+        console.log('✅ Payment confirmed as successful');
+        
+        // Ensure our database is updated (in case webhook hasn't processed yet)
+        if (payment.status !== 'paid') {
+          await storage.updatePaymentStatus(
+            payment.id,
+            'paid',
+            billId,
+            billDetails.transaction_id || undefined,
+            billDetails.paid_at ? new Date(billDetails.paid_at) : new Date()
+          );
+
+          // Activate boost if this is a boost payment
+          if (payment.paymentType === 'boost') {
+            try {
+              const boostPackage = await storage.getBoostPackageById(payment.boost_option_id!);
+              if (boostPackage) {
+                const productIds = payment.productIds?.map(id => parseInt(id.toString())) || [];
+                if (productIds.length > 0) {
+                  await storage.activateBoostForProducts(productIds, boostPackage.durationHours);
+                  console.log(`✨ Boost activated for products: ${productIds.join(', ')}`);
+                }
+              }
+            } catch (boostError) {
+              console.error('❌ Error activating boost in redirect:', boostError);
+            }
+          }
+        }
+
+        return res.redirect(`${process.env.CLIENT_URL}/payment/success?bill_id=${billId}&order_id=${payment.orderId}`);
+      } else {
+        console.log('❌ Payment not successful');
+        return res.redirect(`${process.env.CLIENT_URL}/payment/failed?bill_id=${billId}&order_id=${payment.orderId}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Error processing redirect:', error);
+      return res.redirect(`${process.env.CLIENT_URL}/payment/error?error=server_error`);
+    }
   });
   
   // Social preview routes for better WhatsApp/Facebook sharing
@@ -1332,10 +1649,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Get all boost packages
-  app.get("/api/boost/packages", async (req, res) => {
+  // Get all boost packages with comprehensive error handling
+  app.get("/api/boost/packages", apiLimiter, async (req, res, next) => {
+    const requestId = generateRequestId();
+    
     try {
-      console.log("Fetching boost packages");
+      console.log(`🎯 [${requestId}] Fetching boost packages`);
+      
       const { data, error } = await supabase
         .from('boost_packages')
         .select('*')
@@ -1344,16 +1664,480 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .order('item_count', { ascending: true });
         
       if (error) {
-        console.error('Error fetching boost packages:', error);
-        return res.status(500).json({ message: 'Error fetching boost packages', error });
+        const dbError = new BoostDatabaseError(
+          'Failed to fetch boost packages',
+          'fetch_boost_packages',
+          new Error(error.message),
+          requestId
+        );
+        logBoostError(dbError, { supabaseError: error });
+        return next(dbError);
       }
       
-      return res.json(data);
+      if (!data || data.length === 0) {
+        console.log(`⚠️ [${requestId}] No active boost packages found`);
+        return res.json([]);
+      }
+      
+      console.log(`✅ [${requestId}] Successfully fetched ${data.length} boost packages`);
+      return res.json({
+        success: true,
+        data,
+        count: data.length,
+        requestId
+      });
+      
     } catch (err) {
-      console.error('Error fetching boost packages:', err);
-      return res.status(500).json({ message: 'Server error fetching boost packages' });
+      const error = new BoostDatabaseError(
+        'Unexpected error fetching boost packages',
+        'fetch_boost_packages',
+        err as Error,
+        requestId
+      );
+      return next(error);
     }
   });
+
+  // Create boost order with comprehensive error handling and transaction management
+  app.post("/api/boost/create-order", 
+    ...boostValidationMiddleware.createOrder,
+    async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+      const requestId = req.requestId || generateRequestId();
+      
+      try {
+        console.log(`🎯 [${requestId}] Creating boost order`);
+        
+        // Authenticate user
+        const user = await getAuthenticatedUser(req);
+        if (!user) {
+          const error = new BoostOrderError(
+            'Authentication required to create boost order',
+            BoostErrorCode.UNAUTHORIZED_ACCESS,
+            401,
+            { operation: 'create_boost_order' },
+            requestId
+          );
+          return next(error);
+        }
+
+        const { boostPackageId, productIds } = req.body;
+        
+        // Create idempotency key for this operation
+        const idempotencyKey = req.idempotencyKey || createIdempotencyKey(
+          user.id, 
+          'create_boost_order', 
+          { boostPackageId, productIds }
+        );
+
+        // Check for existing idempotent operation
+        const existingOperation = checkIdempotentOperation(idempotencyKey);
+        if (existingOperation) {
+          console.log(`🔄 [${requestId}] Returning idempotent result for boost order`);
+          return res.status(200).json(existingOperation.result);
+        }
+
+        // Execute boost order creation in transaction
+        const result = await executeBoostTransaction(async (txId) => {
+          trackOperation(txId, 'validate_boost_package');
+          
+          // Verify boost package exists and is active
+          const { data: boostPackage, error: packageError } = await supabase
+            .from('boost_packages')
+            .select('*')
+            .eq('id', boostPackageId)
+            .eq('is_active', true)
+            .single();
+
+          if (packageError || !boostPackage) {
+            throw new BoostOrderError(
+              'Boost package not found or inactive',
+              BoostErrorCode.PACKAGE_NOT_FOUND,
+              404,
+              { boostPackageId, supabaseError: packageError },
+              requestId
+            );
+          }
+
+          // Check if user selected correct number of products for the package
+          if (productIds.length !== boostPackage.item_count) {
+            throw new BoostValidationError(
+              `This boost package requires exactly ${boostPackage.item_count} product(s)`,
+              'productIds',
+              `${productIds.length} products selected`,
+              requestId
+            );
+          }
+
+          trackOperation(txId, 'validate_products');
+          
+          // Verify all products exist, belong to the user, are active, and not already featured
+          const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('*')
+            .in('id', productIds)
+            .eq('seller_id', user.id);
+
+          if (productsError) {
+            throw new BoostDatabaseError(
+              'Error verifying products',
+              'fetch_user_products',
+              new Error(productsError.message),
+              requestId
+            );
+          }
+
+          if (!products || products.length !== productIds.length) {
+            const foundIds = products?.map(p => p.id) || [];
+            const missingIds = productIds.filter(id => !foundIds.includes(id));
+            
+            throw new BoostOrderError(
+              'One or more products not found or not owned by user',
+              BoostErrorCode.PRODUCT_NOT_OWNED,
+              404,
+              { requestedIds: productIds, foundIds, missingIds },
+              requestId
+            );
+          }
+
+          // Check if products are active and not already featured
+          const inactiveProducts = products.filter(p => p.status !== 'active');
+          if (inactiveProducts.length > 0) {
+            throw new BoostValidationError(
+              'Products must be active to be featured',
+              'productStatus',
+              inactiveProducts.map(p => ({ id: p.id, name: p.name, status: p.status })),
+              requestId
+            );
+          }
+
+          const alreadyFeatured = products.filter(p => p.is_featured === true);
+          if (alreadyFeatured.length > 0) {
+            throw new BoostOrderError(
+              'Some products are already featured',
+              BoostErrorCode.ALREADY_FEATURED,
+              409,
+              { featuredProducts: alreadyFeatured.map(p => ({ id: p.id, name: p.name })) },
+              requestId
+            );
+          }
+
+          trackOperation(txId, 'create_payment_record');
+          
+          // Generate unique order ID
+          const orderId = crypto.randomUUID();
+
+          // Calculate expiration time (24 hours from now)
+          const expiresAt = new Date();
+          expiresAt.setHours(expiresAt.getHours() + 24);
+
+          // Create payment record in database
+          const { data: payment, error: paymentError } = await supabase
+            .from('payments')
+            .insert({
+              user_id: user.id,
+              order_id: orderId,
+              amount: boostPackage.price,
+              status: 'pending',
+              payment_type: 'boost',
+              boost_option_id: boostPackageId,
+              product_ids: productIds.map(String), // Convert to string array as expected by schema
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              metadata: {
+                boost_package: boostPackage,
+                selected_products: products.map(p => ({ id: p.id, name: p.name })),
+                expires_at: expiresAt.toISOString(),
+                transaction_id: txId,
+                request_id: requestId
+              }
+            })
+            .select()
+            .single();
+
+          if (paymentError || !payment) {
+            throw new BoostDatabaseError(
+              'Failed to create payment record',
+              'create_payment',
+              new Error(paymentError?.message || 'No payment returned'),
+              requestId
+            );
+          }
+
+          // Add rollback action to delete payment record if bill creation fails
+          addRollbackAction(txId, async () => {
+            await supabase
+              .from('payments')
+              .delete()
+              .eq('order_id', orderId);
+          });
+
+          trackOperation(txId, 'create_billplz_bill');
+          
+          // Create Billplz bill
+          let billData;
+          try {
+            billData = await billplz.createBill({
+              name: `${user.firstName || user.username} ${user.lastName || ''}`.trim(),
+              email: user.email,
+              amount: boostPackage.price, // Amount in sen
+              description: `Boost Package: ${boostPackage.name} (${boostPackage.item_count} items for ${boostPackage.duration_hours} hours)`,
+              reference_1: orderId,
+              reference_2: `boost_${boostPackageId}`,
+              callback_url: `${process.env.APP_URL || 'http://localhost:5000'}/api/payments/billplz-callback`,
+              redirect_url: `${process.env.CLIENT_URL || 'http://localhost:5173'}/boost/payment-result`
+            });
+          } catch (billplzError) {
+            throw new BoostBillplzError(
+              'Failed to create payment bill',
+              billplzError,
+              requestId
+            );
+          }
+
+          if (!billData || !billData.id) {
+            throw new BoostBillplzError(
+              'Invalid response from payment service',
+              billData,
+              requestId
+            );
+          }
+
+          trackOperation(txId, 'update_payment_with_bill_id');
+          
+          // Update payment record with bill ID
+          const { error: updateError } = await supabase
+            .from('payments')
+            .update({ 
+              bill_id: billData.id,
+              updated_at: new Date().toISOString()
+            })
+            .eq('order_id', orderId);
+
+          if (updateError) {
+            console.warn(`⚠️ [${requestId}] Failed to update payment with bill ID:`, updateError);
+            // Don't fail the transaction for this, as the bill was created successfully
+          }
+
+          // Return success result
+          const successResult = {
+            success: true,
+            paymentUrl: billData.url,
+            orderId: orderId,
+            billId: billData.id,
+            amount: boostPackage.price,
+            expiresAt: expiresAt.toISOString(),
+            transactionId: txId,
+            requestId
+          };
+
+          // Store idempotent result
+          if (req.idempotencyKey) {
+            storeIdempotentResponse(req.idempotencyKey, successResult);
+          }
+
+          return successResult;
+
+        }, {
+          idempotencyKey,
+          metadata: { 
+            userId: user.id, 
+            boostPackageId, 
+            productIds,
+            operation: 'create_boost_order'
+          }
+        });
+
+        console.log(`✅ [${requestId}] Boost order created successfully`);
+        return res.status(201).json(result);
+
+      } catch (error) {
+        if (error instanceof BoostOrderError) {
+          return next(error);
+        }
+        
+        const unexpectedError = new BoostDatabaseError(
+          'Unexpected error creating boost order',
+          'create_boost_order',
+          error as Error,
+          requestId
+        );
+        return next(unexpectedError);
+      }
+    }
+  );
+
+  // Enhanced boost payment webhook with comprehensive error handling
+  app.post('/api/boost/webhook', 
+    ...boostValidationMiddleware.processWebhook,
+    async (req: Request, res: Response, next: NextFunction) => {
+      const requestId = req.requestId || generateRequestId();
+      
+      try {
+        console.log(`🔔 [${requestId}] BOOST WEBHOOK RECEIVED`);
+        
+        // Log webhook details for monitoring
+        const logData = {
+          requestId,
+          headers: req.headers,
+          body: req.body,
+          timestamp: new Date().toISOString()
+        };
+        console.log('📋 Boost Webhook Details:', JSON.stringify(logData, null, 2));
+
+        const {
+          billplzid: billId,
+          billplzpaid: paid,
+          billplzpaid_at: paidAt
+        } = req.body;
+
+        // Find the payment record by bill ID
+        const payment = await storage.getPaymentByBillId(billId);
+        if (!payment) {
+          const error = new BoostOrderError(
+            'Payment record not found for webhook',
+            BoostErrorCode.PAYMENT_FAILED,
+            404,
+            { billId },
+            requestId
+          );
+          return next(error);
+        }
+
+        // Only process boost payments
+        if (payment.paymentType !== 'boost') {
+          console.log(`⚠️ [${requestId}] Ignoring non-boost payment: ${payment.paymentType}`);
+          return res.status(200).json({ status: 'ignored', reason: 'not_boost_payment' });
+        }
+
+        // Create idempotency key for webhook processing
+        const idempotencyKey = createIdempotencyKey(
+          payment.userId,
+          'process_boost_webhook',
+          { billId, paid, paidAt }
+        );
+
+        // Check for existing idempotent operation
+        const existingOperation = checkIdempotentOperation(idempotencyKey);
+        if (existingOperation) {
+          console.log(`🔄 [${requestId}] Returning idempotent webhook result`);
+          return res.status(200).json(existingOperation.result);
+        }
+
+        // Process payment in transaction
+        const result = await processBoostPaymentTransaction(
+          payment.id,
+          billId,
+          paid === 'true' ? 'paid' : 'failed',
+          paidAt ? new Date(paidAt) : undefined,
+          idempotencyKey
+        );
+
+        const webhookResult = {
+          status: 'success',
+          message: 'Boost webhook processed successfully',
+          billId,
+          paymentId: payment.id,
+          paymentStatus: result.status,
+          transactionId: result.transactionId,
+          requestId
+        };
+
+        console.log(`✅ [${requestId}] Boost webhook processed successfully`);
+        return res.status(200).json(webhookResult);
+
+      } catch (error) {
+        if (error instanceof BoostOrderError) {
+          return next(error);
+        }
+        
+        const webhookError = new BoostOrderError(
+          'Failed to process boost webhook',
+          BoostErrorCode.WEBHOOK_VALIDATION_FAILED,
+          500,
+          { originalError: error.message },
+          requestId
+        );
+        return next(webhookError);
+      }
+    }
+  );
+
+  // Get boost order status endpoint
+  app.get('/api/boost/orders/:orderId', 
+    apiLimiter,
+    async (req: Request, res: Response, next: NextFunction) => {
+      const requestId = generateRequestId();
+      
+      try {
+        const user = await getAuthenticatedUser(req);
+        if (!user) {
+          const error = new BoostOrderError(
+            'Authentication required',
+            BoostErrorCode.UNAUTHORIZED_ACCESS,
+            401,
+            {},
+            requestId
+          );
+          return next(error);
+        }
+
+        const { orderId } = req.params;
+        
+        // Get payment by order ID
+        const payment = await storage.getPaymentByOrderId(orderId);
+        if (!payment) {
+          const error = new BoostOrderError(
+            'Boost order not found',
+            BoostErrorCode.PAYMENT_FAILED,
+            404,
+            { orderId },
+            requestId
+          );
+          return next(error);
+        }
+
+        // Verify user owns this order
+        if (payment.userId !== user.id) {
+          const error = new BoostOrderError(
+            'You can only view your own boost orders',
+            BoostErrorCode.UNAUTHORIZED_ACCESS,
+            403,
+            { orderId, userId: user.id, paymentUserId: payment.userId },
+            requestId
+          );
+          return next(error);
+        }
+
+        return res.json({
+          success: true,
+          order: {
+            id: payment.id,
+            orderId: payment.orderId,
+            amount: payment.amount,
+            status: payment.status,
+            paymentType: payment.paymentType,
+            billId: payment.billId,
+            createdAt: payment.createdAt,
+            paidAt: payment.paidAt,
+            productIds: payment.productIds
+          },
+          requestId
+        });
+
+      } catch (error) {
+        const dbError = new BoostDatabaseError(
+          'Failed to fetch boost order status',
+          'get_boost_order_status',
+          error as Error,
+          requestId
+        );
+        return next(dbError);
+      }
+    }
+  );
+
+  // Global boost error handler
+  app.use('/api/boost', handleBoostError);
 
   // Products endpoints
   app.get("/api/products", async (req, res, next) => {
@@ -3424,8 +4208,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Check for reserve price
           const hasReservePrice = auction.reservePrice !== null && auction.reservePrice > 0;
+          
+          // DIAGNOSTIC LOGGING - Type analysis
+          console.log(`\n=== AUCTION ${auction.id} RESERVE PRICE DEBUG ===`);
+          console.log(`Reserve Price: ${auction.reservePrice} (type: ${typeof auction.reservePrice})`);
+          console.log(`Current Bid: ${auction.currentBid} (type: ${typeof auction.currentBid})`);
+          console.log(`Has Reserve Price: ${hasReservePrice}`);
+          
+          // Convert to numbers for comparison to avoid string comparison issues
+          const reservePriceNum = auction.reservePrice ? parseFloat(auction.reservePrice.toString()) : 0;
+          const currentBidNum = auction.currentBid ? parseFloat(auction.currentBid.toString()) : 0;
+          
+          // Validation: Check for invalid number conversions
+          if (hasReservePrice && (isNaN(reservePriceNum) || reservePriceNum <= 0)) {
+            console.error(`❌ AUCTION ${auction.id} ERROR: Invalid reserve price conversion: ${auction.reservePrice} -> ${reservePriceNum}`);
+            continue; // Skip this auction to avoid incorrect processing
+          }
+          
+          if (auction.currentBid !== null && (isNaN(currentBidNum) || currentBidNum < 0)) {
+            console.error(`❌ AUCTION ${auction.id} ERROR: Invalid current bid conversion: ${auction.currentBid} -> ${currentBidNum}`);
+            continue; // Skip this auction to avoid incorrect processing
+          }
+          
+          console.log(`Reserve Price (number): ${reservePriceNum}`);
+          console.log(`Current Bid (number): ${currentBidNum}`);
+          
           const reserveNotMet = hasReservePrice && 
-            (auction.currentBid === null || auction.currentBid < (auction.reservePrice || 0));
+            (auction.currentBid === null || currentBidNum < reservePriceNum);
+          
+          // Additional validation: Double-check the logic before proceeding
+          if (hasReservePrice && auction.currentBid !== null && currentBidNum >= reservePriceNum) {
+            console.log(`✅ VALIDATION: Reserve price met (${currentBidNum} >= ${reservePriceNum})`);
+          } else if (hasReservePrice && (auction.currentBid === null || currentBidNum < reservePriceNum)) {
+            console.log(`❌ VALIDATION: Reserve price not met (${currentBidNum} < ${reservePriceNum})`);
+          } else {
+            console.log(`✅ VALIDATION: No reserve price, auction can complete normally`);
+          }
+          
+          console.log(`Reserve Not Met: ${reserveNotMet} (currentBid null: ${auction.currentBid === null}, currentBid < reserve: ${currentBidNum < reservePriceNum})`);
+          console.log(`=== END DEBUG ===\n`);
             
           if (reserveNotMet) {
             // Reserve price wasn't met, update status to 'reserve_not_met'
@@ -3477,7 +4298,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notifyAuctionRoom(auction.id, product.id, 'reserveNotMet', auction.currentBid, auction.currentBidderId);
             
           } else {
-            // Regular auction completion flow
+            // Regular auction completion flow - RESERVE MET OR NO RESERVE
+            console.log(`\n=== AUCTION ${auction.id} SUCCESSFUL COMPLETION ===`);
+            console.log(`Reserve was met or no reserve required. Setting status to 'pending'`);
             await storage.updateAuction(auction.id, { status: 'pending' });
             console.log(`Updated auction #${auction.id} status to 'pending'`);
             
@@ -3602,64 +4425,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Commented out to reduce log noise
   setInterval(checkAndProcessExpiredAuctions, 60000);
   
-  // Function to check for expired featured products
+  // Start auction health monitoring to catch and fix stuck auctions
+  import('./auction-health-monitor.js').then(({ startAuctionHealthMonitor }) => {
+    startAuctionHealthMonitor();
+  }).catch(error => {
+    console.error('Failed to start auction health monitor:', error);
+  });
+  
+  // Enhanced function to check for expired featured products with comprehensive error handling
   async function checkAndUpdateExpiredFeaturedProducts() {
-    console.log("Running featured products expiration check...");
-    
-    // Get current time
-    const currentTime = new Date().toISOString();
+    const requestId = generateRequestId();
     
     try {
-      // Find products where:
-      // 1. is_featured is true
-      // 2. featured_until exists and is earlier than current time
-      const { data: expiredProducts, error } = await supabase
-        .from('products')
-        .select('id, name, featured_until, featured_duration_hours')
-        .eq('is_featured', true)
-        .lt('featured_until', currentTime);
-        
-      if (error) {
-        console.error("Error checking for expired featured products:", error);
+      console.log(`🔄 [${requestId}] Running featured products expiration check...`);
+      
+      // Use Supabase-based expiration (no longer uses complex Drizzle transactions)
+      const result = await expireFeaturedProductsTransaction();
+      
+      if (result.expiredCount === 0) {
+        console.log(`✅ [${requestId}] No expired featured products found`);
         return;
       }
       
-      if (!expiredProducts || expiredProducts.length === 0) {
-        console.log("No expired featured products found");
-        return;
+      console.log(`✅ [${requestId}] Successfully expired ${result.expiredCount} featured products`);
+      console.log(`📋 [${requestId}] Expired product IDs: ${result.expiredProducts.join(', ')}`);
+      
+      // Log the successful expiration
+      try {
+        const { BoostLogger } = await import('./boost-logging');
+        BoostLogger.performanceMetric(
+          requestId,
+          'expire_featured_products',
+          Date.now(),
+          true,
+          { 
+            expiredCount: result.expiredCount,
+            expiredProducts: result.expiredProducts 
+          }
+        );
+      } catch (logError) {
+        console.error('Error logging performance metric:', logError);
       }
       
-      console.log(`Found ${expiredProducts.length} products with expired featured status`);
+    } catch (error) {
+      console.error(`❌ [${requestId}] Error in featured products expiration check:`, error);
       
-      // Update each expired product
-      for (const product of expiredProducts) {
-        console.log(`Expiring featured status for product #${product.id} "${product.name}" (expired at ${product.featured_until}, duration: ${product.featured_duration_hours || 'unknown'} hours)`);
-        
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({
-            is_featured: false
-          })
-          .eq('id', product.id);
-          
-        if (updateError) {
-          console.error(`Error updating product #${product.id}:`, updateError);
-        } else {
-          console.log(`✅ Successfully expired featured status for product #${product.id}`);
-        }
+      // Log the error with simplified error handling (no complex boost error system)
+      try {
+        const { BoostLogger } = await import('./boost-logging');
+        BoostLogger.logError(
+          error as Error,
+          'expire_featured_products_scheduled',
+          {
+            operation: 'expire_featured_products',
+            requestId,
+            scheduled: true,
+            errorMessage: (error as Error).message
+          }
+        );
+      } catch (logError) {
+        console.error('Error logging boost error:', logError);
       }
       
-      console.log("Completed featured products expiration check");
-    } catch (err) {
-      console.error("Error in featured products expiration check:", err);
+      // Don't throw the error - this is a background process
+      // We want it to continue running even if one execution fails
     }
   }
   
   // Run the initial check
   checkAndUpdateExpiredFeaturedProducts();
   
-  // Set up recurring check for featured product expiration (every 30 minutes)
-  setInterval(checkAndUpdateExpiredFeaturedProducts, 30 * 60 * 1000);
+  // Set up recurring check for featured product expiration (every 2 minutes for testing)
+  setInterval(checkAndUpdateExpiredFeaturedProducts, 2 * 60 * 1000);
   
   // GET /api/auctions - Get all auctions
   app.get('/api/auctions', async (req, res) => {

@@ -51,7 +51,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/v1/auth/me"],
     enabled: !!localStorage.getItem('app_token'),
     retry: false,
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "/api/v1/auth/me");
+        const userData = await response.json();
+        console.log('✅ [Auth] User data fetched successfully:', userData);
+        return userData;
+      } catch (error: any) {
+        console.error('❌ [Auth] Failed to fetch user data:', error);
+        
+        // If authentication fails (401/403), clear invalid token
+        if (error.message?.includes('401') || error.message?.includes('403')) {
+          console.log('🧹 [Auth] Clearing invalid token due to auth failure');
+          removeAuthToken();
+          queryClient.setQueryData(["/api/v1/auth/me"], null);
+          // Also check if Supabase session exists and clear it if needed
+          supabase.auth.signOut();
+        }
+        
+        // Return null for auth failures to show logged out state
+        if (error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('404')) {
+          return null;
+        }
+        
+        // Re-throw other errors
+        throw error;
+      }
+    },
   });
+
+  // Listen for localStorage changes and refetch user when token changes
+  useEffect(() => {
+    const checkTokenAndRefetch = () => {
+      const token = localStorage.getItem('app_token');
+      console.log('🔍 [Auth] Checking token state:', token ? 'token exists' : 'no token');
+      
+      if (!token) {
+        // No token means user should be logged out
+        console.log('🚪 [Auth] No token found, setting user to null');
+        queryClient.setQueryData(["/api/v1/auth/me"], null);
+      } else if (!user && !isLoading) {
+        // Token exists but no user data - refetch
+        console.log('🔄 [Auth] Token exists but no user data, refetching...');
+        refetchUser();
+      }
+    };
+
+    // Check immediately
+    checkTokenAndRefetch();
+
+    // Listen for storage changes (e.g., from other tabs)
+    window.addEventListener('storage', checkTokenAndRefetch);
+    
+    return () => {
+      window.removeEventListener('storage', checkTokenAndRefetch);
+    };
+  }, [user, isLoading, refetchUser]);
 
   // Listen for Supabase auth state changes
   useEffect(() => {
@@ -84,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } else if (event === 'SIGNED_OUT') {
           // Clear application JWT and user data
+          console.log('🚪 [Auth] Supabase signed out, clearing local auth state');
           removeAuthToken();
           queryClient.setQueryData(["/api/v1/auth/me"], null);
           queryClient.invalidateQueries({ queryKey: ["/api/v1/auth/me"] });
@@ -92,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [refetchUser]);
 
   // Sign up with email and password
   const signUpMutation = useMutation({

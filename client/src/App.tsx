@@ -21,10 +21,13 @@ import AuthCallback from "@/pages/auth-callback";
 import { AuthVerifyPage } from "@/pages/auth-verify";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-supabase-auth";
+import { AuthDebug } from "@/components/debug/auth-debug";
 import TermsOfServicePage from "./pages/terms-of-service";
 import PrivacyPolicyPage from "./pages/privacy-policy";
 import BuyingGuidePage from "@/pages/buying-guide"; // Import the new component
 import BoostCheckoutPage from "@/pages/boost-checkout"; // Import boost checkout page
+import BoostSuccessPage from "@/pages/boost-success"; // Import boost success page
+import BoostFailurePage from "@/pages/boost-failure"; // Import boost failure page
 
 function Router() {
   // Analytics tracking for all route changes
@@ -54,6 +57,10 @@ function Router() {
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/buying-guide" component={BuyingGuidePage} /> {/* Added Buying Guide route */}
       <ProtectedRoute path="/boost-checkout" component={BoostCheckoutPage} /> {/* Added Boost Checkout route */}
+      <ProtectedRoute path="/boost/success" component={BoostSuccessPage} /> {/* Added Boost Success route */}
+      <ProtectedRoute path="/boost/success/:orderId" component={BoostSuccessPage} /> {/* Added Boost Success route with orderId */}
+      <ProtectedRoute path="/boost/failure" component={BoostFailurePage} /> {/* Added Boost Failure route */}
+      <ProtectedRoute path="/boost/failure/:reason" component={BoostFailurePage} /> {/* Added Boost Failure route with reason */}
       <Route component={NotFound} />
     </Switch>
   );
@@ -66,6 +73,7 @@ function App() {
         <AuthProvider>
           <Router />
           <Toaster />
+          <AuthDebug />
         </AuthProvider>
       </AnalyticsProvider>
     </QueryClientProvider>

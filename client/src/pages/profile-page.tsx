@@ -82,6 +82,7 @@ export default function ProfilePage() {
     enabled: !!user
   });
 
+
   // Handle profile update
   const updateProfileMutation = useMutation({
     mutationFn: async (userData: Partial<User>) => {

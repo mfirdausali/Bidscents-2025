@@ -362,6 +362,12 @@ export const insertTransactionSchema = createInsertSchema(transactions).pick({
   status: true,
 });
 
+// Schema for creating boost orders
+export const createBoostOrderSchema = z.object({
+  boostPackageId: z.number().int().positive("Boost package ID must be a positive integer"),
+  productIds: z.array(z.number().int().positive("Product ID must be a positive integer")).min(1, "At least one product must be selected"),
+});
+
 // Types for TypeScript
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -406,6 +412,8 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+export type CreateBoostOrder = z.infer<typeof createBoostOrderSchema>;
 
 // Extended types
 export type ProductWithDetails = Product & {

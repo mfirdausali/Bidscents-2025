@@ -516,7 +516,7 @@ export default function SellerProfilePage() {
                         <div>
                           <p className="font-medium">Products</p>
                           <p className="text-muted-foreground">
-                            {productsData?.pagination.totalProducts || 0} items
+                            {productsData?.products.filter(p => p.status === 'active' || p.status === 'featured').length || 0} items
                           </p>
                         </div>
                       </div>
@@ -637,7 +637,7 @@ export default function SellerProfilePage() {
                         Retry
                       </Button>
                     </div>
-                  ) : productsData?.products.filter(p => p.status === 'active').length === 0 ? (
+                  ) : productsData?.products.filter(p => p.status === 'active' || p.status === 'featured').length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-muted-foreground">
                         No active products found.
@@ -646,7 +646,7 @@ export default function SellerProfilePage() {
                   ) : (
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                       {productsData?.products
-                        .filter(product => product.status === 'active')
+                        .filter(product => product.status === 'active' || product.status === 'featured')
                         .map((product) => (
                           product.listingType === 'auction' && product.auction ? (
                             <AuctionCard 

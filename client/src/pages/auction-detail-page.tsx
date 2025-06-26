@@ -14,6 +14,7 @@ import { Footer } from "@/components/ui/footer";
 import { useAuth } from "@/hooks/use-supabase-auth";
 import { formatDateTime } from "@/lib/date-utils";
 import { formatCurrency } from "@/lib/utils";
+import { createWebSocket } from "@/lib/websocket-utils";
 
 interface Bid {
   id: number;
@@ -108,16 +109,8 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
   useEffect(() => {
     if (!id) return;
     
-    // Setup WebSocket connection
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    // Determine the correct host and port
-    const isDevelopment = import.meta.env.DEV;
-    const host = isDevelopment ? 'localhost:3000' : window.location.host;
-    const wsUrl = `${protocol}//${host}/ws`;
-    console.log('🎯 [AuctionDetail] WebSocket URL:', wsUrl, '(dev mode:', isDevelopment, ')');
-    
-    // Create WebSocket connection
-    socket.current = new WebSocket(wsUrl);
+    // Create WebSocket connection using centralized utility
+    socket.current = createWebSocket();
     
     socket.current.onopen = () => {
       setWsConnected(true);

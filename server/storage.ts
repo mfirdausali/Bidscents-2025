@@ -1,15 +1,17 @@
-import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids, payments } from "@shared/schema";
+import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids, payments, boostPackages, transactions } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
+  BoostPackage, InsertBoostPackage,
   Review, InsertReview,
   Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
   ProductImage, InsertProductImage,
   Message, InsertMessage, MessageWithDetails,
   Auction, InsertAuction, AuctionWithDetails,
   Bid, InsertBid, BidWithDetails,
-  Payment, InsertPayment
+  Payment, InsertPayment,
+  Transaction, InsertTransaction, TransactionWithDetails
 } from "@shared/schema";
 
 // Define cart types since they're removed from schema but still required by the interface
@@ -47,6 +49,21 @@ type ProductFilter = {
   maxPrice?: number;
   search?: string;
 };
+
+// Custom error types for boost validation
+export class BoostValidationError extends Error {
+  constructor(public code: string, message: string) {
+    super(message);
+    this.name = 'BoostValidationError';
+  }
+}
+
+export const BOOST_ERROR_CODES = {
+  PACKAGE_NOT_FOUND: 'PACKAGE_NOT_FOUND',
+  INVALID_PRODUCT_OWNERSHIP: 'INVALID_PRODUCT_OWNERSHIP', 
+  PRODUCTS_ALREADY_FEATURED: 'PRODUCTS_ALREADY_FEATURED',
+  PRODUCT_COUNT_MISMATCH: 'PRODUCT_COUNT_MISMATCH'
+} as const;
 
 export interface IStorage {
   // User methods
@@ -149,6 +166,13 @@ export interface IStorage {
   getUserTransactions(userId: number): Promise<TransactionWithDetails[]>;
   getProductTransactions(productId: number): Promise<TransactionWithDetails[]>;
   updateTransactionStatus(id: number, status: string): Promise<Transaction>;
+  
+  // Boost methods
+  getBoostPackageById(id: number): Promise<BoostPackage | null>;
+  createBoostPayment(userId: number, orderId: string, boostPackageId: number, productIds: number[], amount: number): Promise<number>;
+  getUserProductsForBoosting(userId: number, productIds: number[]): Promise<Product[]>;
+  validateBoostOrder(userId: number, boostPackageId: number, productIds: number[]): Promise<void>;
+  activateBoostForProducts(productIds: number[], durationHours: number): Promise<void>;
   
   // Removed session storage - using Supabase as sole IdP
 }
@@ -688,6 +712,32 @@ export class MemStorage implements IStorage {
       };
     }));
   }
+
+  // Boost methods - stub implementations for MemStorage
+  async getBoostPackageById(id: number): Promise<BoostPackage | null> {
+    console.warn("Boost functionality not implemented in MemStorage");
+    return null;
+  }
+
+  async createBoostPayment(userId: number, orderId: string, boostPackageId: number, productIds: number[], amount: number): Promise<number> {
+    console.warn("Boost functionality not implemented in MemStorage");
+    throw new Error("Boost functionality not implemented in MemStorage");
+  }
+
+  async getUserProductsForBoosting(userId: number, productIds: number[]): Promise<Product[]> {
+    console.warn("Boost functionality not implemented in MemStorage");
+    return [];
+  }
+
+  async validateBoostOrder(userId: number, boostPackageId: number, productIds: number[]): Promise<void> {
+    console.warn("Boost functionality not implemented in MemStorage");
+    throw new BoostValidationError(BOOST_ERROR_CODES.PACKAGE_NOT_FOUND, "Boost functionality not implemented in MemStorage");
+  }
+
+  async activateBoostForProducts(productIds: number[], durationHours: number): Promise<void> {
+    console.warn("Boost functionality not implemented in MemStorage");
+    throw new Error("Boost functionality not implemented in MemStorage");
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -870,6 +920,11 @@ export class DatabaseStorage implements IStorage {
   async getSellerProducts(sellerId: number): Promise<ProductWithDetails[]> {
     const sellerProducts = await db.select().from(products).where(eq(products.sellerId, sellerId));
     return this.addProductDetails(sellerProducts);
+  }
+
+  async getAllProductsWithDetails(): Promise<ProductWithDetails[]> {
+    const allProducts = await db.select().from(products);
+    return this.addProductDetails(allProducts);
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
@@ -1321,6 +1376,16 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
   
+  async getPaymentById(id: number): Promise<Payment | undefined> {
+    const result = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.id, id))
+      .execute();
+      
+    return result[0];
+  }
+  
   async getPaymentByOrderId(orderId: string): Promise<Payment | undefined> {
     const result = await db
       .select()
@@ -1573,6 +1638,287 @@ export class DatabaseStorage implements IStorage {
         images,
       };
     }));
+  }
+
+  // Transaction methods
+  async createTransaction(data: InsertTransaction): Promise<Transaction> {
+    const [newTransaction] = await db.insert(transactions).values(data).returning();
+    return newTransaction;
+  }
+
+  async getUserTransactions(userId: number): Promise<TransactionWithDetails[]> {
+    const userTransactions = await db.select()
+      .from(transactions)
+      .where(or(eq(transactions.sellerId, userId), eq(transactions.buyerId, userId)))
+      .orderBy(desc(transactions.createdAt));
+    
+    return this.addTransactionDetails(userTransactions);
+  }
+
+  async getProductTransactions(productId: number): Promise<TransactionWithDetails[]> {
+    const productTransactions = await db.select()
+      .from(transactions)
+      .where(eq(transactions.productId, productId))
+      .orderBy(desc(transactions.createdAt));
+    
+    return this.addTransactionDetails(productTransactions);
+  }
+
+  async updateTransactionStatus(id: number, status: string): Promise<Transaction> {
+    const [updatedTransaction] = await db
+      .update(transactions)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(transactions.id, id))
+      .returning();
+    
+    if (!updatedTransaction) {
+      throw new Error("Transaction not found");
+    }
+    
+    return updatedTransaction;
+  }
+
+  private async addTransactionDetails(transactionsList: Transaction[]): Promise<TransactionWithDetails[]> {
+    return Promise.all(transactionsList.map(async (transaction) => {
+      // Get product
+      const [product] = await db.select()
+        .from(products)
+        .where(eq(products.id, transaction.productId));
+      
+      // Get seller
+      const [seller] = await db.select()
+        .from(users)
+        .where(eq(users.id, transaction.sellerId));
+      
+      // Get buyer
+      const [buyer] = await db.select()
+        .from(users)
+        .where(eq(users.id, transaction.buyerId));
+      
+      return {
+        ...transaction,
+        product,
+        seller,
+        buyer
+      };
+    }));
+  }
+
+  // Auction methods - stub implementations for now since they may be implemented elsewhere
+  async getAuctions(): Promise<Auction[]> {
+    return db.select().from(auctions);
+  }
+
+  async getAuctionById(id: number): Promise<Auction | undefined> {
+    const [auction] = await db.select().from(auctions).where(eq(auctions.id, id));
+    return auction;
+  }
+
+  async getProductAuctions(productId: number): Promise<Auction[]> {
+    return db.select().from(auctions).where(eq(auctions.productId, productId));
+  }
+
+  async createAuction(auction: InsertAuction): Promise<Auction> {
+    const [newAuction] = await db.insert(auctions).values(auction).returning();
+    return newAuction;
+  }
+
+  async updateAuction(id: number, auction: Partial<InsertAuction>): Promise<Auction> {
+    const [updatedAuction] = await db
+      .update(auctions)
+      .set(auction)
+      .where(eq(auctions.id, id))
+      .returning();
+    
+    if (!updatedAuction) {
+      throw new Error("Auction not found");
+    }
+    
+    return updatedAuction;
+  }
+
+  async deleteAuction(id: number): Promise<void> {
+    await db.delete(auctions).where(eq(auctions.id, id));
+  }
+
+  // Bid methods - stub implementations for now
+  async getBidsForAuction(auctionId: number): Promise<Bid[]> {
+    return db.select().from(bids).where(eq(bids.auctionId, auctionId));
+  }
+
+  async createBid(bid: InsertBid): Promise<Bid> {
+    const [newBid] = await db.insert(bids).values(bid).returning();
+    return newBid;
+  }
+
+  async updatePreviousBids(auctionId: number, newBidderId: number): Promise<void> {
+    await db
+      .update(bids)
+      .set({ isWinning: false })
+      .where(
+        and(
+          eq(bids.auctionId, auctionId),
+          sql`bidder_id != ${newBidderId}`
+        )
+      );
+  }
+
+  // Boost methods
+  async getBoostPackageById(id: number): Promise<BoostPackage | null> {
+    try {
+      const [boostPackage] = await db.select()
+        .from(boostPackages)
+        .where(eq(boostPackages.id, id));
+      
+      return boostPackage || null;
+    } catch (error) {
+      console.error('Error getting boost package:', error);
+      return null;
+    }
+  }
+
+  async createBoostPayment(userId: number, orderId: string, boostPackageId: number, productIds: number[], amount: number): Promise<number> {
+    try {
+      const [payment] = await db.insert(payments).values({
+        userId,
+        orderId,
+        amount,
+        status: 'pending',
+        paymentType: 'boost',
+        boost_option_id: boostPackageId,
+        productIds: productIds.map(id => id.toString())
+      }).returning();
+      
+      return payment.id;
+    } catch (error) {
+      console.error('Error creating boost payment:', error);
+      throw error;
+    }
+  }
+
+  async getUserProductsForBoosting(userId: number, productIds: number[]): Promise<Product[]> {
+    try {
+      if (productIds.length === 0) {
+        return [];
+      }
+
+      const userProducts = await db.select()
+        .from(products)
+        .where(
+          and(
+            eq(products.sellerId, userId),
+            inArray(products.id, productIds)
+          )
+        );
+      
+      return userProducts;
+    } catch (error) {
+      console.error('Error getting user products for boosting:', error);
+      throw error;
+    }
+  }
+
+
+  async validateBoostOrder(userId: number, boostPackageId: number, productIds: number[]): Promise<void> {
+    try {
+      // Check if package exists and is active
+      const boostPackage = await this.getBoostPackageById(boostPackageId);
+      if (!boostPackage) {
+        throw new BoostValidationError(
+          BOOST_ERROR_CODES.PACKAGE_NOT_FOUND,
+          'Boost package not found or inactive'
+        );
+      }
+
+      if (!boostPackage.isActive) {
+        throw new BoostValidationError(
+          BOOST_ERROR_CODES.PACKAGE_NOT_FOUND,
+          'Boost package is not active'
+        );
+      }
+
+      // Validate product count matches package limits
+      if (productIds.length !== boostPackage.itemCount) {
+        throw new BoostValidationError(
+          BOOST_ERROR_CODES.PRODUCT_COUNT_MISMATCH,
+          `Expected ${boostPackage.itemCount} products, but received ${productIds.length}`
+        );
+      }
+
+      // Verify user owns all selected products
+      const userProducts = await this.getUserProductsForBoosting(userId, productIds);
+      if (userProducts.length !== productIds.length) {
+        const ownedProductIds = userProducts.map(p => p.id);
+        const notOwnedIds = productIds.filter(id => !ownedProductIds.includes(id));
+        throw new BoostValidationError(
+          BOOST_ERROR_CODES.INVALID_PRODUCT_OWNERSHIP,
+          `User does not own products with IDs: ${notOwnedIds.join(', ')}`
+        );
+      }
+
+      // Check if any products are already featured
+      const featuredProducts = userProducts.filter(product => product.isFeatured);
+      if (featuredProducts.length > 0) {
+        const featuredIds = featuredProducts.map(p => p.id);
+        throw new BoostValidationError(
+          BOOST_ERROR_CODES.PRODUCTS_ALREADY_FEATURED,
+          `Products with IDs ${featuredIds.join(', ')} are already featured`
+        );
+      }
+
+    } catch (error) {
+      if (error instanceof BoostValidationError) {
+        throw error;
+      }
+      console.error('Error validating boost order:', error);
+      throw new Error('Failed to validate boost order');
+    }
+  }
+
+  async activateBoostForProducts(productIds: number[], durationHours: number): Promise<void> {
+    console.log(`🚀 Activating boost for products ${productIds.join(', ')} for ${durationHours} hours`);
+
+    if (productIds.length === 0) {
+      console.warn('No product IDs provided for boost activation');
+      return;
+    }
+
+    const currentTime = new Date();
+    const expirationTime = new Date(currentTime.getTime() + (durationHours * 60 * 60 * 1000));
+
+    console.log(`Featured period: ${currentTime.toISOString()} to ${expirationTime.toISOString()}`);
+
+    try {
+      // Use database transaction for consistency
+      await db.transaction(async (tx) => {
+        // Update all products with featured status and timestamps
+        for (const productId of productIds) {
+          const [updatedProduct] = await tx
+            .update(products)
+            .set({
+              isFeatured: true,
+              featuredAt: currentTime,
+              featuredUntil: expirationTime,
+              featuredDurationHours: durationHours,
+              status: 'featured',
+              updatedAt: currentTime
+            })
+            .where(eq(products.id, productId))
+            .returning();
+
+          if (!updatedProduct) {
+            throw new Error(`Failed to update product ${productId} - product not found`);
+          }
+
+          console.log(`✅ Product ${productId} successfully boosted until ${expirationTime.toISOString()}`);
+        }
+      });
+
+      console.log(`🎉 Successfully activated boost for ${productIds.length} products`);
+    } catch (error) {
+      console.error('❌ Error activating boost for products:', error);
+      throw new Error(`Failed to activate boost for products: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
 

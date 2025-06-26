@@ -901,6 +901,73 @@ export default function SellerDashboard() {
     auctionForm.setValue("imageUrl", firstImageUrl);
   };
 
+  // Developer helper: Fill auction form with demo data
+  const fillDemoAuctionData = () => {
+    const brands = ["Chanel", "Dior", "Tom Ford", "Creed", "Maison Margiela", "Le Labo", "Byredo", "Hermès"];
+    const perfumeNames = [
+      "Midnight Noir", "Golden Rose", "Ocean Breeze", "Velvet Dreams", "Crystal Essence",
+      "Amber Nights", "Silver Mist", "Ruby Passion", "Emerald Garden", "Diamond Sparkle",
+      "Sunset Glow", "Moonlight Serenade", "Sapphire Sky", "Copper Dawn", "Pearl Whisper"
+    ];
+    const descriptions = [
+      "A luxurious fragrance with notes of bergamot, jasmine, and sandalwood. Perfect for evening wear.",
+      "An elegant blend of citrus and floral notes with a warm woody base. Ideal for special occasions.",
+      "A fresh and vibrant scent featuring ocean breeze with hints of sea salt and driftwood.",
+      "A sophisticated fragrance with rich vanilla, amber, and exotic spices. Long-lasting and captivating.",
+      "A modern interpretation of classic elegance with rose petals, musk, and cedar.",
+      "An intense and mysterious scent with dark chocolate, coffee, and smoky incense notes."
+    ];
+    const batchCodes = ["A2023", "B2024", "C2023", "D2024", "E2023", "F2024"];
+    const boxConditions = ["Good", "Damaged", "No Box"];
+    const timeOptions = [
+      { label: "10 minutes", minutes: 10 },
+      { label: "20 minutes", minutes: 20 },
+      { label: "1 hour", minutes: 60 }
+    ];
+
+    // Generate random data
+    const randomBrand = brands[Math.floor(Math.random() * brands.length)];
+    const randomName = perfumeNames[Math.floor(Math.random() * perfumeNames.length)];
+    const randomDescription = descriptions[Math.floor(Math.random() * descriptions.length)];
+    const randomStartingPrice = Math.floor(Math.random() * 200) + 50; // 50-250
+    const randomReservePrice = randomStartingPrice + Math.floor(Math.random() * 100) + 20; // +20 to +120
+    const randomBuyNowPrice = randomReservePrice + Math.floor(Math.random() * 150) + 30; // +30 to +180
+    const randomBidIncrement = [0.10, 0.50, 1.00, 2.00, 5.00][Math.floor(Math.random() * 5)];
+    const randomTimeOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+    const endDate = new Date(Date.now() + randomTimeOption.minutes * 60 * 1000);
+    const randomRemaining = Math.floor(Math.random() * 60) + 40; // 40-100%
+    const randomBatchCode = batchCodes[Math.floor(Math.random() * batchCodes.length)];
+    const randomYear = 2020 + Math.floor(Math.random() * 5); // 2020-2024
+    const randomBoxCondition = boxConditions[Math.floor(Math.random() * boxConditions.length)];
+    const randomVolume = [30, 50, 75, 100, 150][Math.floor(Math.random() * 5)];
+
+    // Fill the form
+    auctionForm.setValue("name", `${randomBrand} ${randomName}`);
+    auctionForm.setValue("brand", randomBrand);
+    auctionForm.setValue("description", randomDescription);
+    auctionForm.setValue("startingPrice", randomStartingPrice);
+    auctionForm.setValue("reservePrice", randomReservePrice);
+    auctionForm.setValue("buyNowPrice", randomBuyNowPrice);
+    auctionForm.setValue("bidIncrement", randomBidIncrement);
+    auctionForm.setValue("auctionEndDate", endDate);
+    auctionForm.setValue("imageUrl", "https://example.com/demo-perfume.jpg");
+    auctionForm.setValue("stockQuantity", 1);
+    auctionForm.setValue("categoryId", 1); // Assuming 1 is a valid category
+    auctionForm.setValue("isNew", Math.random() > 0.5);
+    auctionForm.setValue("isFeatured", Math.random() > 0.7);
+    auctionForm.setValue("remainingPercentage", randomRemaining);
+    auctionForm.setValue("batchCode", randomBatchCode);
+    auctionForm.setValue("purchaseYear", randomYear);
+    auctionForm.setValue("boxCondition", randomBoxCondition);
+    auctionForm.setValue("volume", randomVolume);
+
+    console.log("🎲 Demo auction data filled:", {
+      name: `${randomBrand} ${randomName}`,
+      endTime: randomTimeOption.label,
+      endDate: endDate.toLocaleString()
+    });
+  };
+
   // Create auction mutation
   const createAuctionMutation = useMutation({
     mutationFn: async (data: {
@@ -1470,13 +1537,6 @@ export default function SellerDashboard() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                onClick={() => setLocation("/boost-checkout")}
-                className="mt-4 md:mt-0 bg-purple-600 hover:bg-purple-700 text-white flex items-center"
-              >
-                <Star className="mr-2 h-4 w-4" />
-                Boost Products
-              </Button>
               <Button
                 onClick={handleAddNewProduct}
                 className="mt-4 md:mt-0 bg-gold text-rich-black hover:bg-metallic-gold flex items-center"
@@ -3031,6 +3091,16 @@ export default function SellerDashboard() {
                   >
                     Cancel
                   </Button>
+                  {!isEditMode && process.env.NODE_ENV === 'development' && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={fillDemoAuctionData}
+                      className="bg-purple-100 text-purple-700 hover:bg-purple-200"
+                    >
+                      🎲 Fill Demo Data
+                    </Button>
+                  )}
                   <Button
                     type="submit"
                     className="bg-gold text-rich-black hover:bg-metallic-gold"

@@ -1,8 +1,9 @@
-import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids, payments, transactions } from "@shared/schema";
+import { users, products, categories, reviews, orders, orderItems, productImages, messages, auctions, bids, payments, transactions, boostPackages } from "@shared/schema";
 import type { 
   User, InsertUser, 
   Product, InsertProduct, ProductWithDetails,
   Category, InsertCategory,
+  BoostPackage, InsertBoostPackage,
   Review, InsertReview,
   Order, InsertOrder, OrderItem, InsertOrderItem, OrderWithItems,
   ProductImage, InsertProductImage,
@@ -2760,5 +2761,148 @@ export class SupabaseStorage implements IStorage {
       product_id: payment.product_id
     });
     return payment;
+  }
+
+  async activateBoostForProducts(productIds: number[], durationHours: number): Promise<void> {
+    console.log(`🚀 [SupabaseStorage] Activating boost for products ${productIds.join(', ')} for ${durationHours} hours`);
+
+    if (productIds.length === 0) {
+      console.warn('No product IDs provided for boost activation');
+      return;
+    }
+
+    const currentTime = new Date();
+    const expirationTime = new Date(currentTime.getTime() + (durationHours * 60 * 60 * 1000));
+
+    console.log(`Featured period: ${currentTime.toISOString()} to ${expirationTime.toISOString()}`);
+
+    try {
+      // Use Supabase transaction for consistency
+      const { error } = await supabase.rpc('activate_boost_for_products', {
+        p_product_ids: productIds,
+        p_duration_hours: durationHours,
+        p_current_time: currentTime.toISOString(),
+        p_expiration_time: expirationTime.toISOString()
+      });
+
+      if (error) {
+        console.error('❌ Error calling Supabase RPC for boost activation:', error);
+        
+        // Fallback to individual updates if RPC fails
+        console.log('🔄 Falling back to individual product updates');
+        
+        for (const productId of productIds) {
+          const { error: updateError } = await supabase
+            .from('products')
+            .update({
+              is_featured: true,
+              featured_at: currentTime.toISOString(),
+              featured_until: expirationTime.toISOString(),
+              featured_duration_hours: durationHours,
+              status: 'featured',
+              updated_at: currentTime.toISOString()
+            })
+            .eq('id', productId);
+
+          if (updateError) {
+            console.error(`❌ Error updating product ${productId}:`, updateError);
+            throw new Error(`Failed to update product ${productId}: ${updateError.message}`);
+          }
+
+          console.log(`✅ Product ${productId} successfully boosted until ${expirationTime.toISOString()}`);
+        }
+      } else {
+        console.log('✅ RPC call successful for boost activation');
+      }
+
+      console.log(`🎉 Successfully activated boost for ${productIds.length} products`);
+    } catch (error) {
+      console.error('❌ Error activating boost for products:', error);
+      throw new Error(`Failed to activate boost for products: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async validateBoostOrder(userId: number, boostPackageId: number, productIds: number[]): Promise<void> {
+    console.log(`🔍 [SupabaseStorage] Validating boost order for user ${userId}, package ${boostPackageId}, products: ${productIds.join(', ')}`);
+    
+    try {
+      // Check if package exists and is active
+      const { data: boostPackage, error: packageError } = await supabase
+        .from('boost_packages')
+        .select('*')
+        .eq('id', boostPackageId)
+        .eq('is_active', true)
+        .single();
+
+      if (packageError || !boostPackage) {
+        throw new Error('Boost package not found or inactive');
+      }
+
+      console.log(`✅ Boost package found: ${boostPackage.name} (${boostPackage.item_count} items, ${boostPackage.duration_hours}h)`);
+
+      // Validate product count matches package limits
+      if (productIds.length !== boostPackage.item_count) {
+        throw new Error(`Expected ${boostPackage.item_count} products, but received ${productIds.length}`);
+      }
+
+      // Verify user owns all selected products
+      const { data: userProducts, error: productsError } = await supabase
+        .from('products')
+        .select('id, seller_id, is_featured, featured_until')
+        .in('id', productIds)
+        .eq('seller_id', userId);
+
+      if (productsError) {
+        console.error('❌ Error checking product ownership:', productsError);
+        throw new Error('Failed to validate product ownership');
+      }
+
+      if (!userProducts || userProducts.length !== productIds.length) {
+        const ownedProductIds = userProducts?.map(p => p.id) || [];
+        const notOwnedIds = productIds.filter(id => !ownedProductIds.includes(id));
+        throw new Error(`You don't own these products: ${notOwnedIds.join(', ')}`);
+      }
+
+      // Check if any products are already featured
+      const currentTime = new Date();
+      const featuredProducts = userProducts.filter(p => 
+        p.is_featured && 
+        p.featured_until && 
+        new Date(p.featured_until) > currentTime
+      );
+
+      if (featuredProducts.length > 0) {
+        const featuredIds = featuredProducts.map(p => p.id);
+        throw new Error(`Products with IDs ${featuredIds.join(', ')} are already featured`);
+      }
+
+      console.log('✅ Boost order validation passed');
+    } catch (error) {
+      console.error('❌ Error validating boost order:', error);
+      throw error;
+    }
+  }
+
+  async getBoostPackageById(id: number): Promise<BoostPackage | null> {
+    console.log(`🔍 [SupabaseStorage] Fetching boost package ID: ${id}`);
+    
+    try {
+      const { data: boostPackage, error } = await supabase
+        .from('boost_packages')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching boost package:', error);
+        return null;
+      }
+
+      console.log(`✅ Boost package found: ${boostPackage?.name}`);
+      return boostPackage;
+    } catch (error) {
+      console.error('❌ Error getting boost package:', error);
+      return null;
+    }
   }
 }

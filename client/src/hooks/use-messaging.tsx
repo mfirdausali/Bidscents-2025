@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './use-supabase-auth';
 import { useToast } from './use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { createWebSocket } from '@/lib/websocket-utils';
 
 // Message type definition
 export interface Message {
@@ -97,14 +98,7 @@ export function useMessaging() {
         reconnectTimeout = null;
       }
       
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      // Determine the correct host and port
-      const isDevelopment = import.meta.env.DEV;
-      const host = isDevelopment ? 'localhost:3000' : window.location.host;
-      const wsUrl = `${protocol}//${host}/ws`;
-      console.log('WebSocket URL:', wsUrl, '(dev mode:', isDevelopment, ')');
-      
-      const socket = new WebSocket(wsUrl);
+      const socket = createWebSocket();
       socketRef.current = socket;
       
       // Handle connection error and reconnect logic

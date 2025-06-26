@@ -17,11 +17,20 @@ import { Search, Heart, MessageCircle, User, LogOut, Package, Shield } from "luc
 
 export function Header() {
   const [location] = useLocation();
-  const { user, signOutMutation } = useAuth();
+  const { user, signOutMutation, isLoading } = useAuth();
   const { unreadCount } = useUnreadMessages();
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const queryClient = useQueryClient();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🏠 [Header] Auth state:', {
+      user: user ? { id: user.id, email: user.email, username: user.username } : null,
+      isLoading,
+      hasToken: !!localStorage.getItem('app_token')
+    });
+  }, [user, isLoading]);
 
   // Handle scroll event to add shadow to header
   useEffect(() => {
@@ -101,7 +110,12 @@ export function Header() {
             </Link>
             
             {/* User menu */}
-            {user ? (
+            {isLoading ? (
+              // Show loading state
+              <Button variant="ghost" size="icon" className="rounded-full p-0" disabled>
+                <User className="h-5 w-5 animate-pulse" />
+              </Button>
+            ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full p-0">
@@ -109,7 +123,7 @@ export function Header() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuLabel>My Account ({user.username})</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <Link href="/profile">
                     <DropdownMenuItem className="cursor-pointer">
