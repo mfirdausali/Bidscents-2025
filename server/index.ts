@@ -11,7 +11,7 @@ console.log('[TIMEZONE] Timezone offset:', new Date().getTimezoneOffset(), 'minu
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { secureRoutes } from "./secure-routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { serveStatic, log } from "./vite";
 import { testConnection } from "./db";
 import { testSupabaseConnection } from "./supabase";
 import { configureSecurityMiddleware } from "./security-middleware";
@@ -73,6 +73,8 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
+    // Dynamic import to avoid bundling Vite in production
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
     serveStatic(app);
