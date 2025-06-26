@@ -37,18 +37,9 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true,
   };
 
-  // Use inline config instead of importing vite.config.ts to avoid bundling issues
+  // Use the actual vite.config.ts file for proper configuration
   const vite = await createViteServer({
-    plugins: [
-      // Basic React plugin for development
-      {
-        name: "react-dev",
-        configResolved(config) {
-          // Minimal React setup for development
-        }
-      }
-    ],
-    configFile: false,
+    configFile: path.resolve(__dirname, '..', 'vite.config.ts'),
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
@@ -74,10 +65,7 @@ export async function setupVite(app: Express, server: Server) {
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
-      );
+      // Let Vite handle versioning - don't manually add version parameters
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
