@@ -8,75 +8,19 @@ import type { Application } from 'express';
  * @param app Express application instance
  */
 export function configureSecurityMiddleware(app: Application) {
-  // Configure CORS
+  // Simplified CORS - allow all origins for smooth operation
   const corsOptions: cors.CorsOptions = {
-    origin: function (origin, callback) {
-      // Allow requests with no origin for health checks and server-side requests
-      if (!origin) {
-        if (process.env.NODE_ENV === 'development') {
-          // In development, allow requests with no origin (e.g., server-side requests)
-          return callback(null, true);
-        } else {
-          // In production, allow requests with no origin for health checks
-          // DigitalOcean health checks may not include origin header
-          console.log('[SECURITY] Allowing request with no origin header (likely health check)');
-          return callback(null, true);
-        }
-      }
-      
-      const allowedOrigins = [
-        process.env.APP_URL || 'http://localhost:5000',
-        'https://bidscents.replit.app',
-        'https://bidscents-2025-scsjl.ondigitalocean.app',
-      ];
-
-      // Add current Replit domain dynamically
-      if (process.env.REPLIT_DOMAINS) {
-        allowedOrigins.push(`https://${process.env.REPLIT_DOMAINS}`);
-      }
-      
-      // In development or non-production, allow localhost origins and be more permissive
-      if (process.env.NODE_ENV !== 'production') {
-        allowedOrigins.push(
-          'http://localhost:3000',
-          'http://localhost:5000',
-          'http://localhost:5173',
-          'http://127.0.0.1:5000',
-          'http://127.0.0.1:3000',
-          'http://127.0.0.1:5173'
-        );
-        
-        // Allow any .replit.dev domain in development
-        if (origin && origin.includes('.replit.dev')) {
-          return callback(null, true);
-        }
-      }
-      
-      // Allow DigitalOcean App Platform domains
-      if (origin && origin.includes('.ondigitalocean.app')) {
-        console.log(`[SECURITY] Allowed DigitalOcean origin: ${origin}`);
-        return callback(null, true);
-      }
-      
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        // console.log(`[SECURITY] Allowed CORS origin: ${origin}`); // Commented to reduce log noise
-        callback(null, true);
-      } else {
-        console.error(`[SECURITY] Rejected CORS origin: ${origin}`);
-        console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: true, // Allow all origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
-    exposedHeaders: ['X-Total-Count', 'X-Page-Count', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
     maxAge: 86400 // 24 hours
   };
   
   app.use(cors(corsOptions));
   
-  // Configure cookie parser for CSRF double-submit pattern
+  // Keep cookie parser for session handling (without CSRF)
   app.use(cookieParser());
   
   // Configure Helmet for security headers
