@@ -14,9 +14,19 @@ export function FeaturedProductCarousel() {
   const { toast } = useToast();
 
   // Fetch featured products
-  const { data: featuredProducts } = useQuery<ProductWithDetails[]>({
+  const { data: featuredProducts, isLoading, error } = useQuery<ProductWithDetails[]>({
     queryKey: ["/api/products/featured"],
   });
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🎠 [FeaturedProductCarousel] Query state:', {
+      isLoading,
+      error: error?.message,
+      featuredProducts: featuredProducts?.length || 0,
+      data: featuredProducts
+    });
+  }, [isLoading, error, featuredProducts]);
 
   const handlePrev = () => {
     if (!featuredProducts || featuredProducts.length < 2 || isTransitioning) return;
@@ -89,18 +99,62 @@ export function FeaturedProductCarousel() {
     };
   }, [featuredProducts, isTransitioning]); // Removed currentIndex to prevent re-creating interval
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <section className="pb-4 lg:pb-8 bg-white">
+        <div className="container mx-auto px-4 lg:px-6">
+          <h2 className="font-playfair text-2xl lg:text-3xl font-bold mb-3 lg:mb-5 text-center">Featured Products</h2>
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    console.error('🚨 [FeaturedProductCarousel] Error loading featured products:', error);
+    return (
+      <section className="pb-4 lg:pb-8 bg-white">
+        <div className="container mx-auto px-4 lg:px-6">
+          <h2 className="font-playfair text-2xl lg:text-3xl font-bold mb-3 lg:mb-5 text-center">Featured Products</h2>
+          <div className="text-center py-8">
+            <p className="text-gray-500">Unable to load featured products at this time.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Show empty state
   if (!featuredProducts || featuredProducts.length === 0) {
-    return null;
+    return (
+      <section className="pb-4 lg:pb-8 bg-white">
+        <div className="container mx-auto px-4 lg:px-6">
+          <h2 className="font-playfair text-2xl lg:text-3xl font-bold mb-3 lg:mb-5 text-center">Featured Products</h2>
+          <div className="text-center py-8">
+            <p className="text-gray-500">No featured products available at this time.</p>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   // Helper function to get product image URL
   const getProductImageUrl = (product: ProductWithDetails) => {
     if (product.images && product.images.find(img => img.imageOrder === 0)) {
-      return `/api/images/${product.images.find(img => img.imageOrder === 0)?.imageUrl}`;
+      const imageUrl = product.images.find(img => img.imageOrder === 0)?.imageUrl;
+      return imageUrl?.startsWith('http') ? imageUrl : `/api/images/${imageUrl}`;
     } else if (product.images && product.images.length > 0) {
-      return `/api/images/${product.images[0].imageUrl}`;
+      const imageUrl = product.images[0].imageUrl;
+      return imageUrl?.startsWith('http') ? imageUrl : `/api/images/${imageUrl}`;
+    } else if (product.imageUrl) {
+      return product.imageUrl.startsWith('http') ? product.imageUrl : `/api/images/${product.imageUrl}`;
     } else {
-      return `/api/images/${product.imageUrl}`;
+      // Fallback placeholder image
+      return 'https://images.unsplash.com/photo-1541643600914-78b084683601?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60';
     }
   };
 

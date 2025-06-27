@@ -538,16 +538,21 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getFeaturedProducts(): Promise<ProductWithDetails[]> {
+    const now = new Date().toISOString();
+    
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('status', 'featured')
+      .eq('is_featured', true)
+      .gt('featured_until', now) // Only get products that haven't expired yet
       .order('featured_at', { ascending: false });
     
     if (error) {
       console.error('Error getting featured products:', error);
       return [];
     }
+    
+    console.log(`📋 getFeaturedProducts: Found ${data?.length || 0} active featured products`);
     
     // Map from snake_case to camelCase for our application logic
     const mappedProducts = (data || []).map(product => this.mapSnakeToCamelCase(product));
