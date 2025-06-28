@@ -183,7 +183,7 @@ export function FeaturedProductCarousel() {
                 <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                   <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
                     <div className="absolute top-0 left-0 z-10 m-2 flex gap-2">
-                      <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
+                      <div className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full uppercase tracking-wider">
                         Featured
                       </div>
                       {firstProduct.listingType === "auction" && (
@@ -231,7 +231,7 @@ export function FeaturedProductCarousel() {
                   <div className="flex flex-col h-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
                     <div className="relative h-48 md:h-64 overflow-hidden rounded-t-lg">
                       <div className="absolute top-0 left-0 z-10 m-2 flex gap-2">
-                        <div className="text-xs bg-gold text-rich-black px-2 py-1 rounded-full uppercase tracking-wider">
+                        <div className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full uppercase tracking-wider">
                           Featured
                         </div>
                         {secondProduct.listingType === "auction" && (
@@ -296,13 +296,15 @@ export function FeaturedProductCarousel() {
               </button>
               
               {/* Pagination dots */}
-              <div className="mt-6 flex justify-center items-center">
-                <div className="flex space-x-2">
+              <div className="mt-8 flex justify-center items-center">
+                <div className="flex space-x-3">
                   {paginationDotIndices.map((dotIndex) => (
                     <button
                       key={dotIndex}
-                      className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
-                        dotIndex === currentIndex ? 'bg-gold' : 'bg-gray-300'
+                      className={`w-4 h-4 rounded-full transition-all duration-300 border-2 hover:scale-110 ${
+                        dotIndex === currentIndex 
+                          ? 'bg-purple-600 border-purple-600 shadow-md' 
+                          : 'bg-white border-gray-400 hover:border-purple-400 shadow-sm'
                       }`}
                       onClick={() => {
                         if (isTransitioning || dotIndex === currentIndex) return;

@@ -688,9 +688,13 @@ export default function MessagesPage() {
       
       // 1. Call API to confirm the purchase (update the status in the database)
       // The server will handle transaction creation
+      const token = localStorage.getItem('app_token');
       const response = await fetch('/api/messages/action/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ messageId }),
         credentials: 'include',
       });
@@ -769,9 +773,13 @@ export default function MessagesPage() {
       }
       
       // 1. Call API to confirm the payment was received (update the transaction status in the database)
+      const token = localStorage.getItem('app_token');
       const response = await fetch('/api/messages/action/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ messageId }),
         credentials: 'include',
       });
@@ -844,10 +852,12 @@ export default function MessagesPage() {
       const message = activeChat.find(msg => msg.id === messageId);
       const actualSellerId = sellerId || message?.receiverId;
       
+      const token = localStorage.getItem('app_token');
       const response = await fetch(`/api/messages/submit-review/${messageId}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           rating: reviewRating,
@@ -899,9 +909,13 @@ export default function MessagesPage() {
       }
       
       // 1. Call API to confirm the delivery was received (update the transaction status in the database)
+      const token = localStorage.getItem('app_token');
       const response = await fetch('/api/messages/action/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ messageId }),
         credentials: 'include',
       });

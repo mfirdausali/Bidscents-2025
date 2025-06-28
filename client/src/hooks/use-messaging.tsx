@@ -271,6 +271,61 @@ export function useMessaging() {
             console.log('📡 [WebSocket] Dispatched read events for data:', data);
           }
           
+          // Handle action message sent confirmation
+          if (data.type === 'action_message_sent') {
+            console.log('🎯 Action message sent confirmation received:', data.message);
+            
+            // Add the action message to our state only if it doesn't already exist
+            setMessages(prev => {
+              const exists = prev.some(msg => msg.id === data.message.id);
+              if (!exists) {
+                console.log('✅ Adding new action message to state:', data.message.actionType);
+                return [data.message, ...prev];
+              }
+              return prev;
+            });
+            
+            // Dispatch update event
+            const actionSentEvent = new CustomEvent('messaging:action_sent', {
+              detail: data.message
+            });
+            window.dispatchEvent(actionSentEvent);
+          }
+          
+          // Handle new action message received
+          if (data.type === 'new_action_message') {
+            console.log('🎯 New action message received:', data.message);
+            
+            // Add the action message to our state only if it doesn't already exist
+            setMessages(prev => {
+              const exists = prev.some(msg => msg.id === data.message.id);
+              if (!exists) {
+                return [data.message, ...prev];
+              }
+              return prev;
+            });
+            
+            // Show toast notification for action messages
+            const actionTypeText = {
+              'INITIATE': 'Transaction Request',
+              'CONFIRM_PAYMENT': 'Payment Confirmation',
+              'CONFIRM_DELIVERY': 'Delivery Confirmation',
+              'REVIEW': 'Review Request'
+            }[data.message.actionType] || 'Action Required';
+            
+            toast({
+              title: `${actionTypeText} from ${data.message.sender?.username || 'someone'}`,
+              description: `Product: ${data.message.product?.name || 'Unknown Product'}`,
+              variant: 'default',
+            });
+            
+            // Dispatch update event
+            const actionReceivedEvent = new CustomEvent('messaging:action_received', {
+              detail: data.message
+            });
+            window.dispatchEvent(actionReceivedEvent);
+          }
+          
           // Handle transaction action confirmation
           if (data.type === 'action_confirmed') {
             console.log('Transaction action confirmed:', data.message);

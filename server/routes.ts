@@ -376,6 +376,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             break;
             
+          case 'send_action_message':
+            // Handle action message (transaction initiation, payment confirmation, etc.)
+            console.log('🎯 SERVER: Processing send_action_message request');
+            console.log('📥 Action message data:', {
+              type: data.type,
+              receiverId: data.receiverId,
+              productId: data.productId,
+              actionType: data.actionType
+            });
+            
+            // Get authenticated user from WebSocket client
+            const actionClientInfo = clients.get(ws);
+            if (!actionClientInfo) {
+              console.error('❌ SERVER: User not authenticated for send_action_message');
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Not authenticated'
+              }));
+              break;
+            }
+            
+            if (!data.receiverId || !data.productId || !data.actionType) {
+              console.error('❌ SERVER: Missing required fields for send_action_message');
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Missing receiverId, productId, or actionType'
+              }));
+              break;
+            }
+            
+            try {
+              console.log('💾 SERVER: Creating action message in database');
+              
+              // Create action message data - don't encrypt action messages
+              const actionMessageData = {
+                senderId: actionClientInfo.userId,
+                receiverId: data.receiverId,
+                content: null, // Action messages don't have text content - use null instead of empty string
+                productId: data.productId,
+                messageType: 'ACTION' as const,
+                actionType: data.actionType,
+                isRead: false,
+              };
+              
+              console.log('📝 SERVER: Creating action message with data:', {
+                senderId: actionMessageData.senderId,
+                receiverId: actionMessageData.receiverId,
+                productId: actionMessageData.productId,
+                messageType: actionMessageData.messageType,
+                actionType: actionMessageData.actionType
+              });
+              
+              // Save action message to database
+              const savedActionMessage = await storage.sendMessage(actionMessageData);
+              console.log('✅ SERVER: Action message saved with ID:', savedActionMessage.id);
+              
+              // Audit action message sent
+              await auditLog({
+                eventType: AuditEventType.USER_MESSAGE_SENT,
+                severity: AuditSeverity.INFO,
+                userId: actionClientInfo.userId,
+                ipAddress: ws._socket?.remoteAddress || 'websocket',
+                userAgent: 'WebSocket Client',
+                action: `Sent action message: ${data.actionType}`,
+                resourceType: 'message',
+                resourceId: savedActionMessage.id,
+                details: {
+                  receiverId: data.receiverId,
+                  productId: data.productId,
+                  actionType: data.actionType,
+                  messageType: 'ACTION'
+                },
+                success: true
+              });
+              
+              // Get user details for response
+              const actionSender = await storage.getUser(actionClientInfo.userId);
+              const actionReceiver = await storage.getUser(data.receiverId);
+              
+              // Get product details
+              let actionProduct = null;
+              try {
+                actionProduct = await storage.getProductById(data.productId);
+              } catch (err) {
+                console.warn('SERVER: Could not fetch product details for action message:', err);
+              }
+              
+              // Create detailed action message response
+              const actionMessageResponse = {
+                id: savedActionMessage.id,
+                senderId: savedActionMessage.senderId,
+                receiverId: savedActionMessage.receiverId,
+                content: savedActionMessage.content,
+                productId: savedActionMessage.productId,
+                messageType: savedActionMessage.messageType,
+                actionType: savedActionMessage.actionType,
+                isRead: savedActionMessage.isRead,
+                createdAt: savedActionMessage.createdAt,
+                sender: actionSender ? {
+                  id: actionSender.id,
+                  username: actionSender.username,
+                  profileImage: actionSender.profileImage
+                } : undefined,
+                receiver: actionReceiver ? {
+                  id: actionReceiver.id,
+                  username: actionReceiver.username,
+                  profileImage: actionReceiver.profileImage
+                } : undefined,
+                product: actionProduct ? {
+                  id: actionProduct.id,
+                  name: actionProduct.name,
+                  price: actionProduct.price,
+                  imageUrl: actionProduct.imageUrl
+                } : undefined
+              };
+              
+              console.log('📤 SERVER: Sending action message confirmation to sender');
+              // Send confirmation to sender
+              ws.send(JSON.stringify({
+                type: 'action_message_sent',
+                message: actionMessageResponse
+              }));
+              
+              // Send action message to receiver if they're connected
+              let actionReceiverNotified = false;
+              clients.forEach((receiverInfo, receiverWs) => {
+                if (receiverWs.readyState === WebSocket.OPEN && receiverInfo.userId === data.receiverId) {
+                  console.log('📨 SERVER: Sending action message to receiver');
+                  receiverWs.send(JSON.stringify({
+                    type: 'new_action_message',
+                    message: actionMessageResponse
+                  }));
+                  actionReceiverNotified = true;
+                }
+              });
+              
+              if (!actionReceiverNotified) {
+                console.log('⚠️ SERVER: Action message receiver not connected, saved for later');
+              }
+              
+              console.log('✅ SERVER: send_action_message processing complete');
+              
+            } catch (error) {
+              console.error('❌ SERVER: Error processing send_action_message:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to send action message: ' + errorMessage
+              }));
+            }
+            break;
+            
           case 'chat_message':
             // Handle, store, and broadcast chat messages
             if (data.senderId && data.receiverId && data.content) {

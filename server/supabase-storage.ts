@@ -544,7 +544,7 @@ export class SupabaseStorage implements IStorage {
       .from('products')
       .select('*')
       .eq('is_featured', true)
-      .gt('featured_until', now) // Only get products that haven't expired yet
+      .or(`featured_until.is.null,featured_until.gt.${now}`) // Include products with NULL featured_until OR not yet expired
       .order('featured_at', { ascending: false });
     
     if (error) {
@@ -1866,14 +1866,31 @@ export class SupabaseStorage implements IStorage {
     // Import encryption utility
     const { encryptMessage } = await import('./encryption');
     
-    // Encrypt the message content before storing
-    const dbMessage = {
+    // Prepare content - only encrypt text messages, not action messages
+    let contentToStore: string | null = null;
+    if (message.messageType === 'ACTION') {
+      // Action messages don't have text content to encrypt
+      contentToStore = null;
+    } else if (message.content) {
+      // Regular text messages need encryption
+      contentToStore = encryptMessage(message.content);
+    }
+    
+    // Prepare database message object
+    const dbMessage: any = {
       sender_id: message.senderId,
       receiver_id: message.receiverId,
-      content: encryptMessage(message.content), // Encrypt the content
+      content: contentToStore,
       product_id: message.productId || null,
       is_read: message.isRead || false
     };
+    
+    // Add action message specific fields if this is an action message
+    if (message.messageType === 'ACTION') {
+      dbMessage.message_type = 'ACTION';
+      dbMessage.action_type = message.actionType;
+      dbMessage.is_clicked = message.isClicked || false;
+    }
     
     const { data, error } = await supabase
       .from('messages')
@@ -1886,16 +1903,29 @@ export class SupabaseStorage implements IStorage {
       throw new Error('Failed to send message');
     }
     
-    // Convert snake_case to camelCase
-    return {
+    // Convert snake_case to camelCase and include action message fields
+    const result: any = {
       id: data.id,
       senderId: data.sender_id,
       receiverId: data.receiver_id,
-      content: data.content, // This will be encrypted
+      content: data.content, // Will be null for action messages, encrypted for text messages
       isRead: data.is_read,
       createdAt: new Date(data.created_at),
       productId: data.product_id,
-    } as Message;
+    };
+    
+    // Add action message specific fields if they exist
+    if (data.message_type) {
+      result.messageType = data.message_type;
+    }
+    if (data.action_type) {
+      result.actionType = data.action_type;
+    }
+    if (data.is_clicked !== undefined) {
+      result.isClicked = data.is_clicked;
+    }
+    
+    return result as Message;
   }
   
   async markMessageAsRead(id: number): Promise<Message> {

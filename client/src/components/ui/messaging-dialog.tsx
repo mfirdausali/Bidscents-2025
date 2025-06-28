@@ -367,12 +367,16 @@ export function MessagingDialog({
                                   
                                   if (msg.id) {
                                     // We call an API endpoint to mark the transaction as confirmed
+                                    const token = localStorage.getItem('app_token');
                                     fetch(`/api/messages/action/confirm`, {
                                       method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
+                                      headers: { 
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}`
+                                      },
                                       body: JSON.stringify({ messageId: msg.id })
                                     })
-                                    .then(response => {
+                                    .then(async response => {
                                       if (response.ok) {
                                         // Optimistically update the local state
                                         setConversation(prev => 
@@ -380,12 +384,15 @@ export function MessagingDialog({
                                             m.id === msg.id ? { ...m, isClicked: true } : m
                                           )
                                         );
+                                        console.log('✅ Purchase confirmed successfully');
                                       } else {
-                                        throw new Error('Failed to confirm purchase');
+                                        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+                                        throw new Error(errorData.message || 'Failed to confirm purchase');
                                       }
                                     })
                                     .catch(error => {
-                                      console.error('Error confirming purchase:', error);
+                                      console.error('❌ Error confirming purchase:', error);
+                                      alert(`Failed to confirm purchase: ${error.message}`);
                                     });
                                   }
                                 }}
