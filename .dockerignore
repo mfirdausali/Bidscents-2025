@@ -1,55 +1,75 @@
-# Dependencies
-node_modules
-npm-debug.log*
-
-# Environment files
-.env.local
-.env.development
-.env.test
-
-# Build outputs
-dist
-build
-.next
-.nuxt
-
-# Development files
-.git
-.gitignore
-README.md
-*.md
-
-# IDE files
-.vscode
-.idea
-*.swp
-*.swo
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Test files
-coverage
-*.test.js
-test
-
-# Logs
-logs
-*.log
-
-# Temporary files
-tmp
-temp
-.tmp
-
-# Cache
-.cache
-.parcel-cache
-
-# Development scripts
+# Development and debug files
 test-*.js
-investigate-*.js
+debug-*.js
 manual-*.js
 check-*.js
 analyze-*.js
+investigate-*.js
+create-*.js
+fix-*.js
+run-*.js
+monitor-*.js
+
+# Documentation files (keep essential ones, exclude verbose debug docs)
+API_SECURITY_AUDIT_REPORT.md
+AUDIT_LOGGING_DOCUMENTATION.md
+AUTHORIZATION_VULNERABILITY_REPORT.md
+BOOST_ERROR_HANDLING_SUMMARY.md
+DATABASE_PERFORMANCE_ANALYSIS.md
+ERROR_HANDLING_GUIDE.md
+FEATURED_PRODUCTS_EXPIRATION_FIX_REPORT.md
+FEATURED_PRODUCTS_TEST_REPORT.md
+FRONTEND_PERFORMANCE_ANALYSIS.md
+GEMINI.md
+PRODUCTION_READINESS_REPORT.md
+PRODUCTION_SECURITY_CHECKLIST.md
+RATE_LIMITING_EXAMPLES.md
+RATE_LIMITING_IMPLEMENTATION_GUIDE.md
+REDIS_INTEGRATION_GUIDE.md
+SECURITY_IMPLEMENTATION_COMPLETE.md
+TRANSACTION_RELIABILITY_REPORT.md
+WEBSOCKET_OPTIMIZATION_GUIDE.md
+
+# Development-only client files
+client/src/App-*.tsx
+client/src/lib/websocket-debug.ts
+client/src/components/error-boundary.tsx
+client/src/components/ui/optimized-image.tsx
+client/src/components/ui/product-card-optimized.tsx
+client/src/hooks/use-performance-monitor.ts
+client/src/lib/error-handling.ts
+client/src/lib/queryClient.optimized.ts
+client/src/pages/error-pages.tsx
+vite.config.optimized.ts
+
+# Development server files
+server/message-optimization.ts
+server/websocket-monitoring.ts
+server/websocket-optimizations.ts
+server/redis-stores.ts
+server/file-security-test.ts
+server/error-integration-example.ts
+server/redis-integration-example.ts
+server/upload-integration-example.ts
+
+# Git and development tools
+.git
+.gitignore
+.github/
+.vscode/
+.idea/
+*.log
+
+# Dependencies (will be installed in container)
+node_modules/
+
+# Environment files (should be passed as secrets)
+.env*
+!.env.example
+
+# OS and temporary files
+.DS_Store
+*.tmp
+*.temp
+temp/
+tmp/

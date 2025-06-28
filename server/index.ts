@@ -4,22 +4,35 @@ dotenv.config();
 // CRITICAL: Set server timezone to UTC to prevent auction expiry issues
 // This must be set before any date operations
 process.env.TZ = 'UTC';
-console.log('[TIMEZONE] Server timezone set to UTC');
-console.log('[TIMEZONE] Current UTC time:', new Date().toISOString());
-console.log('[TIMEZONE] Timezone offset:', new Date().getTimezoneOffset(), 'minutes (should be 0)');
+
+// Initialize production safety checks
+ensureProductionSafety();
+
+if (isProduction()) {
+  logger.info('Server timezone set to UTC for production');
+  logger.info('Current UTC time', { time: new Date().toISOString() });
+} else {
+  console.log('[TIMEZONE] Server timezone set to UTC');
+  console.log('[TIMEZONE] Current UTC time:', new Date().toISOString());
+  console.log('[TIMEZONE] Timezone offset:', new Date().getTimezoneOffset(), 'minutes (should be 0)');
+}
 
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { secureRoutes } from "./secure-routes";
 import { serveStatic, log } from "./vite";
 import { configureSecurityMiddleware } from "./security-middleware";
+import { ensureProductionSafety, isProduction } from "./production-config";
+import { logger } from "./logger";
 
 const app = express();
 
 // Health check endpoint FIRST - before any middleware
 // This MUST be before configureSecurityMiddleware to avoid CORS issues
 app.get('/api/health', (req, res) => {
-  console.log('[HEALTH] Health check requested from:', req.headers.origin || 'no-origin');
+  if (!isProduction()) {
+    console.log('[HEALTH] Health check requested from:', req.headers.origin || 'no-origin');
+  }
   
   // Set CORS headers explicitly for health checks
   res.header('Access-Control-Allow-Origin', '*');

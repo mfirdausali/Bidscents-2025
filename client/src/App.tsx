@@ -85,7 +85,7 @@ function App() {
         <AuthProvider>
           <Router />
           <Toaster />
-          <AuthDebug />
+          {process.env.NODE_ENV === 'development' && <AuthDebug />}
         </AuthProvider>
       </AnalyticsProvider>
     </QueryClientProvider>

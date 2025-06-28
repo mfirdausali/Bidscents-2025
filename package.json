@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push",
     "postinstall": "npm run build",
     "prod:setup": "npm ci --only=production && npm run build",
+    "prod:build": "node scripts/production-build.js",
     "health": "curl -f http://localhost:5000/api/health || exit 1"
   },
   "dependencies": {

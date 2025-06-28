@@ -30,6 +30,7 @@ import crypto from 'crypto';
 import { requireAuth, getUserFromToken, authRoutes, AuthenticatedRequest } from './app-auth';
 import { authLimiter, passwordResetLimiter, apiLimiter, userLookupLimiter, adminLimiter } from './rate-limiter';
 import { auditLog, auditMiddleware, auditAuth, auditResource, auditSecurity, auditPayment, auditAdmin, auditFile, AuditEventType, AuditSeverity } from './audit-logger';
+import { logger } from './logger';
 
 // Import boost error handling system
 import {
@@ -100,7 +101,7 @@ async function getAuthenticatedUser(req: Request): Promise<any | null> {
     const fullUser = await storage.getUser(tokenUser.id);
     return fullUser;
   } catch (error) {
-    console.error('Error fetching full user details:', error);
+    logger.error('Error fetching full user details', { error: error instanceof Error ? error.message : error });
     return null;
   }
 }
@@ -168,13 +169,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // WebSocket connection handler
   wss.on('connection', (ws: ExtendedWebSocket) => {
-    console.log('WebSocket client connected');
+    logger.websocket('Client connected');
     
     // Handle messages from client
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
-        console.log('[HANDLER 1] Received WebSocket message:', data);
+        logger.websocket('Received message', { type: data.type });
         
         // Handle different message types
         switch (data.type) {
@@ -204,12 +205,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       username: user.username 
                     }));
                   } else {
-                    console.log('WebSocket authentication failed: user not found in database');
+                    logger.warn('WebSocket authentication failed: user not found in database');
                     ws.send(JSON.stringify({ type: 'auth_failed', message: 'User profile not found' }));
                     ws.close();
                   }
                 } else {
-                  console.log('WebSocket authentication failed: invalid token');
+                  logger.warn('WebSocket authentication failed: invalid token');
                   ws.send(JSON.stringify({ type: 'auth_failed', message: 'Invalid authentication token' }));
                   ws.close();
                 }
@@ -219,7 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ws.close();
               }
             } else {
-              console.log('WebSocket authentication failed: no token provided');
+              logger.warn('WebSocket authentication failed: no token provided');
               ws.send(JSON.stringify({ type: 'auth_failed', message: 'Authentication token required' }));
               ws.close();
             }
