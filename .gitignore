@@ -4,3 +4,27 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Logs
+logs/
+*.log
+
+# Test files
+test-*.js
+fix-*.js
+
+# IDE files
+.idea/
+.vscode/
+
+# OS files
+Thumbs.db
+
+# Production files
+start-production.sh
+ecosystem.config.cjs
