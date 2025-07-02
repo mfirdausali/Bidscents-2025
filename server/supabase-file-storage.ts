@@ -56,30 +56,41 @@ function getFileExtension(mimetype: string): string {
 export async function uploadFile(
   buffer: Buffer,
   imageType: string,
-  mimetype: string
+  mimetype: string,
+  existingFileId?: string
 ): Promise<string> {
   try {
     const bucket = getBucketForImageType(imageType);
     const fileExtension = getFileExtension(mimetype);
-    const storagePath = generateStoragePath(imageType, fileExtension);
+    
+    let storagePath: string;
+    let fileId: string;
+    
+    if (existingFileId) {
+      // Parse existing file ID to get the storage path
+      const parsed = parseFileId(existingFileId);
+      storagePath = `${parsed.imageType}_${parsed.uuid}${fileExtension}`;
+      fileId = existingFileId;
+    } else {
+      // Generate new storage path and file ID
+      storagePath = generateStoragePath(imageType, fileExtension);
+      const filename = storagePath.split("/").pop() || storagePath;
+      const uuid = filename.split("_")[1]?.split(".")[0];
+      fileId = `${imageType}_${uuid}`;
+    }
     
     const { data, error } = await supabase.storage
       .from(bucket)
       .upload(storagePath, buffer, {
         contentType: mimetype,
         cacheControl: "3600",
-        upsert: false,
+        upsert: existingFileId ? true : false, // Allow upsert if using existing file ID
       });
 
     if (error) {
       logger.error("Supabase storage upload error:", error);
       throw new Error(`Failed to upload file: ${error.message}`);
     }
-
-    // Extract UUID from the filename (format: imageType_uuid.ext)
-    const filename = storagePath.split("/").pop() || storagePath;
-    const uuid = filename.split("_")[1]?.split(".")[0];
-    const fileId = `${imageType}_${uuid}`;
     
     logger.info(`File uploaded to Supabase Storage: ${fileId} -> ${bucket}/${storagePath}`);
     

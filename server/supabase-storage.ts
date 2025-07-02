@@ -308,67 +308,6 @@ export class SupabaseStorage implements IStorage {
     return this.mapUserFromDb(data);
   }
 
-  // Authentication helper methods
-  async getUserByProviderId(providerId: string): Promise<User | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('provider_id', providerId)
-      .single();
-    
-    if (error) {
-      console.error('Error getting user by provider ID:', error);
-      return null;
-    }
-    
-    return data ? this.mapUserFromDb(data) : null;
-  }
-
-  async getUserByEmail(email: string): Promise<User | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
-    
-    if (error) {
-      console.error('Error getting user by email:', error);
-      return null;
-    }
-    
-    return data ? this.mapUserFromDb(data) : null;
-  }
-
-  async getUserByUsername(username: string): Promise<User | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .single();
-    
-    if (error) {
-      console.error('Error getting user by username:', error);
-      return null;
-    }
-    
-    return data ? this.mapUserFromDb(data) : null;
-  }
-
-  async updateUserProviderId(userId: number, providerId: string): Promise<void> {
-    const { error } = await supabase
-      .from('users')
-      .update({ 
-        provider_id: providerId,
-        provider: 'supabase'
-      })
-      .eq('id', userId);
-    
-    if (error) {
-      console.error('Error updating user provider ID:', error);
-      throw new Error(`Failed to update user provider ID: ${error.message}`);
-    }
-  }
-
   // Category methods
   async getAllCategories(): Promise<Category[]> {
     const { data, error } = await supabase
@@ -1111,6 +1050,34 @@ export class SupabaseStorage implements IStorage {
       imageName: data.image_name,
       createdAt: data.created_at
     } as ProductImage;
+  }
+
+  async updateProductImage(id: number, productImage: Partial<InsertProductImage>): Promise<ProductImage> {
+    const updateData: any = {};
+    
+    // Map camelCase to snake_case for database
+    if (productImage.productId !== undefined) updateData.product_id = productImage.productId;
+    if (productImage.imageUrl !== undefined) updateData.image_url = productImage.imageUrl;
+    if (productImage.displayOrder !== undefined) updateData.display_order = productImage.displayOrder;
+    
+    const { data, error } = await supabase
+      .from('product_images')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating product image:', error);
+      throw new Error(`Failed to update product image: ${error.message}`);
+    }
+    
+    return {
+      id: data.id,
+      productId: data.product_id,
+      imageUrl: data.image_url,
+      displayOrder: data.display_order
+    };
   }
 
   async deleteProductImage(id: number): Promise<void> {

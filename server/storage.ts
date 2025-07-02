@@ -118,6 +118,7 @@ export interface IStorage {
   // Product Image methods
   getProductImages(productId: number): Promise<ProductImage[]>;
   createProductImage(productImage: InsertProductImage): Promise<ProductImage>;
+  updateProductImage(id: number, productImage: Partial<InsertProductImage>): Promise<ProductImage>;
   deleteProductImage(id: number): Promise<void>;
   
   // Auction methods
@@ -574,6 +575,16 @@ export class MemStorage implements IStorage {
     };
     this.productImages.set(id, newImage);
     return newImage;
+  }
+
+  async updateProductImage(id: number, productImage: Partial<InsertProductImage>): Promise<ProductImage> {
+    const existing = this.productImages.get(id);
+    if (!existing) {
+      throw new Error("Product image not found");
+    }
+    const updated = { ...existing, ...productImage };
+    this.productImages.set(id, updated);
+    return updated;
   }
 
   async deleteProductImage(id: number): Promise<void> {
@@ -1163,6 +1174,20 @@ export class DatabaseStorage implements IStorage {
   async createProductImage(productImage: InsertProductImage): Promise<ProductImage> {
     const [newImage] = await db.insert(productImages).values(productImage).returning();
     return newImage;
+  }
+
+  async updateProductImage(id: number, productImage: Partial<InsertProductImage>): Promise<ProductImage> {
+    const [updatedImage] = await db
+      .update(productImages)
+      .set(productImage)
+      .where(eq(productImages.id, id))
+      .returning();
+    
+    if (!updatedImage) {
+      throw new Error("Product image not found");
+    }
+    
+    return updatedImage;
   }
 
   async deleteProductImage(id: number): Promise<void> {
