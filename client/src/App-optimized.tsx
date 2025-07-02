@@ -7,7 +7,6 @@ import { useAnalytics } from "./hooks/use-analytics";
 import { AnalyticsProvider } from "./components/analytics/analytics-provider";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-supabase-auth";
-import { AuthDebug } from "@/components/debug/auth-debug";
 
 // Eagerly loaded routes (critical path)
 import HomePage from "@/pages/home-page";
@@ -109,7 +108,6 @@ function App() {
         <AuthProvider>
           <Router />
           <Toaster />
-          {process.env.NODE_ENV === 'development' && <AuthDebug />}
         </AuthProvider>
       </AnalyticsProvider>
     </QueryClientProvider>

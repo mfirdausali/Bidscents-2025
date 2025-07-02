@@ -26,7 +26,6 @@ import AuthCallback from "@/pages/auth-callback";
 import { AuthVerifyPage } from "@/pages/auth-verify";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-supabase-auth";
-import { AuthDebug } from "@/components/debug/auth-debug";
 import TermsOfServicePage from "./pages/terms-of-service";
 import PrivacyPolicyPage from "./pages/privacy-policy";
 import BuyingGuidePage from "@/pages/buying-guide";
@@ -113,7 +112,6 @@ function App() {
             <ErrorBoundary>
               <Router />
               <Toaster />
-              <AuthDebug />
             </ErrorBoundary>
           </AuthProvider>
         </AnalyticsProvider>

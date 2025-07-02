@@ -104,7 +104,7 @@ const productSchema = z.object({
     .string()
     .min(10, { message: "Description must be at least 10 characters" }),
   price: z.number().min(0.01, { message: "Price must be greater than 0" }),
-  imageUrl: z.string().url({ message: "Please enter a valid image URL" }), // Keep for compatibility, will be updated in backend
+  imageUrl: z.string().optional(), // Made optional - will be handled by imageFiles upload
   imageFiles: z.any().optional(), // Will hold the actual file objects for upload
   stockQuantity: z
     .number()
@@ -152,10 +152,7 @@ const auctionSchema = z.object({
   auctionDuration: z
     .string()
     .min(1, { message: "Please select an auction duration" }),
-  imageUrl: z
-    .string()
-    .url({ message: "Please enter a valid image URL" })
-    .optional(),
+  imageUrl: z.string().optional(), // Made optional - will be handled by imageFiles upload
   imageFiles: z.any().optional(),
   stockQuantity: z
     .number()
@@ -511,6 +508,7 @@ export default function SellerDashboard() {
     // Include sellerId from the logged-in user
     const productWithSellerId = {
       ...data,
+      imageUrl: data.imageUrl === "pending-upload" ? "" : (data.imageUrl || ""),
       sellerId: user?.id || 0,
     };
 
@@ -835,9 +833,11 @@ export default function SellerDashboard() {
       setImagePreviewUrls(newFilePreviewUrls);
     }
 
-    // Update form with first image URL as a placeholder
-    const firstImageUrl = imagePreviewUrls[0] || newFilePreviewUrls[0] || "";
-    form.setValue("imageUrl", firstImageUrl);
+    // Update form with a placeholder value when we have images
+    // This prevents validation errors when imageUrl is optional
+    if (imagePreviewUrls.length > 0 || newFilePreviewUrls.length > 0) {
+      form.setValue("imageUrl", "pending-upload");
+    }
   };
 
   // Remove image from preview
@@ -871,12 +871,21 @@ export default function SellerDashboard() {
     newPreviewUrls.splice(index, 1);
     setImagePreviewUrls(newPreviewUrls);
 
-    // Update form with first remaining image or empty string
-    const remainingPreview = newPreviewUrls[0] || "";
-    if (isAuctionForm) {
-      auctionForm.setValue("imageUrl", remainingPreview);
+    // Update form based on remaining images
+    if (newPreviewUrls.length > 0) {
+      // Still have images, keep placeholder
+      if (isAuctionForm) {
+        auctionForm.setValue("imageUrl", "pending-upload");
+      } else {
+        form.setValue("imageUrl", "pending-upload");
+      }
     } else {
-      form.setValue("imageUrl", remainingPreview);
+      // No images left, clear the field
+      if (isAuctionForm) {
+        auctionForm.setValue("imageUrl", undefined);
+      } else {
+        form.setValue("imageUrl", undefined);
+      }
     }
   };
 
@@ -908,9 +917,10 @@ export default function SellerDashboard() {
       setImagePreviewUrls(newFilePreviewUrls);
     }
 
-    // Update auction form with first image URL as a placeholder
-    const firstImageUrl = imagePreviewUrls[0] || newFilePreviewUrls[0] || "";
-    auctionForm.setValue("imageUrl", firstImageUrl);
+    // Update auction form with placeholder when we have images
+    if (imagePreviewUrls.length > 0 || newFilePreviewUrls.length > 0) {
+      auctionForm.setValue("imageUrl", "pending-upload");
+    }
   };
 
   // Developer helper: Fill auction form with demo data
@@ -1095,7 +1105,7 @@ export default function SellerDashboard() {
       brand: data.brand,
       description: data.description,
       price: data.startingPrice, // Use starting price as the base price
-      imageUrl: data.imageUrl,
+      imageUrl: data.imageUrl === "pending-upload" ? "" : (data.imageUrl || ""),
       stockQuantity: data.stockQuantity,
       categoryId: data.categoryId,
       isNew: data.isNew,

@@ -1,3 +1,4 @@
+import React, { Suspense } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -28,7 +29,6 @@ import AuthCallback from "@/pages/auth-callback";
 import { AuthVerifyPage } from "@/pages/auth-verify";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-supabase-auth";
-import { AuthDebug } from "@/components/debug/auth-debug";
 import TermsOfServicePage from "./pages/terms-of-service";
 import PrivacyPolicyPage from "./pages/privacy-policy";
 import BuyingGuidePage from "@/pages/buying-guide"; // Import the new component
@@ -38,6 +38,11 @@ import BoostFailurePage from "@/pages/boost-failure"; // Import boost failure pa
 import BoostPaymentResult from "@/pages/boost-payment-result"; // Import boost payment result page
 import { SecurityDashboard } from "@/pages/admin/security-dashboard"; // Import security dashboard
 // WebSocket interceptor is loaded above
+
+// Lazy load debug component only in development
+const FacebookAuthDebug = import.meta.env.DEV 
+  ? React.lazy(() => import("@/components/debug/facebook-auth-debug").then(m => ({ default: m.FacebookAuthDebug })))
+  : null;
 
 function Router() {
   // Analytics tracking for all route changes
@@ -73,6 +78,13 @@ function Router() {
       <ProtectedRoute path="/boost/failure" component={BoostFailurePage} /> {/* Added Boost Failure route */}
       <ProtectedRoute path="/boost/failure/:reason" component={BoostFailurePage} /> {/* Added Boost Failure route with reason */}
       <ProtectedRoute path="/boost/payment-result" component={BoostPaymentResult} /> {/* Added Boost Payment Result route */}
+      {import.meta.env.DEV && FacebookAuthDebug && (
+        <Route path="/debug/facebook-auth">
+          <Suspense fallback={<div>Loading debug tool...</div>}>
+            <FacebookAuthDebug />
+          </Suspense>
+        </Route>
+      )}
       <Route component={NotFound} />
     </Switch>
   );
@@ -85,7 +97,6 @@ function App() {
         <AuthProvider>
           <Router />
           <Toaster />
-          {process.env.NODE_ENV === 'development' && <AuthDebug />}
         </AuthProvider>
       </AnalyticsProvider>
     </QueryClientProvider>
