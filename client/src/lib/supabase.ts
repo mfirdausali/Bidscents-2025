@@ -28,7 +28,9 @@ function createSupabaseClient() {
       detectSessionInUrl: true,
       flowType: 'pkce',
       // Reduce token refresh frequency to prevent multiple instances
-      storageKey: 'supabase.auth.token'
+      storageKey: 'supabase.auth.token',
+      // Add debug mode in development
+      debug: import.meta.env.DEV
     },
     // Optimize connection settings
     global: {

@@ -353,7 +353,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         provider: 'facebook',
         options: {
           redirectTo: `${window.location.origin}/auth-callback`,
-          scopes: 'email public_profile'
+          scopes: 'email public_profile',
+          queryParams: {
+            auth_type: 'rerequest' // Force Facebook to show permission dialog again
+          }
         }
       });
 

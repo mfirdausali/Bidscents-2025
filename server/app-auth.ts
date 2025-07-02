@@ -11,6 +11,7 @@ import { supabase } from './supabase';
 import { storage } from './storage';
 import { auditAuth, auditSecurity, AuditEventType, AuditSeverity, auditLog } from './audit-logger';
 import { trackLoginAttempt, trackSession, updateSessionActivity, deactivateSession } from './security-tracking';
+import { transformUserImages } from './image-url-helper';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_EXPIRES_IN = '7d';
