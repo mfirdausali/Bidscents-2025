@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/use-supabase-auth";
 import { formatDateTime } from "@/lib/date-utils";
 import { formatCurrency } from "@/lib/utils";
 import { createWebSocket } from "@/lib/websocket-utils";
+import { MetaTags } from "@/components/seo/meta-tags";
 
 interface Bid {
   id: number;
@@ -532,9 +533,56 @@ export default function AuctionDetailPage({}: AuctionDetailProps) {
     );
   }
 
+  // Generate structured data for auction products
+  const jsonLdData = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": product.name,
+    "description": product.description,
+    "brand": {
+      "@type": "Brand",
+      "name": product.brand
+    },
+    "image": product.images && product.images.length > 0 
+      ? `${window.location.origin}/api/images/${product.images[0]?.imageUrl}` 
+      : product.imageUrl 
+        ? `${window.location.origin}/api/images/${product.imageUrl}` 
+        : `${window.location.origin}/placeholder.jpg`,
+    "offers": {
+      "@type": "AggregateOffer",
+      "offerCount": auctionData.bidCount || 0,
+      "lowPrice": auctionData.startingPrice,
+      "highPrice": auctionData.currentBid || auctionData.startingPrice,
+      "priceCurrency": "MYR",
+      "availability": isActive ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
+      "priceValidUntil": auctionData.endsAt,
+      "seller": product.seller ? {
+        "@type": "Person",
+        "name": product.seller.username || "Seller"
+      } : undefined
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
+      
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={`${product.name} - Auction ending ${formatDateTime(auctionData.endsAt)}`}
+        description={`Bid on ${product.name} by ${product.brand}. Current bid: ${formatCurrency(auctionData.currentBid || auctionData.startingPrice)}. ${product.description}`}
+        image={product.images && product.images.length > 0 
+          ? `${window.location.origin}/api/images/${product.images[0]?.imageUrl}` 
+          : product.imageUrl 
+            ? `${window.location.origin}/api/images/${product.imageUrl}` 
+            : undefined}
+        url={`${window.location.origin}/auctions/${id}`}
+        type="product"
+        shopName={product.seller?.username}
+        location={product.seller?.location || ""}
+        jsonLd={jsonLdData}
+      />
+      
       <div className="flex-grow container mx-auto p-6">
         <h1 className="text-3xl font-bold mb-6">{product.name}</h1>
         

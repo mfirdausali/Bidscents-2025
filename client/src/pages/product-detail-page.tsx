@@ -11,6 +11,7 @@ import { ContactSellerButton } from "@/components/ui/contact-seller-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Info } from "lucide-react";
 import { useAuth } from "@/hooks/use-supabase-auth";
+import { MetaTags } from "@/components/seo/meta-tags";
 
 export default function ProductDetailPage() {
   const [, params] = useRoute("/products/:id");
@@ -72,9 +73,65 @@ export default function ProductDetailPage() {
     );
   }
 
+  // Generate structured data for product
+  const jsonLdData = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": product.name,
+    "description": product.description || `${product.name} by ${product.brand}`,
+    "brand": {
+      "@type": "Brand",
+      "name": product.brand
+    },
+    "image": product.images && product.images.length > 0 
+      ? `${window.location.origin}/api/images/${product.images[0]?.imageUrl}` 
+      : product.imageUrl 
+        ? `${window.location.origin}/api/images/${product.imageUrl}` 
+        : `${window.location.origin}/placeholder.jpg`,
+    "offers": {
+      "@type": "Offer",
+      "price": product.price,
+      "priceCurrency": "MYR",
+      "availability": product.isActive ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      "itemCondition": product.isNew ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
+      "seller": product.seller ? {
+        "@type": "Person",
+        "name": product.seller.username || "Seller"
+      } : undefined
+    },
+    "additionalProperty": [
+      {
+        "@type": "PropertyValue",
+        "name": "Volume",
+        "value": product.volume || "N/A"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Remaining",
+        "value": `${product.remainingPercentage || 100}%`
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
+      
+      {/* SEO Meta Tags */}
+      <MetaTags
+        title={`${product.name} by ${product.brand} - ${product.volume || ''} | BidScents`}
+        description={`${product.description || `Authentic ${product.name} perfume by ${product.brand}`}. ${product.remainingPercentage || 100}% full. Price: RM ${product.price.toFixed(2)}. Sold by ${product.seller?.username || 'verified seller'}.`}
+        image={product.images && product.images.length > 0 
+          ? `${window.location.origin}/api/images/${product.images[0]?.imageUrl}` 
+          : product.imageUrl 
+            ? `${window.location.origin}/api/images/${product.imageUrl}` 
+            : undefined}
+        url={`${window.location.origin}/products/${productId}`}
+        type="product"
+        shopName={product.seller?.username}
+        location={product.seller?.location || ""}
+        jsonLd={jsonLdData}
+      />
       
       <main className="flex-grow">
         <div className="container mx-auto px-6 py-12">

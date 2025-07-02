@@ -19,12 +19,14 @@ import multer from "multer";
 import * as supabaseFileStorage from "./supabase-file-storage"; // Import Supabase storage implementation
 import { IMAGE_TYPES } from "./types/index.js";
 import path from "path"; // Added import for path
+import { transformProductImages, transformImageUrlsArray, transformUserImages } from "./image-url-helper";
+import { handleLegacyImage, isLegacyImageId } from "./legacy-image-handler";
 import { supabase } from "./supabase"; // Import Supabase for server-side operations
 import { createClient } from '@supabase/supabase-js';
 import { users } from "@shared/schema"; // Import the users schema for database updates
 import { WebSocketServer, WebSocket } from 'ws';
 import { encryptMessage, decryptMessage, isEncrypted } from './encryption';
-import { generateSellerPreview } from './social-preview';
+import { generateSellerPreview, generateAuctionPreview, generateProductPreview } from './social-preview';
 import * as billplz from './billplz';
 import crypto from 'crypto';
 import { requireAuth, getUserFromToken, authRoutes, AuthenticatedRequest } from './app-auth';
@@ -1047,7 +1049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ws.send(JSON.stringify({
                   type: 'bidAccepted',
                   bid: bidWithDetails,
-                  message: `Your bid of $${parseFloat(amount).toFixed(2)} was accepted`
+                  message: `Your bid of RM${parseFloat(amount).toFixed(2)} was accepted`
                 }));
                 
                 console.log(`✅ Successfully completed bid process: User ${userId} placed bid of ${amount} on auction ${auctionId}`);
@@ -1481,8 +1483,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Middleware to detect social media crawlers and redirect to preview pages
+  app.use((req, res, next) => {
+    const userAgent = req.headers['user-agent'] || '';
+    const isSocialCrawler = /facebookexternalhit|WhatsApp|Twitterbot|LinkedInBot|Slackbot|Telegram|discord|Instagram|Facebot|Pinterest|Snapchat/i.test(userAgent);
+    
+    // Check if this is an auction page request from a social crawler
+    if (isSocialCrawler && req.path.match(/^\/auctions?\/(\d+)$/)) {
+      const auctionId = req.path.match(/^\/auctions?\/(\d+)$/)?.[1];
+      console.log(`[SOCIAL-REDIRECT] Detected social crawler for auction ${auctionId}, redirecting to preview`);
+      return res.redirect(`/social/auction/${auctionId}`);
+    }
+    
+    // Check if this is a product page request from a social crawler
+    if (isSocialCrawler && req.path.match(/^\/products\/(\d+)$/)) {
+      const productId = req.path.match(/^\/products\/(\d+)$/)?.[1];
+      console.log(`[SOCIAL-REDIRECT] Detected social crawler for product ${productId}, redirecting to preview`);
+      return res.redirect(`/social/product/${productId}`);
+    }
+    
+    // Check if this is a seller page request from a social crawler
+    if (isSocialCrawler && req.path.match(/^\/sellers\/(\d+)$/)) {
+      const sellerId = req.path.match(/^\/sellers\/(\d+)$/)?.[1];
+      console.log(`[SOCIAL-REDIRECT] Detected social crawler for seller ${sellerId}, redirecting to preview`);
+      return res.redirect(`/social/seller/${sellerId}`);
+    }
+    
+    next();
+  });
+
   // Social preview routes for better WhatsApp/Facebook sharing
   app.get("/social/seller/:id", generateSellerPreview);
+  app.get("/social/auction/:id", generateAuctionPreview);
+  app.get("/social/product/:id", generateProductPreview);
 
   // User profile update endpoint
   app.patch("/api/user/:id", async (req, res, next) => {
@@ -2596,17 +2629,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.auction) {
         const auctionData = req.body.auction;
         
+        // Convert numeric price fields to strings for decimal type
+        const convertedAuctionData = {
+          ...auctionData,
+          ...(auctionData.startingPrice !== undefined && { startingPrice: String(auctionData.startingPrice) }),
+          ...(auctionData.reservePrice !== undefined && { reservePrice: String(auctionData.reservePrice) }),
+          ...(auctionData.buyNowPrice !== undefined && { buyNowPrice: String(auctionData.buyNowPrice) }),
+          ...(auctionData.bidIncrement !== undefined && { bidIncrement: String(auctionData.bidIncrement) }),
+          ...(auctionData.currentBid !== undefined && { currentBid: String(auctionData.currentBid) })
+        };
+        
         // Only update certain fields if there are no bids yet
         if (auction.currentBid) {
           // If there are bids, only allow updating certain fields
           const safeAuctionData = {
-            buyNowPrice: auctionData.buyNowPrice,
+            buyNowPrice: convertedAuctionData.buyNowPrice,
             // Add other safe-to-update fields here
           };
           await storage.updateAuction(auctionId, safeAuctionData);
         } else {
           // If no bids yet, can update all fields
-          await storage.updateAuction(auctionId, auctionData);
+          await storage.updateAuction(auctionId, convertedAuctionData);
         }
       }
       
@@ -2999,8 +3042,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Delete the image from object storage
       if (image.imageUrl) {
-        await supabaseFileStorage.deleteFile(image.imageUrl);
-        console.log(`Deleted individual image ${image.imageUrl} from storage: ${deleteResult ? 'success' : 'failed'}`);
+        try {
+          await supabaseFileStorage.deleteFile(image.imageUrl);
+          console.log(`Successfully deleted image ${image.imageUrl} from storage`);
+        } catch (deleteError: any) {
+          console.error(`Failed to delete image ${image.imageUrl} from storage:`, deleteError.message);
+          // Continue with database deletion even if storage deletion fails
+        }
       }
       
       // Delete from database
@@ -3641,18 +3689,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (imageId.endsWith('.gif')) contentType = 'image/gif';
       if (imageId.endsWith('.webp')) contentType = 'image/webp';
 
-      // Get the image from Supabase Storage
-      const { buffer: imageBuffer, mimetype } = await supabaseFileStorage.downloadFile(imageId);
+      try {
+        // Try to get the image from Supabase Storage
+        const { buffer: imageBuffer, mimetype } = await supabaseFileStorage.downloadFile(imageId);
 
-      if (imageBuffer) {
-        console.log(`Image ${imageId} found - serving with content type ${mimetype || contentType}`);
-        // If we have the image, send it back with the appropriate content type
-        res.setHeader('Content-Type', mimetype || contentType);
-        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-        return res.send(imageBuffer);
+        if (imageBuffer) {
+          console.log(`Image ${imageId} found - serving with content type ${mimetype || contentType}`);
+          // If we have the image, send it back with the appropriate content type
+          res.setHeader('Content-Type', mimetype || contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+          return res.send(imageBuffer);
+        }
+      } catch (storageError: any) {
+        console.log(`Image ${imageId} not found in Supabase storage, checking legacy handler`);
+        
+        // If it's a legacy image ID, try the legacy handler
+        if (isLegacyImageId(imageId)) {
+          const legacyResult = await handleLegacyImage(imageId);
+          if (legacyResult) {
+            console.log(`Serving placeholder for legacy image ${imageId}`);
+            res.setHeader('Content-Type', legacyResult.mimetype);
+            res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+            return res.send(legacyResult.buffer);
+          }
+        }
       }
 
-      console.log(`Image ${imageId} not found in storage`);
+      console.log(`Image ${imageId} not found in storage or legacy handler`);
       // If we get here, the image was not found
       res.status(404).json({ message: 'Image not found' });
     } catch (error) {
@@ -3666,17 +3729,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, providerId, provider } = req.body;
 
-      if (!email || !providerId || !provider) {
-        return res.status(400).json({ message: 'Missing required OAuth information' });
+      console.log('📧 OAuth sync request:', { email, providerId, provider });
+
+      if (!providerId || !provider) {
+        return res.status(400).json({ 
+          message: 'Missing required OAuth information',
+          details: 'Provider ID and provider name are required'
+        });
+      }
+
+      // Email might be missing for some OAuth providers (like Facebook)
+      if (!email) {
+        console.error('❌ No email provided from OAuth provider:', provider);
+        return res.status(400).json({ 
+          message: 'Error getting user email from external provider',
+          details: 'Email permission may not have been granted. Please ensure you grant email access when logging in with Facebook.'
+        });
       }
 
       // First, check if we already have a user with this email
       let user = await storage.getUserByEmail(email);
 
       if (user) {
+        console.log('✅ Existing user found:', user.id);
         // User exists - return user data directly (Supabase handles sessions)
         return res.status(200).json({ user });
       } else {
+        console.log('🆕 Creating new user for email:', email);
         // User doesn't exist - create a new account
         // Generate a username from email
         const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
@@ -3688,6 +3767,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username = `${baseUsername}${counter}`;
           counter++;
         }
+
+        console.log('📝 Generated username:', username);
 
         // Create the user
         const newUser = await storage.createUser({
@@ -3702,6 +3783,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isAdmin: false,
           isBanned: false
         });
+
+        console.log('✅ New user created:', newUser.id);
 
         // Return new user data (Supabase handles sessions)
         return res.status(201).json({ user: newUser });
@@ -3765,7 +3848,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Log for debugging
-      console.log(`Created new product image record:`, productImage);
+      console.log(`[CREATE] Created new product image record:`, {
+        id: productImage.id,
+        productId: productImage.productId,
+        imageUrl: productImage.imageUrl,
+        sellerId: sellerId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Double-check the image was created by querying it back
+      const verifyImages = await storage.getProductImages(productId);
+      console.log(`[CREATE] Verification - Product ${productId} now has ${verifyImages.length} images`);
+      console.log(`[CREATE] Image IDs:`, verifyImages.map(img => img.id));
       
       res.status(200).json(productImage);
     } catch (error) {
@@ -3776,6 +3870,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Handle the /api/product-images/:id/upload endpoint for backward compatibility
   app.post("/api/product-images/:id/upload", imageUpload.single('image'), async (req, res, next) => {
     try {
+      console.log('=== Product Image Upload Request ===');
+      console.log('URL params:', req.params);
+      console.log('Body:', req.body);
+      console.log('File:', req.file ? { name: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype } : 'No file');
+      console.log('Headers:', req.headers);
+      console.log('Auth header present:', !!req.headers.authorization);
       // Check authentication
       let sellerId = 0;
       const user = await getAuthenticatedUser(req); if (user) {
@@ -3805,26 +3905,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Looking for product image with id ${imageId}`);
       
-      // Since we're having issues with the database method, use a direct approach
-      // Get the product images from all products
+      // Get the product image directly from database
       let foundProductImage = null;
-      const allProducts = await storage.getProducts();
-      for (const product of allProducts) {
-        if (product.images) {
-          for (const image of product.images) {
-            if (image.id === imageId) {
-              foundProductImage = image;
+      
+      console.log(`[UPLOAD] Step 1: Looking for image ID ${imageId} for seller ${sellerId}`);
+      
+      try {
+        // Method 1: Try direct query first (if we had a getProductImageById method)
+        console.log('[UPLOAD] Method 1: Attempting direct image lookup...');
+        // Note: This would be ideal but we don't have this method yet
+        
+        // Method 2: Get all products for seller and search their images
+        console.log('[UPLOAD] Method 2: Getting all products for seller...');
+        const allProducts = await storage.getProducts();
+        const sellerProducts = allProducts.filter(p => p.sellerId === sellerId);
+        console.log(`[UPLOAD] Found ${sellerProducts.length} products for seller ${sellerId}`);
+        console.log('[UPLOAD] Product IDs:', sellerProducts.map(p => p.id));
+        
+        for (const product of sellerProducts) {
+          console.log(`[UPLOAD] Checking product ${product.id} for images...`);
+          const images = await storage.getProductImages(product.id);
+          console.log(`[UPLOAD] Product ${product.id} has ${images.length} images:`, images.map(img => ({ id: img.id, url: img.imageUrl })));
+          
+          const image = images.find(img => img.id === imageId);
+          if (image) {
+            foundProductImage = image;
+            console.log(`[UPLOAD] Found image ${imageId} in product ${product.id}`);
+            break;
+          }
+        }
+        
+        if (!foundProductImage) {
+          // Method 3: Try getting ALL product images across ALL products (emergency fallback)
+          console.log('[UPLOAD] Method 3: Emergency fallback - checking ALL products...');
+          const allProducts = await storage.getProducts();
+          console.log(`[UPLOAD] Total products in system: ${allProducts.length}`);
+          
+          for (const product of allProducts) {
+            const images = await storage.getProductImages(product.id);
+            const image = images.find(img => img.id === imageId);
+            if (image) {
+              console.log(`[UPLOAD] Found image ${imageId} in product ${product.id} (seller: ${product.sellerId})`);
+              // Verify this product belongs to the seller
+              if (product.sellerId === sellerId) {
+                foundProductImage = image;
+                console.log('[UPLOAD] Image belongs to correct seller');
+              } else {
+                console.log(`[UPLOAD] WARNING: Image found but belongs to different seller (${product.sellerId} vs ${sellerId})`);
+              }
               break;
             }
           }
-          if (foundProductImage) break;
         }
+      } catch (error) {
+        console.error("[UPLOAD] Error finding product image:", error);
       }
       
-      console.log(`Found product image:`, foundProductImage);
+      console.log(`[UPLOAD] Final result - Found product image:`, foundProductImage);
       
       if (!foundProductImage) {
-        return res.status(404).json({ message: "Product image record not found" });
+        console.log(`[UPLOAD] ERROR: Image ${imageId} not found for seller ${sellerId}`);
+        console.log('[UPLOAD] Debugging info:', {
+          imageId,
+          sellerId,
+          timestamp: new Date().toISOString(),
+          method: req.method,
+          url: req.url
+        });
+        return res.status(404).json({ 
+          message: "Product image record not found",
+          debug: {
+            imageId,
+            sellerId,
+            searchedAt: new Date().toISOString()
+          }
+        });
       }
       
       // Verify the product belongs to the seller
@@ -3848,24 +4003,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Attempting to upload image to object storage with ID: ${imageUrl}`);
       console.log(`Image size: ${req.file.size} bytes, type: ${req.file.mimetype}`);
       
-      // Upload the file to storage (re-upload with same ID)
-      await supabaseFileStorage.uploadFile(
-        req.file.buffer,
-        IMAGE_TYPES.PRODUCT,
-        req.file.mimetype
-      );
-      
-      console.log(`File re-uploaded successfully`);
-      
-      // Return success response
-      res.status(200).json({
-        ...foundProductImage,
-        url: await supabaseFileStorage.getPublicUrl(imageUrl),
-        message: "Image uploaded successfully"
-      });
-    } catch (error) {
+      try {
+        // For legacy image IDs, create a new ID since they don't exist in Supabase
+        let uploadedFileId;
+        if (imageUrl.startsWith("image-id-")) {
+          // Generate new file ID for legacy images
+          uploadedFileId = await supabaseFileStorage.uploadFile(
+            req.file.buffer,
+            IMAGE_TYPES.PRODUCT,
+            req.file.mimetype
+          );
+          
+          // Update the product image record with the new ID
+          await storage.updateProductImage(foundProductImage.id, {
+            imageUrl: uploadedFileId
+          });
+        } else {
+          // Try to reuse existing ID for newer formats
+          uploadedFileId = await supabaseFileStorage.uploadFile(
+            req.file.buffer,
+            IMAGE_TYPES.PRODUCT,
+            req.file.mimetype,
+            imageUrl
+          );
+        }
+        
+        console.log(`File uploaded successfully with ID: ${uploadedFileId}`);
+        
+        // Get the public URL for the uploaded file
+        const publicUrl = await supabaseFileStorage.getPublicUrl(uploadedFileId);
+        
+        // Return success response
+        res.status(200).json({
+          ...foundProductImage,
+          imageUrl: uploadedFileId,
+          url: publicUrl,
+          message: "Image uploaded successfully"
+        });
+      } catch (uploadError: any) {
+        console.error("Failed to upload file:", uploadError);
+        throw uploadError;
+      }
+    } catch (error: any) {
       console.error("Error in upload handler:", error);
-      next(error);
+      console.error("Error stack:", error.stack);
+      
+      // Send a proper error response
+      res.status(500).json({ 
+        message: error.message || "Failed to upload image",
+        error: error.toString()
+      });
     }
   });
   
