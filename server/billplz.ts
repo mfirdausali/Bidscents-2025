@@ -69,7 +69,7 @@ export async function validateBillplzCredentials(): Promise<boolean> {
     console.log('🔍 Validating Billplz credentials...');
     
     // Test API access by fetching collections
-    const response = await fetch(`${BILLPLZ_BASE_URL}/v3/collections`, {
+    const response = await fetch(`${BILLPLZ_BASE_URL}/collections`, {
       headers: {
         'Authorization': createAuthHeader(),
         'Content-Type': 'application/json'
@@ -250,7 +250,7 @@ export async function createBill(params: {
   // But many issues can be resolved by using form-urlencoded, which is the
   // more traditional format for this API
   return billplzRequest(
-    '/v3/bills', 
+    '/bills', 
     'POST', 
     payload, 
     'application/x-www-form-urlencoded'
@@ -261,14 +261,14 @@ export async function createBill(params: {
  * Get bill details by ID
  */
 export async function getBill(billId: string): Promise<any> {
-  return billplzRequest(`/v3/bills/${billId}`);
+  return billplzRequest(`/bills/${billId}`);
 }
 
 /**
  * Delete a bill by ID
  */
 export async function deleteBill(billId: string): Promise<any> {
-  return billplzRequest(`/v3/bills/${billId}`, 'DELETE');
+  return billplzRequest(`/bills/${billId}`, 'DELETE');
 }
 
 /**
