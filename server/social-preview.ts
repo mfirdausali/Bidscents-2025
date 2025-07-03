@@ -137,11 +137,13 @@ export async function generateAuctionPreview(req: Request, res: Response) {
     console.log(`[AUCTION-PREVIEW] Product images found: ${productImages?.length || 0}`);
     
     if (productImages && productImages.length > 0) {
-      imageUrl = `${BASE_URL}/api/images/${productImages[0].imageUrl}`;
-      console.log(`[AUCTION-PREVIEW] Using product image: ${imageUrl}`);
+      // Add query parameter to request optimized image for social media
+      imageUrl = `${BASE_URL}/api/images/${productImages[0].imageUrl}?w=1200&h=630&q=80`;
+      console.log(`[AUCTION-PREVIEW] Using optimized product image: ${imageUrl}`);
     } else if (product.imageUrl) {
-      imageUrl = `${BASE_URL}/api/images/${product.imageUrl}`;
-      console.log(`[AUCTION-PREVIEW] Using main product image: ${imageUrl}`);
+      // Add query parameter to request optimized image for social media
+      imageUrl = `${BASE_URL}/api/images/${product.imageUrl}?w=1200&h=630&q=80`;
+      console.log(`[AUCTION-PREVIEW] Using optimized main product image: ${imageUrl}`);
     } else {
       console.log(`[AUCTION-PREVIEW] No images found, using default image`);
     }
@@ -268,11 +270,13 @@ export async function generateProductPreview(req: Request, res: Response) {
     console.log(`[PRODUCT-PREVIEW] Product images found: ${productImages?.length || 0}`);
     
     if (productImages && productImages.length > 0) {
-      imageUrl = `${BASE_URL}/api/images/${productImages[0].imageUrl}`;
-      console.log(`[PRODUCT-PREVIEW] Using product image: ${imageUrl}`);
+      // Add query parameter to request optimized image for social media
+      imageUrl = `${BASE_URL}/api/images/${productImages[0].imageUrl}?w=1200&h=630&q=80`;
+      console.log(`[PRODUCT-PREVIEW] Using optimized product image: ${imageUrl}`);
     } else if (product.imageUrl) {
-      imageUrl = `${BASE_URL}/api/images/${product.imageUrl}`;
-      console.log(`[PRODUCT-PREVIEW] Using main product image: ${imageUrl}`);
+      // Add query parameter to request optimized image for social media
+      imageUrl = `${BASE_URL}/api/images/${product.imageUrl}?w=1200&h=630&q=80`;
+      console.log(`[PRODUCT-PREVIEW] Using optimized main product image: ${imageUrl}`);
     } else {
       console.log(`[PRODUCT-PREVIEW] No images found, using default image`);
     }

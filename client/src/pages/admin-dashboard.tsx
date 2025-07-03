@@ -132,9 +132,9 @@ export default function AdminDashboard() {
   // Redirect if not admin
   useEffect(() => {
     if (user && !user.isAdmin) {
-      window.location.href = "/";
+      setLocation("/");
     }
-  }, [user]);
+  }, [user, setLocation]);
   
   // Handlers
   const handleBanUser = (user: User) => {

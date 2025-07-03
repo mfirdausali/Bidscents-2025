@@ -33,6 +33,7 @@ import { requireAuth, getUserFromToken, authRoutes, AuthenticatedRequest } from 
 import { authLimiter, passwordResetLimiter, apiLimiter, userLookupLimiter, adminLimiter } from './rate-limiter';
 import { auditLog, auditMiddleware, auditAuth, auditResource, auditSecurity, auditPayment, auditAdmin, auditFile, AuditEventType, AuditSeverity } from './audit-logger';
 import { logger } from './logger';
+import sharp from 'sharp';
 
 // Import boost error handling system
 import {
@@ -3683,6 +3684,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Attempting to retrieve image with ID: ${imageId}`);
 
+      // Check for optimization parameters
+      const width = req.query.w ? parseInt(req.query.w as string) : undefined;
+      const height = req.query.h ? parseInt(req.query.h as string) : undefined;
+      const quality = req.query.q ? parseInt(req.query.q as string) : 90;
+
       // Determine content type based on file extension or default to jpeg
       let contentType = 'image/jpeg';
       if (imageId.endsWith('.png')) contentType = 'image/png';
@@ -3695,7 +3701,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (imageBuffer) {
           console.log(`Image ${imageId} found - serving with content type ${mimetype || contentType}`);
-          // If we have the image, send it back with the appropriate content type
+          
+          // If optimization parameters are provided, process the image
+          if (width || height) {
+            console.log(`Optimizing image ${imageId} with w=${width}, h=${height}, q=${quality}`);
+            
+            try {
+              // Use sharp to resize and optimize the image
+              let sharpInstance = sharp(imageBuffer);
+              
+              // Apply resizing
+              if (width || height) {
+                sharpInstance = sharpInstance.resize(width, height, {
+                  fit: 'cover', // Ensures the image covers the entire area
+                  position: 'center' // Centers the image
+                });
+              }
+              
+              // Apply format-specific optimizations
+              if (contentType === 'image/jpeg' || !contentType.includes('png')) {
+                sharpInstance = sharpInstance.jpeg({ 
+                  quality: quality,
+                  progressive: true // Progressive JPEGs load better on slow connections
+                });
+                contentType = 'image/jpeg';
+              } else if (contentType === 'image/png') {
+                sharpInstance = sharpInstance.png({ 
+                  quality: quality,
+                  compressionLevel: 9
+                });
+              }
+              
+              const optimizedBuffer = await sharpInstance.toBuffer();
+              
+              // Set headers for optimized image
+              res.setHeader('Content-Type', contentType);
+              res.setHeader('Cache-Control', 'public, max-age=2592000'); // Cache for 30 days
+              res.setHeader('X-Image-Optimized', 'true');
+              return res.send(optimizedBuffer);
+              
+            } catch (optimizationError) {
+              console.error(`Error optimizing image ${imageId}:`, optimizationError);
+              // Fall back to original image if optimization fails
+            }
+          }
+          
+          // If no optimization needed or optimization failed, send original
           res.setHeader('Content-Type', mimetype || contentType);
           res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
           return res.send(imageBuffer);

@@ -19,6 +19,7 @@ type AuthContextType = {
   signOutMutation: UseMutationResult<void, Error, void>;
   resetPasswordMutation: UseMutationResult<void, Error, { email: string }>;
   signInWithFacebookMutation: UseMutationResult<any, Error, void>;
+  refetchUser: () => void;
 };
 
 type SignUpData = { 
@@ -419,6 +420,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOutMutation,
         resetPasswordMutation,
         signInWithFacebookMutation,
+        refetchUser,
       }}
     >
       {children}

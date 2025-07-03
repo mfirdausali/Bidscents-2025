@@ -22,6 +22,7 @@ export interface AuthenticatedRequest extends Request {
     email: string;
     supabaseId: string;
     isSeller?: boolean;
+    isAdmin?: boolean;
   };
 }
 
@@ -75,12 +76,13 @@ export async function verifySupabaseAuth(req: Request, res: Response, next: Next
 /**
  * Generate application-specific JWT
  */
-export function generateAppJWT(userId: number, email: string, supabaseId: string, isSeller?: boolean): string {
+export function generateAppJWT(userId: number, email: string, supabaseId: string, isSeller?: boolean, isAdmin?: boolean): string {
   const payload = {
     userId, 
     email, 
     supabaseId,
     isSeller: isSeller || false,
+    isAdmin: isAdmin || false,
     type: 'app_token',
     iat: Math.floor(Date.now() / 1000),
   };
@@ -122,6 +124,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
       email: decoded.email,
       supabaseId: decoded.supabaseId,
       isSeller: decoded.isSeller,
+      isAdmin: decoded.isAdmin,
     };
 
     next();
@@ -320,7 +323,7 @@ export const authRoutes = {
 
       console.log('🔄 Backend: Generating application JWT...');
       // Generate application JWT with seller status
-      const appToken = generateAppJWT(localUser.id, localUser.email, user.id, localUser.isSeller);
+      const appToken = generateAppJWT(localUser.id, localUser.email, user.id, localUser.isSeller, localUser.isAdmin);
 
       const response = {
         token: appToken,
@@ -331,6 +334,7 @@ export const authRoutes = {
           firstName: localUser.firstName,
           lastName: localUser.lastName,
           isSeller: localUser.isSeller,
+          isAdmin: localUser.isAdmin,
         }
       };
       
@@ -420,6 +424,7 @@ export const authRoutes = {
         coverPhoto: user.coverPhoto,
         isEmailVerified: user.isVerified,
         isSeller: user.isSeller,
+        isAdmin: user.isAdmin,
       });
     } catch (error) {
       console.error('Get user profile error:', error);
@@ -471,7 +476,7 @@ export const authRoutes = {
       if (localUser) {
         console.log('✅ Recovery: User profile already exists');
         // User exists, just return the profile
-        const appToken = generateAppJWT(localUser.id, localUser.email, user.id, localUser.isSeller);
+        const appToken = generateAppJWT(localUser.id, localUser.email, user.id, localUser.isSeller, localUser.isAdmin);
         
         return res.json({
           token: appToken,
@@ -482,6 +487,7 @@ export const authRoutes = {
             firstName: localUser.firstName,
             lastName: localUser.lastName,
             isSeller: localUser.isSeller,
+            isAdmin: localUser.isAdmin,
           },
           recovered: false
         });
@@ -524,7 +530,7 @@ export const authRoutes = {
       console.log('✅ Recovery: Successfully created user profile:', localUser.email);
 
       // Generate application JWT
-      const appToken = generateAppJWT(localUser.id, localUser.email, user.id, localUser.isSeller);
+      const appToken = generateAppJWT(localUser.id, localUser.email, user.id, localUser.isSeller, localUser.isAdmin);
 
       res.json({
         token: appToken,
@@ -535,6 +541,7 @@ export const authRoutes = {
           firstName: localUser.firstName,
           lastName: localUser.lastName,
           isSeller: localUser.isSeller,
+          isAdmin: localUser.isAdmin,
         },
         recovered: true
       });

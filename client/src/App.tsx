@@ -36,12 +36,16 @@ import BoostCheckoutPage from "@/pages/boost-checkout"; // Import boost checkout
 import BoostSuccessPage from "@/pages/boost-success"; // Import boost success page
 import BoostFailurePage from "@/pages/boost-failure"; // Import boost failure page
 import BoostPaymentResult from "@/pages/boost-payment-result"; // Import boost payment result page
-import { SecurityDashboard } from "@/pages/admin/security-dashboard"; // Import security dashboard
+import { SecurityDashboard } from "@/pages/admin/security-dashboard-full"; // Import full security dashboard
 // WebSocket interceptor is loaded above
 
-// Lazy load debug component only in development
+// Lazy load debug components only in development
 const FacebookAuthDebug = import.meta.env.DEV 
   ? React.lazy(() => import("@/components/debug/facebook-auth-debug").then(m => ({ default: m.FacebookAuthDebug })))
+  : null;
+
+const AdminStatusDebug = import.meta.env.DEV
+  ? React.lazy(() => import("@/components/debug/admin-status-debug").then(m => ({ default: m.AdminStatusDebug })))
   : null;
 
 function Router() {
@@ -97,6 +101,11 @@ function App() {
         <AuthProvider>
           <Router />
           <Toaster />
+          {import.meta.env.DEV && AdminStatusDebug && (
+            <Suspense fallback={null}>
+              <AdminStatusDebug />
+            </Suspense>
+          )}
         </AuthProvider>
       </AnalyticsProvider>
     </QueryClientProvider>

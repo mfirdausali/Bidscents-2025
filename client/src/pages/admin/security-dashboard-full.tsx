@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '../../lib/queryClient';
+import { apiRequest, getQueryFn } from '../../lib/queryClient';
+import { useAuth } from '../../hooks/use-supabase-auth';
+import { useLocation } from 'wouter';
+import { Header } from '../../components/ui/header';
 import { 
   Shield, 
   AlertTriangle, 
@@ -113,8 +116,17 @@ interface RateLimitStats {
 export function SecurityDashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [timeRange, setTimeRange] = useState('24h');
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // Redirect if not admin
+  useEffect(() => {
+    if (user && !user.isAdmin) {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
 
   // Calculate date range
   const getDateRange = () => {
@@ -144,8 +156,8 @@ export function SecurityDashboard() {
     queryKey: ['authMetrics', timeRange],
     queryFn: async () => {
       const { startDate, endDate } = getDateRange();
-      const response = await apiRequest(`/api/security/auth-metrics?startDate=${startDate}&endDate=${endDate}`);
-      return response;
+      const response = await apiRequest("GET", `/api/security/auth-metrics?startDate=${startDate}&endDate=${endDate}`);
+      return await response.json();
     },
     refetchInterval: autoRefresh ? 30000 : false
   });
@@ -164,10 +176,8 @@ export function SecurityDashboard() {
     queryKey: ['securityAlerts', timeRange],
     queryFn: async () => {
       const { startDate, endDate } = getDateRange();
-      const response = await api.get('/api/security/alerts', {
-        params: { startDate, endDate, limit: 50 }
-      });
-      return response.data;
+      const response = await apiRequest("GET", `/api/security/alerts?startDate=${startDate}&endDate=${endDate}&limit=50`);
+      return await response.json();
     },
     refetchInterval: autoRefresh ? 10000 : false
   });
@@ -176,10 +186,8 @@ export function SecurityDashboard() {
     queryKey: ['rateLimitStats', timeRange],
     queryFn: async () => {
       const { startDate, endDate } = getDateRange();
-      const response = await api.get('/api/security/rate-limits', {
-        params: { startDate, endDate }
-      });
-      return response.data;
+      const response = await apiRequest("GET", `/api/security/rate-limits?startDate=${startDate}&endDate=${endDate}`);
+      return await response.json();
     },
     refetchInterval: autoRefresh ? 60000 : false
   });
@@ -187,8 +195,8 @@ export function SecurityDashboard() {
   const { data: activeSessions } = useQuery({
     queryKey: ['activeSessions'],
     queryFn: async () => {
-      const response = await api.get('/api/security/sessions');
-      return response.data;
+      const response = await apiRequest("GET", `/api/security/sessions`);
+      return await response.json();
     },
     refetchInterval: autoRefresh ? 60000 : false
   });
@@ -196,8 +204,8 @@ export function SecurityDashboard() {
   const { data: suspiciousActivity } = useQuery({
     queryKey: ['suspiciousActivity'],
     queryFn: async () => {
-      const response = await api.get('/api/security/suspicious-activity');
-      return response.data;
+      const response = await apiRequest("GET", `/api/security/suspicious-activity`);
+      return await response.json();
     },
     refetchInterval: autoRefresh ? 30000 : false
   });
@@ -205,11 +213,11 @@ export function SecurityDashboard() {
   // Mutations
   const acknowledgeMutation = useMutation({
     mutationFn: async ({ alertId, notes }: { alertId: string; notes: string }) => {
-      const response = await api.post(`/api/security/alerts/${alertId}/acknowledge`, {
+      const response = await apiRequest("POST", `/api/security/alerts/${alertId}/acknowledge`, {
         acknowledgedBy: 'admin', // Should come from auth context
         notes
       });
-      return response.data;
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['securityAlerts'] });
@@ -348,9 +356,13 @@ export function SecurityDashboard() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      
+      <main className="flex-grow bg-gray-50">
+        <div className="container mx-auto px-6 py-8">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Security Dashboard</h1>
           <p className="text-muted-foreground">Monitor security events and system health</p>
@@ -752,7 +764,9 @@ export function SecurityDashboard() {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+          </Tabs>
+        </div>
+      </main>
     </div>
   );
 }
